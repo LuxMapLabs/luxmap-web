@@ -17,22 +17,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
-          cache-dependency-path: code/civicflow-desktop/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install Dependencies
-        run: |
-          cd code/civicflow-desktop
-          npm ci
+        run: npm ci
 
       - name: Build & Package Electron App
-        run: |
-          cd code/civicflow-desktop
-          npm run build
+        run: npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          # Token cần thiết để electron-builder ký số hoặc xuất bản nếu cấu hình
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Installer Artifact
@@ -40,7 +35,7 @@ jobs:
         with:
           name: CivicFlow-Windows-Setup
           path: |
-            code/civicflow-desktop/release/0.0.0/*.exe
-            code/civicflow-desktop/release/0.0.0/*.msi
+            release/0.0.0/*.exe
+            release/0.0.0/*.msi
           if-no-files-found: error
           retention-days: 7
