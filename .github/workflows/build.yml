@@ -40,14 +40,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Create GitHub Release (Only on main branch)
-        if: github.ref == 'refs/heads/main'
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: CivicFlow v0.0.${{ github.run_number }}
+          tag_name: v0.0.${{ github.run_number }}
+          name: CivicFlow Build v0.0.${{ github.run_number }}
           draft: false
-          prerelease: false
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
           files: |
             release/**/*.exe
             release/**/*.msi
