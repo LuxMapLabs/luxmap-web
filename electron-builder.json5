@@ -37,9 +37,13 @@
   },
   "nsis": {
     "oneClick": false,
-    "perMachine": false,
+    "perMachine": true,
     "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false
+  },
+  "msi": {
+    "oneClick": false,
+    "perMachine": true
   },
   "linux": {
     "target": [
