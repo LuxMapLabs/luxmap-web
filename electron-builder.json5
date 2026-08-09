@@ -25,12 +25,6 @@
         "arch": [
           "x64"
         ]
-      },
-      {
-        "target": "msi",
-        "arch": [
-          "x64"
-        ]
       }
     ],
     "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
@@ -40,10 +34,6 @@
     "perMachine": true,
     "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false
-  },
-  "msi": {
-    "oneClick": false,
-    "perMachine": true
   },
   "linux": {
     "target": [
