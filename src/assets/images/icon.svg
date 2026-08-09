@@ -1,0 +1,9 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Civic Flow</title>
+<desc>Chữ C ghép từ ba cung màu thể hiện ba chặng của quy trình xử lý, với một nút trung tâm.</desc>
+<rect x="0" y="0" width="512" height="512" rx="134" fill="#1F3864"/>
+<path d="M339 114 A 165 165 0 0 0 150 130" fill="none" stroke="#FFFFFF" stroke-width="55" stroke-linecap="round"/>
+<path d="M130 150 A 165 165 0 0 0 130 362" fill="none" stroke="#8FD9E8" stroke-width="55" stroke-linecap="round"/>
+<path d="M150 382 A 165 165 0 0 0 339 398" fill="none" stroke="#5FC4B0" stroke-width="55" stroke-linecap="round"/>
+<circle cx="268" cy="256" r="43" fill="#FFFFFF"/>
+</svg>

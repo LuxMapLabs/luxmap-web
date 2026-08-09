@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+
+/* Design tokens từ đặc tả CivicFlow */
+@theme {
+  --color-primary: #1f3864;
+  --color-secondary: #3e86c9;
+  --color-accent: #5fc4b0;
+  --color-info: #8fd9e8;
+  --color-warning: #e9a23b;
+  --color-danger: #d64545;
+  --color-surface: #f5f7fa;
+  --color-text-main: #1a1a1a;
+  --color-text-sub: #6b7280;
+}

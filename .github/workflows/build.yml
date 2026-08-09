@@ -1,0 +1,46 @@
+name: Build & Package Windows App
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: code/civicflow-desktop/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd code/civicflow-desktop
+          npm ci
+
+      - name: Build & Package Electron App
+        run: |
+          cd code/civicflow-desktop
+          npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          # Token cần thiết để electron-builder ký số hoặc xuất bản nếu cấu hình
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CivicFlow-Windows-Setup
+          path: |
+            code/civicflow-desktop/release/0.0.0/*.exe
+            code/civicflow-desktop/release/0.0.0/*.msi
+          if-no-files-found: error
+          retention-days: 7
