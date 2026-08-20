@@ -10,24 +10,45 @@ const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
 const typesDir = path.resolve(rootDir, 'src/types')
 
-const swaggerUrl = process.env.API_URL || 'http://localhost:5141/swagger/v1/swagger.json'
+// Tự động đọc file .env nếu có
+const envPath = path.resolve(rootDir, '.env')
+if (fs.existsSync(envPath)) {
+    const envLines = fs.readFileSync(envPath, 'utf-8').split('\n')
+    for (const line of envLines) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith('#')) continue
+        const [key, ...vals] = trimmed.split('=')
+        if (key && vals.length > 0) {
+            process.env[key.trim()] = vals.join('=').trim().replace(/^["']|["']$/g, '')
+        }
+    }
+}
+
+const baseUrl = process.env.VITE_API_URL || process.env.API_URL || 'http://localhost:5141'
+const swaggerUrl = baseUrl.endsWith('.json') ? baseUrl : `${baseUrl.replace(/\/$/, '')}/swagger/v1/swagger.json`
 
 console.log('🚀 [1/2] Đang lấy Swagger Schema từ: ' + swaggerUrl + '...')
 
 function fetchJson(url) {
     return new Promise((resolve, reject) => {
         const client = url.startsWith('https') ? https : http
-        client.get(url, { rejectUnauthorized: false }, (res) => {
+        const req = client.get(url, { rejectUnauthorized: false }, (res) => {
+            if (res.statusCode !== 200) {
+                return reject(new Error(`Server phản hồi mã lỗi HTTP ${res.statusCode}`))
+            }
             let data = ''
             res.on('data', (chunk) => (data += chunk))
             res.on('end', () => {
                 try {
                     resolve(JSON.parse(data))
                 } catch (e) {
-                    reject(e)
+                    reject(new Error(`Dữ liệu nhận được không phải là JSON hợp lệ: ${e.message}`))
                 }
             })
-        }).on('error', reject)
+        })
+        req.on('error', (err) => {
+            reject(new Error(`Không thể kết nối tới Backend tại ${url}. Hãy chắc chắn Backend đang chạy (bấm Ctrl + F5 trong Visual Studio)! (${err.message})`))
+        })
     })
 }
 
