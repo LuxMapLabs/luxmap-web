@@ -1,6 +1,6 @@
-# 📖 HƯỚNG DẪN PHÁT TRIỂN (DEVELOPER GUIDE)
+# 📖 HƯỚNG DẪN PHÁT TRIỂN (LUXMAP WEB APP DEVELOPER GUIDE)
 
-Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự án và lập trình các chức năng mới theo đúng chuẩn kiến trúc của CivicFlow Desktop App.
+Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự án và lập trình các chức năng mới theo chuẩn kiến trúc của **LuxMap Web App** (Web GIS Platform & SPA Dashboard).
 
 ---
 
@@ -13,7 +13,7 @@ Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự á
 ### Các bước bắt đầu:
 1. Di chuyển vào thư mục dự án:
    ```bash
-   cd .../civicflow-desktop
+   cd code/luxmap-web
    ```
 2. Cài đặt các thư viện phụ thuộc:
    ```bash
@@ -24,125 +24,61 @@ Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự á
    ```bash
    cp .env.example .env
    ```
-4. Chạy ứng dụng trong môi trường phát triển (Dev Mode):
-   - **Chạy bản App Desktop Electron (đầy đủ):**
-     ```bash
-     npm run dev
-     ```
-   - **Chạy bản Web-only (chỉ chạy Dev Server, khuyên dùng khi lập trình UI & debug Redux):**
-     ```bash
-     npm run dev:web
-     ```
-     *(Server chạy tại `http://localhost:5173`, giúp bạn mở trực tiếp trên Chrome để dùng extension Redux DevTools mượt mà).*
+4. Chạy ứng dụng trong môi trường phát triển (Dev Server):
+   ```bash
+   npm run dev
+   ```
+   *(Trình duyệt sẽ tự động mở tại `http://localhost:5173`).*
 
+5. Kiểm tra build production:
+   ```bash
+   npm run build
+   ```
 
 ---
 
 ## 🏗️ 2. Quy trình thêm một tính năng mới (Feature)
 
-Mỗi chức năng Redux (ví dụ: `auth`, `reports`) đều phải tuân thủ cấu trúc phẳng trong thư mục `src/feature/[tên-chức-năng]/`. Các giao diện trang hiển thị sẽ nằm độc lập trong thư mục `src/pages/[tên-trang]/`.
+Mỗi chức năng Redux (ví dụ: `auth`, `assets`, `faults`, `workOrders`) tuân thủ cấu trúc phẳng trong thư mục `src/feature/[tên-chức-năng]/`. Các giao diện trang hiển thị nằm độc lập trong thư mục `src/pages/[tên-trang]/`.
 
-Hãy thực hiện theo các bước sau để thêm tính năng mới:
-
-### Bước 1: Tạo thư mục chức năng mới
-Ví dụ bạn muốn tạo chức năng quản lý phản ánh (`reports`):
+### Cấu trúc chuẩn:
 ```text
-src/feature/reports/      # Thư mục logic Redux
-├── reportAPI.ts          # Các hàm gọi API tới backend (hậu tố API viết hoa)
-├── reportSaga.ts         # Saga quản lý tác vụ async (gọi API, side effects...)
-└── reportSlice.ts        # Slice quản lý state & actions bằng Redux Toolkit
+src/feature/assets/         # Thư mục logic Redux quản lý tài sản
+├── assetAPI.ts             # Các hàm gọi API tới backend
+├── assetSaga.ts            # Saga quản lý tác vụ async (gọi API, side effects)
+└── assetSlice.ts           # Slice quản lý state & actions bằng Redux Toolkit
 
-src/pages/reports/        # Thư mục chứa giao diện view riêng biệt
-├── components/           # Component dành riêng cho trang reports
-├── ReportQueuePage.tsx   # Trang danh sách hàng đợi tiếp nhận
-└── ReportDetailPage.tsx  # Trang chi tiết phản ánh
+src/pages/assets/           # Thư mục chứa giao diện view riêng biệt
+├── components/             # Component riêng cho trang assets (Modal, Table...)
+├── AssetMapPage.tsx        # Trang bản đồ tài sản GIS
+└── AssetRegisterPage.tsx   # Trang đăng ký / import tài sản CSV
 ```
 
-### Bước 2: Viết API trong `reportAPI.ts`
-Sử dụng `apiClient` từ `shared/lib/api.ts` hoặc axios trực tiếp để gọi API:
-```typescript
-import axios from 'axios'
-
-export const reportAPI = {
-  getReports: async (params?: any) => {
-    const response = await axios.get('/reports', { params })
-    return response.data
-  }
-}
-```
-
-### Bước 3: Định nghĩa State & Reducers trong `reportSlice.ts`
-Sử dụng `@reduxjs/toolkit` để tạo slice:
-```typescript
-import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-
-const reportSlice = createSlice({
-  name: 'reports',
-  initialState: { list: [], loading: false, error: null },
-  reducers: {
-    fetchReportsRequest: (state) => { state.loading = true },
-    fetchReportsSuccess: (state, action: PayloadAction<any>) => {
-      state.loading = false
-      state.list = action.payload
-    },
-    fetchReportsFailure: (state, action: PayloadAction<string>) => {
-      state.loading = false
-      state.error = action.payload
-    }
-  }
-})
-
-export const { fetchReportsRequest, fetchReportsSuccess, fetchReportsFailure } = reportSlice.actions
-export default reportSlice.reducer
-```
-
-### Bước 4: Xử lý Side Effects trong `reportSaga.ts`
-Sử dụng `redux-saga` để bắt action request, gọi API và trả về kết quả:
-```typescript
-import { call, put, takeLatest } from 'redux-saga/effects'
-import { reportAPI } from './reportAPI'
-import { fetchReportsRequest, fetchReportsSuccess, fetchReportsFailure } from './reportSlice'
-
-function* handleFetchReports() {
-  try {
-    const data = yield call(reportAPI.getReports)
-    yield put(fetchReportsSuccess(data))
-  } catch (error: any) {
-    yield put(fetchReportsFailure(error.message))
-  }
-}
-
-export function* reportSaga() {
-  yield takeLatest(fetchReportsRequest.type, handleFetchReports)
-}
-```
-
-### Bước 5: Đăng ký Slice và Saga vào Redux Store
-- Thêm reducer mới vào `src/redux/rootReducer.ts`
-- Thêm saga mới vào `src/redux/rootSaga.ts`
+### Các bước thực hiện:
+1. **Viết API**: Định nghĩa các endpoint trong `[feature]API.ts` sử dụng `apiClient` từ `src/config/apiClient.ts`.
+2. **Tạo Slice**: Tạo actions và reducers trong `[feature]Slice.ts`.
+3. **Tạo Saga**: Xử lý async side effects trong `[feature]Saga.ts` bằng `redux-saga/effects` (`call`, `put`, `takeLatest`).
+4. **Đăng ký vào Store**:
+   - Thêm reducer vào `src/redux/rootReducer.ts`
+   - Thêm saga vào `src/redux/rootSaga.ts`
+5. **Xây dựng UI Component & Page**: Kết nối với Redux Store qua `useSelector` và `useDispatch` trong thư mục `src/pages/`.
 
 ---
 
 ## 🎨 3. Thiết kế giao diện (UI/UX) với Tailwind v4
 
-- Hãy sử dụng các màu sắc chủ đạo được định nghĩa trong hệ thống màu của dự án (xem ở CSS `@theme` trong `src/index.css`):
-  - `bg-primary` / `text-primary` — Màu Navy chính của UBND.
-  - `bg-secondary` / `text-secondary` — Xanh dương cho link, icon.
-  - `bg-accent` — Xanh ngọc cho trạng thái đã xử lý xong.
-  - `bg-danger` — Đỏ cho trường hợp quá hạn hoặc nút xoá.
-- Đảm bảo thiết kế đáp ứng (Responsive) tốt trên màn hình máy tính từ `1366px` đến `2560px`.
+- Sử dụng các Design Tokens màu sắc chủ đạo được cấu hình trong `src/index.css`:
+  - `bg-primary` / `text-primary` (`#1f3864`) — Xanh Navy chủ đạo quản lý.
+  - `bg-secondary` / `text-secondary` (`#3e86c9`) — Xanh dương cho link, icon, button.
+  - `bg-accent` (`#5fc4b0`) — Xanh ngọc cho trạng thái đèn bình thường (Normal).
+  - `bg-warning` (`#e9a23b`) — Vàng cam cho trạng thái đèn mờ (Dim).
+  - `bg-danger` (`#d64545`) — Đỏ cho trạng thái đèn tắt/hỏng (Out) hoặc cảnh báo quá hạn SLA.
+  - `bg-surface` (`#f5f7fa`) — Màu nền xám nhạt dịu mắt cho trang Web.
+- Đảm bảo giao diện Responsive chuẩn trên màn hình máy tính từ `1366px` đến `2560px`.
 
-## 🔍 4. Hướng dẫn Debug Redux Store trong môi trường Dev
+---
 
-Do nhân Electron v30+ có lỗi tương thích khiến các tiện ích mở rộng của Chrome (như Redux DevTools) không thể nạp trực tiếp vào cửa sổ Electron Desktop, bạn hãy sử dụng Google Chrome để debug trực quan:
+## 🔍 4. Debug Redux Store & API Interceptor
 
-1. Khởi động dự án bằng chế độ web-only (không mở app desktop):
-   ```bash
-   npm run dev:web
-   ```
-2. Mở trình duyệt **Google Chrome** và truy cập: `http://localhost:5173`
-3. Nhấn **F12** và chọn tab **Redux** để sử dụng giao diện đồ họa theo dõi state, action và timeline mượt mà và trực quan nhất.
-
-
-
-
+- **Redux DevTools**: Dự án đã bật `devTools: true` trong `src/redux/store.ts`. Bạn chỉ cần mở trình duyệt Google Chrome, nhấn **F12** và chọn tab **Redux** để debug state, action timeline.
+- **Token Interceptor**: `apiClient.ts` tự động gắn `Authorization: Bearer <token>` vào mọi request và tự động refresh token khi gặp mã lỗi `401 Unauthorized`.
