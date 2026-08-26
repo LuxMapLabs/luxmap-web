@@ -27,7 +27,9 @@ apiClient.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        const isAuthRequest = originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/register')
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
             originalRequest._retry = true
 
             try {
@@ -36,11 +38,16 @@ apiClient.interceptors.response.use(
                     throw new Error('No refresh token available')
                 }
 
-                const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+                const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
                     refreshToken,
                 })
 
-                const { accessToken, newRefreshToken } = response.data
+                const authData = response.data?.data
+                if (!authData) {
+                    throw new Error('Invalid refresh response data')
+                }
+
+                const { accessToken, refreshToken: newRefreshToken } = authData
 
                 sessionStorage.setItem('accessToken', accessToken)
                 if (newRefreshToken) {
