@@ -37,14 +37,56 @@ Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự á
 
 ---
 
-## 🏗️ 2. Quy trình thêm một tính năng mới (Feature)
+## 🔄 2. Quy trình Tự động sinh TypeScript Types từ Backend (`npm run gen`)
+
+Mỗi khi Backend (BE) cập nhật code mới, thêm API hoặc sửa/xóa trường dữ liệu, Frontend chỉ cần gõ **1 lệnh ngắn duy nhất**:
+
+```bash
+npm run gen
+```
+
+### 🧠 Cơ chế tự động hóa thông minh:
+1. **Kết nối Swagger:** Tự động đọc Swagger Schema từ Backend (`http://localhost:5141/swagger/v1/swagger.json`).
+2. **Tự động bóc tách theo Module sau `/api/v1/`:**
+   - Endpoint `/api/v1/auth/*` ➔ Tự động sinh **`src/types/auth.ts`**
+   - Endpoint `/api/v1/Health/*` ➔ Tự động sinh **`src/types/health.ts`**
+   - Sau này có `/api/v1/poles/*` ➔ Tự động sinh **`src/types/poles.ts`**
+   - Sau này có `/api/v1/faults/*` ➔ Tự động sinh **`src/types/faults.ts`**
+   - Sau này có `/api/v1/work-orders/*` ➔ Tự động sinh **`src/types/workorders.ts`**
+3. **Phân loại `common.ts` thông minh:**
+   - Bất kỳ type nào dùng chung từ 2 module trở lên hoặc các cấu trúc lỗi/phân trang (`ApiError`, `PaginationMeta`, `UserDto`, `UserRole`) sẽ được tự động gom vào **`src/types/common.ts`**.
+   - Các file domain tự động đính kèm `import type { ... } from './common'` tương ứng.
+4. **Cập nhật Barrel Export:** Tự động cập nhật **`src/types/index.ts`** để export toàn bộ. Không sinh file thừa `api.d.ts`.
+
+### 💻 Cách sử dụng Types trong Code:
+Bạn có thể import trực tiếp từ `@/types` mà không cần nhớ vị trí file:
+```typescript
+import { 
+    LoginRequest, 
+    RegisterRequest, 
+    AuthResponse, 
+    UserDto, 
+    ApiError, 
+    PaginationMeta 
+} from '@/types'
+
+// Ví dụ hàm gọi API có gán Type chặt chẽ:
+export const loginApi = async (payload: LoginRequest): Promise<AuthResponse> => {
+    const response = await apiClient.post('/api/v1/auth/login', payload)
+    return response.data.data
+}
+```
+
+---
+
+## 🏗️ 3. Quy trình thêm một tính năng mới (Feature)
 
 Mỗi chức năng Redux (ví dụ: `auth`, `assets`, `faults`, `workOrders`) tuân thủ cấu trúc phẳng trong thư mục `src/feature/[tên-chức-năng]/`. Các giao diện trang hiển thị nằm độc lập trong thư mục `src/pages/[tên-trang]/`.
 
 ### Cấu trúc chuẩn:
 ```text
 src/feature/assets/         # Thư mục logic Redux quản lý tài sản
-├── assetAPI.ts             # Các hàm gọi API tới backend
+├── assetAPI.ts             # Các hàm gọi API tới backend (sử dụng apiClient)
 ├── assetSaga.ts            # Saga quản lý tác vụ async (gọi API, side effects)
 └── assetSlice.ts           # Slice quản lý state & actions bằng Redux Toolkit
 
@@ -65,7 +107,7 @@ src/pages/assets/           # Thư mục chứa giao diện view riêng biệt
 
 ---
 
-## 🎨 3. Thiết kế giao diện (UI/UX) với Tailwind v4
+## 🎨 4. Thiết kế giao diện (UI/UX) với Tailwind v4
 
 - Sử dụng các Design Tokens màu sắc chủ đạo được cấu hình trong `src/index.css`:
   - `bg-primary` / `text-primary` (`#1f3864`) — Xanh Navy chủ đạo quản lý.
@@ -78,7 +120,7 @@ src/pages/assets/           # Thư mục chứa giao diện view riêng biệt
 
 ---
 
-## 🔍 4. Debug Redux Store & API Interceptor
+## 🔍 5. Debug Redux Store & API Interceptor
 
 - **Redux DevTools**: Dự án đã bật `devTools: true` trong `src/redux/store.ts`. Bạn chỉ cần mở trình duyệt Google Chrome, nhấn **F12** và chọn tab **Redux** để debug state, action timeline.
 - **Token Interceptor**: `apiClient.ts` tự động gắn `Authorization: Bearer <token>` vào mọi request và tự động refresh token khi gặp mã lỗi `401 Unauthorized`.
