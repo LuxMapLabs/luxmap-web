@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+@source "./**/*.{ts,tsx}";
+@source "./pages/**/*.{ts,tsx}";
+
 /* Design tokens từ đặc tả CivicFlow */
 @theme {
   --color-primary: #1f3864;
@@ -11,4 +14,22 @@
   --color-surface: #f5f7fa;
   --color-text-main: #1a1a1a;
   --color-text-sub: #6b7280;
+}
+
+/* MapLibre Hover Tooltip Custom Style (Clean Light Mode & No width restriction) */
+.feeder-hover-tooltip {
+  max-width: none !important;
+  pointer-events: none !important;
+}
+
+.feeder-hover-tooltip .maplibregl-popup-content {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 10px !important;
+  max-width: none !important;
+}
+
+.feeder-hover-tooltip .maplibregl-popup-tip {
+  border-top-color: #ffffff !important;
 }

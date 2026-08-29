@@ -7,7 +7,7 @@ Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự á
 ## 🛠️ 1. Cấu hình môi trường & Chạy dự án
 
 ### Yêu cầu hệ thống:
-- **Node.js**: Phiên bản 18 trở lên (khuyên dùng v20 LTS).
+- **Node.js**: Phiên bản 18 trở lên (khuyên dùng **Node.js v20 LTS**).
 - **npm**: v9 trở lên.
 
 ### Các bước bắt đầu:
@@ -15,15 +15,21 @@ Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự á
    ```bash
    cd code/luxmap-web
    ```
-2. Cài đặt các thư viện phụ thuộc:
+2. Cài đặt các thư viện phụ thuộc bằng lệnh chuẩn:
    ```bash
-   npm install
+   npm ci
    ```
+   *(Hoặc `npm install` nếu đang khởi tạo dự án lần đầu).*
 3. Cấu hình biến môi trường:
-   Sao chép file `.env.example` thành `.env` tại thư mục gốc và thiết lập địa chỉ URL của Backend API:
+   Sao chép file `.env.example` thành `.env` tại thư mục gốc và thiết lập địa chỉ Host của Backend API:
    ```bash
    cp .env.example .env
    ```
+   *Ví dụ trong file `.env`:*
+   ```env
+   VITE_API_URL=http://localhost:5000
+   ```
+   *(Hệ thống `apiClient.ts` tự động gắn thêm `/api/v1` thành `http://localhost:5000/api/v1`).*
 4. Chạy ứng dụng trong môi trường phát triển (Dev Server):
    ```bash
    npm run dev
@@ -46,7 +52,7 @@ npm run gen
 ```
 
 ### 🧠 Cơ chế tự động hóa thông minh:
-1. **Kết nối Swagger:** Tự động đọc Swagger Schema từ Backend (`http://localhost:5141/swagger/v1/swagger.json`).
+1. **Kết nối Swagger:** Tự động đọc Swagger Schema từ Backend (`http://localhost:5141/swagger/v1/swagger.json` hoặc URL cấu hình).
 2. **Tự động bóc tách theo Module sau `/api/v1/`:**
    - Endpoint `/api/v1/auth/*` ➔ Tự động sinh **`src/types/auth.ts`**
    - Endpoint `/api/v1/Health/*` ➔ Tự động sinh **`src/types/health.ts`**
@@ -56,23 +62,17 @@ npm run gen
 3. **Phân loại `common.ts` thông minh:**
    - Bất kỳ type nào dùng chung từ 2 module trở lên hoặc các cấu trúc lỗi/phân trang (`ApiError`, `PaginationMeta`, `UserDto`, `UserRole`) sẽ được tự động gom vào **`src/types/common.ts`**.
    - Các file domain tự động đính kèm `import type { ... } from './common'` tương ứng.
-4. **Cập nhật Barrel Export:** Tự động cập nhật **`src/types/index.ts`** để export toàn bộ. Không sinh file thừa `api.d.ts`.
+4. **Cập nhật Barrel Export:** Tự động cập nhật **`src/types/index.ts`** để export toàn bộ.
 
-### 💻 Cách sử dụng Types trong Code:
-Bạn có thể import trực tiếp từ `@/types` mà không cần nhớ vị trí file:
+### 💻 Cách sử dụng Types & Gọi API trong Code:
+Bạn có thể import trực tiếp từ `@/types` và gọi qua `apiClient`:
 ```typescript
-import { 
-    LoginRequest, 
-    RegisterRequest, 
-    AuthResponse, 
-    UserDto, 
-    ApiError, 
-    PaginationMeta 
-} from '@/types'
+import apiClient from '@/config/apiClient'
+import type { LoginRequest, AuthResponse } from '@/types'
 
-// Ví dụ hàm gọi API có gán Type chặt chẽ:
+// Ví dụ hàm gọi API (Base URL đã có sẵn /api/v1):
 export const loginApi = async (payload: LoginRequest): Promise<AuthResponse> => {
-    const response = await apiClient.post('/api/v1/auth/login', payload)
+    const response = await apiClient.post('/auth/login', payload)
     return response.data.data
 }
 ```
@@ -85,25 +85,19 @@ Mỗi chức năng Redux (ví dụ: `auth`, `assets`, `faults`, `workOrders`) tu
 
 ### Cấu trúc chuẩn:
 ```text
-src/feature/assets/         # Thư mục logic Redux quản lý tài sản
-├── assetAPI.ts             # Các hàm gọi API tới backend (sử dụng apiClient)
-├── assetSaga.ts            # Saga quản lý tác vụ async (gọi API, side effects)
-└── assetSlice.ts           # Slice quản lý state & actions bằng Redux Toolkit
-
-src/pages/assets/           # Thư mục chứa giao diện view riêng biệt
-├── components/             # Component riêng cho trang assets (Modal, Table...)
-├── AssetMapPage.tsx        # Trang bản đồ tài sản GIS
-└── AssetRegisterPage.tsx   # Trang đăng ký / import tài sản CSV
+src/
+├── config/
+│   └── apiClient.ts        # Axios Client cấu hình tự động Base URL (/api/v1) & Token Interceptors
+├── feature/assets/         # Thư mục logic Redux quản lý tài sản
+│   ├── assetAPI.ts         # Các hàm gọi API tới backend (sử dụng apiClient)
+│   ├── assetSaga.ts        # Saga quản lý tác vụ async (gọi API, side effects)
+│   └── assetSlice.ts       # Slice quản lý state & actions bằng Redux Toolkit
+├── pages/assets/           # Thư mục chứa giao diện view riêng biệt
+│   ├── components/         # Component riêng cho trang assets (Modal, Table...)
+│   ├── AssetMapPage.tsx    # Trang bản đồ tài sản GIS
+│   └── AssetRegisterPage.tsx # Trang đăng ký / import tài sản CSV
+└── components/common/      # Các component dùng chung chính thức của dự án
 ```
-
-### Các bước thực hiện:
-1. **Viết API**: Định nghĩa các endpoint trong `[feature]API.ts` sử dụng `apiClient` từ `src/config/apiClient.ts`.
-2. **Tạo Slice**: Tạo actions và reducers trong `[feature]Slice.ts`.
-3. **Tạo Saga**: Xử lý async side effects trong `[feature]Saga.ts` bằng `redux-saga/effects` (`call`, `put`, `takeLatest`).
-4. **Đăng ký vào Store**:
-   - Thêm reducer vào `src/redux/rootReducer.ts`
-   - Thêm saga vào `src/redux/rootSaga.ts`
-5. **Xây dựng UI Component & Page**: Kết nối với Redux Store qua `useSelector` và `useDispatch` trong thư mục `src/pages/`.
 
 ---
 
