@@ -1,6 +1,6 @@
 # 📖 HƯỚNG DẪN PHÁT TRIỂN (LUXMAP WEB APP DEVELOPER GUIDE)
 
-Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự án và lập trình các chức năng mới theo chuẩn kiến trúc của **LuxMap Web App** (Web GIS Platform & SPA Dashboard).
+Tài liệu này hướng dẫn cách cấu hình môi trường, chạy dự án, sinh Types từ Backend, quản lý Form & Validation và sử dụng bộ UI Components dùng chung theo chuẩn kiến trúc của **LuxMap Web App** (Web GIS Platform & SPA Dashboard).
 
 ---
 
@@ -79,42 +79,192 @@ export const loginApi = async (payload: LoginRequest): Promise<AuthResponse> => 
 
 ---
 
-## 🏗️ 3. Quy trình thêm một tính năng mới (Feature)
+## 🛡️ 3. Quản lý Form & Xác thực dữ liệu với React Hook Form & Zod (`src/validations/`)
 
-Mỗi chức năng Redux (ví dụ: `auth`, `assets`, `faults`, `workOrders`) tuân thủ cấu trúc phẳng trong thư mục `src/feature/[tên-chức-năng]/`. Các giao diện trang hiển thị nằm độc lập trong thư mục `src/pages/[tên-trang]/`.
+Toàn bộ hệ thống Form trong dự án tuân thủ tiêu chuẩn **100% Type-Safe**, kế thừa trực tiếp từ các kiểu dữ liệu tự động sinh trong `src/types/`.
 
-### Cấu trúc chuẩn:
-```text
-src/
-├── config/
-│   └── apiClient.ts        # Axios Client cấu hình tự động Base URL (/api/v1) & Token Interceptors
-├── feature/assets/         # Thư mục logic Redux quản lý tài sản
-│   ├── assetAPI.ts         # Các hàm gọi API tới backend (sử dụng apiClient)
-│   ├── assetSaga.ts        # Saga quản lý tác vụ async (gọi API, side effects)
-│   └── assetSlice.ts       # Slice quản lý state & actions bằng Redux Toolkit
-├── pages/assets/           # Thư mục chứa giao diện view riêng biệt
-│   ├── components/         # Component riêng cho trang assets (Modal, Table...)
-│   ├── AssetMapPage.tsx    # Trang bản đồ tài sản GIS
-│   └── AssetRegisterPage.tsx # Trang đăng ký / import tài sản CSV
-└── components/common/      # Các component dùng chung chính thức của dự án
+### 📌 Nguyên tắc cốt lõi:
+1. **Schema bắt buộc đi từ Type:** Khi viết schema Zod mới, luôn sử dụng cú pháp `satisfies z.ZodType<YourRequestType>` để TypeScript báo lỗi đỏ ngay nếu schema không khớp với Type từ Backend.
+2. **Quy ước đặt tên file:** `src/validations/[module].schema.ts` (ví dụ: `auth.schema.ts`, `pole.schema.ts`).
+3. **Regex chuẩn hóa:** Sử dụng `PHONE_REGEX` định dạng 10 số di động Việt Nam (`03, 05, 07, 08, 09`).
+
+### 📝 Ví dụ định nghĩa Schema (`src/validations/auth.schema.ts`):
+```typescript
+import { z } from 'zod'
+import type { LoginRequest } from '../types/auth'
+
+export const loginSchema = z.object({
+  emailOrPhone: z
+    .string()
+    .min(1, 'Vui lòng nhập Email hoặc Số điện thoại')
+    .trim(),
+  password: z
+    .string()
+    .min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
+}) satisfies z.ZodType<LoginRequest>
+
+export type LoginFormData = z.infer<typeof loginSchema>
+```
+
+### 💻 Cách sử dụng trong React Component:
+```tsx
+import React from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { loginSchema, LoginFormData } from '@/validations'
+import { Input, Button, showToast } from '@/components/common'
+
+export const LoginForm: React.FC = () => {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  })
+
+  const onSubmit = async (data: LoginFormData) => {
+    try {
+      // Gọi API đăng nhập
+      showToast.success('Đăng nhập thành công!')
+    } catch (err) {
+      showToast.error('Đăng nhập thất bại!')
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Input
+        label="Tài khoản (*)"
+        placeholder="admin@civicflow.vn hoặc 0901234567"
+        error={errors.emailOrPhone?.message}
+        {...register('emailOrPhone')}
+      />
+
+      <Input
+        label="Mật khẩu (*)"
+        type="password"
+        placeholder="Nhập mật khẩu"
+        error={errors.password?.message}
+        {...register('password')}
+      />
+
+      <Button type="submit" variant="primary" loading={isSubmitting} fullWidth>
+        Đăng Nhập
+      </Button>
+    </form>
+  )
+}
 ```
 
 ---
 
-## 🎨 4. Thiết kế giao diện (UI/UX) với Tailwind v4
+## 🎨 4. Bộ UI Components Dùng Chung (Design System)
 
-- Sử dụng các Design Tokens màu sắc chủ đạo được cấu hình trong `src/index.css`:
-  - `bg-primary` / `text-primary` (`#1f3864`) — Xanh Navy chủ đạo quản lý.
-  - `bg-secondary` / `text-secondary` (`#3e86c9`) — Xanh dương cho link, icon, button.
-  - `bg-accent` (`#5fc4b0`) — Xanh ngọc cho trạng thái đèn bình thường (Normal).
-  - `bg-warning` (`#e9a23b`) — Vàng cam cho trạng thái đèn mờ (Dim).
-  - `bg-danger` (`#d64545`) — Đỏ cho trạng thái đèn tắt/hỏng (Out) hoặc cảnh báo quá hạn SLA.
-  - `bg-surface` (`#f5f7fa`) — Màu nền xám nhạt dịu mắt cho trang Web.
-- Đảm bảo giao diện Responsive chuẩn trên màn hình máy tính từ `1366px` đến `2560px`.
+Tất cả các components dùng chung được đặt tại **`src/components/common/`** và export qua master index:
+
+```typescript
+import {
+  Button,
+  Input,
+  SearchInput,
+  StatusBadge,
+  StatCard,
+  Modal,
+  Drawer,
+  DatePicker,
+  DateRangePicker,
+  showToast,
+} from '@/components/common'
+```
+
+### 📋 Danh sách Components & Cách Dùng:
+
+1. **`Button`**:
+   - `variant`: `'primary' | 'secondary' | 'success' | 'danger' | 'outline' | 'ghost'`
+   - `size`: `'sm' | 'md' | 'lg'`
+   - `loading`: `true | false` (tự động hiện spinner và disable click)
+   - `leftIcon` / `rightIcon`: Chèn Lucide icon linh hoạt.
+
+2. **`Input` & `SearchInput`**:
+   - Hỗ trợ `forwardRef` tương thích 100% với `react-hook-form`.
+   - `label`, `helperText`, `error` (tự động đổi viền đỏ và hiện message báo lỗi).
+   - `SearchInput`: Ô tìm kiếm nhanh kèm nút `X` xóa tức thì.
+
+3. **`StatusBadge`**:
+   - `type="fixture"`: Trạng thái bóng đèn (`normal`, `dim`, `out`, `unknown`).
+   - `type="order"`: Trạng thái lệnh sửa chữa (`draft`, `assigned`, `in_progress`, `completed`, `cancelled`).
+   - `type="sla"`: Tiến độ SLA (`ontime`, `warning`, `overdue`).
+
+4. **`StatCard`**:
+   - Thẻ hiển thị chỉ số KPI tổng quan, có biểu tượng màu sắc và xu hướng tăng/giảm (`trend`).
+
+5. **`Modal` & `Drawer`**:
+   - `Modal`: Hộp thoại popup xác nhận thao tác (Duyệt ngân sách, Xóa dữ liệu).
+   - `Drawer`: Ngăn kéo trượt từ cạnh phải màn hình xem chi tiết cột đèn GIS.
+
+6. **`DatePicker` & `DateRangePicker`**:
+   - Chọn 1 ngày hoặc chọn khoảng thời gian.
+   - Hỗ trợ `minDate` (khóa các ngày trước đó), `maxDate` (khóa các ngày sau đó).
+   - Dropdown chọn nhanh Tháng & Năm với thanh cuộn siêu mảnh (`5px`).
+   - Tự động đóng CHỈ KHI click ra ngoài.
+
+7. **`showToast` (Sonner Wrapper)**:
+   - `showToast.success('Tiêu đề', 'Mô tả chi tiết')`
+   - `showToast.error(...)`, `showToast.warning(...)`, `showToast.info(...)`
+   - `showToast.promise(asyncFunc, { loading: '...', success: '...', error: '...' })`
 
 ---
 
-## 🔍 5. Debug Redux Store & API Interceptor
+## 📅 5. Tiện ích Xử lý Thời gian (`src/utils/dateUtils.ts`)
 
-- **Redux DevTools**: Dự án đã bật `devTools: true` trong `src/redux/store.ts`. Bạn chỉ cần mở trình duyệt Google Chrome, nhấn **F12** và chọn tab **Redux** để debug state, action timeline.
+- **`startOfDay(d)`**: Đưa thời gian về `00:00:00.000` triệt tiêu hoàn toàn sai lệch múi giờ.
+- **`formatDate(d)`**: Định dạng ngày tháng chuẩn Việt Nam `DD/MM/YYYY`.
+- **`formatDateRange(start, end)`**: Định dạng khoảng ngày `DD/MM/YYYY - DD/MM/YYYY`.
+- **`isDateDisabled(d, minDate, maxDate)`**: Kiểm tra ngày có bị khóa hay không.
+- **`getDateRangePresets()`**: Danh sách 4 phím tắt chọn nhanh (`Hôm nay`, `Hôm qua`, `7 ngày qua`, `30 ngày qua`).
+
+---
+
+## 📋 6. Hệ thống Enums Chuẩn Hóa (`src/constants/enums.ts`)
+
+Khóa cứng và đồng bộ 100% theo **API Contract v1.1** & **Backend C# Identity (`UserRole.cs`)**:
+
+- **`UserRole`**: `CITIZEN = 0`, `OFFICER = 1`, `LEADER = 2`, `ADMIN = 3`.
+- **`FixtureStatus`**: `NORMAL = 'normal'`, `DIM = 'dim'`, `OUT = 'out'`, `UNKNOWN = 'unknown'`.
+- **`FaultType`**: `LAMP_OUT`, `LAMP_DIM`, `SEGMENT_OUTAGE`, `NODE_OFFLINE`, `RUNTIME_DECLINE`.
+- **`FaultStatus`**: `DETECTED`, `CONFIRMED`, `REJECTED`, `IN_PROGRESS`, `RESOLVED`, `VERIFIED`.
+- **`WorkOrderStatus`**: `OPEN`, `ASSIGNED`, `IN_PROGRESS`, `DONE`, `VERIFIED`, `CANCELLED`.
+- **Bổ sung**: `FixtureType`, `PowerSource`, `Severity`, `SourceChannel`, `DataSource`, `NodeRole`, `NodeStatus`, `RoadClass`.
+
+---
+
+## 🏗️ 7. Quy trình thêm một tính năng mới (Feature)
+
+Mỗi chức năng Redux tuân thủ cấu trúc phẳng trong thư mục `src/feature/[tên-chức-năng]/`. Các giao diện trang hiển thị nằm độc lập trong thư mục `src/pages/[tên-trang]/`.
+
+### Cấu trúc chuẩn:
+```text
+src/
+├── config/                 # Axios Client & Interceptors
+├── constants/              # Enums chuẩn hóa toàn hệ thống
+├── types/                  # TypeScript Types tự động sinh từ Swagger
+├── utils/                  # Tiện ích dùng chung (dateUtils.ts...)
+├── validations/            # Zod Validation Schemas (100% Type-Safe)
+├── components/common/      # UI Components dùng chung (Button, Input, DatePicker...)
+├── feature/assets/         # Thư mục logic Redux quản lý tài sản
+│   ├── assetAPI.ts         # Gọi API tới backend
+│   ├── assetSaga.ts        # Saga quản lý side effects
+│   └── assetSlice.ts       # Slice quản lý state
+└── pages/assets/           # Thư mục chứa giao diện view riêng biệt
+    ├── components/         # Component riêng cho trang assets
+    ├── AssetMapPage.tsx    # Trang bản đồ tài sản GIS
+    └── AssetRegisterPage.tsx
+```
+
+---
+
+## 🔍 8. Debug Redux Store & API Interceptor
+
+- **Redux DevTools**: Dự án đã bật `devTools: true` trong `src/redux/store.ts`. Mở F12 chọn tab **Redux** để debug state timeline.
 - **Token Interceptor**: `apiClient.ts` tự động gắn `Authorization: Bearer <token>` vào mọi request và tự động refresh token khi gặp mã lỗi `401 Unauthorized`.
