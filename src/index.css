@@ -58,3 +58,56 @@
   scrollbar-color: #cbd5e1 transparent;
 }
 
+/* MapLibre Geolocate Control Button Animations */
+
+.maplibregl-ctrl-geolocate {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.maplibregl-ctrl-geolocate:hover {
+  transform: scale(1.12) !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3) !important;
+  z-index: 10 !important;
+}
+
+.maplibregl-ctrl-geolocate:active {
+  transform: scale(0.92) !important;
+}
+
+/* Trong lúc đang dò tìm GPS & bay tới vị trí: Icon xoay tròn quét Radar + Viền hào quang tỏa sáng */
+.maplibregl-ctrl-geolocate.is-searching-location,
+.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-waiting {
+  background-color: #eff6ff !important;
+  animation: geolocate-btn-glow 0.8s infinite alternate ease-in-out !important;
+}
+
+.maplibregl-ctrl-geolocate.is-searching-location .maplibregl-ctrl-icon,
+.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-waiting .maplibregl-ctrl-icon {
+  animation: geolocate-btn-spin 0.75s linear infinite !important;
+  filter: invert(33%) sepia(90%) saturate(2400%) hue-rotate(205deg) brightness(95%) contrast(105%) !important;
+  transform-origin: center center !important;
+}
+
+/* Khi đã định vị thành công */
+.maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active {
+  background-color: #eff6ff !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.45), 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+}
+
+@keyframes geolocate-btn-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes geolocate-btn-glow {
+  0% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 0 8px rgba(59, 130, 246, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.55), 0 0 22px rgba(59, 130, 246, 0.6);
+  }
+}
+
+

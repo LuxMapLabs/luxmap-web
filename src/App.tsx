@@ -1,29 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
+import { DefaultLayout } from './layout/DefaultLayout'
+import { GisMapPage } from './pages/gis-map/GisMapPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
-
-function HomePage() {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-surface font-sans p-6">
-      <div className="rounded-2xl bg-white p-8 shadow-lg max-w-lg w-full text-center border border-gray-100 space-y-4">
-        <h1 className="text-2xl font-bold text-primary mb-2">
-          LuxMap Web GIS Platform
-        </h1>
-        <p className="text-sm text-text-sub">
-          Hệ thống bản đồ số GIS quản lý tài sản và sự cố chiếu sáng đường giao thông nông thôn
-        </p>
-        <div className="flex justify-center gap-3">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-            Web SPA Active
-          </span>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-            React 18 + Vite
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function App() {
   return (
@@ -32,8 +11,11 @@ function App() {
       <Toaster richColors position="top-right" />
 
       <Routes>
-        {/* Default route "/" */}
-        <Route path="/" element={<HomePage />} />
+        {/* Main Application Routes inside DefaultLayout */}
+        <Route element={<DefaultLayout />}>
+          <Route path="/" element={<Navigate to="/gis-map" replace />} />
+          <Route path="/gis-map" element={<GisMapPage />} />
+        </Route>
 
         {/* 404 Not Found Page for all invalid / undefined URLs */}
         <Route path="*" element={<NotFoundPage />} />
@@ -43,3 +25,4 @@ function App() {
 }
 
 export default App
+

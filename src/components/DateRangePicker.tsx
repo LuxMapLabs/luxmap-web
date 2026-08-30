@@ -17,7 +17,7 @@ import {
   startOfDay,
   WEEKDAYS_VN,
   MONTHS_VN,
-} from '../../../utils/dateUtils'
+} from '../utils/dateUtils'
 
 export interface DateRangePickerProps {
   value?: DateRange
@@ -424,4 +424,3 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   )
 }
 
-export default DateRangePicker
