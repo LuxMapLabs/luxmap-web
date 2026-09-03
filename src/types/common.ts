@@ -31,7 +31,7 @@ export interface UserDto {
 export type UserRole = 0 | 1 | 2 | 3
 
 export interface ObjectApiResponse {
-    data?: any
+    data?: unknown
     error?: ApiError
     pagination?: PaginationMeta
 }
