@@ -6,8 +6,9 @@ import { RootState } from './redux/rootReducer'
 import { checkAuth, logout } from './feature/auth/authSlice'
 import LoginPage from './pages/login/LoginPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
-import { LogOut, User as UserIcon, Shield, MapPin, Loader2 } from 'lucide-react'
+import { LogOut, User as UserIcon, Shield, MapPin, Loader2, KeyRound, CheckCircle2 } from 'lucide-react'
 import { UserRole } from './types/auth'
+import { getRefreshToken } from './config/apiClient'
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -69,14 +70,17 @@ const Dashboard: React.FC = () => {
               GIS Platform
             </span>
           </div>
-          
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center space-x-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:text-danger hover:border-danger/30 hover:bg-red-50/30 transition-all duration-200 cursor-pointer"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Đăng xuất</span>
-          </button>
+
+          <div className="flex items-center space-x-3">
+            {/* Nút Đăng xuất */}
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center space-x-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:text-danger hover:border-danger/30 hover:bg-red-50/30 transition-all duration-200 cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Đăng xuất</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -104,24 +108,43 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="mt-8 space-y-4">
-            <h3 className="text-lg font-bold text-gray-800">Thông tin xác thực & Phiên làm việc</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-800">Thông tin xác thực & Phiên làm việc</h3>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                Phiên làm việc hợp lệ
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 bg-surface rounded-xl border border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase">Access Token</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase flex items-center">
+                  <KeyRound className="h-3.5 w-3.5 mr-1 text-primary" />
+                  Access Token (SessionStorage)
+                </p>
                 <p className="text-xs font-mono text-gray-700 truncate mt-1">
                   {sessionStorage.getItem('accessToken') || 'Không tìm thấy'}
                 </p>
               </div>
+
               <div className="p-4 bg-surface rounded-xl border border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase">Trạng thái Xác thực</p>
-                <p className="text-xs font-medium text-emerald-600 truncate mt-1">
-                  Đã đăng nhập thành công
+                <p className="text-xs font-semibold text-gray-400 uppercase flex items-center">
+                  <Shield className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                  Refresh Token (RAM In-Memory)
+                </p>
+                <p className="text-xs font-medium text-emerald-700 truncate mt-1">
+                  {getRefreshToken() ? '●●●●●●●● (Đang lưu an toàn trong RAM)' : 'Không tìm thấy'}
                 </p>
               </div>
             </div>
-            
-            <div className="rounded-xl bg-blue-50 p-4 border border-blue-100 text-sm text-blue-800 leading-relaxed">
-              <strong>🎉 Xác thực thành công!</strong> Đây là trang chính của LuxMap sau khi đăng nhập. Token của bạn được lưu trong <code>sessionStorage</code> và đính kèm tự động vào mỗi API gửi đi. Cơ chế làm mới token tự động (Token Rotation) sẽ chạy ngầm khi Access Token hết hạn.
+
+            <div className="rounded-xl bg-blue-50 p-4 border border-blue-100 text-sm text-blue-800 leading-relaxed space-y-2">
+              <p>
+                <strong>🎉 Xác thực thành công!</strong> Token của bạn được lưu trong <code>sessionStorage</code> và đính kèm tự động vào mỗi API gửi đi.
+              </p>
+              <p className="text-xs text-blue-700">
+                🛡️ <strong>Bảo mật:</strong> <code>refreshToken</code> được giữ riêng trong bộ nhớ RAM của ứng dụng (không nằm trong <code>sessionStorage</code> hay <code>localStorage</code>) để chống rò rỉ token qua tấn công XSS.
+              </p>
             </div>
           </div>
         </div>
