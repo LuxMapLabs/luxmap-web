@@ -35,14 +35,5 @@ desktop.ini
 .env.*
 !.env.example
 
-# Electron build outputs
-release/
-dist-electron/
 
-# VS Code Local History
-.history/
-
-# Root level installers (keep actual packaged builds in release/)
-/*.exe
-/*.msi
 

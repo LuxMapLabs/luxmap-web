@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { RootState } from './redux/rootReducer'
 import { checkAuth, logout } from './feature/auth/authSlice'
 import LoginPage from './pages/login/LoginPage'
+import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { LogOut, User as UserIcon, Shield, MapPin, Loader2 } from 'lucide-react'
 import { UserRole } from './types/auth'
 
@@ -71,7 +72,7 @@ const Dashboard: React.FC = () => {
           
           <button
             onClick={handleLogout}
-            className="inline-flex items-center space-x-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:text-danger hover:border-danger/30 hover:bg-red-50/30 transition-all duration-200"
+            className="inline-flex items-center space-x-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:text-danger hover:border-danger/30 hover:bg-red-50/30 transition-all duration-200 cursor-pointer"
           >
             <LogOut className="h-4 w-4" />
             <span>Đăng xuất</span>
@@ -112,9 +113,9 @@ const Dashboard: React.FC = () => {
                 </p>
               </div>
               <div className="p-4 bg-surface rounded-xl border border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase">Refresh Token</p>
-                <p className="text-xs font-mono text-gray-700 truncate mt-1">
-                  {sessionStorage.getItem('refreshToken') || 'Không tìm thấy'}
+                <p className="text-xs font-semibold text-gray-400 uppercase">Trạng thái Xác thực</p>
+                <p className="text-xs font-medium text-emerald-600 truncate mt-1">
+                  Đã đăng nhập thành công
                 </p>
               </div>
             </div>
@@ -129,6 +130,29 @@ const Dashboard: React.FC = () => {
   )
 }
 
+function HomePage() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-surface font-sans p-6">
+      <div className="rounded-2xl bg-white p-8 shadow-lg max-w-lg w-full text-center border border-gray-100 space-y-4">
+        <h1 className="text-2xl font-bold text-primary mb-2">
+          LuxMap Web GIS Platform
+        </h1>
+        <p className="text-sm text-text-sub">
+          Hệ thống bản đồ số GIS quản lý tài sản và sự cố chiếu sáng đường giao thông nông thôn
+        </p>
+        <div className="flex justify-center gap-3">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+            Web SPA Active
+          </span>
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+            React 18 + Vite
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const dispatch = useDispatch()
 
@@ -139,11 +163,16 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Toaster position="top-right" richColors />
+      {/* Global Toast Notifications (Sonner) */}
+      <Toaster richColors position="top-right" />
+
       <Routes>
         {/* Route đăng nhập */}
         <Route path="/login" element={<LoginPage />} />
-        
+
+        {/* Route giới thiệu HomePage từ dev */}
+        <Route path="/home" element={<HomePage />} />
+
         {/* Route chính được bảo vệ */}
         <Route
           path="/"
@@ -153,9 +182,9 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
-        {/* Redirect tất cả các đường dẫn khác về / */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+
+        {/* 404 Not Found Page từ dev */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   )
