@@ -1,16 +1,16 @@
 /**
- * Token & Session Storage Manager
- * Quản lý lưu trữ Access Token, Refresh Token và Thông tin User
+ * Token Storage Manager
+ * Chuyên biệt quản lý lưu trữ Access Token và Refresh Token
  * Hỗ trợ 2 chế độ:
  * - Không duy trì đăng nhập (rememberMe = false): Lưu vào sessionStorage (mất khi đóng browser/tab, giữ khi F5)
  * - Duy trì đăng nhập (rememberMe = true): Lưu vào localStorage (giữ khi đóng browser và mở lại)
+ * 
+ * LƯU Ý BẢO MẬT: Tuyệt đối không lưu User Profile hay Role tại đây.
+ * Toàn bộ User Profile được quản lý tập trung bên trong Redux Store.
  */
-
-import { User } from '../types/auth'
 
 const ACCESS_TOKEN_KEY = 'luxmap_access_token'
 const REFRESH_TOKEN_KEY = 'luxmap_refresh_token'
-const USER_KEY = 'luxmap_user_profile'
 const REMEMBER_ME_KEY = 'luxmap_remember_me'
 
 // Tương thích ngược với các key cũ nếu có
@@ -52,57 +52,35 @@ export const tokenStorage = {
   },
 
   /**
-   * Lấy thông tin User đã lưu
-   */
-  getUser(): User | null {
-    try {
-      const userStr =
-        sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY)
-      if (!userStr) return null
-      return JSON.parse(userStr) as User
-    } catch {
-      return null
-    }
-  },
-
-  /**
-   * Lưu Token và User khi Đăng nhập thành công
+   * Lưu Token khi Đăng nhập thành công
    * @param accessToken JWT Access Token
    * @param refreshToken Refresh Token
-   * @param user Thông tin người dùng đã chuẩn hóa
    * @param rememberMe true: lưu localStorage, false: lưu sessionStorage
    */
-  setAuth(
+  setTokens(
     accessToken: string,
     refreshToken: string,
-    user: User,
     rememberMe: boolean
   ): void {
-    const userStr = JSON.stringify(user)
-
     if (rememberMe) {
       // 1. Lưu lâu dài vào localStorage
       localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
       localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
-      localStorage.setItem(USER_KEY, userStr)
       localStorage.setItem(REMEMBER_ME_KEY, 'true')
 
-      // Dọn sạch sessionStorage để tránh dữ liệu cũ/lệch phiên
+      // Dọn sạch sessionStorage
       sessionStorage.removeItem(ACCESS_TOKEN_KEY)
       sessionStorage.removeItem(REFRESH_TOKEN_KEY)
-      sessionStorage.removeItem(USER_KEY)
       sessionStorage.removeItem(LEGACY_ACCESS_KEY)
       sessionStorage.removeItem(LEGACY_REFRESH_KEY)
     } else {
       // 2. Chỉ lưu trong phiên hiện tại vào sessionStorage (F5 còn, tắt browser mất)
       sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
       sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
-      sessionStorage.setItem(USER_KEY, userStr)
 
-      // Dọn sạch localStorage để khi đóng browser mở lại không bị tự động login
+      // Dọn sạch localStorage
       localStorage.removeItem(ACCESS_TOKEN_KEY)
       localStorage.removeItem(REFRESH_TOKEN_KEY)
-      localStorage.removeItem(USER_KEY)
       localStorage.removeItem(REMEMBER_ME_KEY)
       localStorage.removeItem(LEGACY_ACCESS_KEY)
       localStorage.removeItem(LEGACY_REFRESH_KEY)
@@ -132,30 +110,16 @@ export const tokenStorage = {
   },
 
   /**
-   * Cập nhật thông tin User mới nhất (sau khi gọi /auth/me thành công)
-   */
-  updateUser(user: User): void {
-    const userStr = JSON.stringify(user)
-    if (this.isRemembered()) {
-      localStorage.setItem(USER_KEY, userStr)
-    } else {
-      sessionStorage.setItem(USER_KEY, userStr)
-    }
-  },
-
-  /**
-   * Xóa sạch toàn bộ phiên đăng nhập (Đăng xuất hoặc Token hết hạn)
+   * Xóa sạch toàn bộ token (khi Đăng xuất hoặc Token hết hạn)
    */
   clearAll(): void {
     sessionStorage.removeItem(ACCESS_TOKEN_KEY)
     sessionStorage.removeItem(REFRESH_TOKEN_KEY)
-    sessionStorage.removeItem(USER_KEY)
     sessionStorage.removeItem(LEGACY_ACCESS_KEY)
     sessionStorage.removeItem(LEGACY_REFRESH_KEY)
 
     localStorage.removeItem(ACCESS_TOKEN_KEY)
     localStorage.removeItem(REFRESH_TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
     localStorage.removeItem(REMEMBER_ME_KEY)
     localStorage.removeItem(LEGACY_ACCESS_KEY)
     localStorage.removeItem(LEGACY_REFRESH_KEY)

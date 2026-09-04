@@ -13,7 +13,7 @@ import tokenStorage from './utils/tokenStorage'
 
 // Protected Route Component: Bảo vệ các tuyến đường nội bộ hệ thống
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, loading, user } = useSelector((state: RootState) => state.auth)
+  const { isAuthenticated, loading } = useSelector((state: RootState) => state.auth)
   const token = tokenStorage.getAccessToken()
 
   // 1. Nếu không có token trong bất kỳ storage nào -> Bắt buộc đăng nhập
@@ -21,8 +21,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/login" replace />
   }
 
-  // 2. Nếu đang loading checkAuth lần đầu và chưa có thông tin user được khôi phục
-  if (loading && !isAuthenticated && !user) {
+  // 2. Có token nhưng đang trong quá trình checkAuth nạp Profile người dùng vào Redux
+  if (loading || !isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900">
         <div className="text-center space-y-3">

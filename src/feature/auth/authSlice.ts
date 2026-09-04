@@ -2,14 +2,13 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { AuthState, User, LoginRequest } from '../../types/auth'
 import tokenStorage from '../../utils/tokenStorage'
 
-// Tự động khôi phục thông tin User và trạng thái xác thực từ Storage ngay khi khởi động
-const initialUser = tokenStorage.getUser()
+// Kiểm tra token để xác định trạng thái loading ban đầu khi khởi động ứng dụng
 const initialToken = tokenStorage.getAccessToken()
 
 const initialState: AuthState = {
-  user: initialUser,
-  isAuthenticated: !!initialToken && !!initialUser,
-  loading: !!initialToken, // Có token -> chờ saga checkAuth thẩm định với backend
+  user: null, // Toàn bộ thông tin User Profile chỉ lưu trong Redux, nạp qua API /auth/me
+  isAuthenticated: false,
+  loading: !!initialToken, // Có token -> bật loading chờ saga checkAuth thẩm định và nạp profile
   error: null,
 }
 
@@ -40,7 +39,6 @@ const authSlice = createSlice({
       state.error = null
     },
     checkAuth: (state) => {
-      // Giữ nguyên trạng thái user hiện tại nếu có, chỉ bật loading
       state.loading = true
       state.error = null
     },
@@ -54,6 +52,7 @@ const authSlice = createSlice({
       state.loading = false
       state.isAuthenticated = false
       state.user = null
+      state.error = null
     },
   },
 })
