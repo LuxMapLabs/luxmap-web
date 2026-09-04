@@ -27,6 +27,7 @@ export interface AuthResponse {
 export interface LoginRequest {
   emailOrPhone: string
   password: string
+  rememberMe?: boolean
 }
 
 export interface RefreshTokenRequest {

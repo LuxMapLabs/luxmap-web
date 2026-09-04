@@ -1,24 +1,24 @@
 import axios, { AxiosRequestConfig, AxiosError } from 'axios'
+import tokenStorage from '../utils/tokenStorage'
 
 const RAW_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5141/api/v1').trim().replace(/\/+$/, '')
 export const API_BASE_URL = RAW_URL.endsWith('/api/v1') ? RAW_URL : `${RAW_URL}/api/v1`
 
 // -------------------------------------------------------------
-// In-Memory Token Storage (Không lưu Refresh Token trong sessionStorage)
+// Tương thích ngược: Helper methods trỏ về tokenStorage
 // -------------------------------------------------------------
-let inMemoryRefreshToken: string | null = null
-
 export const setRefreshToken = (token: string | null) => {
-  inMemoryRefreshToken = token
+  if (token) {
+    tokenStorage.updateRefreshToken(token)
+  }
 }
 
 export const getRefreshToken = (): string | null => {
-  return inMemoryRefreshToken
+  return tokenStorage.getRefreshToken()
 }
 
 export const clearTokens = () => {
-  sessionStorage.removeItem('accessToken')
-  inMemoryRefreshToken = null
+  tokenStorage.clearAll()
 }
 
 export const apiClient = axios.create({
@@ -28,10 +28,10 @@ export const apiClient = axios.create({
   },
 })
 
-// Request Interceptor: Đính kèm Access Token từ sessionStorage
+// Request Interceptor: Đính kèm Access Token từ tokenStorage (sessionStorage hoặc localStorage)
 apiClient.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem('accessToken')
+    const token = tokenStorage.getAccessToken()
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -91,10 +91,10 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true
       isRefreshing = true
 
-      const currentRefreshToken = getRefreshToken()
+      const currentRefreshToken = tokenStorage.getRefreshToken()
       if (!currentRefreshToken) {
-        // Không có refresh token trong RAM, xóa sạch và chuyển về trang login
-        clearTokens()
+        // Không có refresh token hợp lệ, dọn sạch và chuyển về trang login
+        tokenStorage.clearAll()
         isRefreshing = false
         window.location.href = '/login'
         return Promise.reject(error)
@@ -113,10 +113,11 @@ apiClient.interceptors.response.use(
 
         const { accessToken, refreshToken: newRefreshToken } = authData
 
-        // Lưu Access Token mới vào sessionStorage
-        sessionStorage.setItem('accessToken', accessToken)
-        // Lưu Refresh Token mới vào biến In-Memory (Token Rotation)
-        setRefreshToken(newRefreshToken || currentRefreshToken)
+        // Cập nhật Access Token và Refresh Token mới vào đúng Storage
+        tokenStorage.updateAccessToken(accessToken)
+        if (newRefreshToken) {
+          tokenStorage.updateRefreshToken(newRefreshToken)
+        }
 
         processQueue(null, accessToken)
 
@@ -127,7 +128,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest)
       } catch (refreshError) {
         processQueue(refreshError, null)
-        clearTokens()
+        tokenStorage.clearAll()
         window.location.href = '/login'
         return Promise.reject(refreshError)
       } finally {

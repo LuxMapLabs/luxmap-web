@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { loginRequest } from '../../feature/auth/authSlice'
 import { RootState } from '../../redux/rootReducer'
 import {
-  User,
+  Mail,
   Lock,
   Eye,
   EyeOff,
@@ -16,13 +16,31 @@ import {
   MapPin,
   Radio,
   Zap,
+  Sun,
+  Moon,
 } from 'lucide-react'
 
+import tokenStorage from '../../utils/tokenStorage'
+
 export const LoginPage: React.FC = () => {
-  const [emailOrPhone, setEmailOrPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(true)
+  const [rememberMe, setRememberMe] = useState(() => tokenStorage.isRemembered())
+
+  // Trạng thái Dark / Light Mode (Mặc định là Dark Mode)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('luxmap_theme')
+    return saved !== null ? saved === 'dark' : true
+  })
+
+  const toggleTheme = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev
+      localStorage.setItem('luxmap_theme', next ? 'dark' : 'light')
+      return next
+    })
+  }
 
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -45,8 +63,8 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!emailOrPhone.trim()) {
-      toast.warning('Vui lòng nhập Mã nhân viên, Email hoặc Số điện thoại')
+    if (!email.trim()) {
+      toast.warning('Vui lòng nhập địa chỉ Email')
       return
     }
 
@@ -55,17 +73,59 @@ export const LoginPage: React.FC = () => {
       return
     }
 
-    dispatch(loginRequest({ emailOrPhone: emailOrPhone.trim(), password }))
+    dispatch(
+      loginRequest({
+        emailOrPhone: email.trim(),
+        password,
+        rememberMe,
+      })
+    )
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#071120] flex items-center justify-center p-4 sm:p-8 lg:p-12 font-sans relative overflow-hidden select-none">
+    <div
+      className={`min-h-screen w-full flex items-center justify-center p-4 sm:p-8 lg:p-12 font-sans relative overflow-hidden select-none transition-colors duration-500 ${
+        isDarkMode
+          ? 'bg-[#071120] text-white'
+          : 'bg-gradient-to-br from-slate-100 via-sky-50/50 to-blue-50/60 text-slate-900'
+      }`}
+    >
+      {/* Nút bấm chuyển đổi Dark / Light Mode nổi ở góc trên bên phải */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className={`fixed top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-all duration-300 shadow-xl cursor-pointer backdrop-blur-md active:scale-95 ${
+          isDarkMode
+            ? 'bg-[#0c1a32]/85 border-slate-700/80 text-amber-300 hover:bg-[#132847] hover:border-amber-400/50 shadow-black/40'
+            : 'bg-white/90 border-slate-200 text-slate-700 hover:bg-white hover:border-blue-300 shadow-slate-200/80'
+        }`}
+        title={isDarkMode ? 'Chuyển sang Giao diện Sáng (Light Mode)' : 'Chuyển sang Giao diện Tối (Dark Mode)'}
+      >
+        {isDarkMode ? (
+          <>
+            <Sun className="w-4 h-4 text-amber-300 animate-spin-slow" />
+            <span className="text-xs font-bold text-slate-200">Giao diện Sáng</span>
+          </>
+        ) : (
+          <>
+            <Moon className="w-4 h-4 text-[#1f3864]" />
+            <span className="text-xs font-bold text-slate-700">Giao diện Tối</span>
+          </>
+        )}
+      </button>
+
       {/* Background GIS Grid Pattern (Mạng lưới tọa độ không gian) */}
-      <div className="absolute inset-0 pointer-events-none opacity-20">
+      <div className="absolute inset-0 pointer-events-none opacity-25">
         <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <pattern id="gis-grid-full" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#3e86c9" strokeWidth="0.6" strokeOpacity="0.4" />
+              <path
+                d="M 60 0 L 0 0 0 60"
+                fill="none"
+                stroke={isDarkMode ? '#3e86c9' : '#94a3b8'}
+                strokeWidth="0.6"
+                strokeOpacity={isDarkMode ? '0.4' : '0.35'}
+              />
             </pattern>
           </defs>
           <rect width="100%" fill="url(#gis-grid-full)" height="100%" />
@@ -73,18 +133,41 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Ánh sáng Gradient Ambient tạo chiều sâu */}
-      <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] bg-gradient-to-tr from-[#1f3864]/40 to-[#3e86c9]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-20 -right-20 w-[550px] h-[550px] bg-gradient-to-bl from-[#5fc4b0]/15 via-[#1f3864]/30 to-transparent rounded-full blur-3xl pointer-events-none" />
+      <div
+        className={`absolute top-1/4 -left-20 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none transition-all duration-500 ${
+          isDarkMode
+            ? 'bg-gradient-to-tr from-[#1f3864]/40 to-[#3e86c9]/10'
+            : 'bg-gradient-to-tr from-blue-200/50 to-sky-100/40'
+        }`}
+      />
+      <div
+        className={`absolute -bottom-20 -right-20 w-[550px] h-[550px] rounded-full blur-3xl pointer-events-none transition-all duration-500 ${
+          isDarkMode
+            ? 'bg-gradient-to-bl from-[#5fc4b0]/15 via-[#1f3864]/30 to-transparent'
+            : 'bg-gradient-to-bl from-teal-200/30 via-indigo-100/30 to-transparent'
+        }`}
+      />
 
       {/* ========================================================================= */}
       {/* CONTAINER CHÍNH: BỐ CỤC 2 CỘT HIỆN ĐẠI CHO GIAO DIỆN WEB (SPLIT DESKTOP)  */}
       {/* ========================================================================= */}
-      <div className="w-full max-w-5xl bg-[#0c1a32]/95 backdrop-blur-xl rounded-[32px] sm:rounded-[40px] shadow-2xl shadow-black/80 border border-slate-700/60 overflow-hidden relative z-10 flex flex-col lg:flex-row min-h-[640px] transition-all duration-300">
-
+      <div
+        className={`w-full max-w-5xl rounded-[32px] sm:rounded-[40px] border overflow-hidden relative z-10 flex flex-col lg:flex-row min-h-[640px] transition-all duration-300 ${
+          isDarkMode
+            ? 'bg-[#0c1a32]/95 backdrop-blur-xl border-slate-700/60 shadow-2xl shadow-black/80'
+            : 'bg-white border-slate-200/90 shadow-2xl shadow-slate-300/70'
+        }`}
+      >
         {/* ------------------------------------------------------------- */}
         {/* CỘT TRÁI (HERO PANEL): GIS SHOWCASE & THÔNG TIN THƯƠNG HIỆU   */}
         {/* ------------------------------------------------------------- */}
-        <div className="lg:w-[50%] p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden bg-gradient-to-br from-[#0c1a32] via-[#102344] to-[#152e59]">
+        <div
+          className={`lg:w-[50%] p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden transition-colors duration-500 ${
+            isDarkMode
+              ? 'bg-gradient-to-br from-[#0c1a32] via-[#102344] to-[#152e59]'
+              : 'bg-gradient-to-br from-[#16294a] via-[#1f3864] to-[#2b4c80]'
+          }`}
+        >
           {/* Đường GIS vector uốn lượn đứt nét phát sáng */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-90">
             <svg className="w-full h-full absolute inset-0" viewBox="0 0 500 600" fill="none">
@@ -104,7 +187,7 @@ export const LoginPage: React.FC = () => {
               {/* Điểm nút tọa độ cột đèn (Pole / Node) */}
               <circle cx="290" cy="260" r="7" fill="#5fc4b0" />
               <circle cx="290" cy="260" r="14" stroke="#5fc4b0" strokeWidth="2" strokeOpacity="0.4" className="animate-ping" />
-              
+
               {/* Điểm nút vàng cảnh báo sự cố */}
               <circle cx="160" cy="390" r="6" fill="#e9a23b" />
               <circle cx="440" cy="160" r="5" fill="#8fd9e8" />
@@ -130,12 +213,12 @@ export const LoginPage: React.FC = () => {
               <div>
                 <div className="text-2xl font-black tracking-wider text-white uppercase leading-none flex items-center gap-2">
                   <span>LUXMAP</span>
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-[#5fc4b0]/20 text-[#5fc4b0] border border-[#5fc4b0]/30 tracking-normal">
-                    GIS WEB
+                  <span className="text-[10px] font-black tracking-normal px-2 py-0.5 rounded-md bg-[#5fc4b0] text-[#0c1a32]">
+                    GIS 4.0
                   </span>
                 </div>
-                <p className="text-[11px] font-bold tracking-widest text-slate-300 mt-1 uppercase">
-                  FIELD OPERATIONS & ASSET MANAGEMENT
+                <p className="text-xs text-slate-300 font-medium tracking-wide mt-1">
+                  Hệ thống Quản lý Chiếu sáng Nông thôn Thông minh
                 </p>
               </div>
             </div>
@@ -201,38 +284,67 @@ export const LoginPage: React.FC = () => {
         {/* ------------------------------------------------------------- */}
         {/* CỘT PHẢI (FORM PANEL): FORM ĐĂNG NHẬP TÁC NGHIỆP RỘNG RÃI     */}
         {/* ------------------------------------------------------------- */}
-        <div className="lg:w-[50%] bg-white p-8 sm:p-12 lg:p-14 flex flex-col justify-between text-slate-800">
+        <div
+          className={`lg:w-[50%] p-8 sm:p-12 lg:p-14 flex flex-col justify-between transition-colors duration-500 ${
+            isDarkMode ? 'bg-[#0a1628] text-slate-100' : 'bg-white text-slate-800'
+          }`}
+        >
           <div className="w-full max-w-md mx-auto space-y-6">
-            
             {/* Tiêu đề Form */}
             <div className="space-y-1">
-              <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h3
+                className={`text-2xl sm:text-3xl font-black tracking-tight transition-colors ${
+                  isDarkMode ? 'text-white' : 'text-slate-900'
+                }`}
+              >
                 Đăng nhập tác nghiệp
               </h3>
-              <p className="text-sm text-slate-500 font-normal">
+              <p
+                className={`text-sm font-normal transition-colors ${
+                  isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                }`}
+              >
                 Sử dụng tài khoản nhân viên / cán bộ đã được cấp.
               </p>
             </div>
 
             {/* Form đăng nhập */}
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Input: Mã nhân viên / SĐT / Email */}
+              {/* Input: Địa chỉ Email (Đã bỏ Mã nhân viên & SĐT theo yêu cầu) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold tracking-wider text-[#1f3864] block uppercase">
-                  MÃ NHÂN VIÊN / SỐ ĐIỆN THOẠI / EMAIL
+                <label
+                  className={`text-xs font-bold tracking-wider block uppercase transition-colors ${
+                    isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
+                  }`}
+                >
+                  ĐỊA CHỈ EMAIL
                 </label>
-                <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-2 transition-all duration-200 focus-within:border-[#1f3864] focus-within:ring-3 focus-within:ring-[#1f3864]/10 shadow-xs">
+                <div
+                  className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${
+                    isDarkMode
+                      ? 'bg-[#10223d] border-slate-700/80 focus-within:border-[#5fc4b0] focus-within:ring-3 focus-within:ring-[#5fc4b0]/15'
+                      : 'bg-white border-slate-200 focus-within:border-[#1f3864] focus-within:ring-3 focus-within:ring-[#1f3864]/10'
+                  }`}
+                >
                   {/* Khối icon lồng bo góc */}
-                  <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 mr-3 shrink-0">
-                    <User className="w-5 h-5" />
+                  <div
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${
+                      isDarkMode ? 'bg-[#183157] text-[#5fc4b0]' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <Mail className="w-5 h-5" />
                   </div>
                   <input
-                    type="text"
-                    value={emailOrPhone}
-                    onChange={(e) => setEmailOrPhone(e.target.value)}
-                    placeholder="VD: NV-0125 hoặc admin@civicflow.vn"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="VD: admin@civicflow.vn"
                     disabled={loading}
-                    className="w-full text-sm font-semibold text-slate-800 placeholder-slate-400 outline-none bg-transparent py-1 pr-3 disabled:opacity-50"
+                    className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-3 disabled:opacity-50 transition-colors ${
+                      isDarkMode
+                        ? 'text-white placeholder-slate-400'
+                        : 'text-slate-800 placeholder-slate-400'
+                    }`}
                     required
                   />
                 </div>
@@ -240,12 +352,26 @@ export const LoginPage: React.FC = () => {
 
               {/* Input: Mật khẩu */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold tracking-wider text-[#1f3864] block uppercase">
+                <label
+                  className={`text-xs font-bold tracking-wider block uppercase transition-colors ${
+                    isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
+                  }`}
+                >
                   MẬT KHẨU
                 </label>
-                <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-2 transition-all duration-200 focus-within:border-[#1f3864] focus-within:ring-3 focus-within:ring-[#1f3864]/10 shadow-xs">
+                <div
+                  className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${
+                    isDarkMode
+                      ? 'bg-[#10223d] border-slate-700/80 focus-within:border-[#5fc4b0] focus-within:ring-3 focus-within:ring-[#5fc4b0]/15'
+                      : 'bg-white border-slate-200 focus-within:border-[#1f3864] focus-within:ring-3 focus-within:ring-[#1f3864]/10'
+                  }`}
+                >
                   {/* Khối icon lồng bo góc */}
-                  <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 mr-3 shrink-0">
+                  <div
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${
+                      isDarkMode ? 'bg-[#183157] text-[#5fc4b0]' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
                     <Lock className="w-5 h-5" />
                   </div>
                   <input
@@ -254,7 +380,11 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     disabled={loading}
-                    className="w-full text-sm font-semibold text-slate-800 placeholder-slate-400 outline-none bg-transparent py-1 pr-2 disabled:opacity-50"
+                    className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-2 disabled:opacity-50 transition-colors ${
+                      isDarkMode
+                        ? 'text-white placeholder-slate-400'
+                        : 'text-slate-800 placeholder-slate-400'
+                    }`}
                     required
                   />
                   {/* Nút ẩn/hiện mật khẩu */}
@@ -262,7 +392,9 @@ export const LoginPage: React.FC = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={loading}
-                    className="p-2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer shrink-0 transition-colors"
+                    className={`p-2 transition-colors focus:outline-none cursor-pointer shrink-0 ${
+                      isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'
+                    }`}
                     tabIndex={-1}
                     title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                   >
@@ -281,7 +413,11 @@ export const LoginPage: React.FC = () => {
                     disabled={loading}
                     className="w-4.5 h-4.5 rounded-md text-[#1f3864] border-slate-300 focus:ring-[#1f3864] focus:ring-offset-0 cursor-pointer transition-all"
                   />
-                  <span className="text-xs sm:text-sm font-semibold text-slate-600">
+                  <span
+                    className={`text-xs sm:text-sm font-semibold transition-colors ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-600'
+                    }`}
+                  >
                     Duy trì đăng nhập trên thiết bị
                   </span>
                 </label>
@@ -289,7 +425,9 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => toast.info('Vui lòng liên hệ Quản trị viên hệ thống để được cấp lại mật khẩu.')}
-                  className="text-xs font-bold text-[#1f3864] hover:text-[#3e86c9] transition-colors cursor-pointer"
+                  className={`text-xs font-bold transition-colors cursor-pointer ${
+                    isDarkMode ? 'text-[#5fc4b0] hover:text-[#8fd9e8]' : 'text-[#1f3864] hover:text-[#3e86c9]'
+                  }`}
                 >
                   Quên mật khẩu?
                 </button>
@@ -297,11 +435,11 @@ export const LoginPage: React.FC = () => {
 
               {/* Banner hiển thị lỗi trực quan */}
               {error && (
-                <div className="rounded-2xl bg-red-50 p-3.5 text-xs text-danger border border-red-200 flex items-start gap-2.5 animate-in fade-in duration-200">
-                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <div className="rounded-2xl bg-red-500/10 p-3.5 text-xs text-danger border border-red-500/30 flex items-start gap-2.5 animate-in fade-in duration-200">
+                  <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <p className="font-bold text-red-800">Không thể đăng nhập</p>
-                    <p className="text-red-700 leading-relaxed font-medium">{error}</p>
+                    <p className="font-bold text-red-300">Không thể đăng nhập</p>
+                    <p className="text-red-200 leading-relaxed font-medium">{error}</p>
                   </div>
                 </div>
               )}
@@ -310,7 +448,11 @@ export const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 px-6 rounded-2xl bg-[#1f3864] hover:bg-[#16294d] text-white font-bold text-base shadow-xl shadow-[#1f3864]/25 transition-all duration-200 flex items-center justify-center relative active:scale-[0.99] disabled:pointer-events-none disabled:opacity-65 cursor-pointer mt-3"
+                className={`w-full py-4 px-6 rounded-2xl font-bold text-base shadow-xl transition-all duration-200 flex items-center justify-center relative active:scale-[0.99] disabled:pointer-events-none disabled:opacity-65 cursor-pointer mt-3 ${
+                  isDarkMode
+                    ? 'bg-gradient-to-r from-[#1f3864] to-[#2b518c] hover:from-[#244275] hover:to-[#3561a3] text-white shadow-black/40 border border-blue-400/20'
+                    : 'bg-[#1f3864] hover:bg-[#16294d] text-white shadow-[#1f3864]/25'
+                }`}
               >
                 {loading ? (
                   <>
@@ -330,16 +472,38 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Box An Toàn Chân Form: Hỗ trợ ngoại tuyến & Mã hóa an toàn */}
-          <div className="w-full max-w-md mx-auto mt-6 pt-4 border-t border-slate-100">
-            <div className="bg-[#5fc4b0]/10 border border-[#5fc4b0]/30 rounded-2xl p-3.5 flex items-center gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-[#5fc4b0]/20 text-[#1f3864] flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-5 h-5 text-[#247061]" />
+          <div
+            className={`w-full max-w-md mx-auto mt-6 pt-4 border-t transition-colors ${
+              isDarkMode ? 'border-slate-800' : 'border-slate-100'
+            }`}
+          >
+            <div
+              className={`rounded-2xl p-3.5 flex items-center gap-3.5 transition-colors border ${
+                isDarkMode
+                  ? 'bg-[#10223d]/80 border-[#5fc4b0]/20 text-slate-300'
+                  : 'bg-[#5fc4b0]/10 border-[#5fc4b0]/30 text-slate-600'
+              }`}
+            >
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  isDarkMode ? 'bg-[#5fc4b0]/20 text-[#5fc4b0]' : 'bg-[#5fc4b0]/20 text-[#1f3864]'
+                }`}
+              >
+                <CheckCircle2 className="w-5 h-5 text-[#5fc4b0]" />
               </div>
               <div className="space-y-0.5">
-                <div className="text-xs font-black tracking-wide text-[#1f3864] uppercase">
+                <div
+                  className={`text-xs font-black tracking-wide uppercase ${
+                    isDarkMode ? 'text-[#5fc4b0]' : 'text-[#1f3864]'
+                  }`}
+                >
                   HỖ TRỢ LÀM VIỆC NGOẠI TUYẾN
                 </div>
-                <div className="text-xs text-slate-600 font-medium">
+                <div
+                  className={`text-xs font-medium ${
+                    isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                  }`}
+                >
                   Dữ liệu được bảo vệ và mã hóa lưu an toàn trên thiết bị.
                 </div>
               </div>

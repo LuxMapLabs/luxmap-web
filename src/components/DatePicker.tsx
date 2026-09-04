@@ -15,7 +15,7 @@ import {
   startOfDay,
   WEEKDAYS_VN,
   MONTHS_VN,
-} from '../../../utils/dateUtils'
+} from '../utils/dateUtils'
 
 export interface DatePickerProps {
   value?: Date | null
@@ -332,4 +332,3 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   )
 }
 
-export default DatePicker

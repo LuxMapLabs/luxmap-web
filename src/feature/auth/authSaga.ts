@@ -1,8 +1,9 @@
 import { call, put, takeLatest } from 'redux-saga/effects'
 import { PayloadAction } from '@reduxjs/toolkit'
 import authAPI from './authAPI'
-import { LoginRequest, ApiResponse, AuthResponse, User } from '../../types/auth'
-import { setRefreshToken, clearTokens } from '../../config/apiClient'
+import { LoginRequest, ApiResponse, AuthResponse } from '../../types/auth'
+import tokenStorage from '../../utils/tokenStorage'
+import { normalizeUser } from '../../utils/roleUtils'
 import {
   loginRequest,
   loginSuccess,
@@ -16,26 +17,24 @@ import {
 // Saga xử lý đăng nhập
 function* handleLogin(action: PayloadAction<LoginRequest>) {
   try {
-    const response: ApiResponse<AuthResponse> = yield call(authAPI.login, action.payload)
+    const { emailOrPhone, password, rememberMe = false } = action.payload
+
+    // Gửi yêu cầu đăng nhập lên API Backend
+    const response: ApiResponse<AuthResponse> = yield call(authAPI.login, {
+      emailOrPhone,
+      password,
+    })
 
     if (response.data) {
       const { accessToken, refreshToken, user } = response.data
 
-      // 1. Lưu accessToken vào sessionStorage
-      sessionStorage.setItem('accessToken', accessToken)
+      // Chuẩn hóa user object và Role đảm bảo nhất quán
+      const normalizedUser = normalizeUser(user)
 
-      // 2. Lưu refreshToken vào biến in-memory (KHÔNG lưu trong sessionStorage)
-      setRefreshToken(refreshToken)
-
-      // Chuẩn hóa user object nếu cần
-      const normalizedUser: User = {
-        id: user.id || (user as any).userId || '',
-        fullName: user.fullName || '',
-        email: user.email || null,
-        phoneNumber: user.phoneNumber || null,
-        role: user.role,
-        administrativeUnitId: user.administrativeUnitId || '',
-      }
+      // Lưu trữ Token và User theo đúng cờ rememberMe:
+      // - rememberMe = true -> lưu localStorage (mở lại browser vẫn đăng nhập)
+      // - rememberMe = false -> lưu sessionStorage (đóng browser sẽ phải đăng nhập lại, F5 vẫn còn)
+      tokenStorage.setAuth(accessToken, refreshToken, normalizedUser, !!rememberMe)
 
       yield put(loginSuccess({ user: normalizedUser }))
     } else {
@@ -72,8 +71,8 @@ function* handleLogin(action: PayloadAction<LoginRequest>) {
 // Saga xử lý đăng xuất
 function* handleLogout() {
   try {
-    // Xóa access token trong sessionStorage và refresh token trong memory
-    clearTokens()
+    // Xóa sạch toàn bộ token và user ở cả sessionStorage lẫn localStorage
+    tokenStorage.clearAll()
   } catch (error) {
     console.error('Lỗi khi xóa token khi đăng xuất:', error)
   }
@@ -82,29 +81,31 @@ function* handleLogout() {
 // Saga xử lý khôi phục phiên đăng nhập khi reload trang (checkAuth)
 function* handleCheckAuth() {
   try {
-    const token = sessionStorage.getItem('accessToken')
+    const token = tokenStorage.getAccessToken()
     if (!token) {
       yield put(checkAuthFailure())
       return
     }
 
+    // Gọi API /auth/me để lấy thông tin mới nhất từ JWT context
     const response: ApiResponse<any> = yield call(authAPI.getMe)
     if (response.data) {
-      const raw = response.data
-      const user: User = {
-        id: raw.id || raw.userId || '',
-        fullName: raw.fullName || '',
-        email: raw.email || null,
-        phoneNumber: raw.phoneNumber || null,
-        role: raw.role,
-        administrativeUnitId: raw.administrativeUnitId || '',
-      }
-      yield put(checkAuthSuccess({ user }))
+      // Chuẩn hóa role và thông tin user (xử lý cả trường hợp role trả về dạng chuỗi "admin", "officer", ...)
+      const normalizedUser = normalizeUser(response.data)
+
+      // Cập nhật lại thông tin user vào storage tương ứng
+      tokenStorage.updateUser(normalizedUser)
+
+      yield put(checkAuthSuccess({ user: normalizedUser }))
     } else {
+      tokenStorage.clearAll()
       yield put(checkAuthFailure())
     }
-  } catch (error) {
-    // Nếu token hết hạn hoặc lỗi xác thực, reset state
+  } catch (error: any) {
+    // Nếu token bị từ chối hoặc hết hạn (401), xoá phiên và điều hướng login
+    if (error?.response?.status === 401) {
+      tokenStorage.clearAll()
+    }
     yield put(checkAuthFailure())
   }
 }

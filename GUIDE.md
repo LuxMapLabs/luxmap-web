@@ -62,13 +62,13 @@ npm run gen
 3. **Phân loại `common.ts` thông minh:**
    - Bất kỳ type nào dùng chung từ 2 module trở lên hoặc các cấu trúc lỗi/phân trang (`ApiError`, `PaginationMeta`, `UserDto`, `UserRole`) sẽ được tự động gom vào **`src/types/common.ts`**.
    - Các file domain tự động đính kèm `import type { ... } from './common'` tương ứng.
-4. **Cập nhật Barrel Export:** Tự động cập nhật **`src/types/index.ts`** để export toàn bộ.
+4. **Cấu trúc Types theo từng Module:** Mỗi module sở hữu file type độc lập (ví dụ `src/types/auth.ts`, `src/types/common.ts`), import trực tiếp từ file tương ứng mà không dùng barrel index.
 
 ### 💻 Cách sử dụng Types & Gọi API trong Code:
-Bạn có thể import trực tiếp từ `@/types` và gọi qua `apiClient`:
+Bạn có thể import trực tiếp từ `@/types/[module]` và gọi qua `apiClient`:
 ```typescript
 import apiClient from '@/config/apiClient'
-import type { LoginRequest, AuthResponse } from '@/types'
+import type { LoginRequest, AuthResponse } from '@/types/auth'
 
 // Ví dụ hàm gọi API (Base URL đã có sẵn /api/v1):
 export const loginApi = async (payload: LoginRequest): Promise<AuthResponse> => {
@@ -76,6 +76,7 @@ export const loginApi = async (payload: LoginRequest): Promise<AuthResponse> => 
     return response.data.data
 }
 ```
+
 
 ---
 
@@ -111,8 +112,10 @@ export type LoginFormData = z.infer<typeof loginSchema>
 import React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { loginSchema, LoginFormData } from '@/validations'
-import { Input, Button, showToast } from '@/components/common'
+import { loginSchema, LoginFormData } from '@/validations/auth.schema'
+import { Input } from '@/components/Input'
+import { Button } from '@/components/Button'
+import { showToast } from '@/utils/toastUtils'
 
 export const LoginForm: React.FC = () => {
   const {
@@ -161,22 +164,16 @@ export const LoginForm: React.FC = () => {
 
 ## 🎨 4. Bộ UI Components Dùng Chung (Design System)
 
-Tất cả các components dùng chung được đặt tại **`src/components/common/`** và export qua master index:
+Tất cả các components dùng chung được đặt trực tiếp tại **`src/components/`** và import trực tiếp từ từng file component:
 
 ```typescript
-import {
-  Button,
-  Input,
-  SearchInput,
-  StatusBadge,
-  StatCard,
-  Modal,
-  Drawer,
-  DatePicker,
-  DateRangePicker,
-  showToast,
-} from '@/components/common'
+// Import trực tiếp từ file component tương ứng
+import { Button } from '@/components/Button'
+import { Input } from '@/components/Input'
+import { DateRangePicker } from '@/components/DateRangePicker'
+import { showToast } from '@/utils/toastUtils'
 ```
+
 
 ### 📋 Danh sách Components & Cách Dùng:
 
@@ -251,7 +248,7 @@ src/
 ├── types/                  # TypeScript Types tự động sinh từ Swagger
 ├── utils/                  # Tiện ích dùng chung (dateUtils.ts...)
 ├── validations/            # Zod Validation Schemas (100% Type-Safe)
-├── components/common/      # UI Components dùng chung (Button, Input, DatePicker...)
+├── components/             # UI Components dùng chung (Button.tsx, Input.tsx, DatePicker.tsx...)
 ├── feature/assets/         # Thư mục logic Redux quản lý tài sản
 │   ├── assetAPI.ts         # Gọi API tới backend
 │   ├── assetSaga.ts        # Saga quản lý side effects

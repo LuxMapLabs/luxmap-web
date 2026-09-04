@@ -233,13 +233,7 @@ async function run() {
             generatedFiles.push(modName)
         }
 
-        // 3. Tạo src/types/index.ts
-        let indexContent = `/**\n * Barrel export cho toàn bộ Types trong dự án\n */\n`
-        for (const mod of generatedFiles) {
-            indexContent += `export * from './${mod}'\n`
-        }
-        fs.writeFileSync(path.resolve(typesDir, 'index.ts'), indexContent, 'utf-8')
-        console.log(`  ✓ Đã cập nhật: src/types/index.ts`)
+
 
         console.log('✨ XONG! Đã xóa sạch api.d.ts, thư mục chỉ còn các file domain thuần túy!')
     } catch (err) {

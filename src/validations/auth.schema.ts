@@ -24,6 +24,7 @@ export const loginSchema = z.object({
   password: z
     .string()
     .min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
+  rememberMe: z.boolean().optional(),
 }) satisfies z.ZodType<LoginRequest>
 
 export type LoginFormData = z.infer<typeof loginSchema>
