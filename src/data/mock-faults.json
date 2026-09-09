@@ -17,8 +17,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.50217
+    "lng": 106.500339,
+    "lat": 10.97629
    }
   },
   {
@@ -28,15 +28,15 @@
    "fault_type": "lamp_out",
    "fault_status": "detected",
    "severity": "high",
-   "priority_score": 96.0,
+   "priority_score": 96,
    "cluster_id": null,
    "source_channel": "cv",
    "detected_at": "2026-08-19T12:00:00Z",
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.495765
+    "lng": 106.494703,
+    "lat": 10.973087
    }
   },
   {
@@ -46,15 +46,15 @@
    "fault_type": "lamp_out",
    "fault_status": "confirmed",
    "severity": "high",
-   "priority_score": 96.0,
+   "priority_score": 96,
    "cluster_id": null,
    "source_channel": "cv",
    "detected_at": "2026-08-18T12:00:00Z",
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.496725
+    "lng": 106.495546,
+    "lat": 10.973571
    }
   },
   {
@@ -71,8 +71,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.970813,
-    "lng": 106.503019
+    "lng": 106.499683,
+    "lat": 10.968684
    }
   },
   {
@@ -89,8 +89,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.497686
+    "lng": 106.496396,
+    "lat": 10.974044
    }
   },
   {
@@ -107,8 +107,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.965989,
-    "lng": 106.492025
+    "lng": 106.495788,
+    "lat": 10.964558
    }
   },
   {
@@ -118,15 +118,15 @@
    "fault_type": "lamp_out",
    "fault_status": "confirmed",
    "severity": "critical",
-   "priority_score": 86.0,
+   "priority_score": 86,
    "cluster_id": null,
    "source_channel": "cv",
    "detected_at": "2026-08-19T12:00:00Z",
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.494163
+    "lng": 106.493301,
+    "lat": 10.972274
    }
   },
   {
@@ -143,8 +143,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.503451
+    "lng": 106.501463,
+    "lat": 10.976937
    }
   },
   {
@@ -161,8 +161,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.975107,
-    "lng": 106.496356
+    "lng": 106.49813,
+    "lat": 10.974436
    }
   },
   {
@@ -179,8 +179,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.973804,
-    "lng": 106.495737
+    "lng": 106.497769,
+    "lat": 10.973025
    }
   },
   {
@@ -197,8 +197,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.500569
+    "lng": 106.498926,
+    "lat": 10.975497
    }
   },
   {
@@ -215,8 +215,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.97163,
-    "lng": 106.502538
+    "lng": 106.499172,
+    "lat": 10.96793
    }
   },
   {
@@ -233,8 +233,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.972502,
-    "lng": 106.495119
+    "lng": 106.49745,
+    "lat": 10.971605
    }
   },
   {
@@ -251,8 +251,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.968268,
-    "lng": 106.493108
+    "lng": 106.496604,
+    "lat": 10.966965
    }
   },
   {
@@ -269,8 +269,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.503771
+    "lng": 106.501745,
+    "lat": 10.977098
    }
   },
   {
@@ -287,8 +287,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.971085,
-    "lng": 106.502859
+    "lng": 106.499478,
+    "lat": 10.968465
    }
   },
   {
@@ -305,8 +305,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.975433,
-    "lng": 106.496511
+    "lng": 106.498226,
+    "lat": 10.974788
    }
   },
   {
@@ -323,8 +323,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.499928
+    "lng": 106.498367,
+    "lat": 10.97517
    }
   },
   {
@@ -341,8 +341,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.970541,
-    "lng": 106.503179
+    "lng": 106.499679,
+    "lat": 10.969018
    }
   },
   {
@@ -359,8 +359,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.975107,
-    "lng": 106.496356
+    "lng": 106.49813,
+    "lat": 10.974436
    }
   },
   {
@@ -377,8 +377,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.972175,
-    "lng": 106.502218
+    "lng": 106.498935,
+    "lat": 10.967297
    }
   },
   {
@@ -395,8 +395,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969179,
-    "lng": 106.50398
+    "lng": 106.500004,
+    "lat": 10.970633
    }
   },
   {
@@ -413,8 +413,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.971902,
-    "lng": 106.502378
+    "lng": 106.499054,
+    "lat": 10.967613
    }
   },
   {
@@ -431,8 +431,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.971358,
-    "lng": 106.502699
+    "lng": 106.499284,
+    "lat": 10.968248
    }
   },
   {
@@ -449,8 +449,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.972719,
-    "lng": 106.501898
+    "lng": 106.498681,
+    "lat": 10.96667
    }
   },
   {
@@ -467,8 +467,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969973,
-    "lng": 106.504091
+    "lng": 106.502027,
+    "lat": 10.977257
    }
   },
   {
@@ -485,8 +485,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.972447,
-    "lng": 106.502058
+    "lng": 106.498815,
+    "lat": 10.966981
    }
   },
   {
@@ -503,8 +503,8 @@
    "confirmed_by": null,
    "confirmed_at": null,
    "location": {
-    "lat": 10.969571,
-    "lng": 106.493726
+    "lng": 106.496944,
+    "lat": 10.968381
    }
   }
  ]

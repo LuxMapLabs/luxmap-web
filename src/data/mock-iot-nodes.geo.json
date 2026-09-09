@@ -1,0 +1,234 @@
+{
+ "type": "FeatureCollection",
+ "crs_note": "EPSG:4326 (lng, lat)",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.489639,
+     10.970187
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0001",
+    "node_role": "segment_controller",
+    "segment_id": "SEG-001",
+    "pole_id": null,
+    "node_status": "online",
+    "last_report_at": "2026-08-20T04:00:00Z",
+    "battery_pct": 81
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495788,
+     10.964558
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0002",
+    "node_role": "segment_controller",
+    "segment_id": "SEG-002",
+    "pole_id": null,
+    "node_status": "online",
+    "last_report_at": "2026-08-20T06:00:00Z",
+    "battery_pct": 87
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.498048,
+     10.963327
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0003",
+    "node_role": "segment_controller",
+    "segment_id": "SEG-003",
+    "pole_id": null,
+    "node_status": "offline",
+    "last_report_at": "2026-08-20T05:00:00Z",
+    "battery_pct": 84
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500339,
+     10.97629
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0039",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-001",
+    "pole_id": "POLE-0039",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T06:00:00Z",
+    "battery_pct": 100
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.498226,
+     10.974788
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0076",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-002",
+    "pole_id": "POLE-0076",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T08:00:00Z",
+    "battery_pct": 89
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.49813,
+     10.974436
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0075",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-002",
+    "pole_id": "POLE-0075",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T08:00:00Z",
+    "battery_pct": 81
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.499035,
+     10.965475
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0085",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-003",
+    "pole_id": "POLE-0085",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T05:00:00Z",
+    "battery_pct": 59
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.497211,
+     10.970174
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0063",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-002",
+    "pole_id": "POLE-0063",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T05:00:00Z",
+    "battery_pct": 47
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494983,
+     10.973249
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0020",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-001",
+    "pole_id": "POLE-0020",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T06:00:00Z",
+    "battery_pct": 92
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496944,
+     10.968381
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0058",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-002",
+    "pole_id": "POLE-0058",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T04:00:00Z",
+    "battery_pct": 90
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.4976,
+     10.972317
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0069",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-002",
+    "pole_id": "POLE-0069",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T05:00:00Z",
+    "battery_pct": 69
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495788,
+     10.964558
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0047",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-002",
+    "pole_id": "POLE-0047",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T06:00:00Z",
+    "battery_pct": 43
+   }
+  }
+ ]
+}

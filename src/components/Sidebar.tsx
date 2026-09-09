@@ -16,6 +16,8 @@ export interface SidebarProps {
   userName?: string
   userRoleTitle?: string
   userInitials?: string
+  isCollapsed?: boolean
+  onToggle?: () => void
   className?: string
 }
 
@@ -24,6 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userName = 'Khang Nguyễn',
   userRoleTitle = 'Kỹ sư Bảo trì',
   userInitials = 'KN',
+  isCollapsed = false,
   className = '',
 }) => {
   const defaultTabs: SidebarTabItem[] = [
@@ -34,12 +37,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ]
 
-
-
   const navTabs = tabs || defaultTabs
 
   return (
-    <aside className={`w-64 bg-white border-r border-slate-200 flex flex-col justify-between p-3.5 shrink-0 select-none z-20 h-full ${className}`}>
+    <aside
+      className={`bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 select-none z-20 h-full transition-all duration-300 ease-in-out ${
+        isCollapsed
+          ? 'w-0 -translate-x-full overflow-hidden p-0 border-r-0 opacity-0 pointer-events-none'
+          : 'w-64 p-3.5 opacity-100'
+      } ${className}`}
+    >
+
       
       {/* Top Navigation Menu List */}
       <nav className="space-y-1.5 flex-1 pt-1 overflow-y-auto">
