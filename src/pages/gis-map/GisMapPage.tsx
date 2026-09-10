@@ -47,7 +47,11 @@ export interface PoleProperties {
   install_date?: string
   warranty_expiry?: string
   near_sensitive_poi?: boolean
+  has_iot_node?: boolean
+  open_fault_count?: number
+  maintenance_status?: 'normal' | 'under_repair' | 'fault' | string
 }
+
 
 export interface PoleFeature {
   type: string
@@ -95,7 +99,10 @@ export const GisMapPage: React.FC = () => {
   // Selection & Right Panel State
   const [selectedPole, setSelectedPole] = useState<PoleFeature | null>(null)
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null)
-  const [panelTab, setPanelTab] = useState<'info' | 'iot'>('info')
+
+
+
+
 
   // Calculate Dynamic Segments List & Info
   const segmentsList = useMemo(() => {
@@ -447,7 +454,6 @@ export const GisMapPage: React.FC = () => {
         const segId = p.segment_id || 'SEG-001'
         setSelectedSegmentId(segId)
         setSelectedPole(null)
-        setPanelTab('info')
       })
     })
 
@@ -490,6 +496,7 @@ export const GisMapPage: React.FC = () => {
       const isSelected = selectedPole && selectedPole.properties?.pole_id === p.pole_id
       const status = p.fixture_status || 'unknown'
       const isNearPoi = p.near_sensitive_poi === true
+      const hasIotNode = p.has_iot_node === true
       const size = isSelected ? 26 : 18
       const strokeW = isSelected ? 3 : 2
 
@@ -525,7 +532,12 @@ export const GisMapPage: React.FC = () => {
           </svg>
           ${
             isNearPoi
-              ? `<div style="position: absolute; top: -3px; right: -3px; background: #e11d48; color: #fff; width: 11px; height: 11px; border-radius: 9999px; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; z-index: 2;">!</div>`
+              ? `<div style="position: absolute; top: -3px; right: -3px; background: #7c3aed; color: #fff; width: 11px; height: 11px; border-radius: 9999px; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; z-index: 2;" title="Gần trường, cầu">!</div>`
+              : ''
+          }
+          ${
+            hasIotNode
+              ? `<div style="position: absolute; top: -3px; left: -3px; background: #2563eb; color: #fff; width: 11px; height: 11px; border-radius: 9999px; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; z-index: 2;" title="Điểm gắn IoT">⚡</div>`
               : ''
           }
         </div>
@@ -600,7 +612,6 @@ export const GisMapPage: React.FC = () => {
   const handleSelectPole = (f: PoleFeature) => {
     setSelectedPole(f)
     setSelectedSegmentId(f.properties?.segment_id || null)
-    setPanelTab('info')
 
     if (mapRef.current) {
       mapRef.current.flyTo({
@@ -616,7 +627,6 @@ export const GisMapPage: React.FC = () => {
     setSelectedPole(f)
     setSelectedSegmentId(f.properties?.segment_id || null)
     setIsSearchFocused(false)
-    setPanelTab('info')
 
     if (mapRef.current) {
       mapRef.current.flyTo({
@@ -701,6 +711,7 @@ export const GisMapPage: React.FC = () => {
           segmentsList={segmentsList}
           showLabels={showLabels}
           setShowLabels={setShowLabels}
+          isPanelOpen={isPanelOpen}
         />
 
         {/* Map Canvas Container */}
@@ -718,8 +729,6 @@ export const GisMapPage: React.FC = () => {
           setSelectedPole={setSelectedPole}
           setSelectedSegmentId={setSelectedSegmentId}
           activeSegmentDetail={activeSegmentDetail}
-          panelTab={panelTab}
-          setPanelTab={setPanelTab}
           handleSelectPole={handleSelectPole}
         />
       )}
