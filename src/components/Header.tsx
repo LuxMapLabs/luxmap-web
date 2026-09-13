@@ -2,6 +2,8 @@ import React from 'react'
 import {
   Lightbulb,
   Bell,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 
 export interface HeaderProps {
@@ -10,6 +12,8 @@ export interface HeaderProps {
   brandBadge?: string
   hasNotification?: boolean
   onNotificationClick?: () => void
+  isSidebarCollapsed?: boolean
+  onToggleSidebar?: () => void
   className?: string
 }
 
@@ -19,16 +23,34 @@ export const Header: React.FC<HeaderProps> = ({
   brandBadge = 'PROPOSAL SPECS',
   hasNotification = true,
   onNotificationClick,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
   className = '',
 }) => {
   return (
     <header className={`h-14 bg-white border-b border-slate-200 px-5 flex items-center justify-between shrink-0 select-none z-20 ${className}`}>
       
-      {/* Left: Brand Logo + Subtitle */}
+      {/* Left: Sidebar Toggle + Brand Logo + Subtitle */}
       <div className="flex items-center gap-3">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer border border-slate-200/80 shadow-2xs mr-0.5"
+            title={isSidebarCollapsed ? "Mở thanh menu bên trái (Hiện tabbar)" : "Ẩn thanh menu bên trái (Thu gọn tabbar)"}
+          >
+            {isSidebarCollapsed ? (
+              <PanelLeftOpen className="w-4 h-4 text-slate-700" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4 text-slate-700" />
+            )}
+          </button>
+        )}
+
         <div className="w-9 h-9 rounded-xl bg-[#1f3864] text-white flex items-center justify-center shadow-2xs shrink-0">
           <Lightbulb className="w-5 h-5 text-amber-400 fill-amber-400" />
         </div>
+
         <div>
           <div className="flex items-center gap-1.5 leading-none">
             <span className="font-black text-sm tracking-wider text-slate-900 uppercase font-sans">

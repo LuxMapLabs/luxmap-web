@@ -1,11 +1,11 @@
 {
  "pole_id": "POLE-0047",
  "segment_id": "SEG-002",
- "segment_name": "Tuyen B - duong lien ap",
+ "segment_name": "Tuyen B - Nguyen Van Ni",
  "commune_id": "COM-001",
  "location": {
-  "lat": 10.965989,
-  "lng": 106.492025
+  "lng": 106.495788,
+  "lat": 10.964558
  },
  "fixture": {
   "fixture_type": "solar_all_in_one",
@@ -27,7 +27,7 @@
   "last_report_at": "2026-08-20T06:00:00Z"
  },
  "luminance_baseline": {
-  "baseline_value": 1.0,
+  "baseline_value": 1,
   "baseline_window_nights": 14,
   "dim_threshold_ratio": 0.8,
   "out_threshold_ratio": 0.15,
@@ -473,7 +473,7 @@
    "captured_at": "2026-08-19T12:00:00Z",
    "thumbnail_url": "/api/v1/frames/FRM-88213/thumbnail",
    "distance_m": 24.6,
-   "heading_deg": 25.0
+   "heading_deg": 25
   }
  ]
 }

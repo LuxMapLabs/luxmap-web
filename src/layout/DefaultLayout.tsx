@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Header } from '../components/Header'
@@ -10,6 +10,7 @@ import { getRoleName } from '../utils/roleUtils'
 export const DefaultLayout: React.FC = () => {
   const dispatch = useDispatch()
   const { user } = useSelector((state: RootState) => state.auth)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   const handleLogout = () => {
     dispatch(logout())
@@ -29,13 +30,18 @@ export const DefaultLayout: React.FC = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-100 font-sans antialiased text-slate-900">
-      {/* 1. Full-width Top Header (Navbar) */}
-      <Header />
+      {/* 1. Full-width Top Header (Navbar) with Sidebar Toggle */}
+      <Header
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
+      />
 
       {/* 2. Main Workspace: Left Sidebar + Right Page Content */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* Left Sidebar với dữ liệu người dùng thực tế và nút đăng xuất */}
+      <div className="flex-1 flex min-h-0 overflow-hidden relative">
+        {/* Left Sidebar với dữ liệu người dùng thực tế, thu gọn và nút đăng xuất */}
         <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          onToggle={() => setIsSidebarCollapsed((prev) => !prev)}
           userName={user?.fullName || 'Người dùng'}
           userRoleTitle={roleTitle}
           userInitials={initials}
@@ -50,5 +56,6 @@ export const DefaultLayout: React.FC = () => {
     </div>
   )
 }
+
 
 export default DefaultLayout
