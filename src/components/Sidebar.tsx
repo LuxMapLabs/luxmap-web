@@ -29,7 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userInitials = 'KN',
   onLogout,
   isCollapsed = false,
-  onToggle,
+  onToggle: _onToggle,
   className = '',
 }) => {
   const defaultTabs: SidebarTabItem[] = [

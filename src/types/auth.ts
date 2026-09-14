@@ -1,9 +1,9 @@
 import type { ApiError, PaginationMeta, UserDto } from './common'
 
 export enum UserRole {
-  Citizen = 0,
-  Officer = 1,
-  Leader = 2,
+  ManagementAgency = 0,
+  MaintenanceEngineer = 1,
+  FieldCrew = 2,
   Admin = 3,
 }
 
@@ -11,10 +11,39 @@ export interface User {
   id?: string
   userId?: string
   fullName: string
+  username?: string
   email: string | null
   phoneNumber?: string | null
   role: UserRole
-  administrativeUnitId: string
+  roleString?: string
+  administrativeUnitId?: string
+  communeIds?: string[]
+}
+
+export interface WebAuthTokenResponse {
+  accessToken?: string
+  access_token?: string
+  tokenType?: string
+  token_type?: string
+  expiresIn?: number
+  expires_in?: number
+}
+
+export interface WebLoginRequest {
+  username: string
+  password: string
+  rememberMe?: boolean
+  remember_me?: boolean
+}
+
+export interface JwtPayloadClaims {
+  sub: string
+  role: string
+  commune_ids: string[]
+  exp: number
+  iat: number
+  iss?: string
+  aud?: string
 }
 
 export interface AuthResponse {

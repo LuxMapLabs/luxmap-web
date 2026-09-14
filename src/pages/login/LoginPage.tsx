@@ -64,7 +64,7 @@ export const LoginPage: React.FC = () => {
     e.preventDefault()
 
     if (!email.trim()) {
-      toast.warning('Vui lòng nhập địa chỉ Email')
+      toast.warning('Vui lòng nhập tài khoản hoặc email')
       return
     }
 
@@ -310,14 +310,14 @@ export const LoginPage: React.FC = () => {
 
             {/* Form đăng nhập */}
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Input: Địa chỉ Email (Đã bỏ Mã nhân viên & SĐT theo yêu cầu) */}
+              {/* Input: Tài khoản / Email */}
               <div className="space-y-1.5">
                 <label
                   className={`text-xs font-bold tracking-wider block uppercase transition-colors ${
                     isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
                   }`}
                 >
-                  ĐỊA CHỈ EMAIL
+                  TÀI KHOẢN / EMAIL
                 </label>
                 <div
                   className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${
@@ -335,10 +335,10 @@ export const LoginPage: React.FC = () => {
                     <Mail className="w-5 h-5" />
                   </div>
                   <input
-                    type="email"
+                    type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="VD: admin@civicflow.vn"
+                    placeholder="VD: admin hoặc admin@luxmap.vn"
                     disabled={loading}
                     className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-3 disabled:opacity-50 transition-colors ${
                       isDarkMode

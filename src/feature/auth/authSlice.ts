@@ -1,14 +1,11 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { AuthState, User, LoginRequest } from '../../types/auth'
-import tokenStorage from '../../utils/tokenStorage'
 
-// Kiểm tra token để xác định trạng thái loading ban đầu khi khởi động ứng dụng
-const initialToken = tokenStorage.getAccessToken()
-
+// Khi ứng dụng khởi chạy, mặc định loading = true để thực hiện Silent Refresh kiểm tra phiên cookie
 const initialState: AuthState = {
-  user: null, // Toàn bộ thông tin User Profile chỉ lưu trong Redux, nạp qua API /auth/me
+  user: null,
   isAuthenticated: false,
-  loading: !!initialToken, // Có token -> bật loading chờ saga checkAuth thẩm định và nạp profile
+  loading: true,
   error: null,
 }
 

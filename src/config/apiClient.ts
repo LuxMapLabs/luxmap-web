@@ -1,20 +1,15 @@
 import axios, { AxiosRequestConfig, AxiosError } from 'axios'
 import tokenStorage from '../utils/tokenStorage'
 
-const RAW_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5141/api/v1').trim().replace(/\/+$/, '')
+const RAW_URL = (import.meta.env.VITE_API_URL || 'https://localhost:7252/api/v1').trim().replace(/\/+$/, '')
 export const API_BASE_URL = RAW_URL.endsWith('/api/v1') ? RAW_URL : `${RAW_URL}/api/v1`
 
-// -------------------------------------------------------------
-// Tương thích ngược: Helper methods trỏ về tokenStorage
-// -------------------------------------------------------------
-export const setRefreshToken = (token: string | null) => {
-  if (token) {
-    tokenStorage.updateRefreshToken(token)
-  }
+export const setRefreshToken = (_token: string | null) => {
+  // Cookie HttpOnly được backend quản lý tự động
 }
 
 export const getRefreshToken = (): string | null => {
-  return tokenStorage.getRefreshToken()
+  return null
 }
 
 export const clearTokens = () => {
@@ -26,9 +21,11 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // BẮT BUỘC: Cho phép browser gửi và nhận HttpOnly Cookie (__Secure-luxmap_rt)
+  withCredentials: true,
 })
 
-// Request Interceptor: Đính kèm Access Token từ tokenStorage (sessionStorage hoặc localStorage)
+// Request Interceptor: Đính kèm Access Token vào Header Authorization
 apiClient.interceptors.request.use(
   (config) => {
     const token = tokenStorage.getAccessToken()
@@ -41,7 +38,7 @@ apiClient.interceptors.request.use(
 )
 
 // -------------------------------------------------------------
-// Queue cơ chế Refresh Token để tránh Race Condition (Token Rotation)
+// Queue cơ chế Silent Refresh Token để tránh Race Condition
 // -------------------------------------------------------------
 let isRefreshing = false
 let failedQueue: Array<{
@@ -60,22 +57,23 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = []
 }
 
-// Response Interceptor: Tự động Refresh Token khi gặp lỗi 401 Unauthorized
+// Response Interceptor: Tự động Silent Refresh khi gặp lỗi 401 Unauthorized
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }
 
-    // Kiểm tra các endpoint không cần refresh token (login, register, refresh-token)
+    // Kiểm tra các endpoint xác thực không retry để tránh lặp vô hạn
     const url = originalRequest?.url || ''
     const isAuthEndpoint =
+      url.includes('/auth/web/login') ||
+      url.includes('/auth/web/refresh') ||
+      url.includes('/auth/web/logout') ||
       url.includes('/auth/login') ||
-      url.includes('/auth/register') ||
-      url.includes('/auth/refresh-token')
+      url.includes('/auth/refresh')
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
       if (isRefreshing) {
-        // Nếu đang có request khác thực hiện refresh token, xếp hàng request này lại
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject })
         })
@@ -91,45 +89,43 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true
       isRefreshing = true
 
-      const currentRefreshToken = tokenStorage.getRefreshToken()
-      if (!currentRefreshToken) {
-        // Không có refresh token hợp lệ, dọn sạch và chuyển về trang login
-        tokenStorage.clearAll()
-        isRefreshing = false
-        window.location.href = '/login'
-        return Promise.reject(error)
-      }
-
       try {
-        // Gọi API cấp lại token (backend nhận { refreshToken: string })
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
-          refreshToken: currentRefreshToken,
-        })
+        // Gọi API Web Refresh: không cần body, browser tự gửi cookie __Secure-luxmap_rt
+        const response = await axios.post(
+          `${API_BASE_URL}/auth/web/refresh`,
+          {},
+          {
+            withCredentials: true,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
 
-        const authData = response.data?.data
-        if (!authData?.accessToken) {
-          throw new Error('Dữ liệu phản hồi cấp lại token không hợp lệ')
+        const newToken =
+          response.data?.access_token ||
+          response.data?.accessToken ||
+          response.data?.data?.access_token ||
+          response.data?.data?.accessToken
+        if (!newToken) {
+          throw new Error('Không nhận được accessToken mới từ phản hồi refresh')
         }
 
-        const { accessToken, refreshToken: newRefreshToken } = authData
+        // Cập nhật token mới vào storage
+        tokenStorage.updateAccessToken(newToken)
 
-        // Cập nhật Access Token và Refresh Token mới vào đúng Storage
-        tokenStorage.updateAccessToken(accessToken)
-        if (newRefreshToken) {
-          tokenStorage.updateRefreshToken(newRefreshToken)
-        }
-
-        processQueue(null, accessToken)
+        processQueue(null, newToken)
 
         if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`
+          originalRequest.headers.Authorization = `Bearer ${newToken}`
         }
 
         return apiClient(originalRequest)
       } catch (refreshError) {
         processQueue(refreshError, null)
         tokenStorage.clearAll()
-        window.location.href = '/login'
+        // Chỉ redirect nếu không ở trang login
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login'
+        }
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false
