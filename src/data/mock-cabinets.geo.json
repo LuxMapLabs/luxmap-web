@@ -1,0 +1,194 @@
+{
+  "type": "FeatureCollection",
+  "crs_note": "EPSG:4326 (lng, lat)",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          106.489639,
+          10.970187
+        ]
+      },
+      "properties": {
+        "cabinet_id": "CAB-TL8-ROOT",
+        "cabinet_code": "TCS-TL8-ROOT",
+        "cabinet_name": "Tủ Đỉnh Tuyến A (Tỉnh Lộ 8)",
+        "role": "root_cabinet",
+        "segment_id": "SEG-001",
+        "segment_name": "Tuyến A (Tỉnh Lộ 8)",
+        "status": "active",
+        "voltage_v": 221.4,
+        "current_load_kw": 18.2,
+        "power_factor": 0.96,
+        "total_poles_managed": 46,
+        "start_pole_idx": 0,
+        "end_pole_idx": 45,
+        "subordinated_cabinets": [
+          "CAB-TL8-SUB"
+        ],
+        "landmark_note": "Đầu tuyến Tỉnh Lộ 8 - Gần nhà ông A, ngã ba Lê Vĩnh Huy",
+        "installed_at": "2023-01-15",
+        "iot_node_id": "NODE-TL8-ROOT",
+        "atlas": "Đầu tuyến Tỉnh Lộ 8 - Gần nhà ông A, ngã ba Lê Vĩnh Huy"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          106.496112,
+          10.973888
+        ]
+      },
+      "properties": {
+        "cabinet_id": "CAB-TL8-SUB",
+        "cabinet_code": "TCS-TL8-SUB",
+        "cabinet_name": "Tủ Nhánh TL8 (Phân đoạn 2)",
+        "role": "sub_cabinet",
+        "parent_cabinet_id": "CAB-TL8-ROOT",
+        "segment_id": "SEG-001",
+        "segment_name": "Tuyến A (Tỉnh Lộ 8 - Đoạn 2)",
+        "status": "fault",
+        "voltage_v": 0,
+        "current_load_kw": 0,
+        "power_factor": 0,
+        "pole_count": 23,
+        "start_pole_idx": 23,
+        "end_pole_idx": 45,
+        "fault_reason": "Nhảy Aptomat (Trip MCCB 63A) do ngắn mạch phân đoạn 2",
+        "landmark_note": "Giữa Tỉnh Lộ 8 - Đối diện cửa Chợ Củ Chi, gần nhà bà B",
+        "installed_at": "2024-03-15",
+        "iot_node_id": "NODE-TL8-SUB",
+        "atlas": "Giữa Tỉnh Lộ 8 - Đối diện cửa Chợ Củ Chi, gần nhà bà B"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          106.495788,
+          10.964558
+        ]
+      },
+      "properties": {
+        "cabinet_id": "CAB-NVN-ROOT",
+        "cabinet_code": "TCS-NVN-ROOT",
+        "cabinet_name": "Tủ Đỉnh Tuyến B (Nguyễn Văn Ni)",
+        "role": "root_cabinet",
+        "segment_id": "SEG-002",
+        "segment_name": "Tuyến B (Nguyễn Văn Ni)",
+        "status": "active",
+        "voltage_v": 220.8,
+        "current_load_kw": 12.4,
+        "power_factor": 0.95,
+        "total_poles_managed": 31,
+        "start_pole_idx": 46,
+        "end_pole_idx": 76,
+        "subordinated_cabinets": [
+          "CAB-NVN-SUB"
+        ],
+        "landmark_note": "Đầu đường Nguyễn Văn Ni - Gần nhà ông C, đối diện cơ quan",
+        "installed_at": "2023-05-10",
+        "iot_node_id": "NODE-NVN-ROOT",
+        "atlas": "Đầu đường Nguyễn Văn Ni - Gần nhà ông C, đối diện cơ quan"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          106.497211,
+          10.970174
+        ]
+      },
+      "properties": {
+        "cabinet_id": "CAB-NVN-SUB",
+        "cabinet_code": "TCS-NVN-SUB",
+        "cabinet_name": "Tủ Nhánh NVN (Phân đoạn 2)",
+        "role": "sub_cabinet",
+        "parent_cabinet_id": "CAB-NVN-ROOT",
+        "segment_id": "SEG-002",
+        "segment_name": "Tuyến B (Nguyễn Văn Ni - Đoạn 2)",
+        "status": "active",
+        "voltage_v": 219.5,
+        "current_load_kw": 6,
+        "power_factor": 0.94,
+        "pole_count": 15,
+        "start_pole_idx": 62,
+        "end_pole_idx": 76,
+        "landmark_note": "Gần cổng trường THPT Củ Chi - Đối diện cửa nhà ông D",
+        "installed_at": "2024-05-20",
+        "iot_node_id": "NODE-NVN-SUB",
+        "atlas": "Gần cổng trường THPT Củ Chi - Đối diện cửa nhà ông D"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          106.498048,
+          10.963327
+        ]
+      },
+      "properties": {
+        "cabinet_id": "CAB-HVC-ROOT",
+        "cabinet_code": "TCS-HVC-ROOT",
+        "cabinet_name": "Tủ Đỉnh Tuyến C (Huỳnh Văn Cọ)",
+        "role": "root_cabinet",
+        "segment_id": "SEG-003",
+        "segment_name": "Tuyến C (Huỳnh Văn Cọ)",
+        "status": "active",
+        "voltage_v": 220.1,
+        "current_load_kw": 10.5,
+        "power_factor": 0.95,
+        "total_poles_managed": 26,
+        "start_pole_idx": 77,
+        "end_pole_idx": 102,
+        "subordinated_cabinets": [
+          "CAB-HVC-SUB"
+        ],
+        "landmark_note": "Đầu đường Huỳnh Văn Cọ - Gần nhà ông E",
+        "installed_at": "2023-02-12",
+        "iot_node_id": "NODE-HVC-ROOT",
+        "atlas": "Đầu đường Huỳnh Văn Cọ - Gần nhà ông E"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          106.498815,
+          10.966981
+        ]
+      },
+      "properties": {
+        "cabinet_id": "CAB-HVC-SUB",
+        "cabinet_code": "TCS-HVC-SUB",
+        "cabinet_name": "Tủ Nhánh HVC (Phân đoạn 2)",
+        "role": "sub_cabinet",
+        "parent_cabinet_id": "CAB-HVC-ROOT",
+        "segment_id": "SEG-003",
+        "segment_name": "Tuyến C (Huỳnh Văn Cọ - Đoạn 2)",
+        "status": "fault",
+        "voltage_v": 0,
+        "current_load_kw": 0,
+        "power_factor": 0,
+        "pole_count": 13,
+        "start_pole_idx": 90,
+        "end_pole_idx": 102,
+        "fault_reason": "Ngắn mạch pha-đất gây nhảy bảo vệ phân đoạn 2",
+        "landmark_note": "Cuối đường Huỳnh Văn Cọ - Đối diện trạm y tế, gần nhà ông G",
+        "installed_at": "2024-01-10",
+        "iot_node_id": "NODE-HVC-SUB",
+        "atlas": "Cuối đường Huỳnh Văn Cọ - Đối diện trạm y tế, gần nhà ông G"
+      }
+    }
+  ]
+}

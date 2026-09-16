@@ -6,26 +6,27 @@ import {
   AlertCircle,
   HelpCircle,
   Route,
-  Tag,
   X,
+  Lightbulb,
 } from 'lucide-react'
-import { SegmentInfo, GisStats, PoleFeature } from '../GisMapPage'
+import type { SegmentInfo, GisStats } from '../GisMapPage'
+import type { SearchResultItem } from '../../../utils/gis-map/gisSearchUtils'
 
 interface MapControlBarProps {
   searchQuery: string
   setSearchQuery: (q: string) => void
   isSearchFocused: boolean
   setIsSearchFocused: (f: boolean) => void
-  searchSuggestions: PoleFeature[]
-  handleSelectSearchResult: (f: PoleFeature) => void
+  searchSuggestions: SearchResultItem[]
+  handleSelectSearchResult: (item: SearchResultItem) => void
+  handleSearchSubmit: (query: string) => void
+  handleSearchClear?: () => void
   statusFilter: string
   setStatusFilter: (s: string) => void
   stats: GisStats
   selectedSegment: string
   handleSegmentSelect: (segId: string) => void
   segmentsList: SegmentInfo[]
-  showLabels: boolean
-  setShowLabels: React.Dispatch<React.SetStateAction<boolean>>
   isPanelOpen?: boolean
 }
 
@@ -36,29 +37,42 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
   setIsSearchFocused,
   searchSuggestions,
   handleSelectSearchResult,
+  handleSearchSubmit,
+  handleSearchClear,
   statusFilter,
   setStatusFilter,
   stats,
   selectedSegment,
   handleSegmentSelect,
   segmentsList,
-  showLabels,
-  setShowLabels,
   isPanelOpen = false,
 }) => {
   // Reusable Search Input Node
   const searchInputNode = (widthClass: string) => (
     <div className={`relative ${widthClass} bg-white/95 backdrop-blur-md shadow-md border border-slate-200 rounded-xl overflow-visible`}>
       <div className="flex items-center px-3 py-2">
-        <Search className="w-4 h-4 text-blue-500 shrink-0 mr-2" />
+        <button
+          type="button"
+          onClick={() => handleSearchSubmit(searchQuery)}
+          className="cursor-pointer focus:outline-none shrink-0 mr-2"
+          title="Tìm kiếm"
+        >
+          <Search className="w-4 h-4 text-blue-500 hover:text-blue-600 transition" />
+        </button>
         <input
           type="text"
-          placeholder="Tìm mã cột (POLE-0047)..."
+          placeholder="Tìm mã cột, tuyến đường, tủ điện, atlas (gần nhà ông A...)..."
           value={searchQuery}
           onFocus={() => setIsSearchFocused(true)}
           onChange={(e) => {
             setSearchQuery(e.target.value)
             setIsSearchFocused(true)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              handleSearchSubmit(searchQuery)
+            }
           }}
           className="w-full bg-transparent text-xs text-slate-800 font-semibold focus:outline-none placeholder:text-slate-400"
         />
@@ -67,6 +81,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
             type="button"
             onClick={() => {
               setSearchQuery('')
+              handleSearchClear?.()
               setIsSearchFocused(false)
             }}
             className="p-0.5 text-slate-400 hover:text-slate-600 cursor-pointer"
@@ -78,36 +93,48 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
 
       {/* Autocomplete Dropdown */}
       {isSearchFocused && searchQuery.trim() && searchSuggestions.length > 0 && (
-        <div className={`absolute top-12 left-0 ${widthClass} bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 space-y-1 z-30 max-h-60 overflow-y-auto`}>
-          {searchSuggestions.map((f: PoleFeature) => (
+        <div className={`absolute top-12 left-0 min-w-[320px] w-full bg-white/98 backdrop-blur-md border border-slate-200 rounded-2xl shadow-2xl p-1.5 space-y-1 z-50 max-h-72 overflow-y-auto`}>
+          <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-100">
+            <span>Gợi ý ({searchSuggestions.length})</span>
+            <span className="text-[9px] font-normal lowercase text-slate-400">Ấn Enter để chọn</span>
+          </div>
+          {searchSuggestions.map((item: SearchResultItem) => (
             <div
-              key={f.properties.pole_id}
-              onClick={() => handleSelectSearchResult(f)}
-              className="p-2 hover:bg-slate-50 rounded-lg cursor-pointer flex items-center justify-between text-xs transition"
+              key={`${item.category}-${item.id}`}
+              onClick={() => handleSelectSearchResult(item)}
+              className="p-2 hover:bg-blue-50/70 rounded-xl cursor-pointer flex items-center justify-between text-xs transition group"
             >
-              <div>
-                <span className="font-bold text-slate-800">{f.properties.pole_id}</span>
-                <span className="text-[10px] text-slate-500 ml-1.5">{f.properties.segment_id}</span>
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                <div
+                  className={`p-1.5 rounded-lg shrink-0 ${
+                    item.category === 'segment'
+                      ? 'bg-blue-100 text-blue-700'
+                      : item.category === 'cabinet'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  {item.category === 'segment' && <Route className="w-3.5 h-3.5" />}
+                  {item.category === 'cabinet' && <Zap className="w-3.5 h-3.5" />}
+                  {item.category === 'pole' && <Lightbulb className="w-3.5 h-3.5" />}
+                </div>
+                <div className="truncate">
+                  <div className="font-bold text-slate-800 group-hover:text-blue-700 truncate">{item.title}</div>
+                  <div className="text-[10.5px] text-slate-500 truncate">{item.subtitle}</div>
+                </div>
               </div>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
-                  f.properties.fixture_status === 'normal'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : f.properties.fixture_status === 'dim'
-                    ? 'bg-amber-100 text-amber-800'
-                    : f.properties.fixture_status === 'out'
-                    ? 'bg-rose-100 text-rose-800'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
-              >
-                {f.properties.fixture_status === 'normal'
-                  ? 'Sáng'
-                  : f.properties.fixture_status === 'dim'
-                  ? 'Mờ'
-                  : f.properties.fixture_status === 'out'
-                  ? 'Tắt'
-                  : 'Chưa quét'}
-              </span>
+              {item.badgeText && (
+                <span
+                  className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium shrink-0 border flex items-center gap-1.5 shadow-2xs ${
+                    item.badgeColorClass || 'bg-slate-50 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  {item.statusDotColor && (
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.statusDotColor}`} />
+                  )}
+                  <span>{item.badgeText}</span>
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -117,70 +144,90 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
 
   // Reusable Status Filter Pills Node
   const statusPillsNode = (
-    <div className="bg-white/95 backdrop-blur-md shadow-md border border-slate-200 rounded-xl p-1 flex items-center gap-1 text-xs font-medium text-slate-700 shrink-0">
+    <div className="flex items-center bg-white/95 backdrop-blur-md shadow-md border border-slate-200 rounded-xl p-1 gap-1 text-xs shrink-0 overflow-x-auto">
       <button
         type="button"
         onClick={() => setStatusFilter('all')}
-        className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
           statusFilter === 'all'
-            ? 'bg-primary text-white font-bold shadow-2xs'
-            : 'hover:bg-slate-100 text-slate-700 font-semibold'
+            ? 'bg-slate-900 text-white shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100'
         }`}
       >
-        Tất cả ({stats.total})
+        <Zap className="w-3 h-3" />
+        <span>Tất cả</span>
+        <span className="bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+          {stats.total}
+        </span>
       </button>
+
       <button
         type="button"
-        onClick={() => setStatusFilter(statusFilter === 'normal' ? 'all' : 'normal')}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+        onClick={() => setStatusFilter('normal')}
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
           statusFilter === 'normal'
-            ? 'bg-emerald-600 text-white font-bold shadow-2xs'
-            : 'hover:bg-slate-100 text-emerald-700 font-semibold'
+            ? 'bg-emerald-600 text-white shadow-sm'
+            : 'text-emerald-700 hover:bg-emerald-50'
         }`}
       >
-        <Zap className={`w-3.5 h-3.5 ${statusFilter === 'normal' ? 'text-white' : 'text-emerald-500 fill-emerald-100'}`} />
-        <span>Đạt chuẩn ({stats.normal})</span>
+        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>Đạt chuẩn</span>
+        <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+          {stats.normal}
+        </span>
       </button>
+
       <button
         type="button"
-        onClick={() => setStatusFilter(statusFilter === 'dim' ? 'all' : 'dim')}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+        onClick={() => setStatusFilter('dim')}
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
           statusFilter === 'dim'
-            ? 'bg-amber-600 text-white font-bold shadow-2xs'
-            : 'hover:bg-slate-100 text-amber-700 font-semibold'
+            ? 'bg-amber-500 text-white shadow-sm'
+            : 'text-amber-700 hover:bg-amber-50'
         }`}
       >
-        <AlertTriangle className={`w-3.5 h-3.5 ${statusFilter === 'dim' ? 'text-white' : 'text-amber-500 fill-amber-100'}`} />
-        <span>Đèn mờ ({stats.dim})</span>
+        <AlertTriangle className="w-3 h-3" />
+        <span>Đèn mờ</span>
+        <span className="bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+          {stats.dim}
+        </span>
       </button>
+
       <button
         type="button"
-        onClick={() => setStatusFilter(statusFilter === 'out' ? 'all' : 'out')}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+        onClick={() => setStatusFilter('out')}
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
           statusFilter === 'out'
-            ? 'bg-rose-600 text-white font-bold shadow-2xs'
-            : 'hover:bg-slate-100 text-rose-700 font-semibold'
+            ? 'bg-rose-600 text-white shadow-sm'
+            : 'text-rose-700 hover:bg-rose-50'
         }`}
       >
-        <AlertCircle className={`w-3.5 h-3.5 ${statusFilter === 'out' ? 'text-white' : 'text-rose-500 fill-rose-100'}`} />
-        <span>Hỏng/Tắt ({stats.out})</span>
+        <AlertCircle className="w-3 h-3" />
+        <span>Hỏng / Tắt</span>
+        <span className="bg-rose-100 text-rose-800 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+          {stats.out}
+        </span>
       </button>
+
       <button
         type="button"
-        onClick={() => setStatusFilter(statusFilter === 'unknown' ? 'all' : 'unknown')}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+        onClick={() => setStatusFilter('unknown')}
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
           statusFilter === 'unknown'
-            ? 'bg-slate-600 text-white font-bold shadow-2xs'
-            : 'hover:bg-slate-100 text-slate-700 font-semibold'
+            ? 'bg-slate-600 text-white shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100'
         }`}
       >
-        <HelpCircle className={`w-3.5 h-3.5 ${statusFilter === 'unknown' ? 'text-white' : 'text-slate-400'}`} />
-        <span>Chưa quét ({stats.unknown})</span>
+        <HelpCircle className="w-3 h-3" />
+        <span>Chưa quét</span>
+        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+          {stats.unknown}
+        </span>
       </button>
     </div>
   )
 
-  // Reusable Tools Node (Segment Selector & Show Labels Button)
+  // Reusable Tools Node (Segment Selector)
   const toolsNode = (maxDropdownWidth: string) => (
     <div className="flex items-center gap-1.5 shrink-0">
       {/* Segment Filter Dropdown */}
@@ -191,7 +238,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
           onChange={(e) => handleSegmentSelect(e.target.value)}
           className={`bg-transparent text-slate-800 font-bold focus:outline-none cursor-pointer pr-1 ${maxDropdownWidth} truncate`}
         >
-          <option value="all">Tất cả 3 tuyến</option>
+          <option value="all">Tất cả tuyến</option>
           {segmentsList.map((seg) => (
             <option key={seg.id} value={seg.id}>
               {seg.name} - {seg.id} ({seg.poleCount} cột)
@@ -199,28 +246,14 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
           ))}
         </select>
       </div>
-
-      {/* Show/Hide Pole Labels Button */}
-      <button
-        type="button"
-        onClick={() => setShowLabels((prev) => !prev)}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer border shrink-0 ${
-          showLabels
-            ? 'bg-blue-600 text-white border-blue-700'
-            : 'bg-white/95 backdrop-blur-md text-slate-700 border-slate-200 hover:bg-slate-100'
-        }`}
-      >
-        <Tag className="w-3.5 h-3.5" />
-        <span>Hiện mã cột</span>
-      </button>
     </div>
   )
 
   // 1. When Drawer is OPEN (width is limited to ~800px):
-  // Put Route Selector & Show Labels UNDER Search Box to give Status Pills full room on Row 1
+  // Put Route Selector UNDER Search Box to give Status Pills full room on Row 1
   if (isPanelOpen) {
     return (
-      <div className="absolute top-3.5 left-3.5 right-3.5 z-10 flex items-start gap-2.5 pointer-events-none">
+      <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex items-start gap-2.5 pointer-events-none">
         {/* Left Column: Search Box on top, Tools directly underneath */}
         <div className="flex flex-col gap-2 pointer-events-auto shrink-0">
           {searchInputNode('w-64 sm:w-72')}
@@ -238,7 +271,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
   // 2. When Drawer is CLOSED (normal wide screen):
   // Everything is on 1 SINGLE CLEAN ROW!
   return (
-    <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between gap-3 pointer-events-none">
+    <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between gap-3 pointer-events-none">
       <div className="flex items-center gap-2.5 pointer-events-auto">
         {searchInputNode('w-60 lg:w-64')}
         {statusPillsNode}
