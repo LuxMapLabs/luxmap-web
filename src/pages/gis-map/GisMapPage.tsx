@@ -1,57 +1,29 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react'
-import type { Feature } from 'geojson'
+import React, { useRef, useState, useMemo, useCallback } from 'react'
 import * as maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
 
-import {
-  GOOGLE_HYBRID_STYLE,
-  DEFAULT_MAP_CENTER,
-  DEFAULT_MAP_ZOOM,
-} from '../../utils/mapUtils'
+// Backend Types (Tự động tạo từ Backend, giữ nguyên không can thiệp)
+import type { FixtureType, PowerSource, RoadClass, DataSource } from '../../types/assets'
 
-// Mock Data
-import mockPolesData from '../../data/mock-poles.geo.json'
-import mockSegmentsData from '../../data/mock-segments.geo.json'
-
-// Subcomponents & Types
-import { MapControlBar } from './components/MapControlBar'
-import { GisMapLegend } from './components/GisMapLegend'
-import { GisDrawerPanel } from './components/GisDrawerPanel'
-
-export interface SegmentInfo {
-  id: string
-  name: string
-  cabinet: string
-  road: string
-  poleCount: number
-  lengthM: number
-  hasActiveSegmentFault?: boolean
-  iotStatus?: string
-}
-
-export interface GisStats {
-  total: number
-  normal: number
-  dim: number
-  out: number
-  unknown: number
-}
-
+// GeoJSON & UI Types (Giữ nguyên tại đây để đảm bảo tương thích ngược 100% với các file import)
 export interface PoleProperties {
   pole_id: string
   segment_id: string
+  feeder_id?: string | null
   fixture_status?: 'normal' | 'dim' | 'out' | 'unknown' | string
-  power_source?: 'solar' | 'grid' | string
-  fixture_type?: string
+  power_source?: PowerSource | string
+  fixture_type?: FixtureType | string
   lamp_watt?: number
-  install_date?: string
-  warranty_expiry?: string
+  install_date?: string | null
+  warranty_expiry?: string | null
   near_sensitive_poi?: boolean
+  data_source?: DataSource | string
+  lux_value?: number
+  meter_model?: string | null
   has_iot_node?: boolean
   open_fault_count?: number
   maintenance_status?: 'normal' | 'under_repair' | 'fault' | string
+  [key: string]: any
 }
-
 
 export interface PoleFeature {
   type: string
@@ -64,12 +36,15 @@ export interface PoleFeature {
 
 export interface SegmentProperties {
   segment_id: string
-  segment_name?: string
-  road_class?: string
+  segment_name?: string | null
+  road_class?: RoadClass | string
   length_m?: number
   pole_count?: number
   controller_node_id?: string
   has_active_segment_fault?: boolean
+  data_source?: DataSource | string
+  commune_id?: string | null
+  [key: string]: any
 }
 
 export interface SegmentFeature {
@@ -81,645 +56,317 @@ export interface SegmentFeature {
   properties: SegmentProperties
 }
 
+export interface SegmentInfo {
+  id: string
+  name: string
+  cabinet: string
+  road: string
+  poleCount: number
+  lengthM: number
+  hasActiveSegmentFault?: boolean
+  iotStatus?: 'online' | 'offline' | string
+  [key: string]: any
+}
+
+export interface GisStats {
+  total: number
+  normal: number
+  dim: number
+  out: number
+  unknown: number
+}
+
+// Subcomponents, Custom Hooks & Utilities
+import { MapControlBar } from './components/MapControlBar'
+import { GisMapLegend } from './components/GisMapLegend'
+import { GisDrawerPanel } from './components/GisDrawerPanel'
+import { useElectricalCascade } from '../../hooks/gis-map/useElectricalCascade'
+import { useGisMapInstance } from '../../hooks/gis-map/useGisMapInstance'
+import { useFeederLinesLayer } from '../../hooks/gis-map/useFeederLinesLayer'
+import { useGisMarkers } from '../../hooks/gis-map/useGisMarkers'
+import type { SearchResultItem } from '../../utils/gis-map/gisSearchUtils'
+
 export const GisMapPage: React.FC = () => {
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<maplibregl.Map | null>(null)
-  const popupRef = useRef<maplibregl.Popup | null>(null)
-  const markersRef = useRef<maplibregl.Marker[]>([])
-  const isHoveringPoleRef = useRef<boolean>(false)
+  const isHoveringMarkerRef = useRef<boolean>(false)
+  const activeHoverSourceRef = useRef<'pole' | 'cabinet' | 'feeder' | null>(null)
 
+  // 1. Khởi tạo MapLibre instance và các điều khiển bản đồ
+  const { mapContainerRef, mapRef, popupRef, isMapLoaded } = useGisMapInstance()
 
-  // Filters & State
+  // 2. Trạng thái bộ lọc & thanh tìm kiếm
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [searchInput, setSearchInput] = useState<string>('')
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState<string>('')
   const [selectedSegment, setSelectedSegment] = useState<string>('all')
-  const [showLabels, setShowLabels] = useState<boolean>(false)
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false)
 
-  // Selection & Right Panel State
+  // 3. Trạng thái đối tượng được chọn & mở Panel bên phải
   const [selectedPole, setSelectedPole] = useState<PoleFeature | null>(null)
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null)
+  const [selectedCabinet, setSelectedCabinet] = useState<any | null>(null)
 
+  // 4. Hook quản lý logic điện học cascade & danh mục phân tuyến
+  const {
+    cabinets,
+    handleToggleCabinet,
+    effectivePoles,
+    segmentsList,
+    segmentInfoMap,
+    searchSuggestions,
+    filteredFeatures,
+    filteredSegmentsData,
+  } = useElectricalCascade({
+    statusFilter,
+    selectedSegment,
+    searchQuery: appliedSearchQuery,
+    searchInput: searchInput,
+  })
 
-
-
-
-  // Calculate Dynamic Segments List & Info
-  const segmentsList = useMemo(() => {
-    const rawSegments = (mockSegmentsData.features || []) as unknown as SegmentFeature[]
-    return rawSegments.map((f: SegmentFeature, idx: number) => {
-      const p = f.properties || {}
-      const segId = p.segment_id || `SEG-00${idx + 1}`
-      const isFault = p.has_active_segment_fault === true || segId === 'SEG-003'
-      
-      const poleCount = ((mockPolesData.features || []) as unknown as PoleFeature[]).filter(
-        (pole: PoleFeature) => pole.properties?.segment_id === segId
-      ).length || p.pole_count || 0
-
-      let cleanName = segId === 'SEG-001' ? 'Tuyến A' : segId === 'SEG-002' ? 'Tuyến B' : segId === 'SEG-003' ? 'Tuyến C' : segId
-      if (p.segment_name) {
-        const raw = p.segment_name.split(' - ')[0]
-        if (raw.toLowerCase().includes('tuyen a')) cleanName = 'Tuyến A'
-        else if (raw.toLowerCase().includes('tuyen b')) cleanName = 'Tuyến B'
-        else if (raw.toLowerCase().includes('tuyen c')) cleanName = 'Tuyến C'
-        else cleanName = raw
-      }
-
-      return {
-        id: segId,
-        name: cleanName,
-        cabinet: p.controller_node_id || `NODE-00${idx + 1}-CTRL`,
-        road: cleanName,
-        poleCount,
-        lengthM: p.length_m || 0,
-        hasActiveSegmentFault: isFault,
-        iotStatus: isFault ? 'offline' : 'online',
-      } as SegmentInfo
+  // Thống kê nhanh trạng thái chiếu sáng (đồng bộ thời gian thực theo cascade)
+  const stats: GisStats = useMemo(() => {
+    let normal = 0
+    let dim = 0
+    let out = 0
+    let unknown = 0
+    effectivePoles.forEach((f: PoleFeature) => {
+      const s = f.properties?.fixture_status
+      if (s === 'normal') normal++
+      else if (s === 'dim') dim++
+      else if (s === 'out') out++
+      else unknown++
     })
-  }, [])
+    return { total: effectivePoles.length, normal, dim, out, unknown }
+  }, [effectivePoles])
 
-  const segmentInfoMap: Record<string, SegmentInfo> = useMemo(() => {
-    const map: Record<string, SegmentInfo> = {}
-    segmentsList.forEach((s) => {
-      map[s.id] = s
-    })
-    return map
-  }, [segmentsList])
-
-  // Active Segment Details
+  // Chi tiết tuyến đường đang chọn
   const activeSegmentDetail = useMemo(() => {
     if (selectedSegmentId && segmentInfoMap[selectedSegmentId]) {
       return segmentInfoMap[selectedSegmentId]
     }
-    return segmentsList[0] || {
-      id: 'SEG-001',
-      name: 'Tuyến A',
-      cabinet: 'NODE-001-CTRL',
-      road: 'Tuyến A',
-      poleCount: 46,
-      lengthM: 1600,
-      hasActiveSegmentFault: false,
-      iotStatus: 'online',
-    }
+    return (
+      segmentsList[0] || {
+        id: 'SEG-001',
+        name: 'Tuyến A',
+        cabinet: 'NODE-001-CTRL',
+        road: 'Tuyến A',
+        poleCount: 46,
+        lengthM: 1600,
+        hasActiveSegmentFault: false,
+        iotStatus: 'online',
+      }
+    )
   }, [selectedSegmentId, segmentInfoMap, segmentsList])
 
+  // 5. Chọn cột đèn
+  const handleSelectPole = useCallback(
+    (f: PoleFeature) => {
+      setSelectedPole(f)
+      setSelectedCabinet(null)
+      setSelectedSegmentId(f.properties?.segment_id || null)
 
-
-  // Autocomplete Suggestions
-  const searchSuggestions = useMemo(() => {
-    if (!searchQuery.trim()) return []
-    const q = searchQuery.toLowerCase().trim()
-    return ((mockPolesData.features || []) as unknown as PoleFeature[])
-      .filter((f: PoleFeature) => {
-        const id = f.properties?.pole_id?.toLowerCase() || ''
-        const seg = f.properties?.segment_id?.toLowerCase() || ''
-        return id.includes(q) || seg.includes(q)
-      })
-      .slice(0, 8)
-  }, [searchQuery])
-
-  // Filtered Poles Features
-  const filteredFeatures = useMemo(() => {
-    return ((mockPolesData.features || []) as unknown as PoleFeature[]).filter((f: PoleFeature) => {
-      const p = f.properties || {}
-      
-      if (selectedSegment !== 'all' && p.segment_id !== selectedSegment) {
-        return false
-      }
-
-      if (statusFilter !== 'all' && p.fixture_status !== statusFilter) {
-        return false
-      }
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim()
-        const id = p.pole_id?.toLowerCase() || ''
-        const seg = p.segment_id?.toLowerCase() || ''
-        if (!id.includes(q) && !seg.includes(q)) {
-          return false
-        }
-      }
-
-      return true
-    })
-  }, [statusFilter, selectedSegment, searchQuery])
-
-  // Filtered Segments GeoJSON Data (trimmed to match filtered poles)
-  const filteredSegmentsData = useMemo(() => {
-    const allSegments = (mockSegmentsData.features || []) as unknown as SegmentFeature[]
-    
-    // Group filtered poles by segment_id
-    const polesBySeg: Record<string, PoleFeature[]> = {}
-    filteredFeatures.forEach((pole) => {
-      const segId = pole.properties?.segment_id
-      if (segId) {
-        if (!polesBySeg[segId]) polesBySeg[segId] = []
-        polesBySeg[segId].push(pole)
-      }
-    })
-
-    const builtSegments = allSegments
-      .map((seg) => {
-        const segId = seg.properties?.segment_id
-        const segPoles = polesBySeg[segId] || []
-        
-        if (segPoles.length > 1) {
-          const coordinates = segPoles.map((p) => p.geometry.coordinates)
-          return {
-            ...seg,
-            geometry: {
-              type: 'LineString',
-              coordinates,
-            },
-          }
-        }
-        return null
-      })
-      .filter(Boolean) as SegmentFeature[]
-
-    if (selectedSegment === 'all') return builtSegments
-    return builtSegments.filter((f) => f.properties?.segment_id === selectedSegment)
-  }, [selectedSegment, filteredFeatures])
-
-
-  // GIS Overall Statistics
-  const stats: GisStats = useMemo(() => {
-    const list = (mockPolesData.features || []) as unknown as PoleFeature[]
-    const total = list.length
-    const normal = list.filter((f: PoleFeature) => f.properties?.fixture_status === 'normal').length
-    const dim = list.filter((f: PoleFeature) => f.properties?.fixture_status === 'dim').length
-    const out = list.filter((f: PoleFeature) => f.properties?.fixture_status === 'out').length
-    const unknown = list.filter((f: PoleFeature) => !['normal', 'dim', 'out'].includes(f.properties?.fixture_status || '')).length
-    return { total, normal, dim, out, unknown }
-  }, [])
-
-  // Initialize MapLibre GL Map
-  useEffect(() => {
-    if (!mapContainerRef.current) return
-
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: GOOGLE_HYBRID_STYLE,
-      center: DEFAULT_MAP_CENTER,
-      zoom: DEFAULT_MAP_ZOOM,
-      minZoom: 6,
-      maxZoom: 20,
-      attributionControl: false,
-    })
-
-    mapRef.current = map
-
-    // Controls
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), 'bottom-right')
-
-
-
-    
-    const geolocate = new maplibregl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: false,
-      showUserLocation: true,
-    })
-
-    geolocate.on('trackuserlocationstart', () => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.add('is-searching-location')
-    })
-
-    geolocate.on('geolocate', (e: maplibregl.GeolocatePositionEvent) => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.add('is-searching-location')
-
-      if (e?.coords) {
-        map.flyTo({
-          center: [e.coords.longitude, e.coords.latitude],
-          zoom: 17,
+      if (mapRef.current) {
+        mapRef.current.flyTo({
+          center: f.geometry.coordinates,
+          zoom: 17.5,
           speed: 1.2,
         })
-        map.once('moveend', () => {
-          btn?.classList.remove('is-searching-location')
+      }
+    },
+    [mapRef]
+  )
+
+  // 6. Chọn tủ điện
+  const handleSelectCabinet = useCallback(
+    (cabinetData: any, coords: [number, number]) => {
+      const p = cabinetData.properties || cabinetData
+      setSelectedCabinet(p)
+      setSelectedPole(null)
+      if (p.segment_id) {
+        setSelectedSegmentId(p.segment_id)
+      }
+      if (mapRef.current) {
+        mapRef.current.flyTo({
+          center: coords,
+          zoom: p.role === 'root_cabinet' ? 16.8 : 17.5,
+          speed: 1.2,
         })
-      } else {
-        btn?.classList.remove('is-searching-location')
       }
-    })
+    },
+    [mapRef]
+  )
 
-    geolocate.on('error', (err: maplibregl.GeolocateErrorEvent) => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.remove('is-searching-location')
-      console.warn('Geolocation error:', err)
-      if (err?.code === 1) {
-        alert('Trình duyệt chưa được cấp quyền Vị trí (Location). Bạn vui lòng bấm vào biểu tượng cài đặt trên thanh địa chỉ URL để cấp quyền nhé!')
-      }
-    })
-
-    map.addControl(geolocate, 'bottom-right')
-    map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left')
-
-    // Tooltip Popup
-    const popup = new maplibregl.Popup({
-      closeButton: false,
-      closeOnClick: false,
-      offset: [0, -14],
-      className: 'feeder-hover-tooltip',
-    })
-    popupRef.current = popup
-
-    map.on('load', () => {
-      // Register custom Vector Arch Bridge Icon (SDF)
-      const bridgeSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-        <path d="M4 12 L44 12 L44 16 L4 16 Z" fill="#ffffff"/>
-        <line x1="4" y1="8" x2="44" y2="8" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
-        <path d="M4 16 L4 34 L8 34 L8 24 C10 16 20 16 22 24 L22 34 L26 34 L26 24 C28 16 38 16 40 24 L40 34 L44 34 L44 16 Z" fill="#ffffff"/>
-      </svg>`
-      const bridgeImg = new Image(48, 48)
-      bridgeImg.onload = () => {
-        if (!map.hasImage('bridge_icon')) {
-          map.addImage('bridge_icon', bridgeImg, { sdf: true })
-        }
-      }
-      bridgeImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(bridgeSvg)
-
-      // Feeder Segments Line Layer
-      map.addSource('feeder-lines', {
-
-
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: filteredSegmentsData as unknown as Feature[],
-        },
-      })
-
-      // Glow Underlay
-      map.addLayer({
-        id: 'feeder-lines-glow',
-        type: 'line',
-        source: 'feeder-lines',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-        },
-        paint: {
-          'line-color': [
-            'case',
-            ['==', ['get', 'segment_id'], 'SEG-003'],
-            '#e11d48',
-            '#00f2fe',
-          ],
-          'line-width': 9,
-          'line-opacity': 0.45,
-          'line-blur': 4,
-        },
-      })
-
-      // Core Line
-      map.addLayer({
-        id: 'feeder-lines-core',
-        type: 'line',
-        source: 'feeder-lines',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-        },
-        paint: {
-          'line-color': [
-            'case',
-            ['==', ['get', 'segment_id'], 'SEG-003'],
-            '#f43f5e',
-            '#38bdf8',
-          ],
-          'line-width': 3.5,
-          'line-opacity': 0.95,
-        },
-      })
-
-      // Segment Hover Events
-      map.on('mousemove', 'feeder-lines-core', (e) => {
-        if (isHoveringPoleRef.current) {
-          map.getCanvas().style.cursor = ''
-          if (popupRef.current) popupRef.current.remove()
-          return
-        }
-        if (!e.features || e.features.length === 0) return
-        map.getCanvas().style.cursor = 'pointer'
-        const feat = e.features[0]
-        const p = feat.properties || {}
-        const segId = p.segment_id || 'SEG-001'
-        const info = segmentInfoMap[segId]
-
-
-        if (info && popupRef.current) {
-          const isFault = info.hasActiveSegmentFault
-          const statusBg = isFault ? 'bg-rose-500' : 'bg-emerald-500'
-          const statusText = isFault ? 'Sự cố mất điện lộ' : 'Đang cấp điện bình thường'
-
-          const html = `
-            <div class="bg-white/98 text-slate-800 p-3 rounded-2xl shadow-xl border border-slate-200/90 backdrop-blur-md min-w-56 font-sans">
-              <div class="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                <span class="font-bold text-xs text-blue-700 flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full ${statusBg} animate-pulse"></span>
-                  ${info.id} - ${info.cabinet}
-                </span>
-                <span class="text-[10.5px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">${info.poleCount} Cột</span>
-              </div>
-              <div class="pt-2 space-y-1.5 text-[11.5px]">
-                <div class="font-bold text-slate-800">${info.name}</div>
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-slate-500 font-medium">Chiều dài:</span>
-                  <span class="font-mono text-slate-700 font-bold">${info.lengthM}m</span>
-                </div>
-                <div class="flex items-center justify-between text-[11px] pt-0.5">
-                  <span class="text-slate-500 font-medium">Trạng thái:</span>
-                  <span class="${isFault ? 'text-rose-600 bg-rose-50 border border-rose-200' : 'text-emerald-700 bg-emerald-50 border border-emerald-200'} px-2 py-0.5 rounded-full font-bold text-[10.5px]">${statusText}</span>
-                </div>
-              </div>
-            </div>
-          `
-
-          popupRef.current.setLngLat(e.lngLat).setHTML(html).addTo(map)
-
-        }
-      })
-
-      map.on('mouseleave', 'feeder-lines-core', () => {
-        map.getCanvas().style.cursor = ''
-        if (popupRef.current) popupRef.current.remove()
-      })
-
-      map.on('click', 'feeder-lines-core', (e) => {
-        if (!e.features || e.features.length === 0) return
-        const p = e.features[0].properties || {}
-        const segId = p.segment_id || 'SEG-001'
-        setSelectedSegmentId(segId)
-        setSelectedPole(null)
-      })
-    })
-
-    return () => {
-      markersRef.current.forEach((m) => m.remove())
-      markersRef.current = []
-      map.remove()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // 7. Chọn tuyến cáp (Click trực tiếp lên đường dây)
+  const handleSelectSegmentLine = useCallback((segId: string) => {
+    setSelectedSegmentId(segId)
+    setSelectedPole(null)
+    setSelectedCabinet(null)
   }, [])
 
+  // 8. Hook quản lý lớp đường dây cáp điện GeoJSON
+  useFeederLinesLayer({
+    map: mapRef.current,
+    isMapLoaded,
+    filteredSegmentsData,
+    segmentInfoMap,
+    popupRef,
+    isHoveringMarkerRef,
+    activeHoverSourceRef,
+    onSelectSegment: handleSelectSegmentLine,
+  })
 
-  // Update Feeder Lines GeoJSON when selected segment filter changes
-  useEffect(() => {
-    if (!mapRef.current) return
-    const map = mapRef.current
-    if (map.getSource('feeder-lines')) {
-      const src = map.getSource('feeder-lines') as maplibregl.GeoJSONSource
-      src.setData({
-        type: 'FeatureCollection',
-        features: filteredSegmentsData as unknown as Feature[],
-      })
+  // 9. Hook quản lý Marker Cột đèn & Tủ điện + Phân cấp Zoom (LOD)
+  useGisMarkers({
+    map: mapRef.current,
+    isMapLoaded,
+    filteredFeatures,
+    cabinets,
+    selectedPole,
+    selectedCabinet,
+    popupRef,
+    isHoveringMarkerRef,
+    activeHoverSourceRef,
+    onSelectPole: handleSelectPole,
+    onSelectCabinet: handleSelectCabinet,
+  })
 
+  // 10. Lọc tuyến từ Dropdown & Zoom vào tuyến (không mở Drawer)
+  const handleSegmentSelect = useCallback(
+    (segId: string, fromSearch = false) => {
+      setSelectedSegment(segId)
+      setSelectedSegmentId(null)
+      setSelectedPole(null)
+      setSelectedCabinet(null)
 
-
-    }
-  }, [filteredSegmentsData])
-
-  // Render 103 Custom Pole Markers with DOM Elements
-  useEffect(() => {
-    if (!mapRef.current) return
-    const map = mapRef.current
-
-    markersRef.current.forEach((m) => m.remove())
-    markersRef.current = []
-
-    filteredFeatures.forEach((f: PoleFeature) => {
-      const p = f.properties || {}
-      const coords = f.geometry.coordinates
-      const isSelected = selectedPole && selectedPole.properties?.pole_id === p.pole_id
-      const status = p.fixture_status || 'unknown'
-      const isNearPoi = p.near_sensitive_poi === true
-      const hasIotNode = p.has_iot_node === true
-      const size = isSelected ? 26 : 18
-      const strokeW = isSelected ? 3 : 2
-
-      const el = document.createElement('div')
-      el.className = 'select-none pointer-events-auto cursor-pointer group'
-      el.style.width = '0px'
-      el.style.height = '0px'
-      el.style.position = 'relative'
-      el.style.zIndex = isSelected ? '20' : '5'
-
-      // Status Colors
-      let fillCol = '#10b981'
-      let glowCol = 'rgba(16, 185, 129, 0.4)'
-      if (status === 'dim') {
-        fillCol = '#f59e0b'
-        glowCol = 'rgba(245, 158, 11, 0.45)'
-      } else if (status === 'out') {
-        fillCol = '#f43f5e'
-        glowCol = 'rgba(244, 63, 94, 0.45)'
-      } else if (status === 'unknown') {
-        fillCol = '#64748b'
-        glowCol = 'rgba(100, 116, 139, 0.25)'
+      if (segId === 'all' || !fromSearch) {
+        setSearchInput('')
+        setAppliedSearchQuery('')
+        setIsSearchFocused(false)
       }
 
-      const half = size / 2
+      if (!mapRef.current) return
+      const map = mapRef.current
 
-      let html = `
-        <div style="position: absolute; top: -${half}px; left: -${half}px; width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
-          <div style="position: absolute; inset: -4px; border-radius: 9999px; background: ${glowCol}; filter: blur(3px); ${status === 'out' || isSelected ? 'animation: pulse 2s infinite;' : ''}"></div>
-          <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="position: relative; z-index: 1;">
-            <circle cx="12" cy="12" r="10" fill="${fillCol}" stroke="#ffffff" stroke-width="${strokeW}" />
-            ${status === 'normal' ? '<circle cx="12" cy="12" r="3" fill="#ffffff" />' : ''}
-          </svg>
-          ${
-            isNearPoi
-              ? `<div style="position: absolute; top: -3px; right: -3px; background: #7c3aed; color: #fff; width: 11px; height: 11px; border-radius: 9999px; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; z-index: 2;" title="Gần trường, cầu">!</div>`
-              : ''
-          }
-          ${
-            hasIotNode
-              ? `<div style="position: absolute; top: -3px; left: -3px; background: #2563eb; color: #fff; width: 11px; height: 11px; border-radius: 9999px; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; z-index: 2;" title="Điểm gắn IoT">⚡</div>`
-              : ''
-          }
-        </div>
-      `
+      const targetPoles =
+        segId === 'all'
+          ? effectivePoles
+          : effectivePoles.filter((f: PoleFeature) => f.properties?.segment_id === segId)
 
-      if (showLabels || isSelected) {
-        html += `
-          <div style="position: absolute; top: ${half + 3}px; left: 0px; transform: translateX(-50%); background: rgba(15, 23, 42, 0.88); color: #ffffff; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; font-family: monospace; white-space: nowrap; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 2px 6px rgba(0,0,0,0.35); backdrop-filter: blur(2px); pointer-events: none; z-index: 3;">
-            ${p.pole_id}
-          </div>
-        `
-      }
-
-      el.innerHTML = html
-
-      el.addEventListener('mouseenter', () => {
-        isHoveringPoleRef.current = true
-        if (popupRef.current) popupRef.current.remove()
-      })
-
-      el.addEventListener('mouseleave', () => {
-        isHoveringPoleRef.current = false
-      })
-
-      el.addEventListener('mousemove', (e) => {
-        e.stopPropagation()
-        isHoveringPoleRef.current = true
-        if (popupRef.current) popupRef.current.remove()
-      })
-
-      el.addEventListener('click', (e) => {
-        e.stopPropagation()
-        if (popupRef.current) popupRef.current.remove()
-        handleSelectPole(f)
-      })
-
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat(coords)
-
-        .addTo(map)
-
-      markersRef.current.push(marker)
-    })
-  }, [filteredFeatures, selectedPole, showLabels])
-
-  // Handle Segment Select & FitBounds
-  const handleSegmentSelect = (segId: string) => {
-    setSelectedSegment(segId)
-    if (!mapRef.current) return
-    const map = mapRef.current
-
-    if (segId === 'all') {
-      const allPoles = (mockPolesData.features || []) as unknown as PoleFeature[]
-      if (allPoles.length === 0) return
-      const bounds = new maplibregl.LngLatBounds()
-      allPoles.forEach((f: PoleFeature) => bounds.extend(f.geometry.coordinates))
-      map.fitBounds(bounds, { padding: 60, duration: 800, maxZoom: 15.5 })
-    } else {
-      const segPoles = ((mockPolesData.features || []) as unknown as PoleFeature[]).filter(
-        (f: PoleFeature) => f.properties?.segment_id === segId
-      )
-      if (segPoles.length > 0) {
+      if (targetPoles.length > 0) {
         const bounds = new maplibregl.LngLatBounds()
-        segPoles.forEach((f: PoleFeature) => bounds.extend(f.geometry.coordinates))
-        map.fitBounds(bounds, { padding: 80, duration: 800, maxZoom: 16.5 })
+        targetPoles.forEach((f: PoleFeature) => bounds.extend(f.geometry.coordinates))
+        map.fitBounds(bounds, {
+          padding: segId === 'all' ? 60 : 80,
+          duration: 800,
+          maxZoom: segId === 'all' ? 15.5 : 16.5,
+        })
       }
-    }
-  }
+    },
+    [effectivePoles, mapRef]
+  )
 
-  // Select Pole
-  const handleSelectPole = (f: PoleFeature) => {
-    setSelectedPole(f)
-    setSelectedSegmentId(f.properties?.segment_id || null)
+  // 11. Chọn đối tượng từ gợi ý tìm kiếm (Đa danh mục: Tuyến, Cột, Tủ điện, Atlas)
+  const handleSelectSearchResult = useCallback(
+    (item: SearchResultItem) => {
+      setIsSearchFocused(false)
 
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: f.geometry.coordinates,
-        zoom: 17.5,
-        speed: 1.2,
-      })
-    }
-  }
+      if (item.category === 'segment') {
+        setSearchInput(item.title)
+        setAppliedSearchQuery('')
+        setSelectedPole(null)
+        setSelectedCabinet(null)
+        setSelectedSegmentId(null)
+        handleSegmentSelect(item.id, true)
+      } else if (item.category === 'cabinet') {
+        setSearchInput(item.title)
+        setAppliedSearchQuery('')
+        const cab = item.data
+        const p = cab?.properties || {}
+        setSelectedCabinet(p)
+        setSelectedPole(null)
+        if (p.segment_id) {
+          setSelectedSegmentId(p.segment_id)
+          if (selectedSegment !== 'all' && selectedSegment !== p.segment_id) {
+            setSelectedSegment(p.segment_id)
+          }
+        }
+        if (mapRef.current && item.coordinates) {
+          mapRef.current.flyTo({
+            center: item.coordinates,
+            zoom: 17.5,
+            speed: 1.2,
+          })
+        }
+      } else if (item.category === 'pole') {
+        setSearchInput(item.title)
+        setAppliedSearchQuery('')
+        const f = item.data as PoleFeature
+        const segId = f.properties?.segment_id
+        if (segId && selectedSegment !== 'all' && selectedSegment !== segId) {
+          setSelectedSegment(segId)
+        }
+        handleSelectPole(f)
+      }
+    },
+    [handleSegmentSelect, handleSelectPole, mapRef, selectedSegment]
+  )
 
-  // Select Pole from Search Dropdown
-  const handleSelectSearchResult = (f: PoleFeature) => {
-    setSelectedPole(f)
-    setSelectedSegmentId(f.properties?.segment_id || null)
+  // 12. Xử lý khi nhấn Enter trên ô tìm kiếm
+  const handleSearchSubmit = useCallback(
+    (query: string) => {
+      const trimmed = query.trim()
+      setIsSearchFocused(false)
+
+      if (!trimmed) {
+        setAppliedSearchQuery('')
+        return
+      }
+
+      if (searchSuggestions.length > 0) {
+        handleSelectSearchResult(searchSuggestions[0])
+        return
+      }
+
+      setAppliedSearchQuery(trimmed)
+    },
+    [handleSelectSearchResult, searchSuggestions]
+  )
+
+  const handleSearchClear = useCallback(() => {
+    setSearchInput('')
+    setAppliedSearchQuery('')
     setIsSearchFocused(false)
+  }, [])
 
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: f.geometry.coordinates,
-        zoom: 17.5,
-        speed: 1.2,
-      })
-    }
-  }
-
-  const isPanelOpen = Boolean(selectedPole || selectedSegmentId)
+  const isPanelOpen = Boolean(selectedPole || selectedSegmentId || selectedCabinet)
 
   return (
     <div className="flex-1 flex h-full w-full overflow-hidden bg-slate-50 relative select-none">
-      
-      {/* Tooltip Global Style */}
-      <style>{`
-        .feeder-hover-tooltip {
-          pointer-events: none !important;
-          max-width: none !important;
-          z-index: 99999 !important;
-        }
-
-        .feeder-hover-tooltip .maplibregl-popup-content {
-          box-shadow: none !important;
-          background: transparent !important;
-          border-radius: 10px !important;
-          max-width: none !important;
-          padding: 0 !important;
-        }
-        .feeder-hover-tooltip .maplibregl-popup-tip {
-          border-top-color: #ffffff !important;
-        }
-        /* Attribution: Native compact mode showing ONLY the (i) button until clicked */
-        .maplibregl-ctrl-attrib.maplibregl-compact {
-          background-color: transparent !important;
-          border-radius: 12px !important;
-        }
-
-        .maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) {
-          background-color: transparent !important;
-          padding: 0 !important;
-        }
-
-        .maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) .maplibregl-ctrl-attrib-inner {
-          display: none !important;
-        }
-
-        .maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show {
-          background-color: rgba(255, 255, 255, 0.95) !important;
-          backdrop-filter: blur(6px) !important;
-          padding: 2px 28px 2px 8px !important;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-        }
-
-        .maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
-          display: inline-block !important;
-          font-size: 11px !important;
-        }
-      `}</style>
-
-
-
-
-
       {/* Map Area */}
       <div className="flex-1 flex flex-col relative overflow-hidden h-full">
-        
+        {/* Map Canvas Container */}
+        <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+
         {/* Top Control Bar */}
         <MapControlBar
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
+          searchQuery={searchInput}
+          setSearchQuery={setSearchInput}
           isSearchFocused={isSearchFocused}
           setIsSearchFocused={setIsSearchFocused}
           searchSuggestions={searchSuggestions}
           handleSelectSearchResult={handleSelectSearchResult}
+          handleSearchSubmit={handleSearchSubmit}
+          handleSearchClear={handleSearchClear}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
           stats={stats}
           selectedSegment={selectedSegment}
           handleSegmentSelect={handleSegmentSelect}
           segmentsList={segmentsList}
-          showLabels={showLabels}
-          setShowLabels={setShowLabels}
           isPanelOpen={isPanelOpen}
         />
 
-        {/* Map Canvas Container */}
-        <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
-
         {/* Bottom Left Legend Box */}
         <GisMapLegend />
-
       </div>
 
       {/* Right Drawer Side Panel */}
@@ -730,9 +377,11 @@ export const GisMapPage: React.FC = () => {
           setSelectedSegmentId={setSelectedSegmentId}
           activeSegmentDetail={activeSegmentDetail}
           handleSelectPole={handleSelectPole}
+          selectedCabinet={selectedCabinet}
+          setSelectedCabinet={setSelectedCabinet}
+          onToggleCabinet={(cabId) => handleToggleCabinet(cabId, setSelectedCabinet)}
         />
       )}
-
     </div>
   )
 }

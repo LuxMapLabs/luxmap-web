@@ -1,0 +1,11 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <!-- Cabinet enclosure body -->
+  <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" fill="#ffffff" stroke="currentColor" stroke-width="2"/>
+  <!-- Top canopy / header divider -->
+  <path d="M3.5 8H20.5" stroke="currentColor" stroke-width="1.5"/>
+  <!-- Center electrical lightning bolt -->
+  <path d="M13 9L8.5 14H12L11 18L15.5 13H12L13 9Z" fill="currentColor"/>
+  <!-- Root cabinet golden star badge -->
+  <circle cx="17.5" cy="6.5" r="3.5" fill="#f59e0b" stroke="#ffffff" stroke-width="1"/>
+  <path d="M17.5 4.8L18.1 6.2H19.5L18.4 7.1L18.8 8.5L17.5 7.6L16.2 8.5L16.6 7.1L15.5 6.2H16.9L17.5 4.8Z" fill="#ffffff"/>
+</svg>

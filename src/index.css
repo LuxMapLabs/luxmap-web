@@ -20,6 +20,7 @@
 .feeder-hover-tooltip {
   max-width: none !important;
   pointer-events: none !important;
+  z-index: 99999 !important;
 }
 
 .feeder-hover-tooltip .maplibregl-popup-content {
@@ -32,6 +33,67 @@
 
 .feeder-hover-tooltip .maplibregl-popup-tip {
   border-top-color: #ffffff !important;
+}
+
+/* MapLibre Attribution Control Style */
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background-color: transparent !important;
+  border-radius: 12px !important;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) {
+  background-color: transparent !important;
+  padding: 0 !important;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) .maplibregl-ctrl-attrib-inner {
+  display: none !important;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(6px) !important;
+  padding: 2px 28px 2px 8px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  display: inline-block !important;
+  font-size: 11px !important;
+}
+
+/* Marker Zoom Animation & Smooth Transitions */
+.gis-marker-wrap {
+  transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.32s !important;
+  will-change: opacity, transform;
+}
+
+.gis-marker-wrap.gis-marker-visible {
+  opacity: 1 !important;
+  transform: scale(1);
+  pointer-events: auto !important;
+  visibility: visible !important;
+  transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s !important;
+}
+
+.gis-marker-wrap.gis-marker-visible:hover {
+  transform: scale(1.18);
+}
+
+.gis-marker-wrap.gis-marker-visible.is-selected {
+  transform: scale(1.25) !important;
+}
+
+.gis-marker-wrap.gis-marker-visible.is-selected:hover {
+  transform: scale(1.32) !important;
+}
+
+.gis-marker-wrap.gis-marker-hidden {
+  opacity: 0 !important;
+  transform: scale(0.2) !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.32s !important;
 }
 
 /* Custom Thin Scrollbar */

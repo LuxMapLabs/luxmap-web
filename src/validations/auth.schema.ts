@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import type { LoginRequest } from '../types/auth'
 
 /**
  * Regex kiểm tra số điện thoại Việt Nam (10 số)
@@ -24,7 +23,7 @@ export const loginSchema = z.object({
   password: z
     .string()
     .min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
-}) satisfies z.ZodType<LoginRequest>
+})
 
 export type LoginFormData = z.infer<typeof loginSchema>
 
