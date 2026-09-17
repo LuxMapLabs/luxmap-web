@@ -12,9 +12,13 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  Power,
+  MapPin,
 } from 'lucide-react'
 
-import { SegmentInfo, PoleFeature } from '../GisMapPage'
+import type { SegmentInfo, PoleFeature } from '../GisMapPage'
+import cabinetSvg from '../../../assets/icons/cabinet.svg'
+import cabinetRootSvg from '../../../assets/icons/cabinet-root.svg'
 import mockPolesData from '../../../data/mock-poles.geo.json'
 import mockPoleDetailData from '../../../data/mock-pole-detail.json'
 import mockIotNodesData from '../../../data/mock-iot-nodes.geo.json'
@@ -50,6 +54,9 @@ export interface GisDrawerPanelProps {
   setSelectedSegmentId: (s: string | null) => void
   activeSegmentDetail: SegmentInfo
   handleSelectPole: (f: PoleFeature) => void
+  selectedCabinet?: any
+  setSelectedCabinet?: (c: any) => void
+  onToggleCabinet?: (cabinetId: string) => void
 }
 
 interface IncidentRecord {
@@ -70,6 +77,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   setSelectedSegmentId,
   activeSegmentDetail,
   handleSelectPole,
+  selectedCabinet,
+  setSelectedCabinet,
+  onToggleCabinet,
 }) => {
   // Lightbox Modal state
   const [lightboxImage, setLightboxImage] = useState<{
@@ -96,7 +106,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   }, [selectedPole])
 
   // Accordion state: auto-open if pole has issue, otherwise collapsed
-  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(isUnderRepair || isFaulted)
+  const hasIssue =
+    selectedPole?.properties?.fixture_status === 'out' ||
+    selectedPole?.properties?.fixture_status === 'dim' ||
+    (selectedPole?.properties?.open_fault_count || 0) > 0
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(hasIssue)
+
+  // Sync accordion state when a new pole is selected
+  React.useEffect(() => {
+    setIsHistoryOpen(hasIssue)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPole?.properties?.pole_id])
 
   // Load More state (default showing 2 recent incidents)
   const [visibleCount, setVisibleCount] = useState<number>(2)
@@ -138,11 +159,28 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       },
       afterPhoto: {
         url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=900&auto=format&fit=crop&q=80',
-        label: 'Nghiệm thu sau vệ sinh và thay tụ',
+        label: 'Nghiệm thu sau vệ sinh',
       },
     },
     {
-      id: `INC-2024-${poleId ? poleId.replace('POLE-', '') : '0083'}-03`,
+      id: `INC-2025-${poleId ? poleId.replace('POLE-', '') : '0083'}-03`,
+      title: 'Cột nghiêng 4 độ sau va quẹt nhẹ xe tải',
+      time: '05/04/2025 09:15',
+      status: 'resolved',
+      technician: 'Trần Đình Trọng (Đội cơ khí)',
+      workOrderId: 'WO-2025-0405',
+      description: 'Siết lại bu-lông móng cột, cân chỉnh độ thẳng đứng, kiểm tra cáp tiếp địa.',
+      beforePhoto: {
+        url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&auto=format&fit=crop&q=80',
+        label: 'Hiện trường va chạm',
+      },
+      afterPhoto: {
+        url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=900&auto=format&fit=crop&q=80',
+        label: 'Đã gia cố móng hoàn chỉnh',
+      },
+    },
+    {
+      id: `INC-2024-${poleId ? poleId.replace('POLE-', '') : '0083'}-04`,
       title: 'Hở mối nối dây nguồn trên thân cột',
       time: '15/07/2024 10:15',
       status: 'resolved',
@@ -159,7 +197,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       },
     },
     {
-      id: `INC-2023-${poleId ? poleId.replace('POLE-', '') : '0083'}-04`,
+      id: `INC-2023-${poleId ? poleId.replace('POLE-', '') : '0083'}-05`,
       title: 'Bảo trì định kỳ & cân chỉnh góc chiếu đèn',
       time: '05/03/2023 15:00',
       status: 'resolved',
@@ -177,14 +215,14 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     },
   ]
 
-
-
   const polePhotoUrl =
     'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=900&auto=format&fit=crop&q=80'
 
+  const isRootCabinet = selectedCabinet?.role === 'root_cabinet'
+
   return (
     <>
-      <aside className="w-[390px] bg-white border-l border-slate-200 shadow-2xl flex flex-col z-20 shrink-0 font-sans">
+      <aside className="w-[390px] bg-white border-l border-slate-200 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
         
         {/* Panel Header */}
         <div className="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
@@ -197,9 +235,15 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     : maintenanceStatus === 'fault'
                     ? 'bg-rose-100 text-rose-700'
                     : 'bg-emerald-100 text-emerald-700'
+                  : selectedCabinet
+                  ? selectedCabinet.status === 'fault'
+                    ? 'bg-rose-100 text-rose-700'
+                    : isRootCabinet
+                    ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                    : 'bg-emerald-100 text-emerald-700'
                   : activeSegmentDetail.hasActiveSegmentFault
                   ? 'bg-rose-100 text-rose-700'
-                  : 'bg-blue-100 text-blue-700'
+                  : 'bg-emerald-100 text-emerald-700'
               }`}
             >
               {selectedPole ? (
@@ -210,23 +254,26 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 ) : (
                   <Zap className="w-4 h-4 text-emerald-600" />
                 )
+              ) : selectedCabinet ? (
+                <img
+                  src={isRootCabinet ? cabinetRootSvg : cabinetSvg}
+                  className={`w-4.5 h-4.5 shrink-0 ${selectedCabinet.status === 'fault' ? 'filter hue-rotate-180' : ''}`}
+                  alt="Tủ điện"
+                />
               ) : (
-                <Radio className="w-4 h-4 text-blue-600" />
+                <Radio className={`w-4 h-4 ${activeSegmentDetail.hasActiveSegmentFault ? 'text-rose-600' : 'text-emerald-600'}`} />
               )}
             </div>
 
             <div>
               <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                <span>{selectedPole ? selectedPole.properties?.pole_id : activeSegmentDetail.name}</span>
-
-                {selectedPole?.properties?.has_iot_node && (
-                  <span
-                    className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[8px] font-bold shrink-0"
-                    title="Điểm gắn IoT"
-                  >
-                    ⚡
-                  </span>
-                )}
+                <span>
+                  {selectedPole
+                    ? selectedPole.properties?.pole_id
+                    : selectedCabinet
+                    ? selectedCabinet.cabinet_name
+                    : activeSegmentDetail.name}
+                </span>
 
                 {selectedPole?.properties?.near_sensitive_poi && (
                   <span
@@ -252,7 +299,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       Bình thường
                     </span>
                   )
-                ) : (
+                ) : selectedCabinet ? null : (
                   <span
                     className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
                       activeSegmentDetail.hasActiveSegmentFault
@@ -260,12 +307,16 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     }`}
                   >
-                    {activeSegmentDetail.hasActiveSegmentFault ? 'Sự cố lộ' : 'Cấp điện ổn định'}
+                    {activeSegmentDetail.hasActiveSegmentFault ? 'Đã ngắt điện' : 'Cấp điện ổn định'}
                   </span>
                 )}
               </div>
               <div className="text-[11px] text-slate-500">
-                {selectedPole ? activeSegmentDetail.name : `${activeSegmentDetail.id} · Tủ ${activeSegmentDetail.cabinet}`}
+                {selectedPole
+                  ? activeSegmentDetail.name
+                  : selectedCabinet
+                  ? `${selectedCabinet.cabinet_code} · ${selectedCabinet.landmark_note}`
+                  : `${activeSegmentDetail.id} · Tủ ${activeSegmentDetail.cabinet}`}
               </div>
             </div>
           </div>
@@ -275,6 +326,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
             onClick={() => {
               setSelectedPole(null)
               setSelectedSegmentId(null)
+              if (setSelectedCabinet) setSelectedCabinet(null)
             }}
             className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition cursor-pointer"
             title="Đóng"
@@ -287,7 +339,20 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
         <div className="flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar">
           {selectedPole ? (
             <div className="space-y-4 text-xs">
-                  {/* 1. Actual Pole Photo */}
+              {/* Cascade Fault Alert Banner */}
+              {selectedPole.properties.power_loss_reason && (
+                <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl text-xs space-y-1">
+                  <div className="font-bold text-rose-800 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>Sự cố mất nguồn cấp điện!</span>
+                  </div>
+                  <p className="text-rose-700 text-[11px] leading-relaxed">
+                    {selectedPole.properties.power_loss_reason}
+                  </p>
+                </div>
+              )}
+
+              {/* 1. Actual Pole Photo */}
                   <div
                     onClick={() =>
                       setLightboxImage({
@@ -369,6 +434,15 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           </span>
                         </div>
                       )}
+                      <div className="flex justify-between items-start gap-2 pt-1 border-t border-slate-200/60">
+                        <span className="text-slate-500 shrink-0 flex items-center gap-1 font-medium">
+                          <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          Ghi chú Atlas:
+                        </span>
+                        <span className="font-semibold text-slate-800 text-right">
+                          {selectedPole.properties.atlas || selectedPole.properties.atlas_note || 'Đang cập nhật'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -575,6 +649,199 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     )}
                   </div>
             </div>
+          ) : selectedCabinet ? (
+            <div className="space-y-4 text-xs">
+              {/* Cabinet Details Card */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <div className="font-bold text-slate-800 text-xs border-b border-slate-200/80 pb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <img
+                      src={isRootCabinet ? cabinetRootSvg : cabinetSvg}
+                      className={`w-4 h-4 shrink-0 ${selectedCabinet.status === 'fault' ? 'filter hue-rotate-180' : ''}`}
+                      alt="Tủ điện"
+                    />
+                    <span>{isRootCabinet ? 'Thông số Tủ Đỉnh Tuyến' : 'Thông số Tủ Nhánh Phân Đoạn'}</span>
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                      selectedCabinet.status === 'fault'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : isRootCabinet
+                        ? 'bg-amber-50 text-amber-800 border-amber-300'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}
+                  >
+                    {selectedCabinet.status === 'fault' ? 'Đã ngắt nguồn' : 'Đang cấp điện'}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 text-[11.5px] text-slate-600">
+                  <div className="flex justify-between">
+                    <span>Mã hiệu quản lý:</span>
+                    <strong className="text-slate-900 font-mono">{selectedCabinet.cabinet_code}</strong>
+                  </div>
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-slate-500 shrink-0 flex items-center gap-1 font-medium">
+                      <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      Ghi chú Atlas:
+                    </span>
+                    <span className="text-slate-900 font-semibold text-right max-w-[220px]">
+                      {selectedCabinet.atlas || selectedCabinet.landmark_note || 'Đang cập nhật'}
+                    </span>
+                  </div>
+                  {isRootCabinet ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Tuyến lộ phụ trách:</span>
+                        <strong className="text-blue-700 font-bold">{selectedCabinet.segment_name}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Vai trò cấp nguồn:</span>
+                        <strong className="text-amber-700 font-bold flex items-center gap-1">
+                          <span>⭐ Tủ Đỉnh (Cấp nguồn toàn tuyến)</span>
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tổng số đèn quản lý:</span>
+                        <strong className="text-slate-900 font-mono">{selectedCabinet.total_poles_managed} cột đèn</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tủ nhánh trực thuộc:</span>
+                        <strong className="text-emerald-700 font-bold font-mono">{selectedCabinet.subordinated_cabinets?.length || 1} tủ phân đoạn</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Phụ tải toàn tuyến:</span>
+                        <strong className="text-slate-900 font-mono">{selectedCabinet.current_load_kw} kW</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Điện áp nguồn:</span>
+                        <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 font-bold' : 'text-slate-900'}`}>{selectedCabinet.voltage_v} V</strong>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Thuộc tủ đỉnh:</span>
+                        <strong className="text-amber-800 font-semibold">{selectedCabinet.parent_cabinet_id}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Phân đoạn phụ trách:</span>
+                        <strong className="text-blue-700 font-bold">{selectedCabinet.segment_name}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Số lượng đèn phân đoạn:</span>
+                        <strong className="text-slate-900 font-mono">{selectedCabinet.pole_count} cột đèn</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Phụ tải phân đoạn:</span>
+                        <strong className="text-slate-900 font-mono">{selectedCabinet.current_load_kw} kW</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Điện áp pha:</span>
+                        <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 font-bold' : 'text-slate-900'}`}>{selectedCabinet.voltage_v} V</strong>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Breaker Simulation Action Button */}
+                {onToggleCabinet && (
+                  <div className="pt-2 border-t border-slate-200/80">
+                    <button
+                      onClick={() => onToggleCabinet(selectedCabinet.cabinet_id)}
+                      className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all ${
+                        selectedCabinet.status === 'fault'
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-rose-600 hover:bg-rose-700 text-white'
+                      }`}
+                    >
+                      <Power className="w-3.5 h-3.5" />
+                      <span>{selectedCabinet.status === 'fault' ? 'Đóng Aptomat' : 'Ngắt Aptomat'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Electrical Specs Card */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                <div className="font-bold text-slate-800 text-xs border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Hệ thống IoT Giám sát từ xa</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-100 text-emerald-800">
+                    {selectedCabinet.iot_gateway_id || selectedCabinet.iot_node_id}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 bg-white rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-slate-400 block">Hệ số Cos φ</span>
+                    <strong className="text-slate-900 font-mono text-xs">{selectedCabinet.power_factor || '0.95'}</strong>
+                  </div>
+                  <div className="p-2 bg-white rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-slate-400 block">Tần số lưới</span>
+                    <strong className="text-slate-900 font-mono text-xs">50.0 Hz</strong>
+                  </div>
+                  <div className="p-2 bg-white rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-slate-400 block">Nhiệt độ tủ</span>
+                    <strong className="text-slate-900 font-mono text-xs">34.2 °C</strong>
+                  </div>
+                </div>
+
+                {selectedCabinet.fault_reason && (
+                  <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-800 space-y-0.5">
+                    <span className="font-bold flex items-center gap-1 text-rose-700">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Cảnh báo bảo vệ Rơ-le:
+                    </span>
+                    <p className="text-[10.5px] leading-relaxed">{selectedCabinet.fault_reason}</p>
+                    <p className="text-[10px] text-rose-600 font-semibold pt-0.5">➔ Toàn bộ {selectedCabinet.pole_count || selectedCabinet.total_poles_managed} cột thuộc tuyến/phân đoạn này bị cắt điện.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Connected Poles on this Cabinet Section / Route */}
+              {typeof selectedCabinet.start_pole_idx === 'number' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-800 text-xs">
+                      {isRootCabinet ? `Dàn đèn toàn tuyến (${selectedCabinet.cabinet_code})` : `Dàn đèn phân đoạn (${selectedCabinet.cabinet_code})`}
+                    </p>
+                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded ${selectedCabinet.status === 'fault' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                      {selectedCabinet.status === 'fault' ? 'Mất điện' : `${selectedCabinet.pole_count || selectedCabinet.total_poles_managed} đèn đang sáng`}
+                    </span>
+                  </div>
+                  <div className="space-y-1 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
+                    {((mockPolesData.features || []) as unknown as PoleFeature[])
+                      .slice(selectedCabinet.start_pole_idx, selectedCabinet.end_pole_idx + 1)
+                      .map((f: PoleFeature) => {
+                        const isOff = selectedCabinet.status === 'fault'
+                        return (
+                          <div
+                            key={f.properties.pole_id}
+                            onClick={() => handleSelectPole(f)}
+                            className="p-2 bg-slate-50 hover:bg-blue-50/80 rounded-lg cursor-pointer flex items-center justify-between border border-slate-100 hover:border-blue-200 transition group"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold font-mono text-slate-800 text-xs group-hover:text-blue-700 transition-colors">
+                                {f.properties.pole_id}
+                              </span>
+                            </div>
+                            <span
+                              className={`text-[9.5px] px-2 py-0.5 rounded font-bold ${
+                                isOff
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {isOff ? 'TẮT (Mất nguồn tủ)' : 'SÁNG (220V)'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-4 text-xs">
               {/* 1. Segment Overview Card */}
@@ -591,7 +858,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     }`}
                   >
-                    {activeSegmentDetail.hasActiveSegmentFault ? 'Sự cố lộ' : 'Bình thường'}
+                    {activeSegmentDetail.hasActiveSegmentFault ? 'Đã ngắt nguồn' : 'Đang cấp điện'}
                   </span>
                 </div>
                 <div className="space-y-1.5 text-[11.5px] text-slate-600">
@@ -655,7 +922,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <span>Aptomat:</span>
                   <strong>
                     {activeSegmentDetail.hasActiveSegmentFault ? (
-                      <span className="text-rose-600 font-bold">Đã Nhảy (Trip)</span>
+                      <span className="text-rose-600 font-bold">Đã Ngắt (OFF)</span>
                     ) : (
                       <span className="text-emerald-700 font-bold">Đang Đóng (ON)</span>
                     )}
@@ -691,11 +958,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           <span className="font-bold font-mono text-slate-800 text-xs group-hover:text-blue-700 transition-colors">
                             {f.properties.pole_id}
                           </span>
-                          {f.properties.has_iot_node && (
-                            <span className="text-[9.5px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-semibold font-mono flex items-center gap-0.5">
-                              ⚡ IoT
-                            </span>
-                          )}
                           {f.properties.near_sensitive_poi && (
                             <span
                               className="w-3.5 h-3.5 rounded-full bg-violet-600 text-white flex items-center justify-center text-[8px] font-bold shrink-0 shadow-xs"

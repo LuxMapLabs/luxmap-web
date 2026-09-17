@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+vite.config.ts.timestamp*
 
 # Khuyến nghị nên commit package-lock.json để đồng bộ phiên bản thư viện trong nhóm
 # package-lock.json

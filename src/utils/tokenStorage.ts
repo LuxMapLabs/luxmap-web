@@ -67,21 +67,6 @@ export const tokenStorage = {
     }
   },
 
-  /**
-   * Tương thích ngược với code cũ
-   */
-  setTokens(accessToken: string, _refreshToken?: string, rememberMe: boolean = false): void {
-    this.setAccessToken(accessToken, rememberMe)
-  },
-
-  getRefreshToken(): string | null {
-    // Refresh token giờ nằm trong HttpOnly cookie
-    return null
-  },
-
-  updateRefreshToken(_newRefreshToken: string): void {
-    // Cookie được backend tự động cập nhật
-  },
 
   /**
    * Xóa sạch token khi Đăng xuất

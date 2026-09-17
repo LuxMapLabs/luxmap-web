@@ -193,6 +193,9 @@ async function run() {
                     commonContent += generateInterface(sName, sDef) + '\n'
                 }
             }
+            if (!moduleSchemas['common'].has('UserDto')) {
+                commonContent += `export interface UserDto {\n    id?: string | null\n    username?: string | null\n    email?: string | null\n    full_name?: string | null\n    role?: string | null\n    commune_ids?: string[]\n}\n\n`
+            }
             fs.writeFileSync(path.resolve(typesDir, 'common.ts'), commonContent, 'utf-8')
             console.log(`  ✓ Đã tạo: src/types/common.ts`)
             generatedFiles.push('common')
