@@ -1,39 +1,26 @@
-import React, { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import React from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from '../components/Header'
-import { Sidebar } from '../components/Sidebar'
 
 export const DefaultLayout: React.FC = () => {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const location = useLocation()
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-100 font-sans antialiased text-slate-900">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans antialiased text-slate-900 dark:text-slate-100">
       
-      {/* 1. Full-width Top Header (Navbar) with Sidebar Toggle */}
-      <Header
-        isSidebarCollapsed={isSidebarCollapsed}
-        onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
-      />
+      {/* 1. Full-width Institutional Top Navbar */}
+      <Header />
 
-      {/* 2. Main Workspace: Left Sidebar + Right Page Content */}
-      <div className="flex-1 flex min-h-0 overflow-hidden relative">
-        
-        {/* Left Sidebar */}
-        <Sidebar
-          isCollapsed={isSidebarCollapsed}
-          onToggle={() => setIsSidebarCollapsed((prev) => !prev)}
-        />
-
-        {/* Right Page Outlet */}
-        <main className="flex-1 overflow-hidden relative w-full h-full">
+      {/* 2. Full-width Main Workspace with Smooth Route Transitions */}
+      <main className="flex-1 overflow-hidden relative w-full h-full">
+        <div key={location.pathname} className="w-full h-full animate-tab-view">
           <Outlet />
-        </main>
-
-      </div>
+        </div>
+      </main>
 
     </div>
   )
 }
 
-
 export default DefaultLayout
+

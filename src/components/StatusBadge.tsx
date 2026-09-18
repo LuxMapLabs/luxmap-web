@@ -22,29 +22,29 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   className = '',
 }) => {
   let displayLabel = label || status || ''
-  let bgClass = 'bg-slate-100 text-slate-700 border-slate-200'
+  let bgClass = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
   let dotClass = 'bg-slate-500'
 
   if (type === 'fixture') {
     switch (status) {
       case 'normal':
         displayLabel = label || 'Sáng tốt'
-        bgClass = 'bg-emerald-50 text-emerald-800 border-emerald-200'
+        bgClass = 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
         dotClass = 'bg-emerald-500'
         break
       case 'dim':
         displayLabel = label || 'Đèn mờ'
-        bgClass = 'bg-amber-50 text-amber-800 border-amber-200'
+        bgClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
         dotClass = 'bg-amber-500'
         break
       case 'out':
         displayLabel = label || 'Đèn tắt'
-        bgClass = 'bg-rose-50 text-rose-800 border-rose-200'
+        bgClass = 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800/60'
         dotClass = 'bg-rose-500'
         break
       case 'unknown':
         displayLabel = label || 'Chưa quét'
-        bgClass = 'bg-slate-100 text-slate-600 border-slate-300'
+        bgClass = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
         dotClass = 'bg-slate-400'
         break
     }
@@ -52,27 +52,27 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     switch (status) {
       case 'draft':
         displayLabel = label || 'Mới tạo'
-        bgClass = 'bg-blue-50 text-blue-800 border-blue-200'
+        bgClass = 'bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800/60'
         dotClass = 'bg-blue-500'
         break
       case 'assigned':
         displayLabel = label || 'Đã phân công'
-        bgClass = 'bg-purple-50 text-purple-800 border-purple-200'
+        bgClass = 'bg-purple-50 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800/60'
         dotClass = 'bg-purple-500'
         break
       case 'in_progress':
         displayLabel = label || 'Đang xử lý'
-        bgClass = 'bg-amber-50 text-amber-800 border-amber-200'
+        bgClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
         dotClass = 'bg-amber-500'
         break
       case 'completed':
         displayLabel = label || 'Hoàn thành'
-        bgClass = 'bg-emerald-50 text-emerald-800 border-emerald-200'
+        bgClass = 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
         dotClass = 'bg-emerald-500'
         break
       case 'cancelled':
         displayLabel = label || 'Đã hủy'
-        bgClass = 'bg-slate-100 text-slate-600 border-slate-200'
+        bgClass = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
         dotClass = 'bg-slate-400'
         break
     }
@@ -80,17 +80,17 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     switch (status) {
       case 'ontime':
         displayLabel = label || 'Đúng hạn'
-        bgClass = 'bg-emerald-50 text-emerald-800 border-emerald-200'
+        bgClass = 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
         dotClass = 'bg-emerald-500'
         break
       case 'warning':
         displayLabel = label || 'Sắp trễ hạn'
-        bgClass = 'bg-amber-50 text-amber-800 border-amber-200'
+        bgClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
         dotClass = 'bg-amber-500'
         break
       case 'overdue':
         displayLabel = label || 'Quá hạn SLA'
-        bgClass = 'bg-rose-50 text-rose-800 border-rose-200'
+        bgClass = 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800/60'
         dotClass = 'bg-rose-500'
         break
     }

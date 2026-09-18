@@ -1,9 +1,11 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source "./**/*.{ts,tsx}";
 @source "./pages/**/*.{ts,tsx}";
 
-/* Design tokens từ đặc tả CivicFlow */
+/* Design tokens từ đặc tả CivicFlow & Bảng màu GovTech Navy (#1f3864 / hover: #27467c) */
 @theme {
   --color-primary: #1f3864;
   --color-secondary: #3e86c9;
@@ -14,9 +16,27 @@
   --color-surface: #f5f7fa;
   --color-text-main: #1a1a1a;
   --color-text-sub: #6b7280;
+
+  /* Bảng màu Dark Mode Xanh Đậm GovTech Midnight Navy (#13223f / canvas: #0b1322 / hover: #1c325c) */
+  --color-slate-950: #0b1322;
+  --color-slate-900: #13223f;
+  --color-slate-800: #1c325c;
+  --color-slate-700: #26437a;
+  --color-slate-600: #3a60a8;
+  --color-slate-500: #6088cc;
+  --color-slate-400: #93b3e6;
+  --color-slate-300: #c5d7f5;
+  --color-slate-200: #e2ecfb;
+  --color-slate-100: #ffffff;
 }
 
-/* MapLibre Hover Tooltip Custom Style (Clean Light Mode & No width restriction) */
+html.dark,
+.dark body {
+  background-color: #0b1322 !important;
+  color: #ffffff !important;
+}
+
+/* MapLibre Hover Tooltip Custom Style (Clean Light & Dark Mode) */
 .feeder-hover-tooltip {
   max-width: none !important;
   pointer-events: none !important;
@@ -35,10 +55,62 @@
   border-top-color: #ffffff !important;
 }
 
+.dark .feeder-hover-tooltip .maplibregl-popup-tip {
+  border-top-color: #13223f !important;
+}
+
+/* MapLibre Controls Dark Mode (Command Center SCADA Style) */
+.maplibregl-ctrl-group {
+  background-color: #13223f !important;
+  border: 1px solid #1e345e !important;
+  box-shadow: 0 4px 14px rgba(11, 19, 34, 0.6) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+.maplibregl-ctrl-group button {
+  background-color: transparent !important;
+  width: 32px !important;
+  height: 32px !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: #1f3864 !important;
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid #1e345e !important;
+}
+
+.maplibregl-ctrl-group .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(0.95) !important;
+}
+
 /* MapLibre Attribution Control Style */
+.maplibregl-ctrl-attrib {
+  background-color: rgba(19, 34, 63, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid #1e345e !important;
+  color: #c5d7f5 !important;
+  border-radius: 9999px !important;
+  padding: 2px 10px !important;
+  font-size: 11px !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: #93c5fd !important;
+  text-decoration: none !important;
+}
+
+.maplibregl-ctrl-attrib a:hover {
+  text-decoration: underline !important;
+}
+
 .maplibregl-ctrl-attrib.maplibregl-compact {
   background-color: transparent !important;
-  border-radius: 12px !important;
+  border: none !important;
+  border-radius: 9999px !important;
 }
 
 .maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) {
@@ -51,20 +123,29 @@
 }
 
 .maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(6px) !important;
-  padding: 2px 28px 2px 8px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  background-color: rgba(19, 34, 63, 0.98) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid #1e345e !important;
+  color: #c5d7f5 !important;
+  padding: 3px 28px 3px 10px !important;
+  box-shadow: 0 4px 14px rgba(11, 19, 34, 0.6) !important;
+  border-radius: 9999px !important;
 }
 
 .maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
   display: inline-block !important;
   font-size: 11px !important;
+  color: #c5d7f5 !important;
+}
+
+.maplibregl-ctrl-attrib-button {
+  filter: invert(1) brightness(0.95) !important;
+  background-color: transparent !important;
 }
 
 /* Marker Zoom Animation & Smooth Transitions */
 .gis-marker-wrap {
-  transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.32s !important;
+  transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0.32s !important;
   will-change: opacity, transform;
 }
 
@@ -73,19 +154,20 @@
   transform: scale(1);
   pointer-events: auto !important;
   visibility: visible !important;
-  transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s !important;
 }
 
 .gis-marker-wrap.gis-marker-visible:hover {
-  transform: scale(1.18);
+  transform: scale(1.3) !important;
+  z-index: 50 !important;
 }
 
 .gis-marker-wrap.gis-marker-visible.is-selected {
-  transform: scale(1.25) !important;
+  transform: scale(1.35) !important;
+  z-index: 60 !important;
 }
 
 .gis-marker-wrap.gis-marker-visible.is-selected:hover {
-  transform: scale(1.32) !important;
+  transform: scale(1.45) !important;
 }
 
 .gis-marker-wrap.gis-marker-hidden {
@@ -94,6 +176,27 @@
   pointer-events: none !important;
   visibility: hidden !important;
   transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.32s !important;
+}
+
+/* Smart Lighting & SCADA Marker Animations */
+@keyframes pole-glow-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 1;
+  }
+}
+
+@keyframes reticle-spin-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Custom Thin Scrollbar */
@@ -107,17 +210,17 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #203154;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #334e80;
 }
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: #203154 transparent;
 }
 
 /* MapLibre Geolocate Control Button Animations */
@@ -141,7 +244,7 @@
 /* Trong lúc đang dò tìm GPS & bay tới vị trí: Icon xoay tròn quét Radar + Viền hào quang tỏa sáng */
 .maplibregl-ctrl-geolocate.is-searching-location,
 .maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-waiting {
-  background-color: #eff6ff !important;
+  background-color: #1e3a8a !important;
   animation: geolocate-btn-glow 0.8s infinite alternate ease-in-out !important;
 }
 
@@ -154,7 +257,7 @@
 
 /* Khi đã định vị thành công */
 .maplibregl-ctrl-geolocate.maplibregl-ctrl-geolocate-active {
-  background-color: #eff6ff !important;
+  background-color: #1e3a8a !important;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.45), 0 4px 12px rgba(37, 99, 235, 0.3) !important;
 }
 
@@ -171,5 +274,22 @@
     box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.55), 0 0 22px rgba(59, 130, 246, 0.6);
   }
 }
+
+/* Smooth Tab Page View Transition */
+@keyframes tab-view-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tab-view {
+  animation: tab-view-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 
 
