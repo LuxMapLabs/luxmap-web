@@ -11,36 +11,17 @@ import {
   EyeOff,
   Loader2,
   ArrowRight,
-  CheckCircle2,
   AlertCircle,
-  MapPin,
-  Radio,
-  Zap,
-  Sun,
-  Moon,
 } from 'lucide-react'
-
 import tokenStorage from '../../utils/tokenStorage'
+import loginBgHq from '../../assets/images/login-bg-hq.png'
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(() => tokenStorage.isRemembered())
-
-  // Trạng thái Dark / Light Mode (Mặc định là Dark Mode)
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('luxmap_theme')
-    return saved !== null ? saved === 'dark' : true
-  })
-
-  const toggleTheme = () => {
-    setIsDarkMode((prev) => {
-      const next = !prev
-      localStorage.setItem('luxmap_theme', next ? 'dark' : 'light')
-      return next
-    })
-  }
+  const [capsLockActive, setCapsLockActive] = useState(false)
 
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -77,386 +58,211 @@ export const LoginPage: React.FC = () => {
   }
 
   return (
-    <div
-      className={`min-h-screen w-full flex items-center justify-center p-4 sm:p-8 lg:p-12 font-sans relative overflow-hidden select-none transition-colors duration-500 ${isDarkMode
-          ? 'bg-[#071120] text-white'
-          : 'bg-gradient-to-br from-slate-100 via-sky-50/50 to-blue-50/60 text-slate-900'
-        }`}
-    >
-      {/* Nút bấm chuyển đổi Dark / Light Mode nổi ở góc trên bên phải */}
-      <button
-        type="button"
-        onClick={toggleTheme}
-        className={`fixed top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-all duration-300 shadow-xl cursor-pointer backdrop-blur-md active:scale-95 ${isDarkMode
-            ? 'bg-[#0c1a32]/85 border-slate-700/80 text-amber-300 hover:bg-[#132847] hover:border-amber-400/50 shadow-black/40'
-            : 'bg-white/90 border-slate-200 text-slate-700 hover:bg-white hover:border-blue-300 shadow-slate-200/80'
-          }`}
-        title={isDarkMode ? 'Chuyển sang Giao diện Sáng (Light Mode)' : 'Chuyển sang Giao diện Tối (Dark Mode)'}
-      >
-        {isDarkMode ? (
-          <>
-            <Sun className="w-4 h-4 text-amber-300 animate-spin-slow" />
-            <span className="text-xs font-bold text-slate-200">Giao diện Sáng</span>
-          </>
-        ) : (
-          <>
-            <Moon className="w-4 h-4 text-[#1f3864]" />
-            <span className="text-xs font-bold text-slate-700">Giao diện Tối</span>
-          </>
-        )}
-      </button>
-
-      {/* Background GIS Grid Pattern (Mạng lưới tọa độ không gian) */}
-      <div className="absolute inset-0 pointer-events-none opacity-25">
-        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="gis-grid-full" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path
-                d="M 60 0 L 0 0 0 60"
-                fill="none"
-                stroke={isDarkMode ? '#3e86c9' : '#94a3b8'}
-                strokeWidth="0.6"
-                strokeOpacity={isDarkMode ? '0.4' : '0.35'}
-              />
-            </pattern>
-          </defs>
-          <rect width="100%" fill="url(#gis-grid-full)" height="100%" />
-        </svg>
-      </div>
-
-      {/* Ánh sáng Gradient Ambient động tạo chiều sâu không gian */}
+    <div className="min-h-screen w-full relative flex items-center justify-end overflow-hidden select-none font-sans bg-[#060c16]">
+      {/* 1. Background Image HD sắc nét nguyên bản (Không bị tối mờ, con đường và đèn nằm trọn vẹn ở bên trái) */}
       <div
-        className={`absolute top-1/4 -left-24 w-[520px] h-[520px] rounded-full blur-3xl pointer-events-none transition-all duration-700 animate-float-slow ${isDarkMode
-            ? 'bg-gradient-to-tr from-[#1f3864]/50 to-[#3e86c9]/20 opacity-80'
-            : 'bg-gradient-to-tr from-blue-300/45 to-sky-200/35 opacity-70'
-          }`}
-      />
-      <div
-        className={`absolute -bottom-24 -right-24 w-[560px] h-[560px] rounded-full blur-3xl pointer-events-none transition-all duration-700 animate-float-reverse ${isDarkMode
-            ? 'bg-gradient-to-bl from-[#5fc4b0]/20 via-[#1f3864]/30 to-transparent opacity-80'
-            : 'bg-gradient-to-bl from-teal-200/40 via-indigo-100/35 to-transparent opacity-70'
-          }`}
-      />
-      <div
-        className={`absolute top-1/3 right-1/4 w-[380px] h-[380px] rounded-full blur-3xl pointer-events-none transition-all duration-700 animate-pulse-glow ${isDarkMode
-            ? 'bg-gradient-to-br from-[#e9a23b]/10 to-transparent'
-            : 'bg-gradient-to-br from-amber-200/25 to-transparent'
-          }`}
+        className="absolute inset-0 bg-cover bg-left lg:bg-center pointer-events-none transition-all duration-500"
+        style={{
+          backgroundImage: `url(${loginBgHq})`,
+        }}
       />
 
-      {/* ========================================================================= */}
-      {/* CONTAINER CHÍNH: BỐ CỤC 2 CỘT HIỆN ĐẠI CHO GIAO DIỆN WEB (SPLIT DESKTOP)  */}
-      {/* ========================================================================= */}
-      <div
-        className={`w-full max-w-5xl rounded-[32px] sm:rounded-[40px] border overflow-hidden relative z-10 flex flex-col lg:flex-row min-h-[640px] transition-all duration-300 animate-login-card ${isDarkMode
-            ? 'bg-[#0c1a32]/95 backdrop-blur-xl border-slate-700/60 shadow-2xl shadow-black/80'
-            : 'bg-white border-slate-200/90 shadow-2xl shadow-slate-300/70'
-          }`}
-      >
-        {/* ------------------------------------------------------------- */}
-        {/* CỘT TRÁI (HERO PANEL): GIS SHOWCASE & THÔNG TIN THƯƠNG HIỆU   */}
-        {/* ------------------------------------------------------------- */}
-        <div
-          className={`lg:w-[50%] p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden transition-colors duration-500 ${isDarkMode
-              ? 'bg-gradient-to-br from-[#0c1a32] via-[#102344] to-[#152e59]'
-              : 'bg-gradient-to-br from-[#16294a] via-[#1f3864] to-[#2b4c80]'
-            }`}
-        >
-          {/* Đường GIS vector uốn lượn đứt nét phát sáng */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-90">
-            <svg className="w-full h-full absolute inset-0" viewBox="0 0 500 600" fill="none">
-              <path
-                d="M -50 450 C 120 420, 220 360, 290 260 C 360 150, 420 180, 550 120"
-                stroke="#1f3d6b"
-                strokeWidth="4"
-                strokeDasharray="8 8"
-              />
-              <path
-                d="M -50 450 C 120 420, 220 360, 290 260 C 360 150, 420 180, 550 120"
-                stroke="#5fc4b0"
-                strokeWidth="2"
-                strokeDasharray="6 12"
-                strokeOpacity="0.85"
-              />
-              {/* Điểm nút tọa độ cột đèn (Pole / Node) */}
-              <circle cx="290" cy="260" r="7" fill="#5fc4b0" />
-              <circle cx="290" cy="260" r="14" stroke="#5fc4b0" strokeWidth="2" strokeOpacity="0.4" className="animate-ping" />
+      {/* 2. Chỉ phủ lớp chuyển bóng rất nhẹ ở rìa phải để hỗ trợ tương phản cho Khung Login */}
+      <div className="absolute inset-0 bg-gradient-to-l from-black/50 via-black/15 to-transparent pointer-events-none" />
 
-              {/* Điểm nút vàng cảnh báo sự cố */}
-              <circle cx="160" cy="390" r="6" fill="#e9a23b" />
-              <circle cx="440" cy="160" r="5" fill="#8fd9e8" />
-            </svg>
+
+      {/* 3. Khung đăng nhập Vuông vức (Không bo góc) kèm hiệu ứng Ambient Halo & Đổ bóng sâu - Nằm bên phải */}
+      <div className="relative z-20 w-full max-w-[490px] mx-auto lg:mx-0 lg:mr-16 xl:mr-24 2xl:mr-32 p-4 sm:p-6 my-auto group">
+        {/* [Mục 4] Ambient Halo phát sáng nhẹ phía sau thẻ */}
+        <div className="absolute -inset-1.5 bg-gradient-to-r from-[#5fc4b0]/15 via-blue-500/10 to-[#5fc4b0]/10 blur-2xl -z-10 opacity-60 group-hover:opacity-95 transition-opacity duration-700 pointer-events-none" />
+
+        <div className="w-full rounded-none p-8 sm:p-11 border border-white/15 hover:border-white/30 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85),0_0_40px_rgba(0,0,0,0.6)] hover:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95),0_0_50px_rgba(95,196,176,0.22)] backdrop-blur-2xl bg-gradient-to-br from-[#0c182a]/95 via-[#09121f]/90 to-[#060e1a]/95 text-white transition-all duration-500 animate-login-card relative overflow-hidden">
+          {/* [Mục 4] Subtle Top Accent Line with Ambient Glow & Hover Highlight */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden">
+            <div className="h-full w-full bg-gradient-to-r from-transparent via-[#5fc4b0] to-transparent shadow-[0_0_15px_rgba(95,196,176,0.7)] group-hover:shadow-[0_0_25px_rgba(95,196,176,1)] transition-all duration-500" />
           </div>
 
-          {/* Top: Logo LuxMap 3 vạch cột đèn */}
-          <div className="relative z-10">
+          {/* 4 Corner Tech Brackets (Điểm nhấn kỹ thuật GIS sắc sảo) */}
+          <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-[#5fc4b0]/80 transition-all duration-300 group-hover:border-[#5fc4b0] group-hover:scale-105" />
+          <div className="absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-[#5fc4b0]/80 transition-all duration-300 group-hover:border-[#5fc4b0] group-hover:scale-105" />
+          <div className="absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-[#5fc4b0]/50 transition-all duration-300 group-hover:border-[#5fc4b0] group-hover:scale-105" />
+          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-[#5fc4b0]/50 transition-all duration-300 group-hover:border-[#5fc4b0] group-hover:scale-105" />
+
+          {/* Header: Logo & Title (Tinh giản & Hiện đại) */}
+          <div className="space-y-7">
+            {/* Logo LuxMap */}
             <div className="flex items-center gap-3.5">
-              <div className="w-13 h-13 rounded-2xl bg-[#132847] border border-[#234575] shadow-lg shadow-black/40 flex items-center justify-center p-2.5">
-                <div className="flex items-end justify-center gap-1.5 h-8 w-8">
-                  <div className="w-1.5 h-5 bg-[#5fc4b0] rounded-full flex flex-col items-center">
-                    <span className="w-2.5 h-2.5 -mt-1 rounded-full bg-[#5fc4b0]" />
-                  </div>
-                  <div className="w-2 h-8 bg-white rounded-full flex flex-col items-center">
-                    <span className="w-3 h-3 -mt-1 rounded-full bg-white shadow-sm shadow-white" />
-                  </div>
-                  <div className="w-1.5 h-6 bg-[#5fc4b0] rounded-full flex flex-col items-center">
-                    <span className="w-2.5 h-2.5 -mt-1 rounded-full bg-[#5fc4b0]" />
-                  </div>
+              <div className="w-11 h-11 rounded-none bg-[#11233e] border border-[#204273] shadow-md shadow-black/40 flex items-center justify-center p-2">
+                <div className="flex items-end justify-center gap-1.5 h-5 w-5">
+                  <div className="w-1.5 h-3.5 bg-[#5fc4b0] rounded-none" />
+                  <div className="w-1.5 h-5 bg-white rounded-none shadow-xs shadow-white" />
+                  <div className="w-1.5 h-3.5 bg-[#5fc4b0] rounded-none" />
                 </div>
               </div>
               <div>
-                <div className="text-2xl font-black tracking-wider text-white uppercase leading-none">
+                <span className="text-2xl font-black tracking-wider text-white uppercase leading-none block">
                   LUXMAP
-                </div>
-                <p className="text-xs text-slate-300 font-medium tracking-wide mt-1">
-                  Hệ thống Quản lý Chiếu sáng Nông thôn Thông minh
-                </p>
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium tracking-wide">
+                  Chiếu sáng Nông thôn Thông minh
+                </span>
               </div>
             </div>
-          </div>
 
-          {/* Center: Tiêu đề Chào mừng & Giới thiệu hệ thống */}
-          <div className="relative z-10 py-8 lg:py-0 space-y-4">
-            <div className="space-y-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold tracking-wider text-[#5fc4b0] uppercase">
-                <Radio className="w-3.5 h-3.5 animate-pulse text-[#5fc4b0]" />
-                Hệ thống Điều hành Chiếu sáng Thông minh
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-tight">
-                Chào mừng trở lại!
-              </h2>
-              <p className="text-sm text-slate-300 leading-relaxed max-w-md">
-                Đăng nhập để nhận lệnh điều phối, giám sát tài sản chiếu sáng và đồng bộ dữ liệu bản đồ số GIS theo thời gian thực.
-              </p>
-            </div>
-
-            {/* Tính năng nổi bật tóm tắt */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="p-3 rounded-2xl bg-[#112444]/60 border border-[#203c6b]/60 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
-                  <MapPin className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-slate-200">Quản lý Cột & Tuyến dây</span>
-              </div>
-              <div className="p-3 rounded-2xl bg-[#112444]/60 border border-[#203c6b]/60 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-semibold text-slate-200">Xử lý Sự cố & Lệnh làm</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom: Card Thiết bị / Hệ thống sẵn sàng */}
-          <div className="relative z-10 pt-4">
-            <div className="bg-[#112444]/90 backdrop-blur-md rounded-2xl p-4 border border-[#203d6e] flex items-center justify-between shadow-lg">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-[#5fc4b0]/15 text-[#5fc4b0] flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="text-xs font-black tracking-wide text-white uppercase">
-                    HỆ THỐNG TRỰC TUYẾN SẴN SÀNG
-                  </div>
-                  <div className="text-[11px] text-slate-300 font-medium mt-0.5">
-                    GPS chính xác · Mạng ổn định · Đồng bộ dữ liệu GIS
-                  </div>
-                </div>
-              </div>
-              {/* Đèn xanh ngọc phát sáng online */}
-              <div className="relative flex items-center justify-center mr-2 shrink-0">
-                <span className="w-3 h-3 rounded-full bg-[#5fc4b0]" />
-                <span className="w-3 h-3 rounded-full bg-[#5fc4b0] absolute animate-ping opacity-80" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ------------------------------------------------------------- */}
-        {/* CỘT PHẢI (FORM PANEL): FORM ĐĂNG NHẬP TÁC NGHIỆP RỘNG RÃI     */}
-        {/* ------------------------------------------------------------- */}
-        <div
-          className={`lg:w-[50%] p-8 sm:p-12 lg:p-14 flex flex-col justify-center transition-colors duration-500 ${isDarkMode ? 'bg-[#0a1628] text-slate-100' : 'bg-white text-slate-800'
-            }`}
-        >
-          <div className="w-full max-w-md mx-auto space-y-6">
-            {/* Tiêu đề Form */}
-            <div className="space-y-1">
-              <h3
-                className={`text-2xl sm:text-3xl font-black tracking-tight transition-colors ${isDarkMode ? 'text-white' : 'text-slate-900'
-                  }`}
-              >
+            {/* Title */}
+            <div className="space-y-1.5">
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                 Đăng nhập
-              </h3>
-              <p
-                className={`text-sm font-normal transition-colors ${isDarkMode ? 'text-slate-400' : 'text-slate-500'
-                  }`}
-              >
-                Sử dụng tài khoản nhân viên / cán bộ đã được cấp.
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 font-normal">
+                Sử dụng tài khoản nhân viên / cán bộ để tiếp tục.
               </p>
             </div>
+          </div>
 
-            {/* Form đăng nhập */}
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Input: Tài khoản / Email */}
-              <div className="space-y-1.5">
-                <label
-                  className={`text-xs font-bold tracking-wider block uppercase transition-colors ${isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
-                    }`}
-                >
-                  TÀI KHOẢN / EMAIL
-                </label>
-                <div
-                  className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${isDarkMode
-                      ? 'bg-[#10223d] border-slate-700/80 focus-within:border-[#5fc4b0] focus-within:ring-3 focus-within:ring-[#5fc4b0]/15'
-                      : 'bg-white border-slate-200 focus-within:border-[#1f3864] focus-within:ring-3 focus-within:ring-[#1f3864]/10'
-                    }`}
-                >
-                  {/* Khối icon lồng bo góc */}
-                  <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${isDarkMode ? 'bg-[#183157] text-[#5fc4b0]' : 'bg-slate-100 text-slate-500'
-                      }`}
-                  >
-                    <Mail className="w-5 h-5" />
-                  </div>
-                  <input
-                    type="text"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="VD: admin hoặc admin@luxmap.vn"
-                    disabled={loading}
-                    className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-3 disabled:opacity-50 transition-colors ${isDarkMode
-                        ? 'text-white placeholder-slate-400'
-                        : 'text-slate-800 placeholder-slate-400'
-                      }`}
-                    required
-                  />
-                </div>
+          {/* Form Login (Vuông vức, tinh giản, sắc sảo) */}
+          <form onSubmit={handleSubmit} className="space-y-5 pt-7">
+            {/* Field: Tài khoản / Email */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-300 block">
+                Tài khoản / Email
+              </label>
+              <div className="relative flex items-center rounded-none border border-slate-700/70 bg-slate-900/70 px-3.5 py-3 group/field focus-within:border-[#5fc4b0] focus-within:ring-1 focus-within:ring-[#5fc4b0]/40 transition-all duration-200">
+                {/* [Mục 2] Icon sáng xanh ngọc khi focus */}
+                <Mail className="w-4.5 h-4.5 text-slate-400 group-focus-within/field:text-[#5fc4b0] transition-colors duration-200 shrink-0" />
+                <input
+                  type="text"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin hoặc email"
+                  disabled={loading}
+                  autoComplete="username"
+                  spellCheck={false}
+                  className="w-full text-sm font-medium outline-none bg-transparent pl-3 pr-2 text-white placeholder-slate-500 disabled:opacity-50"
+                  required
+                />
               </div>
+            </div>
 
-              {/* Input: Mật khẩu */}
-              <div className="space-y-1.5">
-                <label
-                  className={`text-xs font-bold tracking-wider block uppercase transition-colors ${isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
-                    }`}
-                >
-                  MẬT KHẨU
-                </label>
-                <div
-                  className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${isDarkMode
-                      ? 'bg-[#10223d] border-slate-700/80 focus-within:border-[#5fc4b0] focus-within:ring-3 focus-within:ring-[#5fc4b0]/15'
-                      : 'bg-white border-slate-200 focus-within:border-[#1f3864] focus-within:ring-3 focus-within:ring-[#1f3864]/10'
-                    }`}
-                >
-                  {/* Khối icon lồng bo góc */}
-                  <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${isDarkMode ? 'bg-[#183157] text-[#5fc4b0]' : 'bg-slate-100 text-slate-500'
-                      }`}
-                  >
-                    <Lock className="w-5 h-5" />
-                  </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    disabled={loading}
-                    className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-2 disabled:opacity-50 transition-colors ${isDarkMode
-                        ? 'text-white placeholder-slate-400'
-                        : 'text-slate-800 placeholder-slate-400'
-                      }`}
-                    required
-                  />
-                  {/* Nút ẩn/hiện mật khẩu */}
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={loading}
-                    className={`p-2 transition-colors focus:outline-none cursor-pointer shrink-0 ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'
-                      }`}
-                    tabIndex={-1}
-                    title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Tùy chọn: Duy trì đăng nhập */}
-              <div className="flex items-center justify-between pt-0.5">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    disabled={loading}
-                    className="w-4.5 h-4.5 rounded-md text-[#1f3864] border-slate-300 focus:ring-[#1f3864] focus:ring-offset-0 cursor-pointer transition-all"
-                  />
-                  <span
-                    className={`text-xs sm:text-sm font-semibold transition-colors ${isDarkMode ? 'text-slate-300' : 'text-slate-600'
-                      }`}
-                  >
-                    Duy trì đăng nhập trên thiết bị
-                  </span>
-                </label>
-
+            {/* Field: Mật khẩu */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-300 block">
+                Mật khẩu
+              </label>
+              <div className="relative flex items-center rounded-none border border-slate-700/70 bg-slate-900/70 px-3.5 py-3 group/field focus-within:border-[#5fc4b0] focus-within:ring-1 focus-within:ring-[#5fc4b0]/40 transition-all duration-200">
+                {/* [Mục 2] Icon sáng xanh ngọc khi focus */}
+                <Lock className="w-4.5 h-4.5 text-slate-400 group-focus-within/field:text-[#5fc4b0] transition-colors duration-200 shrink-0" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => setCapsLockActive(e.getModifierState('CapsLock'))}
+                  onKeyUp={(e) => setCapsLockActive(e.getModifierState('CapsLock'))}
+                  placeholder="••••••••"
+                  disabled={loading}
+                  autoComplete="current-password"
+                  spellCheck={false}
+                  className="w-full text-sm font-medium outline-none bg-transparent pl-3 pr-2 text-white placeholder-slate-500 disabled:opacity-50"
+                  required
+                />
                 <button
                   type="button"
-                  onClick={() => toast.info('Vui lòng liên hệ Quản trị viên hệ thống để được cấp lại mật khẩu.')}
-                  className={`text-xs font-bold transition-colors cursor-pointer ${isDarkMode ? 'text-[#5fc4b0] hover:text-[#8fd9e8]' : 'text-[#1f3864] hover:text-[#3e86c9]'
-                    }`}
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                  className="p-1 text-slate-400 hover:text-slate-200 transition-colors focus:outline-none cursor-pointer shrink-0"
+                  tabIndex={-1}
+                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 >
-                  Quên mật khẩu?
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
 
-              {/* Banner hiển thị lỗi trực quan duy nhất dưới mật khẩu */}
-              {error && (
-                <div
-                  className={`rounded-2xl p-3.5 text-xs border flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-300 transition-all ${isDarkMode
-                      ? 'bg-red-500/10 border-red-500/30 text-red-300'
-                      : 'bg-red-50 border-red-200 text-red-800 shadow-xs'
-                    }`}
-                >
-                  <AlertCircle
-                    className={`w-5 h-5 shrink-0 mt-0.5 ${isDarkMode ? 'text-red-400' : 'text-red-600'
-                      }`}
-                  />
-                  <div className="space-y-0.5">
-                    <p className={`font-bold ${isDarkMode ? 'text-red-300' : 'text-red-900'}`}>
-                      Không thể đăng nhập
-                    </p>
-                    <p className={`leading-relaxed font-medium ${isDarkMode ? 'text-red-200' : 'text-red-700'}`}>
-                      {error}
-                    </p>
-                  </div>
+              {/* [Mục 2] Cảnh báo Caps Lock tự động */}
+              {capsLockActive && (
+                <div className="flex items-center gap-1.5 text-[11px] text-amber-400/90 pt-0.5 animate-in fade-in duration-200">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Caps Lock đang bật</span>
                 </div>
               )}
+            </div>
 
-              {/* Nút Đăng Nhập Chính */}
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between pt-1.5">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={loading}
+                  className="w-4 h-4 rounded-none text-[#1f3864] border-slate-600 bg-slate-900/80 focus:ring-[#5fc4b0] cursor-pointer transition-all"
+                />
+                <span className="text-xs font-medium text-slate-300">
+                  Duy trì đăng nhập
+                </span>
+              </label>
+
               <button
-                type="submit"
-                disabled={loading}
-                className={`w-full py-4 px-6 rounded-2xl font-bold text-base shadow-xl transition-all duration-200 flex items-center justify-center relative active:scale-[0.99] disabled:pointer-events-none disabled:opacity-65 cursor-pointer mt-3 ${isDarkMode
-                    ? 'bg-gradient-to-r from-[#1f3864] to-[#2b518c] hover:from-[#244275] hover:to-[#3561a3] text-white shadow-black/40 border border-blue-400/20'
-                    : 'bg-[#1f3864] hover:bg-[#16294d] text-white shadow-[#1f3864]/25'
-                  }`}
+                type="button"
+                onClick={() => toast.info('Vui lòng liên hệ Quản trị viên hệ thống để được cấp lại mật khẩu.')}
+                className="text-xs font-semibold text-[#5fc4b0] hover:text-[#8fd9e8] transition-colors cursor-pointer"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-3 h-5 w-5 animate-spin" />
-                    <span>Đang xác thực tác nghiệp...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="tracking-wide">Bắt đầu ca làm việc</span>
-                    <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center absolute right-4">
-                      <ArrowRight className="w-5 h-5 text-white" />
-                    </div>
-                  </>
-                )}
+                Quên mật khẩu?
               </button>
-            </form>
+            </div>
+
+            {/* Error Banner */}
+            {error && (
+              <div className="rounded-none p-3.5 text-xs border border-red-500/30 bg-red-500/10 text-red-300 flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-red-300">Không thể đăng nhập</p>
+                  <p className="leading-relaxed text-red-200">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button (Hiệu ứng Shimmer ánh sáng lướt qua + Glow xanh ngọc + Mũi tên trượt tương tác) */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative w-full py-3.5 px-6 rounded-none font-bold text-sm shadow-xl transition-all duration-300 flex items-center justify-center gap-2.5 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-65 cursor-pointer bg-gradient-to-r from-[#1b345d] via-[#274880] to-[#1b345d] hover:from-[#214175] hover:via-[#315799] hover:to-[#214175] text-white border border-blue-400/30 hover:border-[#5fc4b0]/70 hover:shadow-[0_0_25px_rgba(95,196,176,0.35)] mt-3 overflow-hidden"
+            >
+              {/* Vệt ánh sáng Shimmer lướt qua khi rê chuột */}
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-[#5fc4b0]" />
+                  <span>Đang xác thực...</span>
+                </>
+              ) : (
+                <>
+                  <span className="tracking-wide">Bắt đầu ca làm việc</span>
+                  <ArrowRight className="w-4 h-4 text-[#5fc4b0] transition-transform duration-300 group-hover:translate-x-1.5 group-hover:text-white shrink-0" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Telemetry Status Bar đặt tinh tế bên trong khung đăng nhập */}
+          <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-xs select-none text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="font-semibold text-slate-200 tracking-wide text-[11px]">
+                Hệ thống Trực tuyến
+              </span>
+            </div>
+            <span className="text-white/20">|</span>
+            <span className="text-[11px] text-slate-400">
+              IoT Gateway: <span className="text-slate-300 font-medium">Sẵn sàng</span>
+            </span>
+            <span className="text-white/20">|</span>
+            <span className="text-[#5fc4b0] font-mono text-[11px] tracking-wider font-semibold">
+              LUXMAP v2.4
+            </span>
           </div>
         </div>
       </div>
