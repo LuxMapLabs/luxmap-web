@@ -1,20 +1,18 @@
-import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import {
   ShieldAlert,
   ArrowLeft,
+  Home,
   Map as MapIcon,
   Lightbulb,
   Lock,
 } from 'lucide-react'
 import { RootState } from '../../redux/rootReducer'
-import { getRoleName } from '../../utils/roleUtils'
 
 export const ForbiddenPage: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useSelector((state: RootState) => state.auth)
-  const currentRoleName = user ? getRoleName(user.role) : 'Chưa xác định'
 
   return (
     <div className="h-screen w-screen bg-[#f8fafc] relative overflow-hidden flex flex-col justify-between select-none font-sans text-slate-800">
@@ -41,7 +39,7 @@ export const ForbiddenPage: React.FC = () => {
       {/* 1. Full-Width Top Navbar */}
       <header className="relative z-20 h-16 w-full bg-white/85 backdrop-blur-md border-b border-slate-200/90 px-6 sm:px-12 flex items-center justify-between shrink-0 shadow-2xs">
         <div
-          onClick={() => navigate('/gis-map')}
+          onClick={() => navigate('/')}
           className="flex items-center gap-3 cursor-pointer group"
         >
           <div className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shadow-md shadow-primary/20 transition-transform duration-200 group-hover:scale-105">
@@ -64,10 +62,6 @@ export const ForbiddenPage: React.FC = () => {
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs">
             <span className="text-slate-500">Tài khoản:</span>
             <span className="font-bold text-slate-800">{user.username || user.fullName}</span>
-            <span className="text-slate-300">|</span>
-            <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-semibold text-[11px] border border-rose-200">
-              {currentRoleName}
-            </span>
           </div>
         )}
       </header>
@@ -100,14 +94,14 @@ export const ForbiddenPage: React.FC = () => {
               Khu Vực Bị Hạn Chế Truy Cập
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
-              Tài khoản của bạn mang vai trò <span className="font-bold text-rose-600">[{currentRoleName}]</span>, không đủ thẩm quyền để truy cập vào phân hệ này. Vui lòng liên hệ Quản trị viên nếu bạn cần nâng cấp quyền hạn công tác.
+              Tài khoản của bạn hiện không đủ thẩm quyền để truy cập vào phân hệ này. Vui lòng liên hệ Quản trị viên nếu bạn cần cấp quyền truy cập công tác.
             </p>
           </div>
 
           {/* Interactive Action Buttons */}
           <div className="flex flex-row items-center justify-center gap-3 pt-6">
             <button
-              onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/gis-map'))}
+              onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
               className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer hover:border-slate-300 active:scale-95"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -115,11 +109,11 @@ export const ForbiddenPage: React.FC = () => {
             </button>
 
             <button
-              onClick={() => navigate('/gis-map')}
+              onClick={() => navigate('/')}
               className="px-6 py-2.5 rounded-xl bg-[#1f3864] hover:bg-[#1a2f55] text-white font-bold text-xs shadow-md shadow-slate-900/25 transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
             >
-              <MapIcon className="w-4 h-4" />
-              <span>Về Bản đồ Chiếu sáng</span>
+              <Home className="w-4 h-4" />
+              <span>Về Trang Chủ Tác Nghiệp</span>
             </button>
           </div>
         </div>

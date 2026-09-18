@@ -158,7 +158,7 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.45), 0 4px 12px rgba(37, 99, 235, 0.3) !important;
 }
 
-@keyframes geolocate-btn-spin {
+  @keyframes geolocate-btn-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
@@ -171,5 +171,78 @@
     box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.55), 0 0 22px rgba(59, 130, 246, 0.6);
   }
 }
+
+/* ========================================================================= */
+/* LOGIN PAGE ANIMATIONS & AMBIENT DEPTH                                     */
+/* ========================================================================= */
+
+/* Entrance animation mượt mà cho thẻ Login Card (Fade-in + Slide-up nhẹ) */
+@keyframes loginCardEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-login-card {
+  animation: loginCardEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* Chuyển động lơ lửng rất nhẹ cho các khối ánh sáng nền (Ambient Orbs) */
+@keyframes ambientFloatSlow {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -25px) scale(1.06);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.96);
+  }
+}
+
+@keyframes ambientFloatReverse {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(-35px, 20px) scale(1.05);
+  }
+  66% {
+    transform: translate(25px, -18px) scale(0.95);
+  }
+}
+
+@keyframes ambientPulseGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.08);
+  }
+}
+
+.animate-float-slow {
+  animation: ambientFloatSlow 20s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-float-reverse {
+  animation: ambientFloatReverse 24s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-pulse-glow {
+  animation: ambientPulseGlow 14s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 
 

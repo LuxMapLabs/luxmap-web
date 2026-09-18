@@ -31,40 +31,29 @@ export const tokenStorage = {
   },
 
   /**
-   * Lấy Access Token từ Storage (sessionStorage trước, localStorage sau)
+   * Lấy Access Token từ Storage (luôn ưu tiên sessionStorage)
    */
   getAccessToken(): string | null {
-    return (
-      sessionStorage.getItem(ACCESS_TOKEN_KEY) ||
-      localStorage.getItem(ACCESS_TOKEN_KEY) ||
-      null
-    )
+    return sessionStorage.getItem(ACCESS_TOKEN_KEY) || null
   },
 
   /**
-   * Lưu Access Token khi Đăng nhập thành công
+   * Lưu Access Token khi Đăng nhập thành công (luôn lưu vào sessionStorage)
+   * Việc Duy trì đăng nhập được bảo đảm 100% qua HttpOnly Refresh Token Cookie của Backend
    */
   setAccessToken(accessToken: string, rememberMe: boolean = false): void {
     this.setRememberMe(rememberMe)
-
-    if (rememberMe) {
-      localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
-      sessionStorage.removeItem(ACCESS_TOKEN_KEY)
-    } else {
-      sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
-      localStorage.removeItem(ACCESS_TOKEN_KEY)
-    }
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
+    // Đảm bảo không lưu Access Token ở localStorage nhằm chống tấn công XSS
+    localStorage.removeItem(ACCESS_TOKEN_KEY)
   },
 
   /**
    * Cập nhật Access Token mới khi Silent Refresh thành công
    */
   updateAccessToken(newAccessToken: string): void {
-    if (this.isRemembered()) {
-      localStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken)
-    } else {
-      sessionStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken)
-    }
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken)
+    localStorage.removeItem(ACCESS_TOKEN_KEY)
   },
 
 

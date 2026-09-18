@@ -54,12 +54,6 @@ export const LoginPage: React.FC = () => {
     }
   }, [isAuthenticated, navigate])
 
-  useEffect(() => {
-    if (error) {
-      toast.error(error)
-    }
-  }, [error])
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -84,21 +78,19 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen w-full flex items-center justify-center p-4 sm:p-8 lg:p-12 font-sans relative overflow-hidden select-none transition-colors duration-500 ${
-        isDarkMode
+      className={`min-h-screen w-full flex items-center justify-center p-4 sm:p-8 lg:p-12 font-sans relative overflow-hidden select-none transition-colors duration-500 ${isDarkMode
           ? 'bg-[#071120] text-white'
           : 'bg-gradient-to-br from-slate-100 via-sky-50/50 to-blue-50/60 text-slate-900'
-      }`}
+        }`}
     >
       {/* Nút bấm chuyển đổi Dark / Light Mode nổi ở góc trên bên phải */}
       <button
         type="button"
         onClick={toggleTheme}
-        className={`fixed top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-all duration-300 shadow-xl cursor-pointer backdrop-blur-md active:scale-95 ${
-          isDarkMode
+        className={`fixed top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-all duration-300 shadow-xl cursor-pointer backdrop-blur-md active:scale-95 ${isDarkMode
             ? 'bg-[#0c1a32]/85 border-slate-700/80 text-amber-300 hover:bg-[#132847] hover:border-amber-400/50 shadow-black/40'
             : 'bg-white/90 border-slate-200 text-slate-700 hover:bg-white hover:border-blue-300 shadow-slate-200/80'
-        }`}
+          }`}
         title={isDarkMode ? 'Chuyển sang Giao diện Sáng (Light Mode)' : 'Chuyển sang Giao diện Tối (Dark Mode)'}
       >
         {isDarkMode ? (
@@ -132,41 +124,43 @@ export const LoginPage: React.FC = () => {
         </svg>
       </div>
 
-      {/* Ánh sáng Gradient Ambient tạo chiều sâu */}
+      {/* Ánh sáng Gradient Ambient động tạo chiều sâu không gian */}
       <div
-        className={`absolute top-1/4 -left-20 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none transition-all duration-500 ${
-          isDarkMode
-            ? 'bg-gradient-to-tr from-[#1f3864]/40 to-[#3e86c9]/10'
-            : 'bg-gradient-to-tr from-blue-200/50 to-sky-100/40'
-        }`}
+        className={`absolute top-1/4 -left-24 w-[520px] h-[520px] rounded-full blur-3xl pointer-events-none transition-all duration-700 animate-float-slow ${isDarkMode
+            ? 'bg-gradient-to-tr from-[#1f3864]/50 to-[#3e86c9]/20 opacity-80'
+            : 'bg-gradient-to-tr from-blue-300/45 to-sky-200/35 opacity-70'
+          }`}
       />
       <div
-        className={`absolute -bottom-20 -right-20 w-[550px] h-[550px] rounded-full blur-3xl pointer-events-none transition-all duration-500 ${
-          isDarkMode
-            ? 'bg-gradient-to-bl from-[#5fc4b0]/15 via-[#1f3864]/30 to-transparent'
-            : 'bg-gradient-to-bl from-teal-200/30 via-indigo-100/30 to-transparent'
-        }`}
+        className={`absolute -bottom-24 -right-24 w-[560px] h-[560px] rounded-full blur-3xl pointer-events-none transition-all duration-700 animate-float-reverse ${isDarkMode
+            ? 'bg-gradient-to-bl from-[#5fc4b0]/20 via-[#1f3864]/30 to-transparent opacity-80'
+            : 'bg-gradient-to-bl from-teal-200/40 via-indigo-100/35 to-transparent opacity-70'
+          }`}
+      />
+      <div
+        className={`absolute top-1/3 right-1/4 w-[380px] h-[380px] rounded-full blur-3xl pointer-events-none transition-all duration-700 animate-pulse-glow ${isDarkMode
+            ? 'bg-gradient-to-br from-[#e9a23b]/10 to-transparent'
+            : 'bg-gradient-to-br from-amber-200/25 to-transparent'
+          }`}
       />
 
       {/* ========================================================================= */}
       {/* CONTAINER CHÍNH: BỐ CỤC 2 CỘT HIỆN ĐẠI CHO GIAO DIỆN WEB (SPLIT DESKTOP)  */}
       {/* ========================================================================= */}
       <div
-        className={`w-full max-w-5xl rounded-[32px] sm:rounded-[40px] border overflow-hidden relative z-10 flex flex-col lg:flex-row min-h-[640px] transition-all duration-300 ${
-          isDarkMode
+        className={`w-full max-w-5xl rounded-[32px] sm:rounded-[40px] border overflow-hidden relative z-10 flex flex-col lg:flex-row min-h-[640px] transition-all duration-300 animate-login-card ${isDarkMode
             ? 'bg-[#0c1a32]/95 backdrop-blur-xl border-slate-700/60 shadow-2xl shadow-black/80'
             : 'bg-white border-slate-200/90 shadow-2xl shadow-slate-300/70'
-        }`}
+          }`}
       >
         {/* ------------------------------------------------------------- */}
         {/* CỘT TRÁI (HERO PANEL): GIS SHOWCASE & THÔNG TIN THƯƠNG HIỆU   */}
         {/* ------------------------------------------------------------- */}
         <div
-          className={`lg:w-[50%] p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden transition-colors duration-500 ${
-            isDarkMode
+          className={`lg:w-[50%] p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden transition-colors duration-500 ${isDarkMode
               ? 'bg-gradient-to-br from-[#0c1a32] via-[#102344] to-[#152e59]'
               : 'bg-gradient-to-br from-[#16294a] via-[#1f3864] to-[#2b4c80]'
-          }`}
+            }`}
         >
           {/* Đường GIS vector uốn lượn đứt nét phát sáng */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-90">
@@ -211,11 +205,8 @@ export const LoginPage: React.FC = () => {
                 </div>
               </div>
               <div>
-                <div className="text-2xl font-black tracking-wider text-white uppercase leading-none flex items-center gap-2">
-                  <span>LUXMAP</span>
-                  <span className="text-[10px] font-black tracking-normal px-2 py-0.5 rounded-md bg-[#5fc4b0] text-[#0c1a32]">
-                    GIS 4.0
-                  </span>
+                <div className="text-2xl font-black tracking-wider text-white uppercase leading-none">
+                  LUXMAP
                 </div>
                 <p className="text-xs text-slate-300 font-medium tracking-wide mt-1">
                   Hệ thống Quản lý Chiếu sáng Nông thôn Thông minh
@@ -229,7 +220,7 @@ export const LoginPage: React.FC = () => {
             <div className="space-y-2">
               <span className="inline-flex items-center gap-1.5 text-xs font-bold tracking-wider text-[#5fc4b0] uppercase">
                 <Radio className="w-3.5 h-3.5 animate-pulse text-[#5fc4b0]" />
-                Nền tảng Quản trị & Tác nghiệp Hiện trường
+                Hệ thống Điều hành Chiếu sáng Thông minh
               </span>
               <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-tight">
                 Chào mừng trở lại!
@@ -285,24 +276,21 @@ export const LoginPage: React.FC = () => {
         {/* CỘT PHẢI (FORM PANEL): FORM ĐĂNG NHẬP TÁC NGHIỆP RỘNG RÃI     */}
         {/* ------------------------------------------------------------- */}
         <div
-          className={`lg:w-[50%] p-8 sm:p-12 lg:p-14 flex flex-col justify-between transition-colors duration-500 ${
-            isDarkMode ? 'bg-[#0a1628] text-slate-100' : 'bg-white text-slate-800'
-          }`}
+          className={`lg:w-[50%] p-8 sm:p-12 lg:p-14 flex flex-col justify-center transition-colors duration-500 ${isDarkMode ? 'bg-[#0a1628] text-slate-100' : 'bg-white text-slate-800'
+            }`}
         >
           <div className="w-full max-w-md mx-auto space-y-6">
             {/* Tiêu đề Form */}
             <div className="space-y-1">
               <h3
-                className={`text-2xl sm:text-3xl font-black tracking-tight transition-colors ${
-                  isDarkMode ? 'text-white' : 'text-slate-900'
-                }`}
+                className={`text-2xl sm:text-3xl font-black tracking-tight transition-colors ${isDarkMode ? 'text-white' : 'text-slate-900'
+                  }`}
               >
-                Đăng nhập tác nghiệp
+                Đăng nhập
               </h3>
               <p
-                className={`text-sm font-normal transition-colors ${
-                  isDarkMode ? 'text-slate-400' : 'text-slate-500'
-                }`}
+                className={`text-sm font-normal transition-colors ${isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                  }`}
               >
                 Sử dụng tài khoản nhân viên / cán bộ đã được cấp.
               </p>
@@ -313,24 +301,21 @@ export const LoginPage: React.FC = () => {
               {/* Input: Tài khoản / Email */}
               <div className="space-y-1.5">
                 <label
-                  className={`text-xs font-bold tracking-wider block uppercase transition-colors ${
-                    isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
-                  }`}
+                  className={`text-xs font-bold tracking-wider block uppercase transition-colors ${isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
+                    }`}
                 >
                   TÀI KHOẢN / EMAIL
                 </label>
                 <div
-                  className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${
-                    isDarkMode
+                  className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${isDarkMode
                       ? 'bg-[#10223d] border-slate-700/80 focus-within:border-[#5fc4b0] focus-within:ring-3 focus-within:ring-[#5fc4b0]/15'
                       : 'bg-white border-slate-200 focus-within:border-[#1f3864] focus-within:ring-3 focus-within:ring-[#1f3864]/10'
-                  }`}
+                    }`}
                 >
                   {/* Khối icon lồng bo góc */}
                   <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${
-                      isDarkMode ? 'bg-[#183157] text-[#5fc4b0]' : 'bg-slate-100 text-slate-500'
-                    }`}
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${isDarkMode ? 'bg-[#183157] text-[#5fc4b0]' : 'bg-slate-100 text-slate-500'
+                      }`}
                   >
                     <Mail className="w-5 h-5" />
                   </div>
@@ -340,11 +325,10 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="VD: admin hoặc admin@luxmap.vn"
                     disabled={loading}
-                    className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-3 disabled:opacity-50 transition-colors ${
-                      isDarkMode
+                    className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-3 disabled:opacity-50 transition-colors ${isDarkMode
                         ? 'text-white placeholder-slate-400'
                         : 'text-slate-800 placeholder-slate-400'
-                    }`}
+                      }`}
                     required
                   />
                 </div>
@@ -353,24 +337,21 @@ export const LoginPage: React.FC = () => {
               {/* Input: Mật khẩu */}
               <div className="space-y-1.5">
                 <label
-                  className={`text-xs font-bold tracking-wider block uppercase transition-colors ${
-                    isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
-                  }`}
+                  className={`text-xs font-bold tracking-wider block uppercase transition-colors ${isDarkMode ? 'text-[#8fd9e8]' : 'text-[#1f3864]'
+                    }`}
                 >
                   MẬT KHẨU
                 </label>
                 <div
-                  className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${
-                    isDarkMode
+                  className={`relative flex items-center rounded-2xl border p-2 transition-all duration-200 shadow-xs ${isDarkMode
                       ? 'bg-[#10223d] border-slate-700/80 focus-within:border-[#5fc4b0] focus-within:ring-3 focus-within:ring-[#5fc4b0]/15'
                       : 'bg-white border-slate-200 focus-within:border-[#1f3864] focus-within:ring-3 focus-within:ring-[#1f3864]/10'
-                  }`}
+                    }`}
                 >
                   {/* Khối icon lồng bo góc */}
                   <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${
-                      isDarkMode ? 'bg-[#183157] text-[#5fc4b0]' : 'bg-slate-100 text-slate-500'
-                    }`}
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${isDarkMode ? 'bg-[#183157] text-[#5fc4b0]' : 'bg-slate-100 text-slate-500'
+                      }`}
                   >
                     <Lock className="w-5 h-5" />
                   </div>
@@ -380,11 +361,10 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     disabled={loading}
-                    className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-2 disabled:opacity-50 transition-colors ${
-                      isDarkMode
+                    className={`w-full text-sm font-semibold outline-none bg-transparent py-1 pr-2 disabled:opacity-50 transition-colors ${isDarkMode
                         ? 'text-white placeholder-slate-400'
                         : 'text-slate-800 placeholder-slate-400'
-                    }`}
+                      }`}
                     required
                   />
                   {/* Nút ẩn/hiện mật khẩu */}
@@ -392,9 +372,8 @@ export const LoginPage: React.FC = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={loading}
-                    className={`p-2 transition-colors focus:outline-none cursor-pointer shrink-0 ${
-                      isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'
-                    }`}
+                    className={`p-2 transition-colors focus:outline-none cursor-pointer shrink-0 ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'
+                      }`}
                     tabIndex={-1}
                     title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                   >
@@ -414,9 +393,8 @@ export const LoginPage: React.FC = () => {
                     className="w-4.5 h-4.5 rounded-md text-[#1f3864] border-slate-300 focus:ring-[#1f3864] focus:ring-offset-0 cursor-pointer transition-all"
                   />
                   <span
-                    className={`text-xs sm:text-sm font-semibold transition-colors ${
-                      isDarkMode ? 'text-slate-300' : 'text-slate-600'
-                    }`}
+                    className={`text-xs sm:text-sm font-semibold transition-colors ${isDarkMode ? 'text-slate-300' : 'text-slate-600'
+                      }`}
                   >
                     Duy trì đăng nhập trên thiết bị
                   </span>
@@ -425,21 +403,32 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => toast.info('Vui lòng liên hệ Quản trị viên hệ thống để được cấp lại mật khẩu.')}
-                  className={`text-xs font-bold transition-colors cursor-pointer ${
-                    isDarkMode ? 'text-[#5fc4b0] hover:text-[#8fd9e8]' : 'text-[#1f3864] hover:text-[#3e86c9]'
-                  }`}
+                  className={`text-xs font-bold transition-colors cursor-pointer ${isDarkMode ? 'text-[#5fc4b0] hover:text-[#8fd9e8]' : 'text-[#1f3864] hover:text-[#3e86c9]'
+                    }`}
                 >
                   Quên mật khẩu?
                 </button>
               </div>
 
-              {/* Banner hiển thị lỗi trực quan */}
+              {/* Banner hiển thị lỗi trực quan duy nhất dưới mật khẩu */}
               {error && (
-                <div className="rounded-2xl bg-red-500/10 p-3.5 text-xs text-danger border border-red-500/30 flex items-start gap-2.5 animate-in fade-in duration-200">
-                  <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div
+                  className={`rounded-2xl p-3.5 text-xs border flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-300 transition-all ${isDarkMode
+                      ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                      : 'bg-red-50 border-red-200 text-red-800 shadow-xs'
+                    }`}
+                >
+                  <AlertCircle
+                    className={`w-5 h-5 shrink-0 mt-0.5 ${isDarkMode ? 'text-red-400' : 'text-red-600'
+                      }`}
+                  />
                   <div className="space-y-0.5">
-                    <p className="font-bold text-red-300">Không thể đăng nhập</p>
-                    <p className="text-red-200 leading-relaxed font-medium">{error}</p>
+                    <p className={`font-bold ${isDarkMode ? 'text-red-300' : 'text-red-900'}`}>
+                      Không thể đăng nhập
+                    </p>
+                    <p className={`leading-relaxed font-medium ${isDarkMode ? 'text-red-200' : 'text-red-700'}`}>
+                      {error}
+                    </p>
                   </div>
                 </div>
               )}
@@ -448,11 +437,10 @@ export const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full py-4 px-6 rounded-2xl font-bold text-base shadow-xl transition-all duration-200 flex items-center justify-center relative active:scale-[0.99] disabled:pointer-events-none disabled:opacity-65 cursor-pointer mt-3 ${
-                  isDarkMode
+                className={`w-full py-4 px-6 rounded-2xl font-bold text-base shadow-xl transition-all duration-200 flex items-center justify-center relative active:scale-[0.99] disabled:pointer-events-none disabled:opacity-65 cursor-pointer mt-3 ${isDarkMode
                     ? 'bg-gradient-to-r from-[#1f3864] to-[#2b518c] hover:from-[#244275] hover:to-[#3561a3] text-white shadow-black/40 border border-blue-400/20'
                     : 'bg-[#1f3864] hover:bg-[#16294d] text-white shadow-[#1f3864]/25'
-                }`}
+                  }`}
               >
                 {loading ? (
                   <>
@@ -469,45 +457,6 @@ export const LoginPage: React.FC = () => {
                 )}
               </button>
             </form>
-          </div>
-
-          {/* Box An Toàn Chân Form: Hỗ trợ ngoại tuyến & Mã hóa an toàn */}
-          <div
-            className={`w-full max-w-md mx-auto mt-6 pt-4 border-t transition-colors ${
-              isDarkMode ? 'border-slate-800' : 'border-slate-100'
-            }`}
-          >
-            <div
-              className={`rounded-2xl p-3.5 flex items-center gap-3.5 transition-colors border ${
-                isDarkMode
-                  ? 'bg-[#10223d]/80 border-[#5fc4b0]/20 text-slate-300'
-                  : 'bg-[#5fc4b0]/10 border-[#5fc4b0]/30 text-slate-600'
-              }`}
-            >
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                  isDarkMode ? 'bg-[#5fc4b0]/20 text-[#5fc4b0]' : 'bg-[#5fc4b0]/20 text-[#1f3864]'
-                }`}
-              >
-                <CheckCircle2 className="w-5 h-5 text-[#5fc4b0]" />
-              </div>
-              <div className="space-y-0.5">
-                <div
-                  className={`text-xs font-black tracking-wide uppercase ${
-                    isDarkMode ? 'text-[#5fc4b0]' : 'text-[#1f3864]'
-                  }`}
-                >
-                  HỖ TRỢ LÀM VIỆC NGOẠI TUYẾN
-                </div>
-                <div
-                  className={`text-xs font-medium ${
-                    isDarkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}
-                >
-                  Dữ liệu được bảo vệ và mã hóa lưu an toàn trên thiết bị.
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
