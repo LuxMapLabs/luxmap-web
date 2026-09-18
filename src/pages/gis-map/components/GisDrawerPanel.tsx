@@ -222,37 +222,37 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
   return (
     <>
-      <aside className="w-[390px] bg-white border-l border-slate-200 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
+      <aside className="w-[390px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
         
         {/* Panel Header */}
-        <div className="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/80">
           <div className="flex items-center gap-2.5">
             <div
               className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold shrink-0 ${
                 selectedPole
                   ? maintenanceStatus === 'repairing'
-                    ? 'bg-amber-100 text-amber-700'
+                    ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
                     : maintenanceStatus === 'fault'
-                    ? 'bg-rose-100 text-rose-700'
-                    : 'bg-emerald-100 text-emerald-700'
+                    ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                    : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                   : selectedCabinet
                   ? selectedCabinet.status === 'fault'
-                    ? 'bg-rose-100 text-rose-700'
+                    ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
                     : isRootCabinet
-                    ? 'bg-amber-50 text-amber-800 border border-amber-300'
-                    : 'bg-emerald-100 text-emerald-700'
+                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                    : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                   : activeSegmentDetail.hasActiveSegmentFault
-                  ? 'bg-rose-100 text-rose-700'
-                  : 'bg-emerald-100 text-emerald-700'
+                  ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                  : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
               }`}
             >
               {selectedPole ? (
                 maintenanceStatus === 'repairing' ? (
-                  <Wrench className="w-4 h-4 text-amber-600" />
+                  <Wrench className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 ) : maintenanceStatus === 'fault' ? (
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
                 ) : (
-                  <Zap className="w-4 h-4 text-emerald-600" />
+                  <Zap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 )
               ) : selectedCabinet ? (
                 <img
@@ -261,12 +261,12 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   alt="Tủ điện"
                 />
               ) : (
-                <Radio className={`w-4 h-4 ${activeSegmentDetail.hasActiveSegmentFault ? 'text-rose-600' : 'text-emerald-600'}`} />
+                <Radio className={`w-4 h-4 ${activeSegmentDetail.hasActiveSegmentFault ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
               )}
             </div>
 
             <div>
-              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+              <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
                 <span>
                   {selectedPole
                     ? selectedPole.properties?.pole_id
@@ -278,7 +278,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 {selectedPole?.properties?.near_sensitive_poi && (
                   <span
                     className="w-3.5 h-3.5 rounded-full bg-violet-600 text-white flex items-center justify-center text-[8px] font-bold shrink-0"
-                    title="Gần trường, cầu"
+                    title="Gần trường học"
                   >
                     !
                   </span>
@@ -287,15 +287,15 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 {/* Single Concise Status Badge */}
                 {selectedPole ? (
                   maintenanceStatus === 'repairing' ? (
-                    <span className="text-[10.5px] bg-amber-50 text-amber-800 font-semibold px-2 py-0.5 rounded border border-amber-200">
+                    <span className="text-[10.5px] bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-semibold px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
                       Đang sửa chữa
                     </span>
                   ) : maintenanceStatus === 'fault' ? (
-                    <span className="text-[10.5px] bg-rose-50 text-rose-700 font-semibold px-2 py-0.5 rounded border border-rose-200">
+                    <span className="text-[10.5px] bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-semibold px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800">
                       Báo hỏng
                     </span>
                   ) : (
-                    <span className="text-[10.5px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded border border-emerald-200">
+                    <span className="text-[10.5px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                       Bình thường
                     </span>
                   )
@@ -303,15 +303,15 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <span
                     className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
                       activeSegmentDetail.hasActiveSegmentFault
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                        : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                     }`}
                   >
                     {activeSegmentDetail.hasActiveSegmentFault ? 'Đã ngắt điện' : 'Cấp điện ổn định'}
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
                 {selectedPole
                   ? activeSegmentDetail.name
                   : selectedCabinet
@@ -328,7 +328,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               setSelectedSegmentId(null)
               if (setSelectedCabinet) setSelectedCabinet(null)
             }}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition cursor-pointer"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
             title="Đóng"
           >
             <X className="w-4 h-4" />
@@ -341,12 +341,12 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
             <div className="space-y-4 text-xs">
               {/* Cascade Fault Alert Banner */}
               {selectedPole.properties.power_loss_reason && (
-                <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl text-xs space-y-1">
-                  <div className="font-bold text-rose-800 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 p-3 rounded-xl text-xs space-y-1">
+                  <div className="font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                     <span>Sự cố mất nguồn cấp điện!</span>
                   </div>
-                  <p className="text-rose-700 text-[11px] leading-relaxed">
+                  <p className="text-rose-700 dark:text-rose-400 text-[11px] leading-relaxed">
                     {selectedPole.properties.power_loss_reason}
                   </p>
                 </div>
@@ -360,7 +360,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         title: `Ảnh hiện trường: ${selectedPole.properties.pole_id}`,
                       })
                     }
-                    className="relative h-44 rounded-xl overflow-hidden cursor-pointer group border border-slate-200 bg-slate-900 shadow-2xs"
+                    className="relative h-44 rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs"
                   >
                     <img
                       src={polePhotoUrl}
@@ -378,68 +378,68 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
 
                   {/* 2. Technical Specs Card (Core Asset Identity) */}
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-                    <div className="font-bold text-slate-800 text-xs border-b border-slate-200/80 pb-1 flex items-center gap-1.5">
-                      <Info className="w-3.5 h-3.5 text-blue-600" />
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
+                    <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1 flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                       <span>Thông số kỹ thuật</span>
                     </div>
 
-                    <div className="space-y-1.5 text-[11.5px] text-slate-600">
+                    <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                       <div className="flex justify-between">
                         <span>Tuyến:</span>
-                        <strong className="text-slate-900">{selectedPole.properties.segment_id}</strong>
+                        <strong className="text-slate-900 dark:text-white">{selectedPole.properties.segment_id}</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Nguồn cấp:</span>
-                        <strong className="text-slate-900">
+                        <strong className="text-slate-900 dark:text-white">
                           {selectedPole.properties.power_source === 'solar' ? 'Năng lượng mặt trời' : 'Điện lưới 220V'}
                         </strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Bóng đèn:</span>
-                        <strong className="text-slate-900">
+                        <strong className="text-slate-900 dark:text-white">
                           {selectedPole.properties.fixture_type || 'LED'} ({selectedPole.properties.lamp_watt || 100}W)
                         </strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Tọa độ GPS:</span>
-                        <strong className="text-slate-900 font-mono">
+                        <strong className="text-slate-900 dark:text-white font-mono">
                           {selectedPole.geometry.coordinates[1].toFixed(5)}° N, {selectedPole.geometry.coordinates[0].toFixed(5)}° E
                         </strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Lắp đặt:</span>
-                        <span className="text-slate-800">{selectedPole.properties.install_date || '2022-03-24'}</span>
+                        <span className="text-slate-800 dark:text-slate-200">{selectedPole.properties.install_date || '2022-03-24'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Bảo hành đến:</span>
-                        <span className="text-slate-800">{selectedPole.properties.warranty_expiry || '2027-03-24'}</span>
+                        <span className="text-slate-800 dark:text-slate-200">{selectedPole.properties.warranty_expiry || '2027-03-24'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Cảm biến IoT:</span>
                         {poleIotNode ? (
-                          <strong className="text-blue-600 font-mono flex items-center gap-1">
+                          <strong className="text-blue-600 dark:text-blue-400 font-mono flex items-center gap-1">
                             ⚡ {poleIotNode.node_id} (Pin {poleIotNode.battery_pct}%)
                           </strong>
                         ) : (
-                          <span className="text-slate-400">Không trang bị</span>
+                          <span className="text-slate-400 dark:text-slate-500">Không trang bị</span>
                         )}
                       </div>
                       {selectedPole.properties.near_sensitive_poi && (
-                        <div className="flex justify-between items-center text-slate-600 font-medium">
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 font-medium">
                           <span>Vị trí nhạy cảm:</span>
-                          <span className="flex items-center gap-1.5 text-violet-700 font-semibold">
+                          <span className="flex items-center gap-1.5 text-violet-700 dark:text-violet-300 font-semibold">
                             <span className="w-3.5 h-3.5 rounded-full bg-violet-600 text-white flex items-center justify-center text-[8px] font-bold">!</span>
-                            Gần trường, cầu
+                            Gần trường học
                           </span>
                         </div>
                       )}
-                      <div className="flex justify-between items-start gap-2 pt-1 border-t border-slate-200/60">
-                        <span className="text-slate-500 shrink-0 flex items-center gap-1 font-medium">
+                      <div className="flex justify-between items-start gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                        <span className="text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1 font-medium">
                           <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                           Ghi chú Atlas:
                         </span>
-                        <span className="font-semibold text-slate-800 text-right">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 text-right">
                           {selectedPole.properties.atlas || selectedPole.properties.atlas_note || 'Đang cập nhật'}
                         </span>
                       </div>
@@ -448,17 +448,17 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
                   {/* 3. Dedicated Pole IoT Sensor Card (Only if pole has a sampled_fixture IoT node) */}
                   {poleIotNode && (
-                    <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200/70 space-y-2">
-                      <div className="flex items-center justify-between border-b border-blue-200/50 pb-1.5">
-                        <span className="font-bold text-xs text-blue-900 flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-blue-600" />
+                    <div className="bg-blue-50/60 dark:bg-blue-950/30 p-3 rounded-xl border border-blue-200/70 dark:border-blue-800/50 space-y-2">
+                      <div className="flex items-center justify-between border-b border-blue-200/50 dark:border-blue-800/40 pb-1.5">
+                        <span className="font-bold text-xs text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                           <span>Cảm biến IoT trên cột ({poleIotNode.node_id})</span>
                         </span>
                         <span
                           className={`text-[10.5px] px-2 py-0.5 rounded font-semibold ${
                             poleIotNode.node_status === 'online'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-rose-100 text-rose-800'
+                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                              : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
                           }`}
                         >
                           {poleIotNode.node_status === 'online' ? 'Online' : 'Offline'}
@@ -466,18 +466,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-[11px] pt-0.5">
-                        <div className="p-2 bg-white rounded-lg border border-blue-100">
-                          <span className="text-slate-500 block text-[10px]">Mức pin dự trữ</span>
-                          <strong className="text-slate-900 font-mono text-xs flex items-center gap-1">
+                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Mức pin dự trữ</span>
+                          <strong className="text-slate-900 dark:text-white font-mono text-xs flex items-center gap-1">
                             {poleIotNode.battery_pct}%
                             {poleIotNode.battery_pct < 50 && (
-                              <span className="text-[9px] text-amber-600 font-semibold">(Pin yếu)</span>
+                              <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">(Pin yếu)</span>
                             )}
                           </strong>
                         </div>
-                        <div className="p-2 bg-white rounded-lg border border-blue-100">
-                          <span className="text-slate-500 block text-[10px]">Thời gian phát sáng</span>
-                          <strong className="text-slate-900 font-mono text-xs">
+                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Thời gian phát sáng</span>
+                          <strong className="text-slate-900 dark:text-white font-mono text-xs">
                             {selectedPole.properties.pole_id === 'POLE-0047' ? '6.65 h/đêm' : '10.5 h/đêm'}
                           </strong>
                         </div>
@@ -486,13 +486,13 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   )}
 
                   {/* 3. Luminance Baseline History (Operational Telemetry) */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="bg-white dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                        <Activity className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                         <span>Quang thông 3 đêm gần nhất</span>
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">Baseline</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Baseline</span>
                     </div>
 
                     <div className="space-y-1 pt-0.5">
@@ -501,15 +501,15 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         .map((item: LuminanceHistoryItem, idx: number) => (
                           <div
                             key={idx}
-                            className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[11px]"
+                            className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800 text-[11px]"
                           >
-                            <span className="font-mono text-slate-600">{item.observed_at.split('T')[0]}</span>
-                            <span className="font-bold text-slate-900">{Math.round(item.baseline_ratio * 100)}%</span>
+                            <span className="font-mono text-slate-600 dark:text-slate-400">{item.observed_at.split('T')[0]}</span>
+                            <span className="font-bold text-slate-900 dark:text-white">{Math.round(item.baseline_ratio * 100)}%</span>
                             <span
                               className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
                                 item.classified_as === 'normal'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-amber-100 text-amber-800'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                                  : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
                               }`}
                             >
                               {item.classified_as === 'normal' ? 'Sáng' : 'Mờ'}
@@ -520,59 +520,59 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
 
                   {/* 4. Collapsible Maintenance & Incident History (Accordion at the bottom) */}
-                  <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-2xs">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden bg-white dark:bg-slate-800/50 shadow-2xs">
                     <button
                       type="button"
                       onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-                      className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer text-xs font-bold text-slate-800 select-none"
+                      className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200 select-none"
                     >
                       <span className="flex items-center gap-1.5">
-                        <History className="w-3.5 h-3.5 text-blue-600" />
+                        <History className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                         <span>Lịch sử sự cố & bảo trì</span>
                       </span>
                       {isHistoryOpen ? (
-                        <ChevronUp className="w-4 h-4 text-slate-400" />
+                        <ChevronUp className="w-4 h-4 text-slate-400 dark:text-slate-400" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                        <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-400" />
                       )}
                     </button>
 
                     {isHistoryOpen && (
-                      <div className="p-3 pt-2 space-y-3 border-t border-slate-100 bg-white">
+                      <div className="p-3 pt-2 space-y-3 border-t border-slate-100 dark:border-slate-700/60 bg-white dark:bg-slate-900/40">
                         {incidentHistory.slice(0, visibleCount).map((inc) => (
                           <div
                             key={inc.id}
                             className={`p-2.5 rounded-lg border space-y-2 ${
                               inc.status === 'repairing'
-                                ? 'bg-amber-50/60 border-amber-200'
-                                : 'bg-slate-50/80 border-slate-200/80'
+                                ? 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/50'
+                                : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700/60'
                             }`}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-mono text-[11px] font-bold text-slate-800">{inc.id}</span>
+                              <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200">{inc.id}</span>
                               <span
                                 className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
                                   inc.status === 'repairing'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-emerald-100 text-emerald-800'
+                                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                                    : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
                                 }`}
                               >
                                 {inc.status === 'repairing' ? 'Đang sửa' : 'Đã sửa'}
                               </span>
                             </div>
 
-                            <div className="space-y-0.5 text-[11px] text-slate-700">
+                            <div className="space-y-0.5 text-[11px] text-slate-700 dark:text-slate-300">
                               <div className="flex justify-between">
-                                <span className="text-slate-500">Lỗi:</span>
-                                <strong className="text-slate-800 text-right">{inc.title}</strong>
+                                <span className="text-slate-500 dark:text-slate-400">Lỗi:</span>
+                                <strong className="text-slate-800 dark:text-slate-200 text-right">{inc.title}</strong>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-500">Thời gian:</span>
-                                <span className="font-mono text-slate-600 text-[10.5px]">{inc.time}</span>
+                                <span className="text-slate-500 dark:text-slate-400">Thời gian:</span>
+                                <span className="font-mono text-slate-600 dark:text-slate-400 text-[10.5px]">{inc.time}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-500">Kỹ thuật:</span>
-                                <span className="text-slate-800 font-medium">{inc.technician}</span>
+                                <span className="text-slate-500 dark:text-slate-400">Kỹ thuật:</span>
+                                <span className="text-slate-800 dark:text-slate-200 font-medium">{inc.technician}</span>
                               </div>
                             </div>
 
@@ -585,7 +585,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                     title: `${inc.id} - ${inc.beforePhoto.label}`,
                                   })
                                 }
-                                className="relative h-20 rounded-lg overflow-hidden cursor-pointer group border border-slate-300 bg-slate-900"
+                                className="relative h-20 rounded-lg overflow-hidden cursor-pointer group border border-slate-300 dark:border-slate-700 bg-slate-900"
                               >
                                 <img
                                   src={inc.beforePhoto.url}
@@ -606,7 +606,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                       title: `${inc.id} - ${inc.afterPhoto!.label}`,
                                     })
                                   }
-                                  className="relative h-20 rounded-lg overflow-hidden cursor-pointer group border border-slate-300 bg-slate-900"
+                                  className="relative h-20 rounded-lg overflow-hidden cursor-pointer group border border-slate-300 dark:border-slate-700 bg-slate-900"
                                 >
                                   <img
                                     src={inc.afterPhoto.url}
@@ -619,8 +619,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                   </div>
                                 </div>
                               ) : (
-                                <div className="h-20 rounded-lg border border-dashed border-amber-300 bg-amber-100/40 flex flex-col items-center justify-center p-1 text-center text-amber-800 text-[10px]">
-                                  <Clock className="w-3.5 h-3.5 mb-0.5 text-amber-600" />
+                                <div className="h-20 rounded-lg border border-dashed border-amber-300 dark:border-amber-700 bg-amber-100/40 dark:bg-amber-950/40 flex flex-col items-center justify-center p-1 text-center text-amber-800 dark:text-amber-300 text-[10px]">
+                                  <Clock className="w-3.5 h-3.5 mb-0.5 text-amber-600 dark:text-amber-400" />
                                   <span>Đang sửa chữa...</span>
                                 </div>
                               )}
@@ -632,7 +632,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           <button
                             type="button"
                             onClick={() => setVisibleCount((prev) => prev + 2)}
-                            className="w-full py-2 text-center text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-100/60 rounded-lg transition cursor-pointer border border-blue-200/60"
+                            className="w-full py-2 text-center text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50/50 dark:bg-blue-950/40 hover:bg-blue-100/60 dark:hover:bg-blue-900/50 rounded-lg transition cursor-pointer border border-blue-200/60 dark:border-blue-800/50"
                           >
                             Xem thêm sự cố cũ hơn ↓
                           </button>
@@ -640,7 +640,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           <button
                             type="button"
                             onClick={() => setVisibleCount(2)}
-                            className="w-full py-1.5 text-center text-[10.5px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                            className="w-full py-1.5 text-center text-[10.5px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
                           >
                             Thu gọn ↑
                           </button>
@@ -652,8 +652,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
           ) : selectedCabinet ? (
             <div className="space-y-4 text-xs">
               {/* Cabinet Details Card */}
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
-                <div className="font-bold text-slate-800 text-xs border-b border-slate-200/80 pb-1.5 flex items-center justify-between">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-3">
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <img
                       src={isRootCabinet ? cabinetRootSvg : cabinetSvg}
@@ -665,27 +665,27 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                       selectedCabinet.status === 'fault'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
                         : isRootCabinet
-                        ? 'bg-amber-50 text-amber-800 border-amber-300'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        ? 'bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                        : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                     }`}
                   >
                     {selectedCabinet.status === 'fault' ? 'Đã ngắt nguồn' : 'Đang cấp điện'}
                   </span>
                 </div>
 
-                <div className="space-y-1.5 text-[11.5px] text-slate-600">
+                <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                   <div className="flex justify-between">
                     <span>Mã hiệu quản lý:</span>
-                    <strong className="text-slate-900 font-mono">{selectedCabinet.cabinet_code}</strong>
+                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.cabinet_code}</strong>
                   </div>
                   <div className="flex justify-between items-start gap-2">
-                    <span className="text-slate-500 shrink-0 flex items-center gap-1 font-medium">
+                    <span className="text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1 font-medium">
                       <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       Ghi chú Atlas:
                     </span>
-                    <span className="text-slate-900 font-semibold text-right max-w-[220px]">
+                    <span className="text-slate-900 dark:text-slate-100 font-semibold text-right max-w-[220px]">
                       {selectedCabinet.atlas || selectedCabinet.landmark_note || 'Đang cập nhật'}
                     </span>
                   </div>
@@ -693,52 +693,52 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <>
                       <div className="flex justify-between">
                         <span>Tuyến lộ phụ trách:</span>
-                        <strong className="text-blue-700 font-bold">{selectedCabinet.segment_name}</strong>
+                        <strong className="text-blue-700 dark:text-blue-400 font-bold">{selectedCabinet.segment_name}</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Vai trò cấp nguồn:</span>
-                        <strong className="text-amber-700 font-bold flex items-center gap-1">
+                        <strong className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1">
                           <span>⭐ Tủ Đỉnh (Cấp nguồn toàn tuyến)</span>
                         </strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Tổng số đèn quản lý:</span>
-                        <strong className="text-slate-900 font-mono">{selectedCabinet.total_poles_managed} cột đèn</strong>
+                        <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.total_poles_managed} cột đèn</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Tủ nhánh trực thuộc:</span>
-                        <strong className="text-emerald-700 font-bold font-mono">{selectedCabinet.subordinated_cabinets?.length || 1} tủ phân đoạn</strong>
+                        <strong className="text-emerald-700 dark:text-emerald-400 font-bold font-mono">{selectedCabinet.subordinated_cabinets?.length || 1} tủ phân đoạn</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Phụ tải toàn tuyến:</span>
-                        <strong className="text-slate-900 font-mono">{selectedCabinet.current_load_kw} kW</strong>
+                        <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.current_load_kw} kW</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Điện áp nguồn:</span>
-                        <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 font-bold' : 'text-slate-900'}`}>{selectedCabinet.voltage_v} V</strong>
+                        <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-900 dark:text-white'}`}>{selectedCabinet.voltage_v} V</strong>
                       </div>
                     </>
                   ) : (
                     <>
                       <div className="flex justify-between">
                         <span>Thuộc tủ đỉnh:</span>
-                        <strong className="text-amber-800 font-semibold">{selectedCabinet.parent_cabinet_id}</strong>
+                        <strong className="text-amber-800 dark:text-amber-300 font-semibold">{selectedCabinet.parent_cabinet_id}</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Phân đoạn phụ trách:</span>
-                        <strong className="text-blue-700 font-bold">{selectedCabinet.segment_name}</strong>
+                        <strong className="text-blue-700 dark:text-blue-400 font-bold">{selectedCabinet.segment_name}</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Số lượng đèn phân đoạn:</span>
-                        <strong className="text-slate-900 font-mono">{selectedCabinet.pole_count} cột đèn</strong>
+                        <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.pole_count} cột đèn</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Phụ tải phân đoạn:</span>
-                        <strong className="text-slate-900 font-mono">{selectedCabinet.current_load_kw} kW</strong>
+                        <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.current_load_kw} kW</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Điện áp pha:</span>
-                        <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 font-bold' : 'text-slate-900'}`}>{selectedCabinet.voltage_v} V</strong>
+                        <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-900 dark:text-white'}`}>{selectedCabinet.voltage_v} V</strong>
                       </div>
                     </>
                   )}
@@ -746,7 +746,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
                 {/* Breaker Simulation Action Button */}
                 {onToggleCabinet && (
-                  <div className="pt-2 border-t border-slate-200/80">
+                  <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/60">
                     <button
                       onClick={() => onToggleCabinet(selectedCabinet.cabinet_id)}
                       className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all ${
@@ -763,38 +763,38 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               </div>
 
               {/* Electrical Specs Card */}
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-                <div className="font-bold text-slate-800 text-xs border-b border-slate-200 pb-1.5 flex items-center justify-between">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <Radio className="w-3.5 h-3.5 text-blue-600" />
+                    <Radio className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     <span>Hệ thống IoT Giám sát từ xa</span>
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-100 text-emerald-800">
+                  <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
                     {selectedCabinet.iot_gateway_id || selectedCabinet.iot_node_id}
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2 bg-white rounded-lg border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block">Hệ số Cos φ</span>
-                    <strong className="text-slate-900 font-mono text-xs">{selectedCabinet.power_factor || '0.95'}</strong>
+                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Hệ số Cos φ</span>
+                    <strong className="text-slate-900 dark:text-white font-mono text-xs">{selectedCabinet.power_factor || '0.95'}</strong>
                   </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block">Tần số lưới</span>
-                    <strong className="text-slate-900 font-mono text-xs">50.0 Hz</strong>
+                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Tần số lưới</span>
+                    <strong className="text-slate-900 dark:text-white font-mono text-xs">50.0 Hz</strong>
                   </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block">Nhiệt độ tủ</span>
-                    <strong className="text-slate-900 font-mono text-xs">34.2 °C</strong>
+                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Nhiệt độ tủ</span>
+                    <strong className="text-slate-900 dark:text-white font-mono text-xs">34.2 °C</strong>
                   </div>
                 </div>
 
                 {selectedCabinet.fault_reason && (
-                  <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-800 space-y-0.5">
-                    <span className="font-bold flex items-center gap-1 text-rose-700">
-                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Cảnh báo bảo vệ Rơ-le:
+                  <div className="p-2 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 rounded-lg text-[11px] text-rose-800 dark:text-rose-300 space-y-0.5">
+                    <span className="font-bold flex items-center gap-1 text-rose-700 dark:text-rose-400">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Cảnh báo bảo vệ Rơ-le:
                     </span>
                     <p className="text-[10.5px] leading-relaxed">{selectedCabinet.fault_reason}</p>
-                    <p className="text-[10px] text-rose-600 font-semibold pt-0.5">➔ Toàn bộ {selectedCabinet.pole_count || selectedCabinet.total_poles_managed} cột thuộc tuyến/phân đoạn này bị cắt điện.</p>
+                    <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold pt-0.5">➔ Toàn bộ {selectedCabinet.pole_count || selectedCabinet.total_poles_managed} cột thuộc tuyến/phân đoạn này bị cắt điện.</p>
                   </div>
                 )}
               </div>
@@ -803,10 +803,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               {typeof selectedCabinet.start_pole_idx === 'number' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="font-bold text-slate-800 text-xs">
+                    <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
                       {isRootCabinet ? `Dàn đèn toàn tuyến (${selectedCabinet.cabinet_code})` : `Dàn đèn phân đoạn (${selectedCabinet.cabinet_code})`}
                     </p>
-                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded ${selectedCabinet.status === 'fault' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded ${selectedCabinet.status === 'fault' ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}`}>
                       {selectedCabinet.status === 'fault' ? 'Mất điện' : `${selectedCabinet.pole_count || selectedCabinet.total_poles_managed} đèn đang sáng`}
                     </span>
                   </div>
@@ -819,18 +819,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           <div
                             key={f.properties.pole_id}
                             onClick={() => handleSelectPole(f)}
-                            className="p-2 bg-slate-50 hover:bg-blue-50/80 rounded-lg cursor-pointer flex items-center justify-between border border-slate-100 hover:border-blue-200 transition group"
+                            className="p-2 bg-slate-50 dark:bg-slate-800/60 hover:bg-blue-50/80 dark:hover:bg-slate-700/60 rounded-lg cursor-pointer flex items-center justify-between border border-slate-100 dark:border-slate-700/60 hover:border-blue-200 dark:hover:border-blue-700/50 transition group"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="font-bold font-mono text-slate-800 text-xs group-hover:text-blue-700 transition-colors">
+                              <span className="font-bold font-mono text-slate-800 dark:text-slate-200 text-xs group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
                                 {f.properties.pole_id}
                               </span>
                             </div>
                             <span
                               className={`text-[9.5px] px-2 py-0.5 rounded font-bold ${
                                 isOff
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : 'bg-emerald-100 text-emerald-800'
+                                  ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                                  : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
                               }`}
                             >
                               {isOff ? 'TẮT (Mất nguồn tủ)' : 'SÁNG (220V)'}
@@ -845,58 +845,58 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
           ) : (
             <div className="space-y-4 text-xs">
               {/* 1. Segment Overview Card */}
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-                <div className="font-bold text-slate-800 text-xs border-b border-slate-200/80 pb-1 flex items-center justify-between">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <Info className="w-3.5 h-3.5 text-blue-600" />
+                    <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     <span>Thông tin tuyến</span>
                   </span>
                   <span
                     className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
                       activeSegmentDetail.hasActiveSegmentFault
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                        : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                     }`}
                   >
                     {activeSegmentDetail.hasActiveSegmentFault ? 'Đã ngắt nguồn' : 'Đang cấp điện'}
                   </span>
                 </div>
-                <div className="space-y-1.5 text-[11.5px] text-slate-600">
+                <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                   <div className="flex justify-between">
                     <span>Mã tuyến:</span>
-                    <strong className="text-slate-900 font-mono">{activeSegmentDetail.id}</strong>
+                    <strong className="text-slate-900 dark:text-white font-mono">{activeSegmentDetail.id}</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Tên tuyến:</span>
-                    <strong className="text-slate-900">{activeSegmentDetail.name}</strong>
+                    <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.name}</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Chiều dài tuyến:</span>
-                    <strong className="text-slate-900">{activeSegmentDetail.lengthM} m</strong>
+                    <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.lengthM} m</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Tổng số cột:</span>
-                    <strong className="text-slate-900">{activeSegmentDetail.poleCount} cột</strong>
+                    <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.poleCount} cột</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Tủ điều khiển:</span>
-                    <strong className="text-slate-900">{activeSegmentDetail.cabinet}</strong>
+                    <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.cabinet}</strong>
                   </div>
                 </div>
               </div>
 
               {/* 2. Segment Cabinet IoT Card */}
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2.5">
-                <div className="font-bold text-slate-800 text-xs border-b border-slate-200 pb-1.5 flex items-center justify-between">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2.5">
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <Radio className="w-3.5 h-3.5 text-blue-600" />
+                    <Radio className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     <span>Thông số Tủ {activeSegmentDetail.cabinet}</span>
                   </span>
                   <span
                     className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
                       activeSegmentDetail.iotStatus === 'online'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-rose-100 text-rose-800'
+                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                        : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
                     }`}
                   >
                     {activeSegmentDetail.iotStatus === 'online' ? 'Online' : 'Offline'}
@@ -904,44 +904,44 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2 bg-white rounded-lg border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block">Điện áp</span>
-                    <strong className="text-slate-900 font-mono text-xs">221.4 V</strong>
+                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Điện áp</span>
+                    <strong className="text-slate-900 dark:text-white font-mono text-xs">221.4 V</strong>
                   </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block">Dòng điện</span>
-                    <strong className="text-slate-900 font-mono text-xs">18.6 A</strong>
+                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Dòng điện</span>
+                    <strong className="text-slate-900 dark:text-white font-mono text-xs">18.6 A</strong>
                   </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-200">
-                    <span className="text-[10px] text-slate-400 block">Cos φ</span>
-                    <strong className="text-slate-900 font-mono text-xs">0.94</strong>
+                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Cos φ</span>
+                    <strong className="text-slate-900 dark:text-white font-mono text-xs">0.94</strong>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center text-slate-600 pt-1 border-t border-slate-200">
+                <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700/60">
                   <span>Aptomat:</span>
                   <strong>
                     {activeSegmentDetail.hasActiveSegmentFault ? (
-                      <span className="text-rose-600 font-bold">Đã Ngắt (OFF)</span>
+                      <span className="text-rose-600 dark:text-rose-400 font-bold">Đã Ngắt (OFF)</span>
                     ) : (
-                      <span className="text-emerald-700 font-bold">Đang Đóng (ON)</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">Đang Đóng (ON)</span>
                     )}
                   </strong>
                 </div>
 
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Cập nhật:</span>
-                  <span className="text-slate-800 font-mono">1 phút trước</span>
+                  <span className="text-slate-800 dark:text-slate-200 font-mono">1 phút trước</span>
                 </div>
               </div>
 
               {/* 3. Pole List on this Segment */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="font-bold text-slate-800 text-xs">
+                  <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
                     Danh sách cột ({activeSegmentDetail.name})
                   </p>
-                  <span className="text-[11px] text-slate-500 font-medium">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                     {activeSegmentDetail.poleCount} cột
                   </span>
                 </div>
@@ -952,16 +952,16 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div
                         key={f.properties.pole_id}
                         onClick={() => handleSelectPole(f)}
-                        className="p-2.5 bg-slate-50 hover:bg-blue-50/80 rounded-lg cursor-pointer flex items-center justify-between border border-slate-100 hover:border-blue-200 transition group"
+                        className="p-2.5 bg-slate-50 dark:bg-slate-800/60 hover:bg-blue-50/80 dark:hover:bg-slate-700/60 rounded-lg cursor-pointer flex items-center justify-between border border-slate-100 dark:border-slate-700/60 hover:border-blue-200 dark:hover:border-blue-700/50 transition group"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-bold font-mono text-slate-800 text-xs group-hover:text-blue-700 transition-colors">
+                          <span className="font-bold font-mono text-slate-800 dark:text-slate-200 text-xs group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
                             {f.properties.pole_id}
                           </span>
                           {f.properties.near_sensitive_poi && (
                             <span
                               className="w-3.5 h-3.5 rounded-full bg-violet-600 text-white flex items-center justify-center text-[8px] font-bold shrink-0 shadow-xs"
-                              title="Gần trường, cầu"
+                              title="Gần trường học"
                             >
                               !
                             </span>
@@ -970,10 +970,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded font-medium ${
                             f.properties.fixture_status === 'normal'
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
                               : f.properties.fixture_status === 'dim'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-rose-100 text-rose-800'
+                              ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                              : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
                           }`}
                         >
                           {f.properties.fixture_status === 'normal'

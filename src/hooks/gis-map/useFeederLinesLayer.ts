@@ -45,10 +45,10 @@ export function useFeederLinesLayer({
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['case', ['==', ['get', 'status'], 'fault'], '#e11d48', '#059669'],
-          'line-width': 8,
-          'line-opacity': map.getZoom() >= 13.0 ? 0.45 : 0,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 13, 5, 16, 7],
+          'line-opacity': map.getZoom() >= 13.0 ? 0.35 : 0,
           'line-opacity-transition': { duration: 300, delay: 0 },
-          'line-blur': 3,
+          'line-blur': 2.5,
         },
       })
 
@@ -60,7 +60,7 @@ export function useFeederLinesLayer({
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': ['case', ['==', ['get', 'status'], 'fault'], '#f43f5e', '#10b981'],
-          'line-width': 3.5,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.6, 13, 2.4, 16, 3.0],
           'line-opacity': map.getZoom() >= 13.0 ? 0.95 : 0,
           'line-opacity-transition': { duration: 300, delay: 0 },
         },
