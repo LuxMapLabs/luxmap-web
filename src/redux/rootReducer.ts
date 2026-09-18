@@ -1,8 +1,8 @@
 import { combineReducers } from '@reduxjs/toolkit'
+import authReducer from '../feature/auth/authSlice'
 
 const rootReducer = combineReducers({
-    // Placeholder reducer để tránh lỗi khi chưa có feature nào
-    _placeholder: (state = null) => state,
+    auth: authReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>
