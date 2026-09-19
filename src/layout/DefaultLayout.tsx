@@ -28,7 +28,7 @@ export const DefaultLayout: React.FC = () => {
     : 'U'
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans antialiased text-slate-900 dark:text-slate-100">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50 font-sans antialiased text-slate-900">
       {/* 1. Full-width Institutional Top Navbar */}
       <Header
         userName={user?.fullName || 'Người dùng'}

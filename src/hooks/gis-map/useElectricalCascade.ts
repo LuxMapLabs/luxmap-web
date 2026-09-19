@@ -7,6 +7,7 @@ import {
 import mockPolesData from '../../data/mock-poles.geo.json'
 import mockSegmentsData from '../../data/mock-segments.geo.json'
 import mockCabinetsData from '../../data/mock-cabinets.geo.json'
+import { showToast } from '../../utils/toastUtils'
 
 interface UseElectricalCascadeProps {
   statusFilter: string
@@ -37,42 +38,153 @@ export function useElectricalCascade({
     })
   })
 
-  // Toggle Cabinet breaker (Trip / Restore)
+  // Toggle Cabinet breaker (Trip / Restore) with Physical Cascade Interlocking
   const handleToggleCabinet = (cabId: string, onSelectedCabinetUpdate?: (updater: (prev: any) => any) => void) => {
+    const targetCab = cabinets.find((c) => c.properties?.cabinet_id === cabId)
+    if (!targetCab) return
+
+    const targetProps = targetCab.properties || {}
+    const isRoot = targetProps.role === 'root_cabinet'
+
+    // 1. Interlock check: If trying to activate a sub-cabinet while its parent root cabinet is in FAULT
+    if (!isRoot && targetProps.status === 'fault') {
+      const parentRoot = cabinets.find(
+        (c) =>
+          c.properties?.role === 'root_cabinet' &&
+          (c.properties?.cabinet_id === targetProps.parent_cabinet_id ||
+            c.properties?.segment_id === targetProps.segment_id)
+      )
+
+      if (parentRoot && parentRoot.properties?.status === 'fault') {
+        showToast.warning(
+          'Không thể đóng Aptomat tủ nhánh!',
+          `Tủ nhánh đang mất nguồn cấp do Tủ đỉnh (${parentRoot.properties?.cabinet_name || 'Tủ đỉnh'}) bị ngắt. Cần đóng điện Tủ đỉnh trước!`
+        )
+        return
+      }
+    }
+
+    const currentStatus = targetProps.status
+    const nextStatus = currentStatus === 'fault' ? 'active' : 'fault'
+
     setCabinets((prev) =>
       prev.map((c) => {
-        if (c.properties?.cabinet_id === cabId) {
-          const currentStatus = c.properties.status
-          const nextStatus = currentStatus === 'fault' ? 'active' : 'fault'
+        const cp = c.properties || {}
+        // A. Direct target cabinet update
+        if (cp.cabinet_id === cabId) {
           return {
             ...c,
             properties: {
-              ...c.properties,
+              ...cp,
               status: nextStatus,
               voltage_v: nextStatus === 'fault' ? 0 : 220,
-              current_load_kw: nextStatus === 'fault' ? 0 : 8.5,
+              current_load_kw: nextStatus === 'fault' ? 0 : isRoot ? 18.2 : 8.5,
               power_factor: nextStatus === 'fault' ? 0 : 0.95,
+              fault_reason: nextStatus === 'fault' ? 'Ngắt Aptomat thủ công' : undefined,
             },
           }
         }
+
+        // B. Cascade effect: If target is a ROOT CABINET, cascade to all subordinate SUB-CABINETS
+        if (
+          isRoot &&
+          (cp.parent_cabinet_id === cabId ||
+            (cp.segment_id === targetProps.segment_id && cp.role === 'sub_cabinet'))
+        ) {
+          if (nextStatus === 'fault') {
+            // Root turned off -> Sub-cabinets lose power input (0V, fault)
+            return {
+              ...c,
+              properties: {
+                ...cp,
+                status: 'fault',
+                voltage_v: 0,
+                current_load_kw: 0,
+                power_factor: 0,
+                fault_reason: `Mất nguồn cấp do Tủ đỉnh (${targetProps.cabinet_name}) bị ngắt điện`,
+              },
+            }
+          } else {
+            // Root turned on -> Power restored to downstream sub-cabinets
+            return {
+              ...c,
+              properties: {
+                ...cp,
+                status: 'active',
+                voltage_v: 220,
+                current_load_kw: 8.5,
+                power_factor: 0.95,
+                fault_reason: undefined,
+              },
+            }
+          }
+        }
+
         return c
       })
     )
 
     if (onSelectedCabinetUpdate) {
       onSelectedCabinetUpdate((prev: any) => {
-        if (prev && prev.cabinet_id === cabId) {
-          const nextStatus = prev.status === 'fault' ? 'active' : 'fault'
+        if (!prev) return prev
+        if (prev.cabinet_id === cabId) {
           return {
             ...prev,
             status: nextStatus,
             voltage_v: nextStatus === 'fault' ? 0 : 220,
-            current_load_kw: nextStatus === 'fault' ? 0 : 8.5,
+            current_load_kw: nextStatus === 'fault' ? 0 : isRoot ? 18.2 : 8.5,
             power_factor: nextStatus === 'fault' ? 0 : 0.95,
+            fault_reason: nextStatus === 'fault' ? 'Ngắt Aptomat thủ công' : undefined,
+          }
+        }
+        if (
+          isRoot &&
+          (prev.parent_cabinet_id === cabId ||
+            (prev.segment_id === targetProps.segment_id && prev.role === 'sub_cabinet'))
+        ) {
+          if (nextStatus === 'fault') {
+            return {
+              ...prev,
+              status: 'fault',
+              voltage_v: 0,
+              current_load_kw: 0,
+              power_factor: 0,
+              fault_reason: `Mất nguồn cấp do Tủ đỉnh (${targetProps.cabinet_name}) bị ngắt điện`,
+            }
+          } else {
+            return {
+              ...prev,
+              status: 'active',
+              voltage_v: 220,
+              current_load_kw: 8.5,
+              power_factor: 0.95,
+              fault_reason: undefined,
+            }
           }
         }
         return prev
       })
+    }
+
+    // Informative Feedback Toast
+    if (isRoot) {
+      if (nextStatus === 'fault') {
+        showToast.error(
+          'Đã ngắt Aptomat Tủ đỉnh!',
+          `Toàn bộ tuyến cáp và các tủ nhánh thuộc tuyến đã bị cắt điện do mất nguồn.`
+        )
+      } else {
+        showToast.success(
+          'Đã đóng điện Tủ đỉnh!',
+          `Tuyến cáp và các tủ nhánh hạ nguồn đã được cấp điện trở lại.`
+        )
+      }
+    } else {
+      if (nextStatus === 'fault') {
+        showToast.error('Đã ngắt Aptomat Tủ nhánh!', `Phân đoạn hạ nguồn đã bị ngắt điện.`)
+      } else {
+        showToast.success('Đã đóng Aptomat Tủ nhánh!', `Phân đoạn hạ nguồn đã được cấp điện.`)
+      }
     }
   }
 

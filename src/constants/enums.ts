@@ -28,7 +28,6 @@ export enum FixtureStatus {
  */
 export enum PowerSource {
   GRID = 'grid',   // Lưới điện quốc gia
-  SOLAR = 'solar', // Năng lượng mặt trời
 }
 
 /**
@@ -36,7 +35,6 @@ export enum PowerSource {
  */
 export enum FixtureType {
   LED_ROAD_LAMP = 'led_road_lamp',       // Đèn LED đường phố
-  SOLAR_ALL_IN_ONE = 'solar_all_in_one', // Đèn năng lượng mặt trời All-in-One
 }
 
 /**

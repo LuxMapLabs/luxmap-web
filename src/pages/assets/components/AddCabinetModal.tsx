@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Zap, CheckCircle2, MapPin } from 'lucide-react'
 
 export interface NewCabinetData {
@@ -71,8 +72,8 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
     onClose()
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-lg overflow-hidden animate-in zoom-in-95">
         {/* Header */}
         <div className="p-5 bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-800 text-white flex items-center justify-between">
@@ -237,6 +238,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

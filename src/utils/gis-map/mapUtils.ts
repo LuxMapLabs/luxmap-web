@@ -1,6 +1,6 @@
 export const DEFAULT_MAP_CENTER: [number, number] = [106.4975, 10.9715]
 export const DEFAULT_MAP_ZOOM = 14.8
-export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY || '4A7ex43XNIzlzIcSnO8d'
+export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY 
 
 /**
  * Bản đồ Vệ Tinh Google Hybrid Sạch (Google Satellite + Tự Động Nạp Hoàng Sa & Trường Sa từ Google + MapTiler Vector Sạch trong đất liền - 0% Rác Quán Xá)

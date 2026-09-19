@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { PlusCircle, X, MapPin, CheckCircle2 } from 'lucide-react'
 
 export interface NewPoleData {
@@ -10,8 +11,8 @@ export interface NewPoleData {
   lat: number
   lng: number
   lamp_watt: number
-  power_source: 'grid' | 'solar'
-  fixture_type: 'led_road_lamp' | 'solar_all_in_one'
+  power_source: 'grid'
+  fixture_type: 'led_road_lamp'
   feeder_id: string
   warranty_expiry: string
   near_sensitive_poi: boolean
@@ -53,8 +54,8 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const [lat, setLat] = useState('10.9715')
   const [lng, setLng] = useState('106.4925')
   const [lampWatt, setLampWatt] = useState<number>(100)
-  const [powerSource, setPowerSource] = useState<'grid' | 'solar'>('grid')
-  const [fixtureType, setFixtureType] = useState<'led_road_lamp' | 'solar_all_in_one'>('led_road_lamp')
+  const [powerSource] = useState<'grid'>('grid')
+  const [fixtureType] = useState<'led_road_lamp'>('led_road_lamp')
   const [feederId, setFeederId] = useState('CAB-TL8-ROOT')
   const [warrantyExpiry, setWarrantyExpiry] = useState('2027-12-31')
   const [nearSensitivePoi, setNearSensitivePoi] = useState(false)
@@ -100,12 +101,12 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     onClose()
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-in fade-in"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in"
       />
 
       {/* Modal Dialog */}
@@ -236,7 +237,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                 <option value={50} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">50W</option>
                 <option value={60} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">60W</option>
                 <option value={100} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">100W LED</option>
-                <option value={120} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">120W Solar</option>
+                <option value={120} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">120W LED</option>
                 <option value={150} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">150W Cao áp</option>
                 <option value={200} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">200W Đô thị</option>
               </select>
@@ -245,27 +246,20 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
               <label className="font-bold text-slate-700 dark:text-slate-300">Nguồn cấp điện:</label>
               <select
                 value={powerSource}
-                onChange={(e) => {
-                  const val = e.target.value as 'grid' | 'solar'
-                  setPowerSource(val)
-                  if (val === 'solar') setFixtureType('solar_all_in_one')
-                  else setFixtureType('led_road_lamp')
-                }}
-                className="w-full p-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+                disabled
+                className="w-full p-2.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none cursor-not-allowed"
               >
                 <option value="grid" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Lưới điện 220V</option>
-                <option value="solar" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Năng lượng Mặt trời</option>
               </select>
             </div>
             <div className="space-y-1">
               <label className="font-bold text-slate-700 dark:text-slate-300">Loại bộ đèn:</label>
               <select
                 value={fixtureType}
-                onChange={(e) => setFixtureType(e.target.value as any)}
-                className="w-full p-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+                disabled
+                className="w-full p-2.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none cursor-not-allowed"
               >
                 <option value="led_road_lamp" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">LED Road Lamp</option>
-                <option value="solar_all_in_one" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Solar All-in-One</option>
               </select>
             </div>
           </div>
@@ -337,6 +331,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

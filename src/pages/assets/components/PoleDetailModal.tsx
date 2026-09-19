@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { Info, X, MapPin, Wrench, ShieldCheck, Zap, Lightbulb, AlertTriangle } from 'lucide-react'
 import { StatusBadge } from '../../../components/StatusBadge'
 import type { EditablePoleData } from './EditPoleModal'
@@ -21,12 +22,12 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
   const lux = pole.lux_value ?? 28.5
   const isLuxOk = lux >= 25
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-in fade-in"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in"
       />
 
       {/* Modal Dialog */}
@@ -174,6 +175,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
