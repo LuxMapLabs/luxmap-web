@@ -57,6 +57,7 @@ export interface GisDrawerPanelProps {
   selectedCabinet?: any
   setSelectedCabinet?: (c: any) => void
   onToggleCabinet?: (cabinetId: string) => void
+  cabinets?: any[]
 }
 
 interface IncidentRecord {
@@ -80,6 +81,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   selectedCabinet,
   setSelectedCabinet,
   onToggleCabinet,
+  cabinets,
 }) => {
   // Lightbox Modal state
   const [lightboxImage, setLightboxImage] = useState<{
@@ -219,10 +221,23 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=900&auto=format&fit=crop&q=80'
 
   const isRootCabinet = selectedCabinet?.role === 'root_cabinet'
+  const isSubCabinet = selectedCabinet?.role === 'sub_cabinet'
+  const parentRootCabinet = useMemo(() => {
+    if (!isSubCabinet || !cabinets) return null
+    const found = cabinets.find(
+      (c: any) =>
+        c.properties?.role === 'root_cabinet' &&
+        (c.properties?.cabinet_id === selectedCabinet.parent_cabinet_id ||
+          c.properties?.segment_id === selectedCabinet.segment_id)
+    )
+    return found?.properties || null
+  }, [isSubCabinet, cabinets, selectedCabinet])
+
+  const isParentRootOff = isSubCabinet && parentRootCabinet?.status === 'fault'
 
   return (
     <>
-      <aside className="w-[390px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
+      <aside className="w-97.5 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
         
         {/* Panel Header */}
         <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/80">
@@ -367,7 +382,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       alt={selectedPole.properties.pole_id}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent flex items-end justify-between p-2.5 text-white">
+                    <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent flex items-end justify-between p-2.5 text-white">
                       <span className="text-[11px] font-medium drop-shadow-sm font-mono">
                         {selectedPole.properties.pole_id}
                       </span>
@@ -392,7 +407,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div className="flex justify-between">
                         <span>Nguồn cấp:</span>
                         <strong className="text-slate-900 dark:text-white">
-                          {selectedPole.properties.power_source === 'solar' ? 'Năng lượng mặt trời' : 'Điện lưới 220V'}
+                          Điện lưới 220V
                         </strong>
                       </div>
                       <div className="flex justify-between">
@@ -592,7 +607,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                   alt="Lúc hỏng"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-1 text-white">
+                                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-1 text-white">
                                   <span className="text-[9px] font-semibold text-amber-200">Lúc hỏng</span>
                                   <Maximize2 className="w-3 h-3 text-white/80" />
                                 </div>
@@ -613,7 +628,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                     alt="Nghiệm thu"
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                   />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-1 text-white">
+                                  <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-1 text-white">
                                     <span className="text-[9px] font-semibold text-emerald-200">Nghiệm thu</span>
                                     <Maximize2 className="w-3 h-3 text-white/80" />
                                   </div>
@@ -685,7 +700,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       Ghi chú Atlas:
                     </span>
-                    <span className="text-slate-900 dark:text-slate-100 font-semibold text-right max-w-[220px]">
+                    <span className="text-slate-900 dark:text-slate-100 font-semibold text-right max-w-55">
                       {selectedCabinet.atlas || selectedCabinet.landmark_note || 'Đang cập nhật'}
                     </span>
                   </div>
@@ -744,19 +759,46 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   )}
                 </div>
 
+                {/* Interlocking Warning if Parent Root is Off */}
+                {isParentRootOff && (
+                  <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Khóa liên động điện (Interlocked)</p>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
+                        Tủ đỉnh <strong>{parentRootCabinet?.cabinet_name || selectedCabinet.parent_cabinet_id}</strong> đang bị ngắt điện. Tủ nhánh này không có nguồn cấp đầu vào, Aptomat bị khóa an toàn cho đến khi tủ đỉnh được đóng điện lại.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Breaker Simulation Action Button */}
                 {onToggleCabinet && (
                   <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/60">
                     <button
+                      disabled={isParentRootOff}
                       onClick={() => onToggleCabinet(selectedCabinet.cabinet_id)}
-                      className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all ${
-                        selectedCabinet.status === 'fault'
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          : 'bg-rose-600 hover:bg-rose-700 text-white'
+                      title={
+                        isParentRootOff
+                          ? `Khóa an toàn: Cần đóng điện ${parentRootCabinet?.cabinet_name || 'Tủ đỉnh'} trước`
+                          : undefined
+                      }
+                      className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all ${
+                        isParentRootOff
+                          ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-75'
+                          : selectedCabinet.status === 'fault'
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                          : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
                       }`}
                     >
                       <Power className="w-3.5 h-3.5" />
-                      <span>{selectedCabinet.status === 'fault' ? 'Đóng Aptomat' : 'Ngắt Aptomat'}</span>
+                      <span>
+                        {isParentRootOff
+                          ? 'Khóa Aptomat (Mất nguồn tủ đỉnh)'
+                          : selectedCabinet.status === 'fault'
+                          ? 'Đóng Aptomat'
+                          : 'Ngắt Aptomat'}
+                      </span>
                     </button>
                   </div>
                 )}

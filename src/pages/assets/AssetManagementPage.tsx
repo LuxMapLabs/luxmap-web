@@ -13,7 +13,6 @@ import {
   Zap,
   Route,
   AlertTriangle,
-  Lightbulb,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -40,8 +39,8 @@ export interface AssetPoleItem {
   commune_id: string
   commune_name: string
   lamp_watt: number
-  power_source: 'grid' | 'solar'
-  fixture_type: 'led_road_lamp' | 'solar_all_in_one'
+  power_source: 'grid'
+  fixture_type: 'led_road_lamp'
   fixture_status: 'normal' | 'dim' | 'out' | 'unknown'
   feeder_id: string
   warranty_expiry: string
@@ -178,10 +177,10 @@ export const AssetManagementPage: React.FC = () => {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [sourceFilter, setSourceFilter] = useState('all')
+  const [sortBy, setSortBy] = useState<'fault_first' | 'id_asc'>('id_asc')
 
   const [currentPage, setCurrentPage] = useState(1)
-  const pageSize = 12
+  const pageSize = 10
 
   // Modals state
   const [isAddPoleModalOpen, setIsAddPoleModalOpen] = useState(false)
@@ -208,13 +207,13 @@ export const AssetManagementPage: React.FC = () => {
     setActiveCategory(cat)
     setSearchQuery('')
     setStatusFilter('all')
-    setSourceFilter('all')
+    setSortBy('id_asc')
     setCurrentPage(1)
   }
 
-  // 1. Filtered Poles
+  // 1. Filtered Poles (Urgency-first sorting)
   const filteredPoles = useMemo(() => {
-    return poles.filter((pole) => {
+    const list = poles.filter((pole) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesQuery =
         !q ||
@@ -224,15 +223,24 @@ export const AssetManagementPage: React.FC = () => {
         (pole.atlas && pole.atlas.toLowerCase().includes(q))
 
       const matchesStatus = statusFilter === 'all' || pole.fixture_status === statusFilter
-      const matchesSource = sourceFilter === 'all' || pole.power_source === sourceFilter
 
-      return matchesQuery && matchesStatus && matchesSource
+      return matchesQuery && matchesStatus
     })
-  }, [poles, searchQuery, statusFilter, sourceFilter])
 
-  // 2. Filtered Cabinets
+    return [...list].sort((a, b) => {
+      if (sortBy === 'fault_first') {
+        const severity: Record<string, number> = { out: 0, dim: 1, unknown: 2, normal: 3 }
+        const pA = severity[a.fixture_status] ?? 99
+        const pB = severity[b.fixture_status] ?? 99
+        if (pA !== pB) return pA - pB
+      }
+      return a.pole_id.localeCompare(b.pole_id, undefined, { numeric: true })
+    })
+  }, [poles, searchQuery, statusFilter, sortBy])
+
+  // 2. Filtered Cabinets (Fault-first sorting)
   const filteredCabinets = useMemo(() => {
-    return cabinets.filter((cab) => {
+    const list = cabinets.filter((cab) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesQuery =
         !q ||
@@ -245,11 +253,20 @@ export const AssetManagementPage: React.FC = () => {
 
       return matchesQuery && matchesStatus
     })
-  }, [cabinets, searchQuery, statusFilter])
 
-  // 3. Filtered Segments
+    return [...list].sort((a, b) => {
+      if (sortBy === 'fault_first') {
+        if (a.status !== b.status) {
+          return a.status === 'fault' ? -1 : 1
+        }
+      }
+      return a.cabinet_id.localeCompare(b.cabinet_id, undefined, { numeric: true })
+    })
+  }, [cabinets, searchQuery, statusFilter, sortBy])
+
+  // 3. Filtered Segments (Fault-first sorting)
   const filteredSegments = useMemo(() => {
-    return segments.filter((seg) => {
+    const list = segments.filter((seg) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesQuery =
         !q ||
@@ -266,7 +283,16 @@ export const AssetManagementPage: React.FC = () => {
 
       return matchesQuery && matchesStatus
     })
-  }, [segments, searchQuery, statusFilter])
+
+    return [...list].sort((a, b) => {
+      if (sortBy === 'fault_first') {
+        if (a.has_active_fault !== b.has_active_fault) {
+          return a.has_active_fault ? -1 : 1
+        }
+      }
+      return a.segment_id.localeCompare(b.segment_id, undefined, { numeric: true })
+    })
+  }, [segments, searchQuery, statusFilter, sortBy])
 
   // Pagination for current tab
   const currentListLength =
@@ -413,12 +439,6 @@ export const AssetManagementPage: React.FC = () => {
   }
 
 
-  // Calculate quick metrics
-  const totalRoadKm = (segments.reduce((acc, s) => acc + s.length_m, 0) / 1000).toFixed(1)
-  const activeCabinetsCount = cabinets.filter((c) => c.status === 'active').length
-  const faultCabinetsCount = cabinets.length - activeCabinetsCount
-  const normalPolesCount = poles.filter((p) => p.fixture_status === 'normal').length
-  const poleHealthPct = poles.length > 0 ? ((normalPolesCount / poles.length) * 100).toFixed(1) : '100'
 
   return (
     <div className="h-full w-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none">
@@ -437,153 +457,100 @@ export const AssetManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 flex items-center justify-center shadow-xs">
-                <Boxes className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Quản Lý Tài Sản Hạ Tầng Chiếu Sáng
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Quản lý số hóa 3 phân lớp tài sản: Tuyến đường, Tủ điện điều khiển và Cột & Bóng đèn GIS
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* Segmented Control Navigation Tabs - Silky Sliding Active Pill */}
+        <div className="relative grid grid-cols-3 bg-slate-100/85 p-1.5 rounded-2xl border border-slate-200/70 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] select-none">
+          {/* Animated Sliding Active Pill (Elevated white card with soft ambient lighting) */}
+          <div
+            className="absolute top-1.5 bottom-1.5 left-1.5 rounded-xl bg-white shadow-[0_2px_8px_-1px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.04)] border border-slate-200/80 pointer-events-none transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            style={{
+              width: 'calc((100% - 12px) / 3)',
+              transform: `translateX(calc(${
+                activeCategory === 'poles_and_fixtures' ? 0 : activeCategory === 'cabinets' ? 100 : 200
+              }%))`,
+            }}
+          />
 
-          {/* Top Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsImportModalOpen(true)}
-              className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>Import Dữ Liệu</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Slim KPI Metrics Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-3 hover:border-blue-300 dark:hover:border-blue-700 transition">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-              <Route className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tuyến đường</div>
-              <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">
-                {segments.length} tuyến <span className="text-xs font-medium text-slate-400 dark:text-slate-500">({totalRoadKm} km)</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-3 hover:border-amber-300 dark:hover:border-amber-700 transition">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <Zap className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tủ điều khiển</div>
-              <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">
-                {cabinets.length} tủ{' '}
-                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 font-bold">
-                  ({activeCabinetsCount} cấp điện{faultCabinetsCount > 0 ? `, ${faultCabinetsCount} sự cố` : ''})
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-3 hover:border-indigo-300 dark:hover:border-indigo-700 transition">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-              <Boxes className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cột chiếu sáng</div>
-              <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">
-                {poles.length} cột <span className="text-xs font-medium text-slate-400 dark:text-slate-500">(100% WGS84)</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-3 hover:border-emerald-300 dark:hover:border-emerald-700 transition">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <Lightbulb className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Bóng đèn hoạt động</div>
-              <div className="text-base font-black text-emerald-700 dark:text-emerald-400 mt-0.5">
-                {poleHealthPct}% <span className="text-xs font-medium text-slate-400 dark:text-slate-500">({normalPolesCount}/{poles.length})</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Segmented Control Navigation Tabs */}
-        <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-1.5">
+          {/* Tab 1: Cột & Bóng đèn */}
           <button
             type="button"
             onClick={() => handleCategoryChange('poles_and_fixtures')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
               activeCategory === 'poles_and_fixtures'
-                ? 'bg-[#1f3864] dark:bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/70'
+                ? 'text-slate-900 font-bold'
+                : 'text-slate-500 hover:text-slate-800 font-medium'
             }`}
           >
-            <Boxes className="w-4 h-4" />
+            <Boxes
+              className={`w-4 h-4 transition-all duration-300 ${
+                activeCategory === 'poles_and_fixtures'
+                  ? 'text-blue-600 scale-110 drop-shadow-[0_1px_2px_rgba(37,99,235,0.3)]'
+                  : 'text-slate-400'
+              }`}
+            />
             <span>Cột & Bóng đèn</span>
             <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
                 activeCategory === 'poles_and_fixtures'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200/70 shadow-2xs'
+                  : 'bg-slate-200/70 text-slate-600'
               }`}
             >
               {poles.length}
             </span>
           </button>
 
+          {/* Tab 2: Tủ điện điều khiển */}
           <button
             type="button"
             onClick={() => handleCategoryChange('cabinets')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
               activeCategory === 'cabinets'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/70'
+                ? 'text-slate-900 font-bold'
+                : 'text-slate-500 hover:text-slate-800 font-medium'
             }`}
           >
-            <Zap className="w-4 h-4" />
+            <Zap
+              className={`w-4 h-4 transition-all duration-300 ${
+                activeCategory === 'cabinets'
+                  ? 'text-amber-500 scale-110 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)]'
+                  : 'text-slate-400'
+              }`}
+            />
             <span>Tủ điện điều khiển</span>
             <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
                 activeCategory === 'cabinets'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200/70 shadow-2xs'
+                  : 'bg-slate-200/70 text-slate-600'
               }`}
             >
               {cabinets.length}
             </span>
           </button>
 
+          {/* Tab 3: Tuyến đường chiếu sáng */}
           <button
             type="button"
             onClick={() => handleCategoryChange('segments')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
               activeCategory === 'segments'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/70'
+                ? 'text-slate-900 font-bold'
+                : 'text-slate-500 hover:text-slate-800 font-medium'
             }`}
           >
-            <Route className="w-4 h-4" />
+            <Route
+              className={`w-4 h-4 transition-all duration-300 ${
+                activeCategory === 'segments'
+                  ? 'text-indigo-600 scale-110 drop-shadow-[0_1px_2px_rgba(79,70,229,0.3)]'
+                  : 'text-slate-400'
+              }`}
+            />
             <span>Tuyến đường chiếu sáng</span>
             <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
                 activeCategory === 'segments'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs'
+                  : 'bg-slate-200/70 text-slate-600'
               }`}
             >
               {segments.length}
@@ -592,11 +559,11 @@ export const AssetManagementPage: React.FC = () => {
         </div>
 
         {/* Search & Dynamic Filter Bar */}
-        <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3">
           {/* Left: Filters */}
           <div className="flex flex-1 flex-wrap items-center gap-3">
             {/* Search Box */}
-            <div className="flex-1 min-w-[240px] relative">
+            <div className="flex-1 min-w-60 relative">
               <input
                 type="text"
                 placeholder={
@@ -611,51 +578,36 @@ export const AssetManagementPage: React.FC = () => {
                   setSearchQuery(e.target.value)
                   setCurrentPage(1)
                 }}
-                className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-xs focus:outline-none focus:border-[#1f3864] dark:focus:border-blue-500 font-medium"
+                className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-xs focus:outline-none focus:border-blue-500 font-medium"
               />
-              <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-2.5 top-2.5" />
+              <Search className="w-4 h-4 text-slate-400 dark:text-slate-400 absolute left-2.5 top-2.5" />
             </div>
 
             {/* FILTERS FOR POLES */}
             {activeCategory === 'poles_and_fixtures' && (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => {
-                      setStatusFilter(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
-                  >
-                    <option value="all">Tất cả trạng thái</option>
-                    <option value="normal">Bình thường (Đang sáng)</option>
-                    <option value="dim">Đèn mờ (Suy hao Lux)</option>
-                    <option value="out">Hỏng / Tắt nguồn</option>
-                    <option value="unknown">Chưa quét / Không rõ</option>
-                  </select>
-                </div>
-
+              <div className="flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
                 <select
-                  value={sourceFilter}
+                  value={statusFilter}
                   onChange={(e) => {
-                    setSourceFilter(e.target.value)
+                    setStatusFilter(e.target.value)
                     setCurrentPage(1)
                   }}
                   className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
                 >
-                  <option value="all">Tất cả nguồn cấp</option>
-                  <option value="grid">Lưới điện 220V</option>
-                  <option value="solar">Năng lượng Mặt trời</option>
+                  <option value="all">Tất cả trạng thái</option>
+                  <option value="normal">Bình thường (Đang sáng)</option>
+                  <option value="dim">Đèn mờ (Suy hao Lux)</option>
+                  <option value="out">Hỏng / Tắt nguồn</option>
+                  <option value="unknown">Chưa quét / Không rõ</option>
                 </select>
-              </>
+              </div>
             )}
 
             {/* FILTERS FOR CABINETS */}
             {activeCategory === 'cabinets' && (
               <div className="flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
                 <select
                   value={statusFilter}
                   onChange={(e) => {
@@ -686,56 +638,68 @@ export const AssetManagementPage: React.FC = () => {
                 <option value="fault">Có sự cố phân đoạn</option>
               </select>
             )}
+
           </div>
 
-          {/* Right: Contextual Add Button */}
-          {activeCategory === 'poles_and_fixtures' && (
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setIsAddPoleModalOpen(true)}
-              className="px-3.5 py-2 bg-[#1f3864] dark:bg-blue-600 hover:bg-[#1f3864]/90 dark:hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+              onClick={() => setIsImportModalOpen(true)}
+              className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-100 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              title="Nhập dữ liệu tài sản từ file CSV"
             >
-              <Plus className="w-4 h-4" />
-              <span>Đăng ký Cột mới</span>
+              <Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />
+              <span>Import Dữ Liệu</span>
             </button>
-          )}
 
-          {activeCategory === 'cabinets' && (
-            <button
-              type="button"
-              onClick={() => setIsAddCabinetModalOpen(true)}
-              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Thêm Tủ Điện</span>
-            </button>
-          )}
+            {activeCategory === 'poles_and_fixtures' && (
+              <button
+                type="button"
+                onClick={() => setIsAddPoleModalOpen(true)}
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-sm border border-blue-400/30 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Đăng ký Cột mới</span>
+              </button>
+            )}
 
-          {activeCategory === 'segments' && (
-            <button
-              type="button"
-              onClick={() => setIsAddSegmentModalOpen(true)}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Thêm Tuyến Đường</span>
-            </button>
-          )}
+            {activeCategory === 'cabinets' && (
+              <button
+                type="button"
+                onClick={() => setIsAddCabinetModalOpen(true)}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-sm border border-amber-400/30 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm Tủ Điện</span>
+              </button>
+            )}
+
+            {activeCategory === 'segments' && (
+              <button
+                type="button"
+                onClick={() => setIsAddSegmentModalOpen(true)}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-sm border border-indigo-400/30 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm Tuyến Đường</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 1. TABLE FOR POLES & FIXTURES */}
         {activeCategory === 'poles_and_fixtures' && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700/80">
+                <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="p-3.5">Mã cột</th>
                     <th className="p-3.5">Tuyến đường</th>
                     <th className="p-3.5">Tủ điện nguồn</th>
                     <th className="p-3.5">Địa bàn</th>
                     <th className="p-3.5">Công suất</th>
-                    <th className="p-3.5">Nguồn cấp</th>
                     <th className="p-3.5">Trạng thái</th>
                     <th className="p-3.5">Bảo hành</th>
                     <th className="p-3.5 text-right">Thao tác</th>
@@ -744,61 +708,85 @@ export const AssetManagementPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {paginatedPoles.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-slate-400 dark:text-slate-500 text-xs">
+                      <td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
                         Không tìm thấy cột đèn nào phù hợp với bộ lọc hiện tại.
                       </td>
                     </tr>
                   ) : (
                     paginatedPoles.map((pole) => (
-                      <tr key={pole.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
-                        <td className="p-3.5 font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                          <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${
-                              pole.fixture_status === 'normal'
-                                ? 'bg-emerald-500'
-                                : pole.fixture_status === 'dim'
-                                ? 'bg-amber-500'
-                                : pole.fixture_status === 'out'
-                                ? 'bg-rose-500'
-                                : 'bg-slate-400'
-                            }`}
-                          />
-                          <span className="font-mono">{pole.pole_id}</span>
+                      <tr key={pole.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition">
+                        <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
+                          {pole.pole_id}
                         </td>
-                        <td className="p-3.5 font-medium text-slate-700 dark:text-slate-200 max-w-[180px] truncate" title={pole.segment_name}>
+                        <td className="p-3.5 font-medium text-slate-700 dark:text-slate-200 max-w-45 truncate" title={pole.segment_name}>
                           {pole.segment_name}
                         </td>
-                        <td className="p-3.5 font-mono text-[11px] text-slate-600 dark:text-slate-400">
-                          {pole.feeder_id}
-                        </td>
-                        <td className="p-3.5 text-slate-500 dark:text-slate-400">{pole.commune_name}</td>
-                        <td className="p-3.5 font-semibold text-slate-800 dark:text-slate-200">{pole.lamp_watt}W</td>
                         <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-[11px] border border-slate-200 dark:border-slate-700">
-                            {pole.power_source === 'grid' ? 'Lưới điện' : 'Năng lượng MT'}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetCab = cabinets.find((c) => c.cabinet_id === pole.feeder_id)
+                              if (targetCab) {
+                                setDetailCabinet(targetCab)
+                              } else {
+                                toast.info(`Chưa có thông tin mở rộng cho tủ ${pole.feeder_id}`)
+                              }
+                            }}
+                            className="font-mono text-[11px] text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 font-bold tracking-wide hover:underline cursor-pointer inline-flex items-center gap-1 group transition"
+                            title="Bấm để xem nhanh tủ điện cấp nguồn này"
+                          >
+                            <span>{pole.feeder_id}</span>
+                            <Zap className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100 text-amber-500 shrink-0" />
+                          </button>
                         </td>
+                        <td className="p-3.5 text-slate-500 dark:text-slate-300">{pole.commune_name}</td>
+                        <td className="p-3.5 font-semibold text-slate-800 dark:text-slate-200">{pole.lamp_watt}W</td>
                         <td className="p-3.5">
                           <StatusBadge type="fixture" status={pole.fixture_status} size="sm" />
                         </td>
-                        <td className="p-3.5 text-slate-500 dark:text-slate-400 font-medium">
-                          {pole.warranty_expiry || '—'}
+                        <td className="p-3.5">
+                          {(() => {
+                            if (!pole.warranty_expiry) {
+                              return <span className="text-slate-400 dark:text-slate-500 font-mono">—</span>
+                            }
+                            const expDate = new Date(pole.warranty_expiry)
+                            const isExpired = !isNaN(expDate.getTime()) && expDate < new Date()
+                            return (
+                              <div
+                                className="inline-flex items-center gap-1.5"
+                                title={isExpired ? `Đã hết hạn bảo hành từ ${pole.warranty_expiry}` : `Còn bảo hành đến ${pole.warranty_expiry}`}
+                              >
+                                <span className={`font-mono text-[11px] ${isExpired ? 'text-slate-400 dark:text-slate-400' : 'text-slate-700 dark:text-slate-300 font-semibold'}`}>
+                                  {pole.warranty_expiry}
+                                </span>
+                                {isExpired ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80 shrink-0">
+                                    Hết hạn
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60 shrink-0">
+                                    Còn hạn
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => setDetailPole(pole)}
-                            className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[#1f3864] dark:text-blue-400 font-bold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1"
+                            className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-sky-300 font-bold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1 border border-transparent dark:border-sky-500/20"
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-3 h-3 text-sky-400" />
                             <span>Chi tiết</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditPole(pole)}
-                            className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1"
+                            className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1 border border-transparent dark:border-slate-700"
                           >
-                            <Edit2 className="w-3 h-3" />
+                            <Edit2 className="w-3 h-3 text-slate-300" />
                             <span>Sửa</span>
                           </button>
                         </td>
@@ -813,10 +801,10 @@ export const AssetManagementPage: React.FC = () => {
 
         {/* 2. TABLE FOR CABINETS */}
         {activeCategory === 'cabinets' && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700/80">
+                <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="p-3.5">Mã tủ điện</th>
                     <th className="p-3.5">Tên tủ & Phân cấp</th>
@@ -831,20 +819,15 @@ export const AssetManagementPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {paginatedCabinets.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-500 text-xs">
+                      <td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
                         Không tìm thấy tủ điện nào phù hợp với bộ lọc hiện tại.
                       </td>
                     </tr>
                   ) : (
                     paginatedCabinets.map((cab) => (
-                      <tr key={cab.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
-                        <td className="p-3.5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                          <span
-                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                              cab.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'
-                            }`}
-                          />
-                          <span className="font-mono font-bold text-slate-900 dark:text-white">{cab.cabinet_id}</span>
+                      <tr key={cab.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition">
+                        <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
+                          {cab.cabinet_id}
                         </td>
                         <td className="p-3.5">
                           <div className="font-bold text-slate-900 dark:text-white">{cab.cabinet_name}</div>
@@ -852,7 +835,7 @@ export const AssetManagementPage: React.FC = () => {
                             {cab.role === 'root_cabinet' ? 'Tủ xuất tuyến chính (Root)' : 'Tủ phân đoạn nhánh (Sub)'}
                           </div>
                         </td>
-                        <td className="p-3.5 font-medium text-slate-700 dark:text-slate-200 max-w-[200px] truncate" title={cab.segment_name}>
+                        <td className="p-3.5 font-medium text-slate-700 dark:text-slate-200 max-w-50 truncate" title={cab.segment_name}>
                           {cab.segment_name}
                         </td>
                         <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200 font-mono">
@@ -864,7 +847,7 @@ export const AssetManagementPage: React.FC = () => {
                           </div>
                           <div className="text-[11px] text-slate-500 dark:text-slate-400">{cab.current_load_kw} kW (cosφ {cab.power_factor})</div>
                         </td>
-                        <td className="p-3.5 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                        <td className="p-3.5 font-mono text-[11px] text-slate-600 dark:text-sky-400 font-bold tracking-wide">
                           {cab.lat.toFixed(4)}, {cab.lng.toFixed(4)}
                         </td>
                         <td className="p-3.5">
@@ -892,9 +875,9 @@ export const AssetManagementPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setDetailCabinet(cab)}
-                            className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[#1f3864] dark:text-blue-400 font-bold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1"
+                            className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-sky-300 font-bold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1 border border-transparent dark:border-sky-500/20"
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-3 h-3 text-sky-400" />
                             <span>Chi tiết</span>
                           </button>
                         </td>
@@ -909,10 +892,10 @@ export const AssetManagementPage: React.FC = () => {
 
         {/* 3. TABLE FOR SEGMENTS */}
         {activeCategory === 'segments' && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700/80">
+                <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="p-3.5">Mã tuyến</th>
                     <th className="p-3.5">Tên tuyến đường</th>
@@ -927,26 +910,26 @@ export const AssetManagementPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {paginatedSegments.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-500 text-xs">
+                      <td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
                         Không tìm thấy tuyến đường nào phù hợp với bộ lọc hiện tại.
                       </td>
                     </tr>
                   ) : (
                     paginatedSegments.map((seg) => (
-                      <tr key={seg.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                      <tr key={seg.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition">
                         <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
                           {seg.segment_id}
                         </td>
-                        <td className="p-3.5 font-bold text-slate-900 dark:text-white max-w-[240px] truncate">
+                        <td className="p-3.5 font-bold text-slate-900 dark:text-white max-w-60 truncate">
                           {seg.segment_name}
                         </td>
                         <td className="p-3.5">
                           <span
                             className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${
                               seg.road_class === 'inter_commune'
-                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-sky-300 border-blue-200 dark:border-blue-800/60'
                                 : seg.road_class === 'inter_village'
-                                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                             }`}
                           >
@@ -963,7 +946,7 @@ export const AssetManagementPage: React.FC = () => {
                         <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200 font-mono">
                           {seg.pole_count} cột
                         </td>
-                        <td className="p-3.5 text-slate-500 dark:text-slate-400 font-medium">
+                        <td className="p-3.5 text-slate-500 dark:text-slate-300 font-medium">
                           {seg.commune_name}
                         </td>
                         <td className="p-3.5">
@@ -991,9 +974,9 @@ export const AssetManagementPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setDetailSegment(seg)}
-                            className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[#1f3864] dark:text-blue-400 font-bold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1"
+                            className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-sky-300 font-bold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1 border border-transparent dark:border-sky-500/20"
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-3 h-3 text-sky-400" />
                             <span>Chi tiết</span>
                           </button>
                         </td>
@@ -1007,7 +990,7 @@ export const AssetManagementPage: React.FC = () => {
         )}
 
         {/* Table Pagination Footer */}
-        <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+        <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <div>
             Hiển thị{' '}
             <strong className="text-slate-800 dark:text-slate-200 font-semibold">
@@ -1030,18 +1013,18 @@ export const AssetManagementPage: React.FC = () => {
               type="button"
               disabled={currentPage <= 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none cursor-pointer text-slate-700 dark:text-slate-300 transition"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none cursor-pointer text-slate-700 dark:text-slate-300 transition"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="px-3 py-1 font-bold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+            <span className="px-3 py-1 font-bold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg">
               {currentPage} / {totalPages}
             </span>
             <button
               type="button"
               disabled={currentPage >= totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none cursor-pointer text-slate-700 dark:text-slate-300 transition"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none cursor-pointer text-slate-700 dark:text-slate-300 transition"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -1100,6 +1083,7 @@ export const AssetManagementPage: React.FC = () => {
 
       <ImportAssetModal
         isOpen={isImportModalOpen}
+        category={activeCategory}
         onClose={() => setIsImportModalOpen(false)}
         onImportSuccess={handleImportSuccess}
       />

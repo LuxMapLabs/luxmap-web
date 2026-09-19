@@ -4,7 +4,6 @@ import { StatusBadge } from '../../../components/StatusBadge'
 import { Button } from '../../../components/Button'
 import {
   Zap,
-  Sun,
   Radio,
   TrendingDown,
   Wrench,
@@ -69,7 +68,6 @@ export const PoleDetailDrawer: React.FC<PoleDetailDrawerProps> = ({
 
   const fixtureStatus = pole.current_status?.fixture_status || 'normal'
   const isDimOrOut = fixtureStatus === 'dim' || fixtureStatus === 'out'
-  const isSolar = pole.fixture?.power_source === 'solar'
 
   const handleCreateWorkOrder = () => {
     showToast.success(
@@ -175,7 +173,7 @@ export const PoleDetailDrawer: React.FC<PoleDetailDrawerProps> = ({
             
             <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
               <span className="text-slate-400 block text-[10px]">Loại bóng</span>
-              <span className="font-bold text-slate-800">{pole.fixture?.fixture_type === 'solar_all_in_one' ? 'Solar All-In-One' : 'LED Đường Phố'}</span>
+              <span className="font-bold text-slate-800">LED Đường Phố</span>
             </div>
 
             <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
@@ -186,8 +184,8 @@ export const PoleDetailDrawer: React.FC<PoleDetailDrawerProps> = ({
             <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
               <span className="text-slate-400 block text-[10px]">Nguồn cấp điện</span>
               <span className="font-bold text-slate-800 flex items-center gap-1 mt-0.5">
-                {isSolar ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Zap className="w-3.5 h-3.5 text-blue-500" />}
-                <span>{isSolar ? 'Năng lượng Mặt trời' : 'Điện lưới Quốc gia'}</span>
+                <Zap className="w-3.5 h-3.5 text-blue-500" />
+                <span>Điện lưới Quốc gia</span>
               </span>
             </div>
 

@@ -60,9 +60,7 @@ apiClient.interceptors.response.use(
     const isAuthEndpoint =
       url.includes('/auth/web/login') ||
       url.includes('/auth/web/refresh') ||
-      url.includes('/auth/web/logout') ||
-      url.includes('/auth/login') ||
-      url.includes('/auth/refresh')
+      url.includes('/auth/web/logout')
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
       if (isRefreshing) {

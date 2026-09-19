@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { X, Zap, MapPin, Activity, AlertTriangle, Route, ShieldCheck, Gauge } from 'lucide-react'
 import type { AssetCabinetItem } from '../AssetManagementPage'
 
@@ -15,8 +16,8 @@ export const CabinetDetailModal: React.FC<CabinetDetailModalProps> = ({
 
   const isFault = cabinet.status === 'fault'
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-lg overflow-hidden animate-in zoom-in-95">
         {/* Header */}
         <div
@@ -156,6 +157,7 @@ export const CabinetDetailModal: React.FC<CabinetDetailModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

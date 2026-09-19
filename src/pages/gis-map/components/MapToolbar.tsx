@@ -1,5 +1,5 @@
 import React from 'react'
-import { Search, Sun, Zap, X } from 'lucide-react'
+import { Search, Zap, X } from 'lucide-react'
 
 export interface MapToolbarProps {
   searchQuery: string
@@ -91,18 +91,6 @@ export const MapToolbar: React.FC<MapToolbarProps> = ({
           >
             <Zap className="w-3 h-3 text-amber-500" />
             <span>Điện lưới</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onPowerSourceChange('solar')}
-            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer ${
-              selectedPowerSource === 'solar'
-                ? 'bg-white text-emerald-700 shadow-2xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Sun className="w-3 h-3 text-emerald-500" />
-            <span>Solar</span>
           </button>
         </div>
 

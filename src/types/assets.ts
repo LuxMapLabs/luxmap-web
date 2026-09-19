@@ -48,7 +48,7 @@ export interface CreateSegmentRequest {
 
 export type DataSource = 'field' | 'public_imagery' | 'calibration_rig' | 'simulated'
 
-export type FixtureType = 'led_road_lamp' | 'solar_all_in_one'
+export type FixtureType = 'led_road_lamp'
 
 export interface ImportResult {
     inserted?: number
@@ -70,7 +70,7 @@ export interface PageQuery {
     page_size?: number
 }
 
-export type PowerSource = 'grid' | 'solar'
+export type PowerSource = 'grid'
 
 export interface RetireFixtureRequest {
     removed_date: string | null
