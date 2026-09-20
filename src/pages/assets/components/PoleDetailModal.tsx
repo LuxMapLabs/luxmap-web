@@ -1,21 +1,28 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { Info, X, MapPin, Wrench, ShieldCheck, Zap, Lightbulb, AlertTriangle } from 'lucide-react'
+import { Info, X, MapPin, ShieldCheck, Zap, Lightbulb, AlertTriangle } from 'lucide-react'
 import { StatusBadge } from '../../../components/StatusBadge'
 import type { EditablePoleData } from './EditPoleModal'
 
 interface PoleDetailModalProps {
   isOpen: boolean
-  pole: (EditablePoleData & { lat?: number; lng?: number; lux_value?: number; open_fault_count?: number; near_sensitive_poi?: boolean }) | null
+  pole: (EditablePoleData & {
+    lat?: number
+    lng?: number
+    lux_value?: number
+    open_fault_count?: number
+    near_sensitive_poi?: boolean
+    feeder_role?: 'root_cabinet' | 'sub_cabinet'
+    parent_feeder_id?: string
+  }) | null
   onClose: () => void
-  onOpenEdit: (pole: EditablePoleData) => void
+  onOpenEdit?: (pole: EditablePoleData) => void
 }
 
 export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
   isOpen,
   pole,
   onClose,
-  onOpenEdit,
 }) => {
   if (!isOpen || !pole) return null
 
@@ -114,9 +121,25 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
               <div>
                 <strong className="text-slate-800 dark:text-slate-200">Tuyến đường:</strong> {pole.segment_name} ({pole.commune_name})
               </div>
-              <div>
+              <div className="flex items-center gap-2 flex-wrap">
                 <strong className="text-slate-800 dark:text-slate-200">Đấu nối Tủ Feeder:</strong>{' '}
                 <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{pole.feeder_id || 'Chưa gắn'}</span>
+                {pole.feeder_role === 'sub_cabinet' ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 font-bold border border-amber-300/60">
+                    <Zap className="w-2.5 h-2.5 text-amber-600 fill-amber-500" />
+                    <span>Tủ Nhánh Phân Đoạn</span>
+                    {pole.parent_feeder_id && (
+                      <span className="text-[9px] font-normal text-amber-700 dark:text-amber-300 ml-0.5">
+                        (Nguồn cấp: {pole.parent_feeder_id})
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 font-bold border border-blue-300/60">
+                    <span>⭐️</span>
+                    <span>Tủ Đỉnh (Nguồn tổng tuyến)</span>
+                  </span>
+                )}
               </div>
               {pole.atlas && (
                 <div>
@@ -154,18 +177,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-between items-center">
-          <button
-            type="button"
-            onClick={() => {
-              onClose()
-              onOpenEdit(pole)
-            }}
-            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-transparent dark:border-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition"
-          >
-            <Wrench className="w-3.5 h-3.5" />
-            <span>Chỉnh sửa thông số</span>
-          </button>
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end items-center">
           <button
             type="button"
             onClick={onClose}

@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Zap, MapPin, Activity, AlertTriangle, Route, ShieldCheck, Gauge } from 'lucide-react'
+import { X, Zap, MapPin, Activity, AlertTriangle, Route, ShieldCheck, Gauge, GitBranch } from 'lucide-react'
 import type { AssetCabinetItem } from '../AssetManagementPage'
 
 interface CabinetDetailModalProps {
@@ -98,12 +98,14 @@ export const CabinetDetailModal: React.FC<CabinetDetailModalProps> = ({
             <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl">
               <div className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1">
                 <Zap className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                <span>Số cột ăn tủ</span>
+                <span>{cabinet.role === 'root_cabinet' ? 'Tổng đèn toàn tuyến' : 'Đèn phân đoạn'}</span>
               </div>
               <div className="text-lg font-black text-emerald-700 dark:text-emerald-400 mt-1">
                 {cabinet.total_poles_managed}
               </div>
-              <div className="text-[10px] text-slate-400 dark:text-slate-500">Điểm chiếu sáng</div>
+              <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                {cabinet.role === 'root_cabinet' ? 'Cấp nguồn toàn tuyến' : 'Phụ trách nhánh'}
+              </div>
             </div>
           </div>
 
@@ -122,10 +124,60 @@ export const CabinetDetailModal: React.FC<CabinetDetailModalProps> = ({
                 <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span>Phân cấp tủ:</span>
               </span>
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                {cabinet.role === 'root_cabinet' ? 'Tủ điện nguồn chính (Root)' : 'Tủ điện phân đoạn phụ (Sub)'}
+              <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                {cabinet.role === 'root_cabinet' ? (
+                  <>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-bold text-[10px]">
+                      ⭐️ ROOT
+                    </span>
+                    <span>Tủ nguồn chính</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-bold text-[10px]">
+                      ⚡️ SUB
+                    </span>
+                    <span>Tủ phân đoạn phụ</span>
+                  </>
+                )}
               </span>
             </div>
+
+            {cabinet.role === 'sub_cabinet' && cabinet.parent_cabinet_id && (
+              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <GitBranch className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Tủ đỉnh cấp nguồn (Tủ cha):</span>
+                </span>
+                <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                  {cabinet.parent_cabinet_id}
+                </span>
+              </div>
+            )}
+
+            {cabinet.role === 'sub_cabinet' && cabinet.branch_start_pole && (
+              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Cột bắt đầu phân đoạn nhánh:</span>
+                </span>
+                <span className="font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
+                  {cabinet.branch_start_pole}
+                </span>
+              </div>
+            )}
+
+            {cabinet.role === 'root_cabinet' && cabinet.subordinated_cabinets && cabinet.subordinated_cabinets.length > 0 && (
+              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <GitBranch className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Các tủ nhánh phụ thuộc:</span>
+                </span>
+                <span className="font-mono font-bold text-amber-700 dark:text-amber-300">
+                  {cabinet.subordinated_cabinets.join(', ')}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">

@@ -23,8 +23,6 @@
         "current_load_kw": 18.2,
         "power_factor": 0.96,
         "total_poles_managed": 46,
-        "start_pole_idx": 0,
-        "end_pole_idx": 45,
         "subordinated_cabinets": [
           "CAB-TL8-SUB"
         ],
@@ -56,8 +54,7 @@
         "current_load_kw": 0,
         "power_factor": 0,
         "pole_count": 23,
-        "start_pole_idx": 23,
-        "end_pole_idx": 45,
+        "branch_start_pole": "POLE-0024",
         "fault_reason": "Nhảy Aptomat (Trip MCCB 63A) do ngắn mạch phân đoạn 2",
         "landmark_note": "Giữa Tỉnh Lộ 8 - Đối diện cửa Chợ Củ Chi, gần nhà bà B",
         "installed_at": "2024-03-15",
@@ -86,8 +83,6 @@
         "current_load_kw": 12.4,
         "power_factor": 0.95,
         "total_poles_managed": 31,
-        "start_pole_idx": 46,
-        "end_pole_idx": 76,
         "subordinated_cabinets": [
           "CAB-NVN-SUB"
         ],
@@ -119,8 +114,7 @@
         "current_load_kw": 6,
         "power_factor": 0.94,
         "pole_count": 15,
-        "start_pole_idx": 62,
-        "end_pole_idx": 76,
+        "branch_start_pole": "POLE-0063",
         "landmark_note": "Gần cổng trường THPT Củ Chi - Đối diện cửa nhà ông D",
         "installed_at": "2024-05-20",
         "iot_node_id": "NODE-NVN-SUB",
@@ -148,8 +142,6 @@
         "current_load_kw": 10.5,
         "power_factor": 0.95,
         "total_poles_managed": 26,
-        "start_pole_idx": 77,
-        "end_pole_idx": 102,
         "subordinated_cabinets": [
           "CAB-HVC-SUB"
         ],
@@ -181,8 +173,7 @@
         "current_load_kw": 0,
         "power_factor": 0,
         "pole_count": 13,
-        "start_pole_idx": 90,
-        "end_pole_idx": 102,
+        "branch_start_pole": "POLE-0091",
         "fault_reason": "Ngắn mạch pha-đất gây nhảy bảo vệ phân đoạn 2",
         "landmark_note": "Cuối đường Huỳnh Văn Cọ - Đối diện trạm y tế, gần nhà ông G",
         "installed_at": "2024-01-10",
