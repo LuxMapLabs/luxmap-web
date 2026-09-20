@@ -4,7 +4,7 @@
  * Khớp hoàn toàn với 4 vai trò của Backend: administrator, management_agency, maintenance_engineer, field_crew
  */
 
-import { UserRole, User, JwtPayloadClaims } from '../types/auth'
+import { UserRole, User, JwtPayloadClaims, CurrentUserResponse } from '../types/auth'
 
 /**
  * Giải mã JWT Access Token phía client (Base64Url an toàn với UTF-8, zero-dependency)
@@ -128,6 +128,29 @@ export const createUserFromToken = (accessToken: string, fallbackUsername?: stri
 }
 
 /**
+ * Chuyển đổi trực tiếp CurrentUserResponse từ GET /api/v1/auth/me thành đối tượng User chuẩn
+ */
+export const mapCurrentUserToUser = (me: CurrentUserResponse): User => {
+  const role = normalizeRole(me.role)
+  const communeIds = Array.isArray(me.commune_ids) ? me.commune_ids : []
+  const userId = me.user_id || ''
+  const fullName = me.full_name?.trim() || me.username || 'Cán bộ kỹ thuật'
+
+  return {
+    id: userId,
+    userId: userId,
+    username: me.username,
+    fullName: fullName,
+    email: me.email || null,
+    phoneNumber: null,
+    role,
+    roleString: me.role,
+    administrativeUnitId: communeIds[0] || '',
+    communeIds,
+  }
+}
+
+/**
  * Chuẩn hóa toàn bộ đối tượng User từ response Backend
  */
 export const normalizeUser = (raw: any): User => {
@@ -142,6 +165,11 @@ export const normalizeUser = (raw: any): User => {
     }
   }
 
+  // Nếu là CurrentUserResponse từ /auth/me
+  if (raw.user_id && raw.full_name !== undefined) {
+    return mapCurrentUserToUser(raw as CurrentUserResponse)
+  }
+
   const role = normalizeRole(raw.role, {
     isAdmin: raw.isAdmin,
     isLeader: raw.isLeader,
@@ -149,17 +177,21 @@ export const normalizeUser = (raw: any): User => {
     isCitizen: raw.isCitizen,
   })
 
+  const communeIds = Array.isArray(raw.communeIds || raw.commune_ids)
+    ? raw.communeIds || raw.commune_ids
+    : []
+
   return {
-    id: String(raw.id || raw.userId || ''),
-    userId: String(raw.id || raw.userId || ''),
-    fullName: String(raw.fullName || raw.name || raw.username || 'Người dùng'),
+    id: String(raw.id || raw.userId || raw.user_id || ''),
+    userId: String(raw.id || raw.userId || raw.user_id || ''),
+    fullName: String(raw.fullName || raw.full_name || raw.name || raw.username || 'Người dùng'),
     username: raw.username,
     email: raw.email || null,
     phoneNumber: raw.phoneNumber || raw.phone || null,
     role,
     roleString: raw.roleString || raw.role,
-    administrativeUnitId: String(raw.administrativeUnitId || ''),
-    communeIds: Array.isArray(raw.communeIds) ? raw.communeIds : [],
+    administrativeUnitId: String(raw.administrativeUnitId || communeIds[0] || ''),
+    communeIds,
   }
 }
 

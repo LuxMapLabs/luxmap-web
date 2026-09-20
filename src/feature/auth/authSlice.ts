@@ -6,6 +6,7 @@ const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
   loading: true,
+  isRefreshingProfile: false,
   error: null,
 }
 
@@ -33,6 +34,7 @@ const authSlice = createSlice({
       state.user = null
       state.isAuthenticated = false
       state.loading = false
+      state.isRefreshingProfile = false
       state.error = null
     },
     checkAuth: (state) => {
@@ -51,6 +53,16 @@ const authSlice = createSlice({
       state.user = null
       state.error = null
     },
+    refreshProfileRequest: (state) => {
+      state.isRefreshingProfile = true
+    },
+    refreshProfileSuccess: (state, action: PayloadAction<{ user: User }>) => {
+      state.isRefreshingProfile = false
+      state.user = action.payload.user
+    },
+    refreshProfileFailure: (state) => {
+      state.isRefreshingProfile = false
+    },
   },
 })
 
@@ -62,6 +74,9 @@ export const {
   checkAuth,
   checkAuthSuccess,
   checkAuthFailure,
+  refreshProfileRequest,
+  refreshProfileSuccess,
+  refreshProfileFailure,
 } = authSlice.actions
 
 export default authSlice.reducer
