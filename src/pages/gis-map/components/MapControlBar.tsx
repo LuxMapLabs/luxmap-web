@@ -142,85 +142,142 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
     </div>
   )
 
-  // Reusable Status Filter Pills Node
+  // Reusable Status Filter Pills Node (Soft Tinted & Unified Design)
   const statusPillsNode = (
-    <div className="flex items-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md border border-slate-200 dark:border-slate-700/80 rounded-xl p-1 gap-1 text-xs shrink-0 overflow-x-auto">
+    <div className="flex items-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-1 gap-1 text-xs shrink-0 overflow-x-auto">
+      {/* 1. Tất cả */}
       <button
         type="button"
         onClick={() => setStatusFilter('all')}
-        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all duration-150 cursor-pointer shrink-0 border ${
           statusFilter === 'all'
-            ? 'bg-slate-900 dark:bg-blue-600 text-white shadow-sm'
-            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            ? 'bg-blue-50 text-blue-800 border-blue-300 shadow-2xs dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+            : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
         }`}
       >
-        <Zap className="w-3 h-3" />
+        <Zap
+          className={`w-3 h-3 ${
+            statusFilter === 'all' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'
+          }`}
+        />
         <span>Tất cả</span>
-        <span className="bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+        <span
+          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
+            statusFilter === 'all'
+              ? 'bg-blue-200/80 text-blue-900 dark:bg-blue-900/90 dark:text-blue-200 font-bold'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+          }`}
+        >
           {stats.total}
         </span>
       </button>
 
+      {/* 2. Đạt chuẩn */}
       <button
         type="button"
         onClick={() => setStatusFilter('normal')}
-        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all duration-150 cursor-pointer shrink-0 border ${
           statusFilter === 'normal'
-            ? 'bg-emerald-600 text-white shadow-sm'
-            : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+            : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
         }`}
       >
-        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span
+          className={`w-2 h-2 rounded-full shrink-0 ${
+            statusFilter === 'normal'
+              ? 'bg-emerald-600 ring-2 ring-emerald-300/70 dark:ring-emerald-700/60'
+              : 'bg-emerald-500'
+          }`}
+        />
         <span>Đạt chuẩn</span>
-        <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+        <span
+          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
+            statusFilter === 'normal'
+              ? 'bg-emerald-200/80 text-emerald-900 dark:bg-emerald-900/90 dark:text-emerald-200 font-bold'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+          }`}
+        >
           {stats.normal}
         </span>
       </button>
 
+      {/* 3. Đèn mờ */}
       <button
         type="button"
         onClick={() => setStatusFilter('dim')}
-        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all duration-150 cursor-pointer shrink-0 border ${
           statusFilter === 'dim'
-            ? 'bg-amber-500 text-white shadow-sm'
-            : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+            ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-2xs dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+            : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
         }`}
       >
-        <AlertTriangle className="w-3 h-3" />
+        <AlertTriangle
+          className={`w-3 h-3 ${
+            statusFilter === 'dim' ? 'text-amber-700 dark:text-amber-400' : 'text-amber-500'
+          }`}
+        />
         <span>Đèn mờ</span>
-        <span className="bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+        <span
+          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
+            statusFilter === 'dim'
+              ? 'bg-amber-200/80 text-amber-900 dark:bg-amber-900/90 dark:text-amber-200 font-bold'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+          }`}
+        >
           {stats.dim}
         </span>
       </button>
 
+      {/* 4. Hỏng / Tắt */}
       <button
         type="button"
         onClick={() => setStatusFilter('out')}
-        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all duration-150 cursor-pointer shrink-0 border ${
           statusFilter === 'out'
-            ? 'bg-rose-600 text-white shadow-sm'
-            : 'text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+            ? 'bg-rose-50 text-rose-800 border-rose-300 shadow-2xs dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800'
+            : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
         }`}
       >
-        <AlertCircle className="w-3 h-3" />
+        <AlertCircle
+          className={`w-3 h-3 ${
+            statusFilter === 'out' ? 'text-rose-700 dark:text-rose-400' : 'text-rose-500'
+          }`}
+        />
         <span>Hỏng / Tắt</span>
-        <span className="bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+        <span
+          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
+            statusFilter === 'out'
+              ? 'bg-rose-200/80 text-rose-900 dark:bg-rose-900/90 dark:text-rose-200 font-bold'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+          }`}
+        >
           {stats.out}
         </span>
       </button>
 
+      {/* 5. Chưa quét */}
       <button
         type="button"
         onClick={() => setStatusFilter('unknown')}
-        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all duration-150 cursor-pointer shrink-0 border ${
           statusFilter === 'unknown'
-            ? 'bg-slate-600 dark:bg-slate-700 text-white shadow-sm'
-            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            ? 'bg-slate-100 text-slate-800 border-slate-300 shadow-2xs dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+            : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
         }`}
       >
-        <HelpCircle className="w-3 h-3" />
+        <HelpCircle
+          className={`w-3 h-3 ${
+            statusFilter === 'unknown' ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400'
+          }`}
+        />
         <span>Chưa quét</span>
-        <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+        <span
+          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
+            statusFilter === 'unknown'
+              ? 'bg-slate-200/90 text-slate-800 dark:bg-slate-700 dark:text-slate-300 font-bold'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+          }`}
+        >
           {stats.unknown}
         </span>
       </button>

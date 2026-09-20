@@ -2,58 +2,83 @@ import * as maplibregl from 'maplibre-gl'
 import type { PoleFeature } from '../../pages/gis-map/GisMapPage'
 
 export function getCabinetSvgString({
-  color = '#10b981',
   size = 24,
-  strokeWidth = 2,
   isRoot = false,
   isFault = false,
+  uid = '',
 }: {
   color?: string
   size?: number
   strokeWidth?: number
   isRoot?: boolean
   isFault?: boolean
+  uid?: string
 }) {
-  const enclosureBorder = isFault ? '#f43f5e' : isRoot ? '#f59e0b' : color
-  const boltColor = isFault ? '#f43f5e' : isRoot ? '#fbbf24' : '#34d399'
-  const ledColor = isFault ? '#f43f5e' : isRoot ? '#f59e0b' : '#10b981'
+  const idSuffix = uid || `${isRoot ? 'root' : isFault ? 'fault' : 'norm'}-${Math.floor(Math.random() * 10000)}`
 
-  return `<svg width="${size}" height="${size}" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 6px rgba(0,0,0,0.65));">
+  let cHighlight = '#6ee7b7'
+  let cBody = '#059669'
+  let cDeep = '#047857'
+  let cShadow = '#064e3b'
+
+  if (isFault) {
+    cHighlight = '#fda4af'
+    cBody = '#e11d48'
+    cDeep = '#be123c'
+    cShadow = '#4c0519'
+  } else if (isRoot) {
+    cHighlight = '#fde047'
+    cBody = '#d97706'
+    cDeep = '#b45309'
+    cShadow = '#451a03'
+  }
+
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2.5px 4px rgba(0,0,0,0.38)); pointer-events: none;">
     <defs>
-      <!-- Substation Chassis Gradient -->
-      <linearGradient id="cab-body-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#152646" />
-        <stop offset="100%" stop-color="#080f1d" />
+      <!-- 3D Enclosure Volume Gradient (Directional Light from Top-Left) -->
+      <linearGradient id="cab-body-${idSuffix}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${cHighlight}" />
+        <stop offset="28%" stop-color="${cBody}" />
+        <stop offset="72%" stop-color="${cDeep}" />
+        <stop offset="100%" stop-color="${cShadow}" />
       </linearGradient>
-      <!-- Subtle metallic upper sheen -->
-      <linearGradient id="cab-sheen" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />
-        <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+
+      <!-- 3D Beveled Outer Chamfer Rim -->
+      <linearGradient id="cab-rim-${idSuffix}" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.2" />
+      </linearGradient>
+
+      <!-- Upper Metal Roof Gloss Reflection -->
+      <linearGradient id="cab-gloss-${idSuffix}" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.05" />
       </linearGradient>
     </defs>
 
-    <!-- Outer Chamfered Enclosure Box -->
-    <rect x="2.5" y="2.5" width="23" height="23" rx="5.5" fill="url(#cab-body-grad)" stroke="${enclosureBorder}" stroke-width="${strokeWidth}" />
-    <!-- Glass/Metallic Upper Sheen -->
-    <rect x="3.5" y="3.5" width="21" height="9" rx="4" fill="url(#cab-sheen)" />
+    <!-- 1. Main 3D Metallic Enclosure Body -->
+    <rect x="3" y="2.5" width="18" height="19" rx="4" fill="url(#cab-body-${idSuffix})" stroke="url(#cab-rim-${idSuffix})" stroke-width="1.2" />
 
-    <!-- Industrial Circuit Cooling Vents (Top line) -->
-    <line x1="6.5" y1="7.5" x2="21.5" y2="7.5" stroke="${enclosureBorder}" stroke-width="1.2" stroke-opacity="0.4" stroke-dasharray="2 1.5" />
+    <!-- 2. Weather Roof / Sun-shield Bevel Highlight -->
+    <rect x="4.5" y="3.8" width="15" height="4.2" rx="2" fill="url(#cab-gloss-${idSuffix})" />
 
-    <!-- Center Glowing High-Voltage Lightning Bolt -->
-    <path d="M15 8.5L9.5 15.5H14L13 21L18.5 14H14L15 8.5Z" fill="${boltColor}" style="filter: drop-shadow(0 0 3px ${boltColor});" />
+    <!-- 3. Embossed Horizontal Compartment Seam -->
+    <line x1="3.5" y1="9.5" x2="20.5" y2="9.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.9" />
+    <line x1="3.5" y1="10.4" x2="20.5" y2="10.4" stroke="rgba(0,0,0,0.3)" stroke-width="0.8" />
 
-    <!-- Status Power LED (Bottom-Right) -->
-    <circle cx="21" cy="21" r="1.8" fill="${ledColor}" stroke="#0b1322" stroke-width="0.6" style="filter: drop-shadow(0 0 3px ${ledColor});" />
+    <!-- 4. SCADA Status Pilot LED Diode -->
+    <circle cx="6.8" cy="6.2" r="1.4" fill="${isFault ? '#fee2e2' : isRoot ? '#fef3c7' : '#d1fae5'}" stroke="rgba(0,0,0,0.25)" stroke-width="0.5" />
+    <circle cx="6.5" cy="5.9" r="0.5" fill="#ffffff" />
 
-    <!-- Root Master Crown / Badge (Top-Right) -->
+    <!-- 5. Crisp White Embossed Electrical Lightning Bolt -->
+    <path d="M12.5 11L8.5 15.5H11.8L10.5 20L15.5 14.5H12.2L13 11Z" fill="#ffffff" style="filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.35));" />
+
     ${
       isRoot
         ? `
-      <g transform="translate(16, 2)">
-        <rect x="0" y="0" width="10" height="7.5" rx="2" fill="#f59e0b" stroke="#0b1322" stroke-width="0.8"/>
-        <text x="5" y="5.8" font-family="system-ui, -apple-system, sans-serif" font-size="5.5" font-weight="900" fill="#0b1322" text-anchor="middle">M</text>
-      </g>
+      <!-- Root Substation Crown Badge -->
+      <circle cx="17.8" cy="5.5" r="3.2" fill="#f59e0b" stroke="#ffffff" stroke-width="1" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));" />
+      <path d="M17.8 3.8L18.4 5H19.7L18.7 5.9L19.1 7.2L17.8 6.4L16.5 7.2L16.9 5.9L15.9 5H17.2L17.8 3.8Z" fill="#ffffff" />
     `
         : ''
     }
@@ -97,44 +122,45 @@ export function createPoleMarkerElement({
   const p = feature.properties || {}
   const status = p.fixture_status || 'unknown'
   const isNearPoi = p.near_sensitive_poi === true
-  const size = isSelected ? 24 : 18
+  const size = isSelected ? 24 : 17
   const half = size / 2
   const poleId = p.pole_id || Math.random().toString(36).substring(2, 6)
 
-  // Palette & lighting configuration for each status
-  let lensHighlight = '#a7f3d0'
-  let lensCore = '#10b981'
-  let lensPerimeter = '#047857'
-  let ambientGlow = 'radial-gradient(circle, rgba(52,211,153,0.55) 0%, rgba(16,185,129,0.18) 65%, transparent 100%)'
-  let bezelStroke = isSelected ? '#38bdf8' : 'rgba(52, 211, 153, 0.5)'
-  const strokeW = isSelected ? 2.4 : 1.2
+  // Rich Apple-style 3D Spherical Gradients
+  let cHighlight = '#86efac'
+  let cBody = '#10b981'
+  let cDeep = '#047857'
+  let cShadow = '#022c22'
+  let glowCol = 'rgba(16, 185, 129, 0.35)'
 
   if (status === 'dim') {
-    lensHighlight = '#fef08a'
-    lensCore = '#f59e0b'
-    lensPerimeter = '#b45309'
-    ambientGlow = 'radial-gradient(circle, rgba(251,191,36,0.6) 0%, rgba(245,158,11,0.2) 65%, transparent 100%)'
-    bezelStroke = isSelected ? '#38bdf8' : 'rgba(251, 191, 36, 0.55)'
+    cHighlight = '#fef08a'
+    cBody = '#f59e0b'
+    cDeep = '#b45309'
+    cShadow = '#451a03'
+    glowCol = 'rgba(245, 158, 11, 0.4)'
   } else if (status === 'out') {
-    lensHighlight = '#fecdd3'
-    lensCore = '#f43f5e'
-    lensPerimeter = '#9f1239'
-    ambientGlow = 'radial-gradient(circle, rgba(244,63,94,0.6) 0%, rgba(225,29,72,0.2) 65%, transparent 100%)'
-    bezelStroke = isSelected ? '#38bdf8' : 'rgba(244, 63, 94, 0.7)'
+    cHighlight = '#fecdd3'
+    cBody = '#f43f5e'
+    cDeep = '#be123c'
+    cShadow = '#4c0519'
+    glowCol = 'rgba(244, 63, 94, 0.45)'
   } else if (status === 'unknown') {
-    lensHighlight = '#e2e8f0'
-    lensCore = '#64748b'
-    lensPerimeter = '#334155'
-    ambientGlow = 'radial-gradient(circle, rgba(148,163,184,0.4) 0%, rgba(100,116,139,0.15) 65%, transparent 100%)'
-    bezelStroke = isSelected ? '#38bdf8' : 'rgba(148, 163, 184, 0.45)'
+    cHighlight = '#f1f5f9'
+    cBody = '#64748b'
+    cDeep = '#334155'
+    cShadow = '#0f172a'
+    glowCol = 'rgba(100, 116, 139, 0.2)'
   }
+
+  const isPulsing = status === 'out' || isSelected
 
   const el = document.createElement('div')
   el.className = 'select-none pointer-events-none'
   el.style.width = '0px'
   el.style.height = '0px'
   el.style.position = 'relative'
-  el.style.zIndex = isSelected ? '35' : status === 'out' ? '25' : '15'
+  el.style.zIndex = isSelected ? '25' : '15'
 
   const markerWrap = document.createElement('div')
   markerWrap.className = `cursor-pointer pointer-events-auto group gis-marker-wrap gis-marker-visible ${isSelected ? 'is-selected' : ''}`
@@ -148,54 +174,45 @@ export function createPoleMarkerElement({
   markerWrap.style.justifyContent = 'center'
 
   markerWrap.innerHTML = `
-    <!-- 1. Ambient Luminescent Aura (Hiệu ứng toả sáng đèn đường sạch sẽ, không có sóng lan) -->
-    <div style="position: absolute; inset: -5px; border-radius: 9999px; background: ${ambientGlow}; pointer-events: none;"></div>
+    <!-- Subtle Ambient Glow -->
+    <div style="position: absolute; inset: -3px; border-radius: 9999px; background: ${glowCol}; filter: blur(2.5px); ${isPulsing ? 'animation: pulse 2s infinite;' : ''}; pointer-events: none;"></div>
 
-    <!-- 2. Target Reticle Beacon (Khi đang được chọn) -->
-    ${
-      isSelected
-        ? `
-      <div style="position: absolute; inset: -6px; border-radius: 9999px; border: 2px solid #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.7); pointer-events: none;"></div>
-    `
-        : ''
-    }
 
-    <!-- 3. 3D Optical Diode Lens SVG (Thấu kính đèn đường LED hiện đại) -->
-    <svg width="${size}" height="${size}" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="position: relative; z-index: 2; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.6)); pointer-events: none;">
+    <!-- Rich 3D Glass Sphere Marker SVG -->
+    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="position: relative; z-index: 2; filter: drop-shadow(0 2.5px 3.5px rgba(0,0,0,0.4)); pointer-events: none;">
       <defs>
-        <radialGradient id="grad-pole-${poleId}" cx="35%" cy="35%" r="65%">
-          <stop offset="0%" stop-color="${lensHighlight}" />
-          <stop offset="50%" stop-color="${lensCore}" />
-          <stop offset="100%" stop-color="${lensPerimeter}" />
+        <!-- 3D Spherical Volume Gradient (Light Source from Top-Left) -->
+        <radialGradient id="sphere-${poleId}" cx="32%" cy="28%" r="75%">
+          <stop offset="0%" stop-color="${cHighlight}" />
+          <stop offset="35%" stop-color="${cBody}" />
+          <stop offset="75%" stop-color="${cDeep}" />
+          <stop offset="100%" stop-color="${cShadow}" />
         </radialGradient>
+        <!-- 3D Bevel Rim Gradient (Brighter on top, subtle at bottom) -->
+        <linearGradient id="rim-${poleId}" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0.25" />
+        </linearGradient>
+        <!-- Top Gloss Sheen (Smooth Glass Dome Reflection) -->
+        <linearGradient id="gloss-${poleId}" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0.04" />
+        </linearGradient>
       </defs>
 
-      <!-- Outer Protective Cyber Bezel -->
-      <circle cx="10" cy="10" r="9" fill="rgba(11, 19, 34, 0.82)" stroke="${bezelStroke}" stroke-width="${strokeW}" />
+      <!-- 1. 3D Sphere Base with 3D Light-Reflecting Bevel Rim -->
+      <circle cx="12" cy="12" r="9.5" fill="url(#sphere-${poleId})" stroke="url(#rim-${poleId})" stroke-width="1.3" />
 
-      <!-- Main Glowing Diode Dome -->
-      <circle cx="10" cy="10" r="6.8" fill="url(#grad-pole-${poleId})" />
+      <!-- 2. Curved Top Glass Sheen (Độ cong vòm kính phản quang 3D) -->
+      <ellipse cx="12" cy="7" rx="5" ry="2.2" fill="url(#gloss-${poleId})" />
 
-      <!-- Optical Glass Specular Highlight (Ánh gương phản quang 3D) -->
-      <circle cx="7.2" cy="7.2" r="1.6" fill="#ffffff" opacity="0.85" />
 
-      <!-- Inner indicator for status 'out' (Cross mark) -->
-      ${
-        status === 'out'
-          ? `
-        <line x1="8" y1="8" x2="12" y2="12" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="0.95" />
-        <line x1="12" y1="8" x2="8" y2="12" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="0.95" />
-      `
-          : ''
-      }
     </svg>
 
-    <!-- 4. Sensitive POI Micro Badge (Trường học, Bệnh viện) -->
+    <!-- POI Indicator -->
     ${
       isNearPoi
-        ? `
-      <div style="position: absolute; top: -5px; right: -5px; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; width: 13px; height: 13px; border-radius: 9999px; border: 1.5px solid #0b1322; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 900; z-index: 10; box-shadow: 0 0 6px rgba(168, 85, 247, 0.85); pointer-events: none;" title="Gần trường học, bệnh viện">!</div>
-    `
+        ? `<div style="position: absolute; top: -3px; right: -3px; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; width: 11px; height: 11px; border-radius: 9999px; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; z-index: 3; box-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none;" title="Gần trường học, bệnh viện">!</div>`
         : ''
     }
   `
@@ -230,15 +247,22 @@ export function createCabinetMarkerElement({
   const p = cabinet.properties || {}
   const isRoot = p.role === 'root_cabinet'
   const isFault = p.status === 'fault'
-  const size = isRoot ? 32 : 25
+  const size = isRoot ? 28 : 22
   const half = size / 2
+
+  const glowCol = isFault
+    ? 'rgba(244, 63, 94, 0.45)'
+    : isRoot
+    ? 'rgba(245, 158, 11, 0.4)'
+    : 'rgba(16, 185, 129, 0.35)'
+  const isPulsing = isFault
 
   const el = document.createElement('div')
   el.className = 'select-none pointer-events-none'
   el.style.width = '0px'
   el.style.height = '0px'
   el.style.position = 'relative'
-  el.style.zIndex = isSelected ? '40' : isRoot ? '30' : '20'
+  el.style.zIndex = isSelected ? '30' : isRoot ? '25' : '20'
 
   const markerWrap = document.createElement('div')
   markerWrap.className = `cursor-pointer pointer-events-auto group gis-marker-wrap gis-marker-visible ${isSelected ? 'is-selected' : ''} ${isRoot ? 'is-root' : ''}`
@@ -251,24 +275,15 @@ export function createCabinetMarkerElement({
   markerWrap.style.alignItems = 'center'
   markerWrap.style.justifyContent = 'center'
 
-  const glowColor = isFault ? '#f43f5e' : isRoot ? '#f59e0b' : '#10b981'
+  const cabId = p.cabinet_id || `cab-${Math.floor(Math.random() * 10000)}`
 
   markerWrap.innerHTML = `
-    <!-- 1. Ambient Enclosure Glow (Quầng sáng êm dịu bao quanh tủ, không có sóng radar) -->
-    <div style="position: absolute; inset: -3px; border-radius: 8px; background: ${glowColor}; opacity: ${isFault ? 0.5 : isSelected ? 0.5 : 0.25}; filter: blur(4px); pointer-events: none;"></div>
-
-    <!-- 2. Target Reticle for Selected Cabinet -->
-    ${
-      isSelected
-        ? `
-      <div style="position: absolute; inset: -6px; border-radius: 10px; border: 2px solid #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.75); pointer-events: none;"></div>
-    `
-        : ''
-    }
-
-    <!-- 3. Smart Enclosure SVG Chassis -->
-    <div style="position: relative; z-index: 2; pointer-events: none; transition: transform 0.2s ease;">
-      ${getCabinetSvgString({ color: isFault ? '#f43f5e' : isRoot ? '#f59e0b' : '#10b981', size, strokeWidth: isRoot || isSelected ? 2.2 : 1.8, isRoot, isFault })}
+    <!-- Ambient Halo -->
+    <div style="position: absolute; inset: -3px; border-radius: 6px; background: ${glowCol}; filter: blur(3px); ${isPulsing ? 'animation: pulse 1.8s infinite;' : ''}; pointer-events: none;"></div>
+    
+    <!-- 3D Cabinet SVG Body -->
+    <div style="position: relative; z-index: 2; pointer-events: none;">
+      ${getCabinetSvgString({ size, isRoot, isFault, uid: cabId })}
     </div>
   `
   el.appendChild(markerWrap)
