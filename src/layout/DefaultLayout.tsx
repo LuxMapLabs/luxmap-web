@@ -3,16 +3,20 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Header } from '../components/Header'
 import { RootState } from '../redux/rootReducer'
-import { logout } from '../feature/auth/authSlice'
+import { logout, refreshProfileRequest } from '../feature/auth/authSlice'
 import { getRoleName, isAdmin } from '../utils/roleUtils'
 
 export const DefaultLayout: React.FC = () => {
   const dispatch = useDispatch()
   const location = useLocation()
-  const { user } = useSelector((state: RootState) => state.auth)
+  const { user, isRefreshingProfile } = useSelector((state: RootState) => state.auth)
 
   const handleLogout = () => {
     dispatch(logout())
+  }
+
+  const handleRefreshProfile = () => {
+    dispatch(refreshProfileRequest())
   }
 
   const roleTitle = getRoleName(user?.role)
@@ -31,11 +35,14 @@ export const DefaultLayout: React.FC = () => {
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50 font-sans antialiased text-slate-900">
       {/* 1. Full-width Institutional Top Navbar */}
       <Header
+        user={user}
         userName={user?.fullName || 'Người dùng'}
         userRoleTitle={roleTitle}
         userInitials={initials}
         isAdminUser={isAdmin(user?.role)}
         onLogout={handleLogout}
+        onRefreshProfile={handleRefreshProfile}
+        isRefreshingProfile={isRefreshingProfile}
       />
 
       {/* 2. Full-width Main Workspace with Smooth Route Transitions */}

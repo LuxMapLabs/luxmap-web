@@ -4,12 +4,21 @@ import {
   WebAuthTokenResponse,
   RegisterRequest,
   ApiResponse,
+  CurrentUserResponse,
 } from '../../types/auth'
 
 // Biến lưu promise refresh đang bay để tránh gọi đồng thời nhiều request cùng lúc (Race Condition)
 let inFlightRefreshPromise: Promise<WebAuthTokenResponse> | null = null
 
 export const authAPI = {
+  /**
+   * Lấy hồ sơ tài khoản đang đăng nhập từ Database (Contract v1.5 mục 4.7)
+   * Đọc trực tiếp từ CSDL nên thông tin họ tên, email và danh sách xã luôn tươi mới nhất.
+   */
+  getMe: async (): Promise<CurrentUserResponse> => {
+    const response = await apiClient.get<CurrentUserResponse>('/auth/me')
+    return response.data
+  },
   /**
    * Đăng nhập giao diện Web (Contract 2.10.2)
    * Tự động nhận HttpOnly Cookie __Secure-luxmap_rt từ server

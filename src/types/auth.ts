@@ -120,12 +120,22 @@ export interface AuthResponseApiResponse {
   pagination?: PaginationMeta
 }
 
+export interface CurrentUserResponse {
+  user_id: string
+  username: string
+  email: string
+  full_name: string
+  role: string
+  commune_ids: string[]
+}
+
 export interface AuthState {
   user: User | null
   isAuthenticated: boolean
   accessToken?: string | null
   refreshToken?: string | null
   loading: boolean
+  isRefreshingProfile?: boolean
   error: string | null
 }
 
