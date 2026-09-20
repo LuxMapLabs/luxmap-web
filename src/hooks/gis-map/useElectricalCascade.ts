@@ -33,6 +33,9 @@ export function useElectricalCascade({
         properties: {
           ...p,
           atlas,
+          // Track if sub-cabinet has its own internal breaker trip
+          internal_tripped: p.status === 'fault',
+          local_fault_reason: p.status === 'fault' ? p.fault_reason : undefined,
         },
       }
     })
@@ -72,25 +75,35 @@ export function useElectricalCascade({
         const cp = c.properties || {}
         // A. Direct target cabinet update
         if (cp.cabinet_id === cabId) {
+          const isNowActive = nextStatus === 'active'
+          const faultReason =
+            nextStatus === 'fault'
+              ? isRoot
+                ? 'Ngắt Aptomat thủ công'
+                : cp.local_fault_reason || 'Nhảy Aptomat (Trip MCCB 63A) do ngắn mạch phân đoạn 2'
+              : undefined
           return {
             ...c,
             properties: {
               ...cp,
               status: nextStatus,
+              internal_tripped: !isNowActive,
+              local_fault_reason: isNowActive ? undefined : faultReason,
               voltage_v: nextStatus === 'fault' ? 0 : 220,
               current_load_kw: nextStatus === 'fault' ? 0 : isRoot ? 18.2 : 8.5,
               power_factor: nextStatus === 'fault' ? 0 : 0.95,
-              fault_reason: nextStatus === 'fault' ? 'Ngắt Aptomat thủ công' : undefined,
+              fault_reason: faultReason,
             },
           }
         }
 
-        // B. Cascade effect: If target is a ROOT CABINET, cascade to all subordinate SUB-CABINETS
-        if (
+        // B. Cascade effect: If target is a ROOT CABINET, cascade only to its subordinate child SUB-CABINETS
+        const isChildSubCabinet =
           isRoot &&
-          (cp.parent_cabinet_id === cabId ||
-            (cp.segment_id === targetProps.segment_id && cp.role === 'sub_cabinet'))
-        ) {
+          cp.role === 'sub_cabinet' &&
+          (cp.parent_cabinet_id ? cp.parent_cabinet_id === cabId : cp.segment_id === targetProps.segment_id)
+
+        if (isChildSubCabinet) {
           if (nextStatus === 'fault') {
             // Root turned off -> Sub-cabinets lose power input (0V, fault)
             return {
@@ -101,11 +114,25 @@ export function useElectricalCascade({
                 voltage_v: 0,
                 current_load_kw: 0,
                 power_factor: 0,
-                fault_reason: `Mất nguồn cấp do Tủ đỉnh (${targetProps.cabinet_name}) bị ngắt điện`,
+                fault_reason: `Mất nguồn cấp do Tủ đỉnh (${targetProps.cabinet_name || targetProps.cabinet_code}) bị ngắt điện`,
               },
             }
           } else {
-            // Root turned on -> Power restored to downstream sub-cabinets
+            // Root turned on -> If sub-cabinet was independently tripped, it STAYS in fault!
+            if (cp.internal_tripped) {
+              return {
+                ...c,
+                properties: {
+                  ...cp,
+                  status: 'fault',
+                  voltage_v: 0,
+                  current_load_kw: 0,
+                  power_factor: 0,
+                  fault_reason: cp.local_fault_reason || 'Nhảy Aptomat (Trip MCCB 63A) do sự cố phân đoạn',
+                },
+              }
+            }
+
             return {
               ...c,
               properties: {
@@ -128,20 +155,30 @@ export function useElectricalCascade({
       onSelectedCabinetUpdate((prev: any) => {
         if (!prev) return prev
         if (prev.cabinet_id === cabId) {
+          const isNowActive = nextStatus === 'active'
+          const faultReason =
+            nextStatus === 'fault'
+              ? isRoot
+                ? 'Ngắt Aptomat thủ công'
+                : prev.local_fault_reason || 'Nhảy Aptomat (Trip MCCB 63A) do ngắn mạch phân đoạn 2'
+              : undefined
           return {
             ...prev,
             status: nextStatus,
+            internal_tripped: !isNowActive,
+            local_fault_reason: isNowActive ? undefined : faultReason,
             voltage_v: nextStatus === 'fault' ? 0 : 220,
             current_load_kw: nextStatus === 'fault' ? 0 : isRoot ? 18.2 : 8.5,
             power_factor: nextStatus === 'fault' ? 0 : 0.95,
-            fault_reason: nextStatus === 'fault' ? 'Ngắt Aptomat thủ công' : undefined,
+            fault_reason: faultReason,
           }
         }
-        if (
+        const isChildSubCabinet =
           isRoot &&
-          (prev.parent_cabinet_id === cabId ||
-            (prev.segment_id === targetProps.segment_id && prev.role === 'sub_cabinet'))
-        ) {
+          prev.role === 'sub_cabinet' &&
+          (prev.parent_cabinet_id ? prev.parent_cabinet_id === cabId : prev.segment_id === targetProps.segment_id)
+
+        if (isChildSubCabinet) {
           if (nextStatus === 'fault') {
             return {
               ...prev,
@@ -149,9 +186,19 @@ export function useElectricalCascade({
               voltage_v: 0,
               current_load_kw: 0,
               power_factor: 0,
-              fault_reason: `Mất nguồn cấp do Tủ đỉnh (${targetProps.cabinet_name}) bị ngắt điện`,
+              fault_reason: `Mất nguồn cấp do Tủ đỉnh (${targetProps.cabinet_name || targetProps.cabinet_code}) bị ngắt điện`,
             }
           } else {
+            if (prev.internal_tripped) {
+              return {
+                ...prev,
+                status: 'fault',
+                voltage_v: 0,
+                current_load_kw: 0,
+                power_factor: 0,
+                fault_reason: prev.local_fault_reason || 'Nhảy Aptomat (Trip MCCB 63A) do sự cố phân đoạn',
+              }
+            }
             return {
               ...prev,
               status: 'active',
@@ -214,13 +261,16 @@ export function useElectricalCascade({
         }
       }
 
-      // 2. Find any sub-cabinet of this route controlling this pole index
+      // 2. Find any sub-cabinet of this route controlling this pole
       const subCab = cabinets.find(
         (c) =>
           c.properties?.role === 'sub_cabinet' &&
           c.properties?.segment_id === segId &&
-          idx >= (c.properties?.start_pole_idx ?? -1) &&
-          idx <= (c.properties?.end_pole_idx ?? -1)
+          (c.properties?.branch_start_pole
+            ? p.pole_id >= c.properties.branch_start_pole
+            : typeof c.properties?.start_pole_idx === 'number'
+            ? idx >= c.properties.start_pole_idx
+            : false)
       )
 
       if (subCab && subCab.properties?.status === 'fault') {
@@ -377,7 +427,6 @@ export function useElectricalCascade({
   // Filtered Segments GeoJSON Data (partitioned by feeder sections, continuous geometry and synced with cabinet status)
   const filteredSegmentsData = useMemo(() => {
     const allSegments = (mockSegmentsData.features || []) as unknown as SegmentFeature[]
-    const allPoles = (mockPolesData.features || []) as unknown as PoleFeature[]
     
     // Chỉ lấy các cột đèn ĐANG HIỂN THỊ (phù hợp với statusFilter, selectedSegment & search) để vẽ đường dây
     // Khi cột đèn bị ẩn thì đường dây tương ứng tự ẩn theo, không bị vẽ dư trên bản đồ
@@ -413,19 +462,20 @@ export function useElectricalCascade({
 
       const isRootFault = rootCab?.properties?.status === 'fault'
       const isSubFault = subCab?.properties?.status === 'fault'
-      const subStartIdx = subCab?.properties?.start_pole_idx
+      const branchPoleId = subCab?.properties?.branch_start_pole
+      const subStartIdx = subCab
+        ? branchPoleId
+          ? segPoles.findIndex((p) => p.properties.pole_id === branchPoleId)
+          : typeof subCab.properties?.start_pole_idx === 'number'
+          ? subCab.properties.start_pole_idx
+          : -1
+        : -1
       const segName = seg.properties?.segment_name || segId
 
       // If route has a sub-cabinet, partition into 2 electrical sections
-      if (subCab && typeof subStartIdx === 'number') {
-        const sec1Poles = segPoles.filter((p) => {
-          const idx = allPoles.findIndex((ap) => ap.properties.pole_id === p.properties.pole_id)
-          return idx <= subStartIdx
-        })
-        const sec2Poles = segPoles.filter((p) => {
-          const idx = allPoles.findIndex((ap) => ap.properties.pole_id === p.properties.pole_id)
-          return idx >= subStartIdx
-        })
+      if (subCab && subStartIdx >= 0) {
+        const sec1Poles = segPoles.slice(0, subStartIdx + 1)
+        const sec2Poles = segPoles.slice(subStartIdx)
 
         const sec1Status = isRootFault ? 'fault' : 'active'
         const sec2Status = isRootFault || isSubFault ? 'fault' : 'active'

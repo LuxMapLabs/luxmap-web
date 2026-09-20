@@ -235,6 +235,28 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
   const isParentRootOff = isSubCabinet && parentRootCabinet?.status === 'fault'
 
+  const cabinetConnectedPoles = useMemo(() => {
+    if (!selectedCabinet) return []
+    const all = (mockPolesData.features || []) as unknown as PoleFeature[]
+    if (isRootCabinet) {
+      return all.filter(
+        (f) =>
+          f.properties.segment_id === selectedCabinet.segment_id ||
+          (selectedCabinet.segment_ids && selectedCabinet.segment_ids.includes(f.properties.segment_id))
+      )
+    }
+    // Sub-cabinet: filter branch poles
+    return all.filter(
+      (f) =>
+        f.properties.segment_id === selectedCabinet.segment_id &&
+        (selectedCabinet.branch_start_pole
+          ? f.properties.pole_id >= selectedCabinet.branch_start_pole
+          : typeof selectedCabinet.start_pole_idx === 'number'
+          ? all.indexOf(f) >= selectedCabinet.start_pole_idx
+          : true)
+    )
+  }, [selectedCabinet, isRootCabinet])
+
   return (
     <>
       <aside className="w-97.5 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
@@ -842,20 +864,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               </div>
 
               {/* Connected Poles on this Cabinet Section / Route */}
-              {typeof selectedCabinet.start_pole_idx === 'number' && (
+              {selectedCabinet && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
                       {isRootCabinet ? `Dàn đèn toàn tuyến (${selectedCabinet.cabinet_code})` : `Dàn đèn phân đoạn (${selectedCabinet.cabinet_code})`}
                     </p>
                     <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded ${selectedCabinet.status === 'fault' ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}`}>
-                      {selectedCabinet.status === 'fault' ? 'Mất điện' : `${selectedCabinet.pole_count || selectedCabinet.total_poles_managed} đèn đang sáng`}
+                      {selectedCabinet.status === 'fault' ? 'Mất điện' : `${cabinetConnectedPoles.length} đèn đang sáng`}
                     </span>
                   </div>
                   <div className="space-y-1 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
-                    {((mockPolesData.features || []) as unknown as PoleFeature[])
-                      .slice(selectedCabinet.start_pole_idx, selectedCabinet.end_pole_idx + 1)
-                      .map((f: PoleFeature) => {
+                    {cabinetConnectedPoles.map((f: PoleFeature) => {
                         const isOff = selectedCabinet.status === 'fault'
                         return (
                           <div

@@ -43,6 +43,9 @@ export interface AssetPoleItem {
   fixture_type: 'led_road_lamp'
   fixture_status: 'normal' | 'dim' | 'out' | 'unknown'
   feeder_id: string
+  feeder_name?: string
+  feeder_role?: 'root_cabinet' | 'sub_cabinet'
+  parent_feeder_id?: string
   warranty_expiry: string
   lat: number
   lng: number
@@ -58,6 +61,7 @@ export interface AssetCabinetItem {
   cabinet_name: string
   role: 'root_cabinet' | 'sub_cabinet'
   segment_id: string
+  segment_ids?: string[]
   segment_name: string
   status: 'active' | 'fault'
   voltage_v: number
@@ -68,6 +72,9 @@ export interface AssetCabinetItem {
   installed_at: string
   lat: number
   lng: number
+  parent_cabinet_id?: string
+  branch_start_pole?: string
+  subordinated_cabinets?: string[]
   fault_reason?: string
 }
 
@@ -97,11 +104,37 @@ if (mockSegmentsGeoJson && Array.isArray((mockSegmentsGeoJson as any).features))
   })
 }
 
+const RAW_CABINET_PROPS: any[] = ((mockCabinetsGeoJson as any).features || []).map((f: any) => f.properties || {})
+
 const INITIAL_POLES: AssetPoleItem[] = ((mockPolesGeoJson as any).features || []).map((f: any, idx: number) => {
   const p = f.properties || {}
   const coords = f.geometry?.coordinates || [106.4896, 10.9701]
   const cId = p.commune_id || 'COM-001'
   const sId = p.segment_id || 'SEG-001'
+
+  // Determine direct controlling cabinet (Sub-cabinet if in downstream branch, else Root-cabinet)
+  const subCab = RAW_CABINET_PROPS.find(
+    (c: any) =>
+      c.role === 'sub_cabinet' &&
+      c.segment_id === sId &&
+      (c.branch_start_pole
+        ? p.pole_id >= c.branch_start_pole
+        : typeof c.start_pole_idx === 'number'
+        ? idx >= c.start_pole_idx
+        : false)
+  )
+
+  const rootCab = RAW_CABINET_PROPS.find(
+    (c: any) =>
+      c.role === 'root_cabinet' &&
+      (c.segment_id === sId || (c.segment_ids && c.segment_ids.includes(sId)))
+  )
+
+  const activeFeeder = subCab || rootCab
+  const feederId = activeFeeder ? activeFeeder.cabinet_id : (p.feeder_id || 'CAB-TL8-ROOT')
+  const feederName = activeFeeder ? activeFeeder.cabinet_name : undefined
+  const feederRole = (activeFeeder?.role || 'root_cabinet') as 'root_cabinet' | 'sub_cabinet'
+  const parentFeederId = subCab ? (subCab.parent_cabinet_id || rootCab?.cabinet_id) : undefined
 
   return {
     id: p.pole_id || `POLE-${String(idx + 1).padStart(4, '0')}`,
@@ -114,7 +147,10 @@ const INITIAL_POLES: AssetPoleItem[] = ((mockPolesGeoJson as any).features || []
     power_source: (p.power_source as any) || 'grid',
     fixture_type: (p.fixture_type as any) || 'led_road_lamp',
     fixture_status: (p.fixture_status as any) || 'normal',
-    feeder_id: p.feeder_id || 'CAB-TL8-ROOT',
+    feeder_id: feederId,
+    feeder_name: feederName,
+    feeder_role: feederRole,
+    parent_feeder_id: parentFeederId,
     warranty_expiry: p.warranty_expiry || '2026-12-31',
     lat: coords[1],
     lng: coords[0],
@@ -129,23 +165,31 @@ const INITIAL_CABINETS: AssetCabinetItem[] = ((mockCabinetsGeoJson as any).featu
   const p = f.properties || {}
   const coords = f.geometry?.coordinates || [106.4896, 10.9701]
   const cId = p.cabinet_id || `CAB-${String(idx + 1).padStart(3, '0')}`
+  const segId = p.segment_id || 'SEG-001'
+
+  // Computed automatically from actual mapped poles
+  const actualPoleCount = INITIAL_POLES.filter((pole) => pole.feeder_id === cId).length
 
   return {
     id: cId,
     cabinet_id: cId,
     cabinet_name: p.cabinet_name || `Tủ điện ${cId}`,
     role: (p.role as any) || 'root_cabinet',
-    segment_id: p.segment_id || 'SEG-001',
+    segment_id: segId,
+    segment_ids: p.segment_ids || (p.segment_id ? [p.segment_id] : ['SEG-001']),
     segment_name: p.segment_name || 'Tuyến A (Tỉnh Lộ 8)',
     status: (p.status as any) || 'active',
     voltage_v: p.voltage_v ?? 220,
     current_load_kw: p.current_load_kw ?? 15,
     power_factor: p.power_factor ?? 0.95,
-    total_poles_managed: p.total_poles_managed || p.pole_count || 30,
+    total_poles_managed: actualPoleCount > 0 ? actualPoleCount : (p.total_poles_managed || p.pole_count || 30),
     landmark_note: p.landmark_note || p.atlas || 'Mốc thực địa tại tuyến',
     installed_at: p.installed_at || '2023-01-15',
     lat: coords[1],
     lng: coords[0],
+    parent_cabinet_id: p.parent_cabinet_id,
+    branch_start_pole: p.branch_start_pole,
+    subordinated_cabinets: p.subordinated_cabinets || [],
     fault_reason: p.fault_reason,
   }
 })
@@ -220,6 +264,10 @@ export const AssetManagementPage: React.FC = () => {
         pole.pole_id.toLowerCase().includes(q) ||
         pole.segment_name.toLowerCase().includes(q) ||
         pole.commune_name.toLowerCase().includes(q) ||
+        pole.feeder_id.toLowerCase().includes(q) ||
+        (pole.feeder_name && pole.feeder_name.toLowerCase().includes(q)) ||
+        (pole.feeder_role === 'sub_cabinet' && (q.includes('nhánh') || q.includes('sub'))) ||
+        (pole.feeder_role === 'root_cabinet' && (q.includes('đỉnh') || q.includes('root'))) ||
         (pole.atlas && pole.atlas.toLowerCase().includes(q))
 
       const matchesStatus = statusFilter === 'all' || pole.fixture_status === statusFilter
@@ -302,7 +350,7 @@ export const AssetManagementPage: React.FC = () => {
       ? filteredCabinets.length
       : filteredSegments.length
 
-  const totalPages = Math.ceil(currentListLength / pageSize) || 1
+  const totalPages = Math.max(1, Math.ceil(currentListLength / pageSize))
 
   const paginatedPoles = useMemo(() => {
     const start = (currentPage - 1) * pageSize
@@ -321,38 +369,103 @@ export const AssetManagementPage: React.FC = () => {
 
   // Handlers for Add
   const handleAddPole = (data: NewPoleData) => {
-    const newItem: AssetPoleItem = {
-      id: data.pole_id,
-      pole_id: data.pole_id,
-      segment_id: data.segment_id,
-      segment_name: data.segment_name,
-      commune_id: data.commune_id,
-      commune_name: data.commune_name,
-      lamp_watt: data.lamp_watt,
-      power_source: data.power_source,
-      fixture_type: data.fixture_type,
-      fixture_status: 'normal',
-      feeder_id: data.feeder_id,
-      warranty_expiry: data.warranty_expiry,
-      lat: data.lat,
-      lng: data.lng,
-      near_sensitive_poi: data.near_sensitive_poi,
-      atlas: data.atlas,
-      lux_value: 30.0,
-      open_fault_count: 0,
-    }
+    handleAddPoles([data])
+  }
 
-    setPoles((prev) => [newItem, ...prev])
+  const handleAddPoles = (dataList: NewPoleData[]) => {
+    if (!dataList || dataList.length === 0) return
+
+    const targetSegmentId = dataList[0].segment_id
+    const existingSegmentPoles = poles.filter((p) => p.segment_id === targetSegmentId)
+    const currentBaseIndex = existingSegmentPoles.length
+
+    const subCab = cabinets.find(
+      (c) =>
+        c.role === 'sub_cabinet' &&
+        (c.segment_id === targetSegmentId || (c.segment_ids && c.segment_ids.includes(targetSegmentId)))
+    )
+    const rootCab = cabinets.find(
+      (c) =>
+        c.role === 'root_cabinet' &&
+        (c.segment_id === targetSegmentId || (c.segment_ids && c.segment_ids.includes(targetSegmentId)))
+    )
+
+    const newItems: AssetPoleItem[] = dataList.map((data, i) => {
+      const poleIdx = currentBaseIndex + i
+      const isUnderSubCab = !!(subCab && poleIdx >= 23)
+      const chosenCab = isUnderSubCab ? subCab : rootCab
+      const feederId = chosenCab?.cabinet_id || data.feeder_id || 'CAB-TL8-ROOT'
+      const feederRole = (chosenCab?.role || 'root_cabinet') as 'root_cabinet' | 'sub_cabinet'
+
+      return {
+        id: data.pole_id,
+        pole_id: data.pole_id,
+        segment_id: data.segment_id,
+        segment_name: data.segment_name,
+        commune_id: data.commune_id,
+        commune_name: data.commune_name,
+        lamp_watt: data.lamp_watt,
+        power_source: data.power_source,
+        fixture_type: data.fixture_type,
+        fixture_status: 'normal',
+        feeder_id: feederId,
+        feeder_name: chosenCab?.cabinet_name,
+        feeder_role: feederRole,
+        parent_feeder_id: isUnderSubCab ? rootCab?.cabinet_id : undefined,
+        warranty_expiry: data.warranty_expiry,
+        lat: data.lat,
+        lng: data.lng,
+        near_sensitive_poi: data.near_sensitive_poi,
+        atlas: data.atlas,
+        lux_value: 30.0,
+        open_fault_count: 0,
+      }
+    })
+
+    setPoles((prev) => [...newItems, ...prev])
+
+    // Update pole count for the segment
+    setSegments((prev) =>
+      prev.map((s) =>
+        s.segment_id === targetSegmentId
+          ? { ...s, pole_count: (s.pole_count || 0) + dataList.length }
+          : s
+      )
+    )
+
+    // Automatically update pole counts for affected cabinets
+    setCabinets((prev) =>
+      prev.map((cab) => {
+        const addedForThisCab = newItems.filter((item) => item.feeder_id === cab.cabinet_id).length
+        return addedForThisCab > 0
+          ? { ...cab, total_poles_managed: (cab.total_poles_managed || 0) + addedForThisCab }
+          : cab
+      })
+    )
+
     setCurrentPage(1)
-    showBanner(`Đã đăng ký thành công cột đèn "${data.pole_id}" vào Bản đồ GIS!`)
+    if (dataList.length === 1) {
+      showBanner(`Đã đăng ký thành công cột đèn "${dataList[0].pole_id}" vào Bản đồ GIS!`)
+    } else {
+      showBanner(`Đã đăng ký thành công ${dataList.length} cột đèn vào Tuyến "${dataList[0].segment_name}"!`)
+    }
   }
 
   const handleAddCabinet = (data: NewCabinetData) => {
-    const newItem: AssetCabinetItem = {
+    handleAddCabinets([data])
+  }
+
+  const handleAddCabinets = (newCabinetsList: NewCabinetData[]) => {
+    if (newCabinetsList.length === 0) return
+
+    const newItems: AssetCabinetItem[] = newCabinetsList.map((data) => ({
       id: data.cabinet_id,
       cabinet_id: data.cabinet_id,
       cabinet_name: data.cabinet_name,
       role: data.role,
+      parent_cabinet_id: data.parent_cabinet_id,
+      branch_start_pole: data.branch_start_pole,
+      subordinated_cabinets: [],
       segment_id: data.segment_id,
       segment_name: data.segment_name,
       status: 'active',
@@ -364,11 +477,28 @@ export const AssetManagementPage: React.FC = () => {
       installed_at: data.installed_at,
       lat: data.lat,
       lng: data.lng,
-    }
+    }))
 
-    setCabinets((prev) => [newItem, ...prev])
+    setCabinets((prev) => {
+      let updated = [...newItems, ...prev]
+      // Update parent cabinets' subordinated_cabinets if any sub cabinets were added
+      newCabinetsList.forEach((sub) => {
+        if (sub.role === 'sub_cabinet' && sub.parent_cabinet_id) {
+          updated = updated.map((c) =>
+            c.cabinet_id === sub.parent_cabinet_id
+              ? {
+                  ...c,
+                  subordinated_cabinets: Array.from(new Set([...(c.subordinated_cabinets || []), sub.cabinet_id])),
+                }
+              : c
+          )
+        }
+      })
+      return updated
+    })
+
     setCurrentPage(1)
-    showBanner(`Đã đăng ký thành công tủ điện "${data.cabinet_id}" vào Cơ sở Dữ liệu GIS!`)
+    showBanner(`Đã lưu thành công ${newCabinetsList.length} tủ điện vào Tuyến "${newCabinetsList[0].segment_name}"!`)
   }
 
   const handleAddSegment = (data: NewSegmentData) => {
@@ -732,11 +862,30 @@ export const AssetManagementPage: React.FC = () => {
                                 toast.info(`Chưa có thông tin mở rộng cho tủ ${pole.feeder_id}`)
                               }
                             }}
-                            className="font-mono text-[11px] text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 font-bold tracking-wide hover:underline cursor-pointer inline-flex items-center gap-1 group transition"
-                            title="Bấm để xem nhanh tủ điện cấp nguồn này"
+                            className="font-mono text-[11px] cursor-pointer inline-flex items-center gap-1.5 group transition text-left"
+                            title={
+                              pole.feeder_role === 'sub_cabinet'
+                                ? `Tủ Nhánh phân đoạn trực tiếp (Nguồn cha: ${pole.parent_feeder_id || 'Tủ đỉnh'}) - Bấm xem chi tiết tủ`
+                                : `Tủ Đỉnh nguồn tổng tuyến - Bấm xem chi tiết tủ`
+                            }
                           >
-                            <span>{pole.feeder_id}</span>
-                            <Zap className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100 text-amber-500 shrink-0" />
+                            {pole.feeder_role === 'sub_cabinet' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 font-semibold shadow-2xs group-hover:border-amber-400 group-hover:bg-amber-100/70 transition">
+                                <Zap className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />
+                                <span className="font-bold tracking-tight">{pole.feeder_id}</span>
+                                <span className="text-[9px] px-1 py-0.2 bg-amber-200/70 dark:bg-amber-800/80 text-amber-900 dark:text-amber-100 rounded font-bold uppercase tracking-wider">
+                                  Tủ Nhánh
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60 font-semibold shadow-2xs group-hover:border-blue-400 group-hover:bg-blue-100/70 transition">
+                                <span className="text-amber-500 text-xs shrink-0">⭐️</span>
+                                <span className="font-bold tracking-tight">{pole.feeder_id}</span>
+                                <span className="text-[9px] px-1 py-0.2 bg-blue-200/70 dark:bg-blue-800/80 text-blue-900 dark:text-blue-100 rounded font-bold uppercase tracking-wider">
+                                  Tủ Đỉnh
+                                </span>
+                              </span>
+                            )}
                           </button>
                         </td>
                         <td className="p-3.5 text-slate-500 dark:text-slate-300">{pole.commune_name}</td>
@@ -830,9 +979,26 @@ export const AssetManagementPage: React.FC = () => {
                           {cab.cabinet_id}
                         </td>
                         <td className="p-3.5">
-                          <div className="font-bold text-slate-900 dark:text-white">{cab.cabinet_name}</div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {cab.role === 'root_cabinet' ? 'Tủ xuất tuyến chính (Root)' : 'Tủ phân đoạn nhánh (Sub)'}
+                          <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            {cab.role === 'root_cabinet' ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                                ⭐️ ROOT
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold text-indigo-700 dark:text-indigo-400">
+                                ⚡️ SUB
+                              </span>
+                            )}
+                            <span>{cab.cabinet_name}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            {cab.role === 'root_cabinet'
+                              ? (cab.subordinated_cabinets && cab.subordinated_cabinets.length > 0
+                                  ? `Tủ chính toàn tuyến • Có ${cab.subordinated_cabinets.length} tủ nhánh`
+                                  : 'Tủ xuất tuyến chính (Root)')
+                              : (cab.parent_cabinet_id
+                                  ? `Tủ nhánh • Nguồn từ ${cab.parent_cabinet_id}${cab.branch_start_pole ? ` (sau ${cab.branch_start_pole})` : ''}`
+                                  : 'Tủ phân đoạn nhánh (Sub)')}
                           </div>
                         </td>
                         <td className="p-3.5 font-medium text-slate-700 dark:text-slate-200 max-w-50 truncate" title={cab.segment_name}>
@@ -1037,14 +1203,20 @@ export const AssetManagementPage: React.FC = () => {
         isOpen={isAddPoleModalOpen}
         onClose={() => setIsAddPoleModalOpen(false)}
         onAddPole={handleAddPole}
+        onAddPoles={handleAddPoles}
         existingPoleCount={poles.length}
+        availableSegments={segments}
+        availableCabinets={cabinets}
       />
 
       <AddCabinetModal
         isOpen={isAddCabinetModalOpen}
         onClose={() => setIsAddCabinetModalOpen(false)}
         onAddCabinet={handleAddCabinet}
+        onAddCabinets={handleAddCabinets}
         existingCount={cabinets.length}
+        availableSegments={segments}
+        availableCabinets={cabinets}
       />
 
       <AddSegmentModal
