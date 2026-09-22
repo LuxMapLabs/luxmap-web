@@ -7,29 +7,26 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          106.489639,
-          10.970187
+          106.48975,
+          10.96998
         ]
       },
       "properties": {
-        "cabinet_id": "CAB-TL8-ROOT",
-        "cabinet_code": "TCS-TL8-ROOT",
-        "cabinet_name": "Tủ Đỉnh Tuyến A (Tỉnh Lộ 8)",
-        "role": "root_cabinet",
+        "cabinet_id": "CAB-TL8-A",
+        "cabinet_code": "TCS-TL8-A",
+        "cabinet_name": "Tủ A - Tỉnh Lộ 8",
+        "feeder_id": "FDR-TL8-A",
         "segment_id": "SEG-001",
         "segment_name": "Tuyến A (Tỉnh Lộ 8)",
         "status": "active",
         "voltage_v": 221.4,
-        "current_load_kw": 18.2,
+        "current_load_kw": 10.2,
         "power_factor": 0.96,
-        "total_poles_managed": 46,
-        "subordinated_cabinets": [
-          "CAB-TL8-SUB"
-        ],
-        "landmark_note": "Đầu tuyến Tỉnh Lộ 8 - Gần nhà ông A, ngã ba Lê Vĩnh Huy",
+        "total_poles_managed": 23,
+        "landmark_note": "Đầu tuyến Tỉnh Lộ 8 - Gần ngã ba Lê Vĩnh Huy (Bệ vỉa hè)",
         "installed_at": "2023-01-15",
-        "iot_node_id": "NODE-TL8-ROOT",
-        "atlas": "Đầu tuyến Tỉnh Lộ 8 - Gần nhà ông A, ngã ba Lê Vĩnh Huy"
+        "iot_node_id": "NODE-TL8-A",
+        "atlas": "Đầu tuyến Tỉnh Lộ 8 - Gần ngã ba Lê Vĩnh Huy (Bệ vỉa hè)"
       }
     },
     {
@@ -37,29 +34,26 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          106.496112,
-          10.973888
+          106.49628,
+          10.97368
         ]
       },
       "properties": {
-        "cabinet_id": "CAB-TL8-SUB",
-        "cabinet_code": "TCS-TL8-SUB",
-        "cabinet_name": "Tủ Nhánh TL8 (Phân đoạn 2)",
-        "role": "sub_cabinet",
-        "parent_cabinet_id": "CAB-TL8-ROOT",
+        "cabinet_id": "CAB-TL8-B",
+        "cabinet_code": "TCS-TL8-B",
+        "cabinet_name": "Tủ B - Tỉnh Lộ 8",
+        "feeder_id": "FDR-TL8-B",
         "segment_id": "SEG-001",
-        "segment_name": "Tuyến A (Tỉnh Lộ 8 - Đoạn 2)",
-        "status": "fault",
-        "voltage_v": 0,
-        "current_load_kw": 0,
-        "power_factor": 0,
-        "pole_count": 23,
-        "branch_start_pole": "POLE-0024",
-        "fault_reason": "Nhảy Aptomat (Trip MCCB 63A) do ngắn mạch phân đoạn 2",
-        "landmark_note": "Giữa Tỉnh Lộ 8 - Đối diện cửa Chợ Củ Chi, gần nhà bà B",
-        "installed_at": "2024-03-15",
-        "iot_node_id": "NODE-TL8-SUB",
-        "atlas": "Giữa Tỉnh Lộ 8 - Đối diện cửa Chợ Củ Chi, gần nhà bà B"
+        "segment_name": "Tuyến A (Tỉnh Lộ 8)",
+        "status": "active",
+        "voltage_v": 220.5,
+        "current_load_kw": 9.8,
+        "power_factor": 0.95,
+        "total_poles_managed": 23,
+        "landmark_note": "Giữa Tỉnh Lộ 8 - Đối diện Chợ Củ Chi (Bệ vỉa hè)",
+        "installed_at": "2023-03-15",
+        "iot_node_id": "NODE-TL8-B",
+        "atlas": "Giữa Tỉnh Lộ 8 - Đối diện Chợ Củ Chi (Bệ vỉa hè)"
       }
     },
     {
@@ -67,29 +61,26 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          106.495788,
-          10.964558
+          106.49605,
+          10.96452
         ]
       },
       "properties": {
-        "cabinet_id": "CAB-NVN-ROOT",
-        "cabinet_code": "TCS-NVN-ROOT",
-        "cabinet_name": "Tủ Đỉnh Tuyến B (Nguyễn Văn Ni)",
-        "role": "root_cabinet",
+        "cabinet_id": "CAB-NVN-A",
+        "cabinet_code": "TCS-NVN-A",
+        "cabinet_name": "Tủ A - Nguyễn Văn Ni",
+        "feeder_id": "FDR-NVN-A",
         "segment_id": "SEG-002",
         "segment_name": "Tuyến B (Nguyễn Văn Ni)",
         "status": "active",
         "voltage_v": 220.8,
-        "current_load_kw": 12.4,
+        "current_load_kw": 7.2,
         "power_factor": 0.95,
-        "total_poles_managed": 31,
-        "subordinated_cabinets": [
-          "CAB-NVN-SUB"
-        ],
-        "landmark_note": "Đầu đường Nguyễn Văn Ni - Gần nhà ông C, đối diện cơ quan",
+        "total_poles_managed": 16,
+        "landmark_note": "Đầu đường Nguyễn Văn Ni - Gần cơ quan (Bệ vỉa hè)",
         "installed_at": "2023-05-10",
-        "iot_node_id": "NODE-NVN-ROOT",
-        "atlas": "Đầu đường Nguyễn Văn Ni - Gần nhà ông C, đối diện cơ quan"
+        "iot_node_id": "NODE-NVN-A",
+        "atlas": "Đầu đường Nguyễn Văn Ni - Gần cơ quan (Bệ vỉa hè)"
       }
     },
     {
@@ -97,28 +88,26 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          106.497211,
-          10.970174
+          106.49748,
+          10.97015
         ]
       },
       "properties": {
-        "cabinet_id": "CAB-NVN-SUB",
-        "cabinet_code": "TCS-NVN-SUB",
-        "cabinet_name": "Tủ Nhánh NVN (Phân đoạn 2)",
-        "role": "sub_cabinet",
-        "parent_cabinet_id": "CAB-NVN-ROOT",
+        "cabinet_id": "CAB-NVN-B",
+        "cabinet_code": "TCS-NVN-B",
+        "cabinet_name": "Tủ B - Nguyễn Văn Ni",
+        "feeder_id": "FDR-NVN-B",
         "segment_id": "SEG-002",
-        "segment_name": "Tuyến B (Nguyễn Văn Ni - Đoạn 2)",
+        "segment_name": "Tuyến B (Nguyễn Văn Ni)",
         "status": "active",
-        "voltage_v": 219.5,
-        "current_load_kw": 6,
+        "voltage_v": 219.8,
+        "current_load_kw": 6.8,
         "power_factor": 0.94,
-        "pole_count": 15,
-        "branch_start_pole": "POLE-0063",
-        "landmark_note": "Gần cổng trường THPT Củ Chi - Đối diện cửa nhà ông D",
-        "installed_at": "2024-05-20",
-        "iot_node_id": "NODE-NVN-SUB",
-        "atlas": "Gần cổng trường THPT Củ Chi - Đối diện cửa nhà ông D"
+        "total_poles_managed": 15,
+        "landmark_note": "Gần cổng trường THPT Củ Chi (Bệ vỉa hè)",
+        "installed_at": "2023-05-20",
+        "iot_node_id": "NODE-NVN-B",
+        "atlas": "Gần cổng trường THPT Củ Chi (Bệ vỉa hè)"
       }
     },
     {
@@ -126,29 +115,26 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          106.498048,
-          10.963327
+          106.49832,
+          10.96330
         ]
       },
       "properties": {
-        "cabinet_id": "CAB-HVC-ROOT",
-        "cabinet_code": "TCS-HVC-ROOT",
-        "cabinet_name": "Tủ Đỉnh Tuyến C (Huỳnh Văn Cọ)",
-        "role": "root_cabinet",
+        "cabinet_id": "CAB-HVC-A",
+        "cabinet_code": "TCS-HVC-A",
+        "cabinet_name": "Tủ A - Huỳnh Văn Cọ",
+        "feeder_id": "FDR-HVC-A",
         "segment_id": "SEG-003",
         "segment_name": "Tuyến C (Huỳnh Văn Cọ)",
         "status": "active",
         "voltage_v": 220.1,
-        "current_load_kw": 10.5,
+        "current_load_kw": 6.0,
         "power_factor": 0.95,
-        "total_poles_managed": 26,
-        "subordinated_cabinets": [
-          "CAB-HVC-SUB"
-        ],
-        "landmark_note": "Đầu đường Huỳnh Văn Cọ - Gần nhà ông E",
+        "total_poles_managed": 13,
+        "landmark_note": "Đầu đường Huỳnh Văn Cọ (Bệ vỉa hè)",
         "installed_at": "2023-02-12",
-        "iot_node_id": "NODE-HVC-ROOT",
-        "atlas": "Đầu đường Huỳnh Văn Cọ - Gần nhà ông E"
+        "iot_node_id": "NODE-HVC-A",
+        "atlas": "Đầu đường Huỳnh Văn Cọ (Bệ vỉa hè)"
       }
     },
     {
@@ -156,29 +142,26 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          106.498815,
-          10.966981
+          106.49910,
+          10.96695
         ]
       },
       "properties": {
-        "cabinet_id": "CAB-HVC-SUB",
-        "cabinet_code": "TCS-HVC-SUB",
-        "cabinet_name": "Tủ Nhánh HVC (Phân đoạn 2)",
-        "role": "sub_cabinet",
-        "parent_cabinet_id": "CAB-HVC-ROOT",
+        "cabinet_id": "CAB-HVC-B",
+        "cabinet_code": "TCS-HVC-B",
+        "cabinet_name": "Tủ B - Huỳnh Văn Cọ",
+        "feeder_id": "FDR-HVC-B",
         "segment_id": "SEG-003",
-        "segment_name": "Tuyến C (Huỳnh Văn Cọ - Đoạn 2)",
-        "status": "fault",
-        "voltage_v": 0,
-        "current_load_kw": 0,
-        "power_factor": 0,
-        "pole_count": 13,
-        "branch_start_pole": "POLE-0091",
-        "fault_reason": "Ngắn mạch pha-đất gây nhảy bảo vệ phân đoạn 2",
-        "landmark_note": "Cuối đường Huỳnh Văn Cọ - Đối diện trạm y tế, gần nhà ông G",
+        "segment_name": "Tuyến C (Huỳnh Văn Cọ)",
+        "status": "active",
+        "voltage_v": 220.0,
+        "current_load_kw": 5.8,
+        "power_factor": 0.94,
+        "total_poles_managed": 13,
+        "landmark_note": "Cuối đường Huỳnh Văn Cọ - Đối diện trạm y tế (Bệ vỉa hè)",
         "installed_at": "2024-01-10",
-        "iot_node_id": "NODE-HVC-SUB",
-        "atlas": "Cuối đường Huỳnh Văn Cọ - Đối diện trạm y tế, gần nhà ông G"
+        "iot_node_id": "NODE-HVC-B",
+        "atlas": "Cuối đường Huỳnh Văn Cọ - Đối diện trạm y tế"
       }
     }
   ]

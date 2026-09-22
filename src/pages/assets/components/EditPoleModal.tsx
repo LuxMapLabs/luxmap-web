@@ -7,8 +7,8 @@ export interface EditablePoleData {
   pole_id: string
   segment_id: string
   segment_name: string
-  commune_id: string
-  commune_name: string
+  commune_id?: string
+  commune_name?: string
   lamp_watt: number
   power_source: 'grid'
   fixture_status: 'normal' | 'dim' | 'out' | 'unknown'

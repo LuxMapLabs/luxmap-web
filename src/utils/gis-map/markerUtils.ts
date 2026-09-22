@@ -107,6 +107,8 @@ export function registerSvgIcon(map: maplibregl.Map, id: string, svg: string, si
 interface CreatePoleMarkerParams {
   feature: PoleFeature
   isSelected: boolean
+  isManagedBySelectedCabinet?: boolean
+  isOtherCabinetSelected?: boolean
   onClick: (f: PoleFeature) => void
   onHover: (f: PoleFeature, coords: [number, number]) => void
   onLeave: () => void
@@ -115,6 +117,8 @@ interface CreatePoleMarkerParams {
 export function createPoleMarkerElement({
   feature,
   isSelected,
+  isManagedBySelectedCabinet = false,
+  isOtherCabinetSelected = false,
   onClick,
   onHover,
   onLeave,
@@ -122,7 +126,9 @@ export function createPoleMarkerElement({
   const p = feature.properties || {}
   const status = p.fixture_status || 'unknown'
   const isNearPoi = p.near_sensitive_poi === true
-  const size = isSelected ? 24 : 17
+
+  const baseSize = isSelected ? 24 : isManagedBySelectedCabinet ? 20 : isOtherCabinetSelected ? 15 : 17
+  const size = baseSize
   const half = size / 2
   const poleId = p.pole_id || Math.random().toString(36).substring(2, 6)
 
@@ -131,7 +137,9 @@ export function createPoleMarkerElement({
   let cBody = '#10b981'
   let cDeep = '#047857'
   let cShadow = '#022c22'
-  let glowCol = 'rgba(16, 185, 129, 0.35)'
+  let glowCol = isManagedBySelectedCabinet
+    ? 'rgba(16, 185, 129, 0.7)'
+    : 'rgba(16, 185, 129, 0.35)'
 
   if (status === 'dim') {
     cHighlight = '#fef08a'
@@ -153,14 +161,14 @@ export function createPoleMarkerElement({
     glowCol = 'rgba(100, 116, 139, 0.2)'
   }
 
-  const isPulsing = status === 'out' || isSelected
+  const isPulsing = status === 'out' || isSelected || isManagedBySelectedCabinet
 
   const el = document.createElement('div')
   el.className = 'select-none pointer-events-none'
   el.style.width = '0px'
   el.style.height = '0px'
   el.style.position = 'relative'
-  el.style.zIndex = isSelected ? '25' : '15'
+  el.style.zIndex = isSelected ? '35' : isManagedBySelectedCabinet ? '30' : isOtherCabinetSelected ? '8' : '15'
 
   const markerWrap = document.createElement('div')
   markerWrap.className = `cursor-pointer pointer-events-auto group gis-marker-wrap gis-marker-visible ${isSelected ? 'is-selected' : ''}`
@@ -172,11 +180,19 @@ export function createPoleMarkerElement({
   markerWrap.style.display = 'flex'
   markerWrap.style.alignItems = 'center'
   markerWrap.style.justifyContent = 'center'
+  markerWrap.style.transition = 'transform 0.2s ease, opacity 0.2s ease'
+
+  if (isOtherCabinetSelected) {
+    markerWrap.style.opacity = '0.35'
+    markerWrap.style.filter = 'grayscale(35%)'
+  } else if (isManagedBySelectedCabinet) {
+    markerWrap.style.opacity = '1'
+    markerWrap.style.transform = 'scale(1.15)'
+  }
 
   markerWrap.innerHTML = `
     <!-- Subtle Ambient Glow -->
-    <div style="position: absolute; inset: -3px; border-radius: 9999px; background: ${glowCol}; filter: blur(2.5px); ${isPulsing ? 'animation: pulse 2s infinite;' : ''}; pointer-events: none;"></div>
-
+    <div style="position: absolute; inset: ${isManagedBySelectedCabinet ? '-5px' : '-3px'}; border-radius: 9999px; background: ${glowCol}; filter: blur(${isManagedBySelectedCabinet ? '3.5px' : '2.5px'}); ${isPulsing ? 'animation: pulse 1.8s infinite;' : ''}; pointer-events: none;"></div>
 
     <!-- Rich 3D Glass Sphere Marker SVG -->
     <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="position: relative; z-index: 2; filter: drop-shadow(0 2.5px 3.5px rgba(0,0,0,0.4)); pointer-events: none;">
@@ -201,18 +217,16 @@ export function createPoleMarkerElement({
       </defs>
 
       <!-- 1. 3D Sphere Base with 3D Light-Reflecting Bevel Rim -->
-      <circle cx="12" cy="12" r="9.5" fill="url(#sphere-${poleId})" stroke="url(#rim-${poleId})" stroke-width="1.3" />
+      <circle cx="12" cy="12" r="9.5" fill="url(#sphere-${poleId})" stroke="${isManagedBySelectedCabinet ? '#ffffff' : `url(#rim-${poleId})`}" stroke-width="${isManagedBySelectedCabinet ? '2' : '1.3'}" />
 
       <!-- 2. Curved Top Glass Sheen (Độ cong vòm kính phản quang 3D) -->
       <ellipse cx="12" cy="7" rx="5" ry="2.2" fill="url(#gloss-${poleId})" />
-
-
     </svg>
 
     <!-- POI Indicator -->
     ${
       isNearPoi
-        ? `<div style="position: absolute; top: -3px; right: -3px; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; width: 11px; height: 11px; border-radius: 9999px; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; z-index: 3; box-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none;" title="Gần trường học, bệnh viện">!</div>`
+        ? `<div style="position: absolute; top: -3px; right: -3px; background: linear-gradient(135deg, #a855f7, #7c3aed); color: #fff; width: 11px; height: 11px; border-radius: 9999px; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 900; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none;" title="Gần trường học, bệnh viện">!</div>`
         : ''
     }
   `
@@ -245,15 +259,12 @@ export function createCabinetMarkerElement({
   onLeave,
 }: CreateCabinetMarkerParams): HTMLDivElement {
   const p = cabinet.properties || {}
-  const isRoot = p.role === 'root_cabinet'
   const isFault = p.status === 'fault'
-  const size = isRoot ? 28 : 22
+  const size = 26
   const half = size / 2
 
   const glowCol = isFault
     ? 'rgba(244, 63, 94, 0.45)'
-    : isRoot
-    ? 'rgba(245, 158, 11, 0.4)'
     : 'rgba(16, 185, 129, 0.35)'
   const isPulsing = isFault
 
@@ -262,10 +273,10 @@ export function createCabinetMarkerElement({
   el.style.width = '0px'
   el.style.height = '0px'
   el.style.position = 'relative'
-  el.style.zIndex = isSelected ? '30' : isRoot ? '25' : '20'
+  el.style.zIndex = isSelected ? '30' : '20'
 
   const markerWrap = document.createElement('div')
-  markerWrap.className = `cursor-pointer pointer-events-auto group gis-marker-wrap gis-marker-visible ${isSelected ? 'is-selected' : ''} ${isRoot ? 'is-root' : ''}`
+  markerWrap.className = `cursor-pointer pointer-events-auto group gis-marker-wrap gis-marker-visible ${isSelected ? 'is-selected' : ''}`
   markerWrap.style.position = 'absolute'
   markerWrap.style.top = `-${half}px`
   markerWrap.style.left = `-${half}px`
@@ -283,7 +294,7 @@ export function createCabinetMarkerElement({
     
     <!-- 3D Cabinet SVG Body -->
     <div style="position: relative; z-index: 2; pointer-events: none;">
-      ${getCabinetSvgString({ size, isRoot, isFault, uid: cabId })}
+      ${getCabinetSvgString({ size, isFault, uid: cabId })}
     </div>
   `
   el.appendChild(markerWrap)

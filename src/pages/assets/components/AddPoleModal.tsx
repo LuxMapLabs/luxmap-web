@@ -9,21 +9,25 @@ import {
   Route,
   Layers,
   AlertCircle,
+  Zap,
 } from 'lucide-react'
 import { DatePicker } from '../../../components/DatePicker'
 
 export interface NewPoleData {
   pole_id: string
+  lamp_code?: string
   segment_id: string
   segment_name: string
-  commune_id: string
-  commune_name: string
+  commune_id?: string
+  commune_name?: string
+  cabinet_id: string
+  cabinet_name?: string
+  feeder_id: string
   lat: number
   lng: number
   lamp_watt: number
   power_source: 'grid'
   fixture_type: 'led_road_lamp'
-  feeder_id: string
   warranty_expiry: string
   near_sensitive_poi: boolean
   atlas: string
@@ -39,9 +43,9 @@ export interface SegmentOption {
 export interface CabinetOption {
   cabinet_id: string
   cabinet_name: string
+  feeder_id?: string
   segment_id?: string
   segment_ids?: string[]
-  role?: 'root_cabinet' | 'sub_cabinet' | string
 }
 
 interface AddPoleModalProps {
@@ -64,16 +68,10 @@ interface PoleRowDraft {
   near_sensitive_poi: boolean
 }
 
-const DEFAULT_COMMUNES = [
-  { id: 'COM-001', name: 'Xã Phước Hậu' },
-  { id: 'COM-002', name: 'Xã Mỹ Hạnh Bắc' },
-  { id: 'COM-003', name: 'Xã Đức Hòa Đông' },
-]
-
 const DEFAULT_SEGMENTS: SegmentOption[] = [
-  { segment_id: 'SEG-001', segment_name: 'Tuyến A - Tỉnh Lộ 8', commune_name: 'Xã Phước Hậu', pole_count: 40 },
-  { segment_id: 'SEG-002', segment_name: 'Tuyến B - Hương Lộ 2', commune_name: 'Xã Phước Hậu', pole_count: 32 },
-  { segment_id: 'SEG-003', segment_name: 'Tuyến C - Huỳnh Văn Cọ', commune_name: 'Xã Mỹ Hạnh Bắc', pole_count: 28 },
+  { segment_id: 'SEG-001', segment_name: 'Tuyến A - Tỉnh Lộ 8', commune_name: 'Xã Phước Hậu', pole_count: 46 },
+  { segment_id: 'SEG-002', segment_name: 'Tuyến B - Nguyễn Văn Ni', commune_name: 'Xã Phước Hậu', pole_count: 31 },
+  { segment_id: 'SEG-003', segment_name: 'Tuyến C - Huỳnh Văn Cọ', commune_name: 'Xã Mỹ Hạnh Bắc', pole_count: 26 },
 ]
 
 export const AddPoleModal: React.FC<AddPoleModalProps> = ({
@@ -88,9 +86,9 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   // Segments & Cabinets list
   const segmentList = availableSegments && availableSegments.length > 0 ? availableSegments : DEFAULT_SEGMENTS
 
-  // Top Section States (Empty by default until user selects)
+  // Top Section States
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
-  const [communeId, setCommuneId] = useState('')
+  const [selectedCabinetId, setSelectedCabinetId] = useState('')
   const [defaultWarranty, setDefaultWarranty] = useState('')
 
   const warrantyDate = defaultWarranty ? new Date(defaultWarranty.replace(/-/g, '/')) : null
@@ -110,16 +108,20 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const [rows, setRows] = useState<PoleRowDraft[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  // Handle Commune change: reset segment selection
-  const handleCommuneChange = (newCommuneId: string) => {
-    setCommuneId(newCommuneId)
-    setSelectedSegmentId('')
-    setErrorMsg(null)
-  }
+  // Current active metadata
+  const currentSegment = segmentList.find((s) => s.segment_id === selectedSegmentId)
+  const resolvedSegmentName = currentSegment?.segment_name || ''
+  const availableCabinetsOnSegment = (availableCabinets || []).filter(
+    (cab) =>
+      cab.segment_id === selectedSegmentId ||
+      (cab.segment_ids && cab.segment_ids.includes(selectedSegmentId))
+  )
+  const currentCabinet = availableCabinetsOnSegment.find((c) => c.cabinet_id === selectedCabinetId)
 
-  // Handle segment change without auto-filling other fields
+  // Handle segment change: reset cabinet selection
   const handleSegmentChange = (newSegmentId: string) => {
     setSelectedSegmentId(newSegmentId)
+    setSelectedCabinetId('')
     setErrorMsg(null)
   }
 
@@ -128,7 +130,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     if (isOpen) {
       setErrorMsg(null)
       setSelectedSegmentId('')
-      setCommuneId('')
+      setSelectedCabinetId('')
       setDefaultWarranty('')
       setRows([])
     }
@@ -136,27 +138,17 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
   if (!isOpen) return null
 
-  // Current active metadata
-  const currentCommune = DEFAULT_COMMUNES.find((c) => c.id === communeId)
-  const filteredSegments = segmentList.filter((s) => {
-    if (!communeId || !currentCommune) return true
-    if (!s.commune_name) return true
-    return s.commune_name.toLowerCase().includes(currentCommune.name.toLowerCase())
-  })
-  const currentSegment = segmentList.find((s) => s.segment_id === selectedSegmentId)
-  const resolvedSegmentName = currentSegment?.segment_name || ''
-
   // Handler: Add New Pole Row at top/end
   const handleAddRow = () => {
     setErrorMsg(null)
 
-    if (!communeId) {
-      setErrorMsg('Vui lòng chọn Địa bàn Xã / Thị trấn ở mục 1 trước khi thêm cột!')
+    if (!selectedSegmentId) {
+      setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1 trước khi thêm cột đèn!')
       return
     }
 
-    if (!selectedSegmentId) {
-      setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1 trước khi thêm cột đèn!')
+    if (!selectedCabinetId) {
+      setErrorMsg('Vui lòng chọn Tủ điện điều khiển trực tiếp quản lý các cột đèn này!')
       return
     }
 
@@ -183,7 +175,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       lat: nextLat,
       lng: nextLng,
       lamp_watt: 100,
-      atlas: `Trụ số ${rows.length + 1} thuộc tuyến`,
+      atlas: `Trụ số ${rows.length + 1} thuộc ${currentCabinet?.cabinet_name || selectedCabinetId}`,
       near_sensitive_poi: false,
     }
 
@@ -219,34 +211,15 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     e.preventDefault()
     setErrorMsg(null)
 
-    if (!communeId) {
-      setErrorMsg('Vui lòng chọn Địa bàn Xã / Thị trấn ở mục 1!')
-      return
-    }
-
     if (!selectedSegmentId) {
       setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1!')
       return
     }
 
-    if (rows.length === 0) {
-      setErrorMsg('Danh sách đang trống. Vui lòng bấm "Thêm Cột Mới" để thêm ít nhất 1 cột đèn!')
+    if (!selectedCabinetId) {
+      setErrorMsg('Vui lòng chọn Tủ điện điều khiển trực tiếp quản lý các cột đèn!')
       return
     }
-
-    // Auto-resolve root feeder cabinet for the segment
-    const rootCab = (availableCabinets || []).find(
-      (cab) =>
-        (cab.role === 'root_cabinet' || cab.cabinet_id.includes('ROOT')) &&
-        (cab.segment_id === selectedSegmentId || (cab.segment_ids && cab.segment_ids.includes(selectedSegmentId)))
-    )
-    const resolvedFeederId =
-      rootCab?.cabinet_id ||
-      (selectedSegmentId === 'SEG-002'
-        ? 'CAB-NVN-ROOT'
-        : selectedSegmentId === 'SEG-003'
-        ? 'CAB-HVC-ROOT'
-        : 'CAB-TL8-ROOT')
 
     if (rows.length === 0) {
       setErrorMsg('Danh sách đang trống. Vui lòng bấm "Thêm Cột Mới" để thêm ít nhất 1 cột đèn!')
@@ -269,34 +242,41 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       }
       seenIds.add(trimmedId)
 
-      const latNum = parseFloat(row.lat)
-      const lngNum = parseFloat(row.lng)
-      if (isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) {
-        setErrorMsg(`Hàng #${i + 1} (${trimmedId}): Tọa độ GPS (Vĩ độ / Kinh độ) không hợp lệ! Vui lòng nhập số hợp lệ.`)
+      const parsedLat = parseFloat(row.lat)
+      const parsedLng = parseFloat(row.lng)
+
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        setErrorMsg(`Hàng #${i + 1} (${trimmedId}): Tọa độ GPS không hợp lệ (Vĩ độ và Kinh độ phải là số)!`)
+        return
+      }
+
+      if (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
+        setErrorMsg(`Hàng #${i + 1} (${trimmedId}): Tọa độ vượt quá phạm vi địa lý (Lat: -90..90, Lng: -180..180)!`)
         return
       }
 
       validatedDataList.push({
         pole_id: trimmedId,
         segment_id: selectedSegmentId,
-        segment_name: resolvedSegmentName,
-        commune_id: communeId,
-        commune_name: currentCommune?.name || '',
-        lat: latNum,
-        lng: lngNum,
-        lamp_watt: row.lamp_watt,
+        segment_name: resolvedSegmentName || selectedSegmentId,
+        commune_name: currentSegment?.commune_name,
+        cabinet_id: selectedCabinetId,
+        cabinet_name: currentCabinet?.cabinet_name,
+        feeder_id: currentCabinet?.feeder_id || `FDR-${selectedCabinetId}`,
+        lat: parsedLat,
+        lng: parsedLng,
+        lamp_watt: row.lamp_watt || 100,
         power_source: 'grid',
         fixture_type: 'led_road_lamp',
-        feeder_id: resolvedFeederId,
-        warranty_expiry: defaultWarranty,
-        near_sensitive_poi: row.near_sensitive_poi,
-        atlas: row.atlas.trim(),
+        warranty_expiry: defaultWarranty || '2026-12-31',
+        near_sensitive_poi: !!row.near_sensitive_poi,
+        atlas: row.atlas.trim() || `Trụ đèn thuộc ${currentCabinet?.cabinet_name || selectedCabinetId}`,
       })
     }
 
-    // Call onAddPoles (and onAddPole fallback if single)
-    onAddPoles(validatedDataList)
-    if (onAddPole && validatedDataList.length === 1) {
+    if (onAddPoles) {
+      onAddPoles(validatedDataList)
+    } else if (onAddPole && validatedDataList.length > 0) {
       onAddPole(validatedDataList[0])
     }
 
@@ -304,19 +284,13 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in"
-      />
-
-      {/* Modal Container */}
-      <div className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95 max-h-[92vh] flex flex-col">
-        {/* Modal Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-[#1f3864] dark:bg-slate-950 text-white shrink-0">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+        
+        {/* Header Modal */}
+        <div className="p-5 bg-gradient-to-r from-[#172b4d] via-[#1f3864] to-[#25457a] text-white flex items-center justify-between shadow-md shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
               <Layers className="w-5 h-5 text-amber-300" />
             </div>
             <div>
@@ -324,7 +298,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                 Đăng Ký Danh Sách Cột Đèn Theo Tuyến
               </h3>
               <p className="text-xs text-slate-200 dark:text-slate-400 mt-0.5">
-                Chọn địa bàn, tuyến đường và khai báo hàng loạt danh sách cột đèn trực tiếp tại một giao diện
+                Chọn tuyến đường, tủ điện điều khiển và khai báo hàng loạt danh sách cột đèn trực tiếp
               </p>
             </div>
           </div>
@@ -347,67 +321,38 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
         {/* Modal Scrollable Body */}
         <form onSubmit={handleBatchSubmit} className="p-5 overflow-y-auto space-y-5 text-xs text-slate-800 dark:text-slate-200 flex-1">
-          {/* ================= SECTION 1: THÔNG TIN ĐỊA BÀN & TUYẾN ĐƯỜNG ================= */}
+          {/* ================= SECTION 1: THÔNG TIN TUYẾN ĐƯỜNG & TỦ ĐIỆN ================= */}
           <div className="p-4 bg-slate-50/70 hover:bg-slate-50/90 dark:bg-slate-800/50 dark:hover:bg-slate-800/70 rounded-2xl border border-slate-200/90 hover:border-slate-300 dark:border-slate-700/80 dark:hover:border-slate-600 space-y-3 shadow-2xs hover:shadow-xs transition-all duration-200">
             <div className="flex items-center justify-between border-b border-slate-200/70 dark:border-slate-700/60 pb-2.5">
               <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 text-xs">
                 <Route className="w-4 h-4 text-[#1f3864] dark:text-blue-400 drop-shadow-2xs" />
-                <span>1. Thiết Lập Địa Bàn, Tuyến Đường & Thông Số Kỹ Thuật Chung</span>
+                <span>1. Thiết Lập Tuyến Đường, Tủ Điện & Thông Số Chung</span>
               </div>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
-                (Thao tác theo thứ tự: Chọn Xã → Chọn Tuyến)
+                (1 Cột đèn được quản lý bởi duy nhất 1 Tủ điện)
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* 1. Commune - Select First */}
+              {/* 1. Select Segment */}
               <div className="space-y-1">
                 <label className="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center justify-between">
-                  <span>1. Địa bàn Xã / Thị trấn:</span>
-                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">(Chọn trước)</span>
-                </label>
-                <select
-                  value={communeId}
-                  onChange={(e) => handleCommuneChange(e.target.value)}
-                  className={`w-full p-2.5 bg-white dark:bg-slate-900 border rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#1f3864]/20 focus:border-[#1f3864] ${
-                    !communeId
-                      ? 'text-slate-400 border-slate-300 dark:border-slate-700'
-                      : 'text-slate-900 dark:text-slate-100 border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500'
-                  }`}
-                >
-                  <option value="" disabled className="text-slate-400 font-normal">
-                    -- Chọn xã / thị trấn quản lý --
-                  </option>
-                  {DEFAULT_COMMUNES.map((c) => (
-                    <option key={c.id} value={c.id} className="text-slate-900 dark:text-slate-100">
-                      {c.name} ({c.id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 2. Select Segment - Filtered by Commune */}
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center justify-between">
-                  <span>2. Tuyến đường áp dụng:</span>
-                  {communeId && filteredSegments.length > 0 && (
-                    <span className="text-[10px] text-slate-400 font-normal">({filteredSegments.length} tuyến khả dụng)</span>
-                  )}
+                  <span>1. Tuyến đường áp dụng:</span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">(Bắt buộc)</span>
                 </label>
                 <select
                   value={selectedSegmentId}
                   onChange={(e) => handleSegmentChange(e.target.value)}
-                  disabled={!communeId}
-                  className={`w-full p-2.5 bg-white dark:bg-slate-900 border rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#1f3864]/20 focus:border-[#1f3864] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800 ${
+                  className={`w-full p-2.5 bg-white dark:bg-slate-900 border rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#1f3864]/20 focus:border-[#1f3864] ${
                     !selectedSegmentId
                       ? 'text-slate-400 border-slate-300 dark:border-slate-700'
                       : 'text-slate-900 dark:text-slate-100 border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500'
                   }`}
                 >
                   <option value="" disabled className="text-slate-400 font-normal">
-                    {communeId ? '-- Chọn tuyến đường áp dụng --' : '-- Vui lòng chọn Xã / Thị trấn trước --'}
+                    -- Chọn tuyến đường áp dụng --
                   </option>
-                  {filteredSegments.map((seg) => (
+                  {segmentList.map((seg) => (
                     <option key={seg.segment_id} value={seg.segment_id} className="text-slate-900 dark:text-slate-100">
                       {seg.segment_name} ({seg.segment_id} • {seg.pole_count || 0} cột)
                     </option>
@@ -415,76 +360,110 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                 </select>
               </div>
 
-              {/* 3. Warranty Expiry */}
+              {/* 2. Select Cabinet */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center justify-between">
+                  <span>2. Tủ điện điều khiển trực tiếp:</span>
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">(1 Cột - 1 Tủ)</span>
+                </label>
+                <select
+                  value={selectedCabinetId}
+                  onChange={(e) => {
+                    setSelectedCabinetId(e.target.value)
+                    setErrorMsg(null)
+                  }}
+                  disabled={!selectedSegmentId}
+                  className={`w-full p-2.5 bg-white dark:bg-slate-900 border rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800 ${
+                    !selectedCabinetId
+                      ? 'text-slate-400 border-slate-300 dark:border-slate-700'
+                      : 'text-slate-900 dark:text-slate-100 border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500'
+                  }`}
+                >
+                  <option value="" disabled className="text-slate-400 font-normal">
+                    {selectedSegmentId
+                      ? availableCabinetsOnSegment.length > 0
+                        ? '-- Chọn tủ điện quản lý --'
+                        : '-- Tuyến này chưa có tủ điện --'
+                      : '-- Vui lòng chọn Tuyến trước --'}
+                  </option>
+                  {availableCabinetsOnSegment.map((cab) => (
+                    <option key={cab.cabinet_id} value={cab.cabinet_id} className="text-slate-900 dark:text-slate-100">
+                      ⚡️ {cab.cabinet_name} ({cab.cabinet_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Warranty Date */}
               <div className="space-y-1">
                 <label className="font-semibold text-slate-700 dark:text-slate-300 text-xs flex items-center justify-between">
-                  <span>3. Hạn bảo hành chung:</span>
-                  <span className="text-[10px] text-slate-400 font-normal">(Tùy chọn)</span>
+                  <span>3. Hạn bảo hành mặc định:</span>
+                  <span className="text-[10px] text-slate-400 font-normal">(Áp dụng cả lô)</span>
                 </label>
                 <DatePicker
                   value={warrantyDate}
                   onChange={handleWarrantyChange}
                   placeholder="Chọn hạn bảo hành"
-                  align="right"
-                  fullWidth
+                  className="w-full"
                 />
               </div>
             </div>
           </div>
 
-          {/* ================= SECTION 2: DANH SÁCH CỘT ĐÈN THUỘC TUYẾN ================= */}
+          {/* ================= SECTION 2: DANH SÁCH CỘT ĐÈN ================= */}
           <div className="space-y-3">
-            {/* Action Toolbar on Top of the List */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
-              <div>
-                <div className="font-bold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400 drop-shadow-2xs" />
-                  <span>2. Danh Sách Cột Đèn Thuộc Tuyến</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 shadow-2xs">
-                    {rows.length} cột đã thiết lập
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>2. Danh Sách Cột Đèn Thuộc Tủ</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  {rows.length} cột đã thêm
+                </span>
+                {currentCabinet && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-indigo-500" />
+                    <span>{currentCabinet.cabinet_name}</span>
                   </span>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Tọa độ tự động tịnh tiến theo tuyến. Bạn có thể tự do sửa đổi hoặc xóa từng hàng.
-                </p>
+                )}
               </div>
 
-              {/* "Thêm Cột Mới" Button right above the table */}
-              <button
-                type="button"
-                onClick={handleAddRow}
-                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold rounded-xl text-xs shadow-xs hover:shadow-md hover:shadow-emerald-600/20 transition-all duration-200 flex items-center gap-2 cursor-pointer self-start sm:self-auto group"
-              >
-                <PlusCircle className="w-4 h-4 text-emerald-100 transition-transform duration-200 group-hover:rotate-90" />
-                <span>Thêm Cột Mới</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>+ Thêm Cột Mới</span>
+                </button>
+              </div>
             </div>
 
-            {/* Dynamic Pole Rows Table */}
-            <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 overflow-hidden shadow-2xs">
-              <div className="max-h-[42vh] overflow-y-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-xs sticky top-0 z-10 text-[11px] font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200/90 dark:border-slate-700">
+            {/* Table Container */}
+            <div className="border border-slate-200 dark:border-slate-700/80 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
+              <div className="overflow-x-auto max-h-72">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-100/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 sticky top-0 z-10 font-bold border-b border-slate-200 dark:border-slate-700">
                     <tr>
                       <th className="py-2.5 px-3 w-10 text-center">#</th>
-                      <th className="py-2.5 px-3 w-64">Tọa độ GPS (WGS84)</th>
-                      <th className="py-2.5 px-3 w-32">Công suất</th>
-                      <th className="py-2.5 px-3">Mốc vị trí (Atlas) / Địa chỉ</th>
-                      <th className="py-2.5 px-3 w-24 text-center">Nhạy cảm</th>
-                      <th className="py-2.5 px-3 w-14 text-center">Xóa</th>
+                      <th className="py-2.5 px-3 w-60">Tọa Độ GPS (Vĩ độ / Kinh độ)</th>
+                      <th className="py-2.5 px-3 w-28">Công Suất</th>
+                      <th className="py-2.5 px-3">Ghi Chú Mốc Thực Địa (Atlas)</th>
+                      <th className="py-2.5 px-3 w-20 text-center">Khu Nhạy Cảm</th>
+                      <th className="py-2.5 px-3 w-12 text-center">Xóa</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs bg-white dark:bg-slate-900">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {rows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                        <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500">
                           <div className="flex flex-col items-center justify-center gap-2">
-                            <Layers className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                            <p className="font-semibold text-xs text-slate-600 dark:text-slate-400">
-                              Chưa có cột nào trong danh sách
-                            </p>
+                            <Layers className="w-8 h-8 text-slate-300 dark:text-slate-600 stroke-[1.5]" />
+                            <p className="font-medium text-xs">Chưa có cột đèn nào trong danh sách.</p>
                             <p className="text-[11px] text-slate-400">
-                              Bấm vào nút <strong>"Thêm Cột Mới"</strong> ở trên để thêm cột đầu tiên
+                              Chọn Tuyến đường, Tủ điện ở trên và bấm <strong className="text-emerald-600 font-bold">"+ Thêm Cột Mới"</strong> để bắt đầu khai báo.
                             </p>
                           </div>
                         </td>
@@ -493,15 +472,15 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                       rows.map((row, index) => (
                         <tr
                           key={row.rowId}
-                          className="hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors duration-150 animate-in fade-in-50 slide-in-from-top-1 duration-200 group"
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/60 transition-colors duration-100 group"
                         >
-                          {/* STT */}
-                          <td className="py-2 px-3 text-center font-bold text-slate-400 text-[11px]">
+                          {/* Row Index */}
+                          <td className="py-2 px-3 text-center text-slate-400 dark:text-slate-500 font-mono text-[11px]">
                             {index + 1}
                           </td>
 
                           {/* Lat / Lng */}
-                          <td className="py-2 px-2.5">
+                          <td className="py-2 px-3">
                             <div className="flex items-center gap-1.5">
                               <div className="relative flex-1">
                                 <span className="absolute left-2 top-2 text-[9px] font-bold text-slate-400 select-none">
@@ -531,11 +510,11 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                           </td>
 
                           {/* Wattage */}
-                          <td className="py-2 px-2.5">
+                          <td className="py-2 px-3">
                             <select
                               value={row.lamp_watt}
                               onChange={(e) => handleUpdateRow(row.rowId, 'lamp_watt', Number(e.target.value))}
-                              className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600 rounded-lg text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#1f3864]/20 focus:border-[#1f3864] cursor-pointer transition-all duration-150"
+                              className="w-full p-1.5 bg-white dark:bg-slate-950 border border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600 rounded-lg text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#1f3864]/20 focus:border-[#1f3864] cursor-pointer transition-all duration-150"
                             >
                               <option value={50}>50W</option>
                               <option value={60}>60W</option>
@@ -547,18 +526,18 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                           </td>
 
                           {/* Atlas Landmark */}
-                          <td className="py-2 px-2.5">
+                          <td className="py-2 px-3">
                             <input
                               type="text"
                               value={row.atlas}
                               onChange={(e) => handleUpdateRow(row.rowId, 'atlas', e.target.value)}
                               placeholder="Mốc thực tế: đối diện nhà số X..."
-                              className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150"
+                              className="w-full p-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150"
                             />
                           </td>
 
                           {/* Sensitive POI */}
-                          <td className="py-2 px-2.5 text-center">
+                          <td className="py-2 px-3 text-center">
                             <input
                               type="checkbox"
                               checked={row.near_sensitive_poi}
@@ -571,7 +550,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                           </td>
 
                           {/* Delete Button per row */}
-                          <td className="py-2 px-2.5 text-center">
+                          <td className="py-2 px-3 text-center">
                             <button
                               type="button"
                               onClick={() => handleDeleteRow(row.rowId)}
@@ -609,7 +588,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
               }`}
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Lưu</span>
+              <span>Lưu Danh Sách Cột</span>
             </button>
           </div>
         </form>

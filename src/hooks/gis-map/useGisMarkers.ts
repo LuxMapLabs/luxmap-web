@@ -38,7 +38,7 @@ export function useGisMarkers({
   onSelectCabinet,
 }: UseGisMarkersProps) {
   const poleMarkersRef = useRef<maplibregl.Marker[]>([])
-  const cabinetMarkersRef = useRef<{ marker: maplibregl.Marker; isRoot: boolean }[]>([])
+  const cabinetMarkersRef = useRef<maplibregl.Marker[]>([])
   const lastShowPolesAndLinesRef = useRef<boolean | null>(null)
 
   // Level of Detail (LOD) visibility based on Zoom level
@@ -46,7 +46,7 @@ export function useGisMarkers({
     if (!map) return
     const zoom = map.getZoom()
     const showPolesAndLines = zoom >= 13.0
-    const showRootCab = zoom >= 9.5
+    const showCabinets = zoom >= 9.5
 
     // 1. Pole Markers
     poleMarkersRef.current.forEach((m) => {
@@ -58,12 +58,11 @@ export function useGisMarkers({
     })
 
     // 2. Cabinet Markers
-    cabinetMarkersRef.current.forEach(({ marker, isRoot }) => {
+    cabinetMarkersRef.current.forEach((marker) => {
       const wrap = marker.getElement()?.firstElementChild as HTMLElement | null
       if (wrap) {
-        const isVisible = isRoot ? showRootCab : showPolesAndLines
-        wrap.classList.toggle('gis-marker-visible', isVisible)
-        wrap.classList.toggle('gis-marker-hidden', !isVisible)
+        wrap.classList.toggle('gis-marker-visible', showCabinets)
+        wrap.classList.toggle('gis-marker-hidden', !showCabinets)
       }
     })
 
@@ -123,6 +122,12 @@ export function useGisMarkers({
       const coords = f.geometry.coordinates as [number, number]
       const coordKey = `${coords[0].toFixed(5)},${coords[1].toFixed(5)}`
       const isSelected = selectedPole && selectedPole.properties?.pole_id === f.properties?.pole_id
+      const isManagedBySelectedCabinet = Boolean(
+        selectedCabinet && selectedCabinet.cabinet_id === f.properties?.cabinet_id
+      )
+      const isOtherCabinetSelected = Boolean(
+        selectedCabinet && selectedCabinet.cabinet_id !== f.properties?.cabinet_id
+      )
 
       // Không vẽ marker cột đèn bên dưới tủ điện khi trùng vị trí để tránh đè layer
       if (cabinetCoordKeys.has(coordKey) && !isSelected) {
@@ -132,6 +137,8 @@ export function useGisMarkers({
       const el = createPoleMarkerElement({
         feature: f,
         isSelected: Boolean(isSelected),
+        isManagedBySelectedCabinet,
+        isOtherCabinetSelected,
         onClick: (feature) => {
           if (!map || map.getZoom() < 13.0) return
           if (popupRef.current) popupRef.current.remove()
@@ -161,19 +168,18 @@ export function useGisMarkers({
     })
 
     updateZoomVisibility()
-  }, [map, isMapLoaded, filteredFeatures, selectedPole, cabinets, onSelectPole, updateZoomVisibility])
+  }, [map, isMapLoaded, filteredFeatures, selectedPole, selectedCabinet, cabinets, onSelectPole, updateZoomVisibility])
 
   // 2. Render Cabinet Markers
   useEffect(() => {
     if (!map || !isMapLoaded) return
 
-    cabinetMarkersRef.current.forEach(({ marker }) => marker.remove())
+    cabinetMarkersRef.current.forEach((m) => m.remove())
     cabinetMarkersRef.current = []
 
     cabinets.forEach((cab) => {
       const p = cab.properties || {}
       const coords = cab.geometry.coordinates as [number, number]
-      const isRoot = p.role === 'root_cabinet'
       const isSelected = selectedCabinet && selectedCabinet.cabinet_id === p.cabinet_id
 
       const el = createCabinetMarkerElement({
@@ -181,8 +187,7 @@ export function useGisMarkers({
         isSelected: Boolean(isSelected),
         onClick: (cabinetData, c) => {
           const curZoom = map.getZoom() ?? 0
-          if (!isRoot && curZoom < 13.0) return
-          if (isRoot && curZoom < 9.5) return
+          if (curZoom < 9.5) return
 
           if (popupRef.current) popupRef.current.remove()
           activeHoverSourceRef.current = null
@@ -190,8 +195,7 @@ export function useGisMarkers({
         },
         onHover: (cabinetData, c) => {
           const curZoom = map.getZoom() ?? 0
-          if (!isRoot && curZoom < 13.0) return
-          if (isRoot && curZoom < 9.5) return
+          if (curZoom < 9.5) return
 
           activeHoverSourceRef.current = 'cabinet'
           isHoveringMarkerRef.current = true
@@ -210,7 +214,7 @@ export function useGisMarkers({
       })
 
       const marker = new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map)
-      cabinetMarkersRef.current.push({ marker, isRoot })
+      cabinetMarkersRef.current.push(marker)
     })
 
     updateZoomVisibility()
@@ -220,7 +224,7 @@ export function useGisMarkers({
   useEffect(() => {
     return () => {
       poleMarkersRef.current.forEach((m) => m.remove())
-      cabinetMarkersRef.current.forEach(({ marker }) => marker.remove())
+      cabinetMarkersRef.current.forEach((m) => m.remove())
     }
   }, [])
 }

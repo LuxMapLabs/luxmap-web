@@ -26,12 +26,11 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
 }) => {
   const nextCode = `SEG-${String(existingCount + 1).padStart(3, '0')}`
 
-  const [segmentId, setSegmentId] = useState(nextCode)
+  const segmentId = nextCode
   const [segmentName, setSegmentName] = useState('')
   const [roadClass, setRoadClass] = useState<'inter_commune' | 'inter_village' | 'alley'>('inter_commune')
   const [lengthM, setLengthM] = useState('1200')
   const [poleCount, setPoleCount] = useState('35')
-  const [communeName, setCommuneName] = useState('Xã Phước Hậu')
 
   if (!isOpen) return null
 
@@ -43,7 +42,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
       road_class: roadClass,
       length_m: parseInt(lengthM, 10) || 1000,
       pole_count: parseInt(poleCount, 10) || 0,
-      commune_name: communeName,
+      commune_name: '',
     })
     onClose()
   }
@@ -73,29 +72,17 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs text-slate-800 dark:text-slate-200">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Mã tuyến (Segment ID)</label>
-              <input
-                type="text"
-                required
-                value={segmentId}
-                onChange={(e) => setSegmentId(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-600"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Cấp đường</label>
-              <select
-                value={roadClass}
-                onChange={(e) => setRoadClass(e.target.value as any)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
-              >
-                <option value="inter_commune" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Đường liên xã (Trục chính)</option>
-                <option value="inter_village" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Đường liên thôn / liên ấp</option>
-                <option value="alley" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Đường nhánh / Ngõ xóm</option>
-              </select>
-            </div>
+          <div>
+            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Cấp đường quy hoạch</label>
+            <select
+              value={roadClass}
+              onChange={(e) => setRoadClass(e.target.value as any)}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
+            >
+              <option value="inter_commune" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Đường liên xã (Trục chính)</option>
+              <option value="inter_village" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Đường liên thôn / liên ấp</option>
+              <option value="alley" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Đường nhánh / Ngõ xóm</option>
+            </select>
           </div>
 
           <div>
@@ -132,18 +119,6 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Địa bàn Xã quản lý</label>
-            <select
-              value={communeName}
-              onChange={(e) => setCommuneName(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
-            >
-              <option value="Xã Phước Hậu" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Xã Phước Hậu</option>
-              <option value="Xã Mỹ Hạnh Bắc" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Xã Mỹ Hạnh Bắc</option>
-              <option value="Xã Đức Hòa Đông" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Xã Đức Hòa Đông</option>
-            </select>
-          </div>
 
           {/* Buttons */}
           <div className="pt-2 flex justify-end gap-2">

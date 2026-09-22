@@ -18,7 +18,6 @@ import {
 
 import type { SegmentInfo, PoleFeature } from '../GisMapPage'
 import cabinetSvg from '../../../assets/icons/cabinet.svg'
-import cabinetRootSvg from '../../../assets/icons/cabinet-root.svg'
 import mockPolesData from '../../../data/mock-poles.geo.json'
 import mockPoleDetailData from '../../../data/mock-pole-detail.json'
 import mockIotNodesData from '../../../data/mock-iot-nodes.geo.json'
@@ -220,42 +219,26 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   const polePhotoUrl =
     'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=900&auto=format&fit=crop&q=80'
 
-  const isRootCabinet = selectedCabinet?.role === 'root_cabinet'
-  const isSubCabinet = selectedCabinet?.role === 'sub_cabinet'
-  const parentRootCabinet = useMemo(() => {
-    if (!isSubCabinet || !cabinets) return null
-    const found = cabinets.find(
-      (c: any) =>
-        c.properties?.role === 'root_cabinet' &&
-        (c.properties?.cabinet_id === selectedCabinet.parent_cabinet_id ||
-          c.properties?.segment_id === selectedCabinet.segment_id)
-    )
-    return found?.properties || null
-  }, [isSubCabinet, cabinets, selectedCabinet])
-
-  const isParentRootOff = isSubCabinet && parentRootCabinet?.status === 'fault'
-
   const cabinetConnectedPoles = useMemo(() => {
     if (!selectedCabinet) return []
     const all = (mockPolesData.features || []) as unknown as PoleFeature[]
-    if (isRootCabinet) {
-      return all.filter(
-        (f) =>
-          f.properties.segment_id === selectedCabinet.segment_id ||
-          (selectedCabinet.segment_ids && selectedCabinet.segment_ids.includes(f.properties.segment_id))
-      )
-    }
-    // Sub-cabinet: filter branch poles
-    return all.filter(
-      (f) =>
-        f.properties.segment_id === selectedCabinet.segment_id &&
-        (selectedCabinet.branch_start_pole
-          ? f.properties.pole_id >= selectedCabinet.branch_start_pole
-          : typeof selectedCabinet.start_pole_idx === 'number'
-          ? all.indexOf(f) >= selectedCabinet.start_pole_idx
-          : true)
+    const segId = selectedCabinet.segment_id
+    const segPoles = all.filter((f) => f.properties?.segment_id === segId)
+
+    const segCabs = (cabinets || []).filter(
+      (c: any) => (c.properties?.segment_id || c.segment_id) === segId
     )
-  }, [selectedCabinet, isRootCabinet])
+    const cabId = selectedCabinet.cabinet_id
+    const cabIdx = Math.max(
+      0,
+      segCabs.findIndex((c: any) => (c.properties?.cabinet_id || c.cabinet_id) === cabId)
+    )
+    const numCabs = Math.max(1, segCabs.length)
+    const chunkSize = Math.ceil(segPoles.length / numCabs)
+    const start = cabIdx * chunkSize
+    const end = cabIdx === numCabs - 1 ? segPoles.length : Math.min(start + chunkSize, segPoles.length)
+    return segPoles.slice(start, end)
+  }, [selectedCabinet, cabinets])
 
   return (
     <>
@@ -275,8 +258,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   : selectedCabinet
                   ? selectedCabinet.status === 'fault'
                     ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
-                    : isRootCabinet
-                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
                     : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                   : activeSegmentDetail.hasActiveSegmentFault
                   ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
@@ -293,7 +274,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 )
               ) : selectedCabinet ? (
                 <img
-                  src={isRootCabinet ? cabinetRootSvg : cabinetSvg}
+                  src={cabinetSvg}
                   className={`w-4.5 h-4.5 shrink-0 ${selectedCabinet.status === 'fault' ? 'filter hue-rotate-180' : ''}`}
                   alt="Tủ điện"
                 />
@@ -693,18 +674,16 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <img
-                      src={isRootCabinet ? cabinetRootSvg : cabinetSvg}
+                      src={cabinetSvg}
                       className={`w-4 h-4 shrink-0 ${selectedCabinet.status === 'fault' ? 'filter hue-rotate-180' : ''}`}
                       alt="Tủ điện"
                     />
-                    <span>{isRootCabinet ? 'Thông số Tủ Đỉnh Tuyến' : 'Thông số Tủ Nhánh Phân Đoạn'}</span>
+                    <span>Thông số Tủ Điện Điều Khiển</span>
                   </span>
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                       selectedCabinet.status === 'fault'
                         ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                        : isRootCabinet
-                        ? 'bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
                         : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                     }`}
                   >
@@ -715,7 +694,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                   <div className="flex justify-between">
                     <span>Mã hiệu quản lý:</span>
-                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.cabinet_code}</strong>
+                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.cabinet_code || selectedCabinet.cabinet_id}</strong>
                   </div>
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1 font-medium">
@@ -726,100 +705,52 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       {selectedCabinet.atlas || selectedCabinet.landmark_note || 'Đang cập nhật'}
                     </span>
                   </div>
-                  {isRootCabinet ? (
-                    <>
-                      <div className="flex justify-between">
-                        <span>Tuyến lộ phụ trách:</span>
-                        <strong className="text-blue-700 dark:text-blue-400 font-bold">{selectedCabinet.segment_name}</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Vai trò cấp nguồn:</span>
-                        <strong className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1">
-                          <span>⭐ Tủ Đỉnh (Cấp nguồn toàn tuyến)</span>
-                        </strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tổng số đèn quản lý:</span>
-                        <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.total_poles_managed} cột đèn</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tủ nhánh trực thuộc:</span>
-                        <strong className="text-emerald-700 dark:text-emerald-400 font-bold font-mono">{selectedCabinet.subordinated_cabinets?.length || 1} tủ phân đoạn</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Phụ tải toàn tuyến:</span>
-                        <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.current_load_kw} kW</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Điện áp nguồn:</span>
-                        <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-900 dark:text-white'}`}>{selectedCabinet.voltage_v} V</strong>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex justify-between">
-                        <span>Thuộc tủ đỉnh:</span>
-                        <strong className="text-amber-800 dark:text-amber-300 font-semibold">{selectedCabinet.parent_cabinet_id}</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Phân đoạn phụ trách:</span>
-                        <strong className="text-blue-700 dark:text-blue-400 font-bold">{selectedCabinet.segment_name}</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Số lượng đèn phân đoạn:</span>
-                        <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.pole_count} cột đèn</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Phụ tải phân đoạn:</span>
-                        <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.current_load_kw} kW</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Điện áp pha:</span>
-                        <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-900 dark:text-white'}`}>{selectedCabinet.voltage_v} V</strong>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Interlocking Warning if Parent Root is Off */}
-                {isParentRootOff && (
-                  <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                    <div>
-                      <p className="font-bold">Khóa liên động điện (Interlocked)</p>
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
-                        Tủ đỉnh <strong>{parentRootCabinet?.cabinet_name || selectedCabinet.parent_cabinet_id}</strong> đang bị ngắt điện. Tủ nhánh này không có nguồn cấp đầu vào, Aptomat bị khóa an toàn cho đến khi tủ đỉnh được đóng điện lại.
-                      </p>
-                    </div>
+                  <div className="flex justify-between">
+                    <span>Tuyến đường cấp nguồn:</span>
+                    <strong className="text-blue-700 dark:text-blue-400 font-bold">{selectedCabinet.segment_name}</strong>
                   </div>
-                )}
+                  <div className="flex justify-between">
+                    <span>Tuyến điện (Lộ cấp nguồn):</span>
+                    <strong className="text-purple-700 dark:text-purple-400 font-bold font-mono">
+                      {selectedCabinet.feeder_id || `FDR-${selectedCabinet.cabinet_id}`}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tổng số đèn quản lý:</span>
+                    <strong className="text-slate-900 dark:text-white font-mono">
+                      {cabinetConnectedPoles.length || selectedCabinet.total_poles_managed || 23} cột đèn
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Công suất phụ tải:</span>
+                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.current_load_kw} kW</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Điện áp định mức:</span>
+                    <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-900 dark:text-white'}`}>
+                      {selectedCabinet.voltage_v} V
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Hệ số công suất:</span>
+                    <strong className="text-slate-900 dark:text-white font-mono">cosφ {selectedCabinet.power_factor || 0.95}</strong>
+                  </div>
+                </div>
 
                 {/* Breaker Simulation Action Button */}
                 {onToggleCabinet && (
                   <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/60">
                     <button
-                      disabled={isParentRootOff}
                       onClick={() => onToggleCabinet(selectedCabinet.cabinet_id)}
-                      title={
-                        isParentRootOff
-                          ? `Khóa an toàn: Cần đóng điện ${parentRootCabinet?.cabinet_name || 'Tủ đỉnh'} trước`
-                          : undefined
-                      }
                       className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all ${
-                        isParentRootOff
-                          ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-75'
-                          : selectedCabinet.status === 'fault'
+                        selectedCabinet.status === 'fault'
                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
                           : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
                       }`}
                     >
                       <Power className="w-3.5 h-3.5" />
                       <span>
-                        {isParentRootOff
-                          ? 'Khóa Aptomat (Mất nguồn tủ đỉnh)'
-                          : selectedCabinet.status === 'fault'
-                          ? 'Đóng Aptomat'
-                          : 'Ngắt Aptomat'}
+                        {selectedCabinet.status === 'fault' ? 'Đóng Aptomat Cấp Điện' : 'Ngắt Aptomat (Tắt Đèn Lộ Này)'}
                       </span>
                     </button>
                   </div>
@@ -858,7 +789,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Cảnh báo bảo vệ Rơ-le:
                     </span>
                     <p className="text-[10.5px] leading-relaxed">{selectedCabinet.fault_reason}</p>
-                    <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold pt-0.5">➔ Toàn bộ {selectedCabinet.pole_count || selectedCabinet.total_poles_managed} cột thuộc tuyến/phân đoạn này bị cắt điện.</p>
+                    <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold pt-0.5">➔ Toàn bộ {cabinetConnectedPoles.length} cột đèn do tủ này quản lý bị ngắt điện.</p>
                   </div>
                 )}
               </div>
@@ -868,15 +799,16 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                      {isRootCabinet ? `Dàn đèn toàn tuyến (${selectedCabinet.cabinet_code})` : `Dàn đèn phân đoạn (${selectedCabinet.cabinet_code})`}
+                      {`Dàn đèn tủ phụ trách (${selectedCabinet.cabinet_code || selectedCabinet.cabinet_id})`}
                     </p>
                     <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded ${selectedCabinet.status === 'fault' ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}`}>
                       {selectedCabinet.status === 'fault' ? 'Mất điện' : `${cabinetConnectedPoles.length} đèn đang sáng`}
                     </span>
                   </div>
                   <div className="space-y-1 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
-                    {cabinetConnectedPoles.map((f: PoleFeature) => {
+                    {cabinetConnectedPoles.map((f: PoleFeature, index: number) => {
                         const isOff = selectedCabinet.status === 'fault'
+                        const lampLabel = f.properties.lamp_code || `Đèn số ${index + 1}`
                         return (
                           <div
                             key={f.properties.pole_id}
@@ -887,6 +819,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                               <span className="font-bold font-mono text-slate-800 dark:text-slate-200 text-xs group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
                                 {f.properties.pole_id}
                               </span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                {lampLabel}
+                              </span>
                             </div>
                             <span
                               className={`text-[9.5px] px-2 py-0.5 rounded font-bold ${
@@ -895,7 +830,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                   : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
                               }`}
                             >
-                              {isOff ? 'TẮT (Mất nguồn tủ)' : 'SÁNG (220V)'}
+                              {isOff ? 'TẮT (Mất nguồn)' : 'SÁNG (220V)'}
                             </span>
                           </div>
                         )

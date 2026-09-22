@@ -12,8 +12,6 @@ interface PoleDetailModalProps {
     lux_value?: number
     open_fault_count?: number
     near_sensitive_poi?: boolean
-    feeder_role?: 'root_cabinet' | 'sub_cabinet'
-    parent_feeder_id?: string
   }) | null
   onClose: () => void
   onOpenEdit?: (pole: EditablePoleData) => void
@@ -122,24 +120,12 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
                 <strong className="text-slate-800 dark:text-slate-200">Tuyến đường:</strong> {pole.segment_name} ({pole.commune_name})
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <strong className="text-slate-800 dark:text-slate-200">Đấu nối Tủ Feeder:</strong>{' '}
-                <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{pole.feeder_id || 'Chưa gắn'}</span>
-                {pole.feeder_role === 'sub_cabinet' ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 font-bold border border-amber-300/60">
-                    <Zap className="w-2.5 h-2.5 text-amber-600 fill-amber-500" />
-                    <span>Tủ Nhánh Phân Đoạn</span>
-                    {pole.parent_feeder_id && (
-                      <span className="text-[9px] font-normal text-amber-700 dark:text-amber-300 ml-0.5">
-                        (Nguồn cấp: {pole.parent_feeder_id})
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 font-bold border border-blue-300/60">
-                    <span>⭐️</span>
-                    <span>Tủ Đỉnh (Nguồn tổng tuyến)</span>
-                  </span>
-                )}
+                <strong className="text-slate-800 dark:text-slate-200">Tủ điện quản lý:</strong>{' '}
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{(pole as any).cabinet_id || pole.feeder_id || 'Chưa gắn'}</span>
+                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800">
+                  <Zap className="w-2.5 h-2.5 text-indigo-500 fill-indigo-500" />
+                  <span>Lộ: {pole.feeder_id || `FDR-${(pole as any).cabinet_id}`}</span>
+                </span>
               </div>
               {pole.atlas && (
                 <div>

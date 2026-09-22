@@ -200,7 +200,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
               if (cols.length >= 5) {
                 const code = cols[0] || `POLE-${String(idx + 100).padStart(4, '0')}`
                 const seg = cols[1] || 'SEG-001'
-                const fdr = cols[2] || 'CAB-TL8-ROOT'
+                const cabId = cols[2] || 'CAB-TL8-A'
                 const com = cols[3] || 'COM-001'
                 const wkt = cols[4] || 'POINT(106.4920 10.9715)'
                 const ftype = (cols[5] as any) || 'led_road_lamp'
@@ -220,6 +220,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 poleItems.push({
                   id: code,
                   pole_id: code,
+                  lamp_code: `Đèn ${code.replace('POLE-', '')}`,
                   segment_id: seg,
                   segment_name: seg === 'SEG-002' ? 'Tuyến B - Hương Lộ 2' : 'Tuyến A - Tỉnh Lộ 8',
                   commune_id: com,
@@ -228,7 +229,9 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                   power_source: psource,
                   fixture_type: ftype,
                   fixture_status: 'normal',
-                  feeder_id: fdr,
+                  cabinet_id: cabId,
+                  cabinet_name: `Tủ ${cabId}`,
+                  feeder_id: `FDR-${cabId}`,
                   warranty_expiry: exp,
                   lat,
                   lng,

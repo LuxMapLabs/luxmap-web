@@ -114,6 +114,8 @@ export const GisMapPage: React.FC = () => {
     segmentInfoMap,
     searchSuggestions,
     filteredFeatures,
+    roadSegmentsData,
+    feederLinesData,
     filteredSegmentsData,
   } = useElectricalCascade({
     statusFilter,
@@ -187,7 +189,7 @@ export const GisMapPage: React.FC = () => {
       if (mapRef.current) {
         mapRef.current.flyTo({
           center: coords,
-          zoom: p.role === 'root_cabinet' ? 16.8 : 17.5,
+          zoom: 17.2,
           speed: 1.2,
         })
       }
@@ -206,12 +208,16 @@ export const GisMapPage: React.FC = () => {
   useFeederLinesLayer({
     map: mapRef.current,
     isMapLoaded,
+    roadSegmentsData,
+    feederLinesData,
     filteredSegmentsData,
+    selectedCabinet,
     segmentInfoMap,
     popupRef,
     isHoveringMarkerRef,
     activeHoverSourceRef,
     onSelectSegment: handleSelectSegmentLine,
+    onSelectCabinet: handleSelectCabinet,
   })
 
   // 9. Hook quản lý Marker Cột đèn & Tủ điện + Phân cấp Zoom (LOD)
