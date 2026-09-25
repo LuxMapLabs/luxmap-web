@@ -37,15 +37,15 @@ export interface AssetPoleItem {
   segment_id: string
   segment_name: string
   commune_id: string
-  commune_name: string
+  commune_name?: string
   lamp_watt: number
   power_source: 'grid'
   fixture_type: 'led_road_lamp'
   fixture_status: 'normal' | 'dim' | 'out' | 'unknown'
+  cabinet_id: string
+  cabinet_name?: string
   feeder_id: string
-  feeder_name?: string
-  feeder_role?: 'root_cabinet' | 'sub_cabinet'
-  parent_feeder_id?: string
+  lamp_code?: string
   warranty_expiry: string
   lat: number
   lng: number
@@ -59,7 +59,7 @@ export interface AssetCabinetItem {
   id: string
   cabinet_id: string
   cabinet_name: string
-  role: 'root_cabinet' | 'sub_cabinet'
+  feeder_id: string
   segment_id: string
   segment_ids?: string[]
   segment_name: string
@@ -72,9 +72,6 @@ export interface AssetCabinetItem {
   installed_at: string
   lat: number
   lng: number
-  parent_cabinet_id?: string
-  branch_start_pole?: string
-  subordinated_cabinets?: string[]
   fault_reason?: string
 }
 
@@ -106,39 +103,37 @@ if (mockSegmentsGeoJson && Array.isArray((mockSegmentsGeoJson as any).features))
 
 const RAW_CABINET_PROPS: any[] = ((mockCabinetsGeoJson as any).features || []).map((f: any) => f.properties || {})
 
+const polesCountBySeg: Record<string, number> = {}
+
 const INITIAL_POLES: AssetPoleItem[] = ((mockPolesGeoJson as any).features || []).map((f: any, idx: number) => {
   const p = f.properties || {}
   const coords = f.geometry?.coordinates || [106.4896, 10.9701]
   const cId = p.commune_id || 'COM-001'
   const sId = p.segment_id || 'SEG-001'
 
-  // Determine direct controlling cabinet (Sub-cabinet if in downstream branch, else Root-cabinet)
-  const subCab = RAW_CABINET_PROPS.find(
-    (c: any) =>
-      c.role === 'sub_cabinet' &&
-      c.segment_id === sId &&
-      (c.branch_start_pole
-        ? p.pole_id >= c.branch_start_pole
-        : typeof c.start_pole_idx === 'number'
-        ? idx >= c.start_pole_idx
-        : false)
-  )
+  // Count position within this segment for sequential chunk assignment
+  const segIdx = polesCountBySeg[sId] || 0
+  polesCountBySeg[sId] = segIdx + 1
 
-  const rootCab = RAW_CABINET_PROPS.find(
-    (c: any) =>
-      c.role === 'root_cabinet' &&
-      (c.segment_id === sId || (c.segment_ids && c.segment_ids.includes(sId)))
-  )
+  // Find Cabinets for this segment
+  const segCabinets = RAW_CABINET_PROPS.filter((c: any) => c.segment_id === sId)
+  const numCabs = segCabinets.length || 1
+  const totalInSeg = ((mockPolesGeoJson as any).features || []).filter((x: any) => x.properties?.segment_id === sId).length || 1
+  const chunkSize = Math.ceil(totalInSeg / numCabs)
+  const cabIdx = Math.min(Math.floor(segIdx / chunkSize), numCabs - 1)
+  const chosenCab = segCabinets[cabIdx] || segCabinets[0]
 
-  const activeFeeder = subCab || rootCab
-  const feederId = activeFeeder ? activeFeeder.cabinet_id : (p.feeder_id || 'CAB-TL8-ROOT')
-  const feederName = activeFeeder ? activeFeeder.cabinet_name : undefined
-  const feederRole = (activeFeeder?.role || 'root_cabinet') as 'root_cabinet' | 'sub_cabinet'
-  const parentFeederId = subCab ? (subCab.parent_cabinet_id || rootCab?.cabinet_id) : undefined
+  const poleNum = segIdx + 1
+  const lampLabel = `Đèn số ${poleNum}`
+
+  const cabinetId = chosenCab?.cabinet_id || `CAB-${sId}-${cabIdx + 1}`
+  const cabinetName = chosenCab?.cabinet_name || `Tủ ${cabIdx + 1} (${sId})`
+  const feederId = chosenCab?.feeder_id || `FDR-${cabinetId}`
 
   return {
     id: p.pole_id || `POLE-${String(idx + 1).padStart(4, '0')}`,
     pole_id: p.pole_id || `POLE-${String(idx + 1).padStart(4, '0')}`,
+    lamp_code: lampLabel,
     segment_id: sId,
     segment_name: SEGMENT_NAMES[sId] || 'Tuyến A - Tỉnh Lộ 8',
     commune_id: cId,
@@ -147,15 +142,14 @@ const INITIAL_POLES: AssetPoleItem[] = ((mockPolesGeoJson as any).features || []
     power_source: (p.power_source as any) || 'grid',
     fixture_type: (p.fixture_type as any) || 'led_road_lamp',
     fixture_status: (p.fixture_status as any) || 'normal',
+    cabinet_id: cabinetId,
+    cabinet_name: cabinetName,
     feeder_id: feederId,
-    feeder_name: feederName,
-    feeder_role: feederRole,
-    parent_feeder_id: parentFeederId,
     warranty_expiry: p.warranty_expiry || '2026-12-31',
     lat: coords[1],
     lng: coords[0],
     near_sensitive_poi: !!p.near_sensitive_poi,
-    atlas: p.atlas || '',
+    atlas: p.atlas ? `${lampLabel} - ${p.atlas}` : lampLabel,
     lux_value: p.lux_value ?? (p.fixture_status === 'dim' ? 14.2 : p.fixture_status === 'out' ? 0.0 : 29.4),
     open_fault_count: p.open_fault_count || 0,
   }
@@ -168,28 +162,25 @@ const INITIAL_CABINETS: AssetCabinetItem[] = ((mockCabinetsGeoJson as any).featu
   const segId = p.segment_id || 'SEG-001'
 
   // Computed automatically from actual mapped poles
-  const actualPoleCount = INITIAL_POLES.filter((pole) => pole.feeder_id === cId).length
+  const actualPoleCount = INITIAL_POLES.filter((pole) => pole.cabinet_id === cId).length
 
   return {
     id: cId,
     cabinet_id: cId,
     cabinet_name: p.cabinet_name || `Tủ điện ${cId}`,
-    role: (p.role as any) || 'root_cabinet',
+    feeder_id: p.feeder_id || `FDR-${cId}`,
     segment_id: segId,
     segment_ids: p.segment_ids || (p.segment_id ? [p.segment_id] : ['SEG-001']),
     segment_name: p.segment_name || 'Tuyến A (Tỉnh Lộ 8)',
     status: (p.status as any) || 'active',
     voltage_v: p.voltage_v ?? 220,
-    current_load_kw: p.current_load_kw ?? 15,
+    current_load_kw: p.current_load_kw ?? 10,
     power_factor: p.power_factor ?? 0.95,
-    total_poles_managed: actualPoleCount > 0 ? actualPoleCount : (p.total_poles_managed || p.pole_count || 30),
+    total_poles_managed: actualPoleCount > 0 ? actualPoleCount : (p.total_poles_managed || 23),
     landmark_note: p.landmark_note || p.atlas || 'Mốc thực địa tại tuyến',
     installed_at: p.installed_at || '2023-01-15',
     lat: coords[1],
     lng: coords[0],
-    parent_cabinet_id: p.parent_cabinet_id,
-    branch_start_pole: p.branch_start_pole,
-    subordinated_cabinets: p.subordinated_cabinets || [],
     fault_reason: p.fault_reason,
   }
 })
@@ -262,12 +253,12 @@ export const AssetManagementPage: React.FC = () => {
       const matchesQuery =
         !q ||
         pole.pole_id.toLowerCase().includes(q) ||
+        (pole.lamp_code && pole.lamp_code.toLowerCase().includes(q)) ||
         pole.segment_name.toLowerCase().includes(q) ||
-        pole.commune_name.toLowerCase().includes(q) ||
+        (pole.commune_name && pole.commune_name.toLowerCase().includes(q)) ||
+        pole.cabinet_id.toLowerCase().includes(q) ||
+        (pole.cabinet_name && pole.cabinet_name.toLowerCase().includes(q)) ||
         pole.feeder_id.toLowerCase().includes(q) ||
-        (pole.feeder_name && pole.feeder_name.toLowerCase().includes(q)) ||
-        (pole.feeder_role === 'sub_cabinet' && (q.includes('nhánh') || q.includes('sub'))) ||
-        (pole.feeder_role === 'root_cabinet' && (q.includes('đỉnh') || q.includes('root'))) ||
         (pole.atlas && pole.atlas.toLowerCase().includes(q))
 
       const matchesStatus = statusFilter === 'all' || pole.fixture_status === statusFilter
@@ -376,42 +367,26 @@ export const AssetManagementPage: React.FC = () => {
     if (!dataList || dataList.length === 0) return
 
     const targetSegmentId = dataList[0].segment_id
-    const existingSegmentPoles = poles.filter((p) => p.segment_id === targetSegmentId)
-    const currentBaseIndex = existingSegmentPoles.length
 
-    const subCab = cabinets.find(
-      (c) =>
-        c.role === 'sub_cabinet' &&
-        (c.segment_id === targetSegmentId || (c.segment_ids && c.segment_ids.includes(targetSegmentId)))
-    )
-    const rootCab = cabinets.find(
-      (c) =>
-        c.role === 'root_cabinet' &&
-        (c.segment_id === targetSegmentId || (c.segment_ids && c.segment_ids.includes(targetSegmentId)))
-    )
-
-    const newItems: AssetPoleItem[] = dataList.map((data, i) => {
-      const poleIdx = currentBaseIndex + i
-      const isUnderSubCab = !!(subCab && poleIdx >= 23)
-      const chosenCab = isUnderSubCab ? subCab : rootCab
-      const feederId = chosenCab?.cabinet_id || data.feeder_id || 'CAB-TL8-ROOT'
-      const feederRole = (chosenCab?.role || 'root_cabinet') as 'root_cabinet' | 'sub_cabinet'
+    const newItems: AssetPoleItem[] = dataList.map((data) => {
+      const cab = cabinets.find((c) => c.cabinet_id === data.cabinet_id)
+      const feederId = cab?.feeder_id || data.feeder_id || `FDR-${data.cabinet_id}`
 
       return {
         id: data.pole_id,
         pole_id: data.pole_id,
+        lamp_code: data.lamp_code,
         segment_id: data.segment_id,
         segment_name: data.segment_name,
-        commune_id: data.commune_id,
+        commune_id: data.commune_id || 'COM-001',
         commune_name: data.commune_name,
         lamp_watt: data.lamp_watt,
         power_source: data.power_source,
         fixture_type: data.fixture_type,
         fixture_status: 'normal',
+        cabinet_id: data.cabinet_id,
+        cabinet_name: cab?.cabinet_name || data.cabinet_name,
         feeder_id: feederId,
-        feeder_name: chosenCab?.cabinet_name,
-        feeder_role: feederRole,
-        parent_feeder_id: isUnderSubCab ? rootCab?.cabinet_id : undefined,
         warranty_expiry: data.warranty_expiry,
         lat: data.lat,
         lng: data.lng,
@@ -436,7 +411,7 @@ export const AssetManagementPage: React.FC = () => {
     // Automatically update pole counts for affected cabinets
     setCabinets((prev) =>
       prev.map((cab) => {
-        const addedForThisCab = newItems.filter((item) => item.feeder_id === cab.cabinet_id).length
+        const addedForThisCab = newItems.filter((item) => item.cabinet_id === cab.cabinet_id).length
         return addedForThisCab > 0
           ? { ...cab, total_poles_managed: (cab.total_poles_managed || 0) + addedForThisCab }
           : cab
@@ -462,40 +437,21 @@ export const AssetManagementPage: React.FC = () => {
       id: data.cabinet_id,
       cabinet_id: data.cabinet_id,
       cabinet_name: data.cabinet_name,
-      role: data.role,
-      parent_cabinet_id: data.parent_cabinet_id,
-      branch_start_pole: data.branch_start_pole,
-      subordinated_cabinets: [],
+      feeder_id: data.feeder_id || `FDR-${data.cabinet_id}`,
       segment_id: data.segment_id,
       segment_name: data.segment_name,
       status: 'active',
       voltage_v: data.voltage_v,
       current_load_kw: data.current_load_kw,
       power_factor: 0.95,
-      total_poles_managed: data.total_poles_managed,
+      total_poles_managed: data.total_poles_managed || 0,
       landmark_note: data.landmark_note,
       installed_at: data.installed_at,
       lat: data.lat,
       lng: data.lng,
     }))
 
-    setCabinets((prev) => {
-      let updated = [...newItems, ...prev]
-      // Update parent cabinets' subordinated_cabinets if any sub cabinets were added
-      newCabinetsList.forEach((sub) => {
-        if (sub.role === 'sub_cabinet' && sub.parent_cabinet_id) {
-          updated = updated.map((c) =>
-            c.cabinet_id === sub.parent_cabinet_id
-              ? {
-                  ...c,
-                  subordinated_cabinets: Array.from(new Set([...(c.subordinated_cabinets || []), sub.cabinet_id])),
-                }
-              : c
-          )
-        }
-      })
-      return updated
-    })
+    setCabinets((prev) => [...newItems, ...prev])
 
     setCurrentPage(1)
     showBanner(`Đã lưu thành công ${newCabinetsList.length} tủ điện vào Tuyến "${newCabinetsList[0].segment_name}"!`)
@@ -855,37 +811,28 @@ export const AssetManagementPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              const targetCab = cabinets.find((c) => c.cabinet_id === pole.feeder_id)
+                              const targetCab = cabinets.find((c) => c.cabinet_id === pole.cabinet_id || c.cabinet_id === pole.feeder_id)
                               if (targetCab) {
                                 setDetailCabinet(targetCab)
                               } else {
-                                toast.info(`Chưa có thông tin mở rộng cho tủ ${pole.feeder_id}`)
+                                toast.info(`Chưa có thông tin mở rộng cho tủ ${pole.cabinet_id}`)
                               }
                             }}
-                            className="font-mono text-[11px] cursor-pointer inline-flex items-center gap-1.5 group transition text-left"
-                            title={
-                              pole.feeder_role === 'sub_cabinet'
-                                ? `Tủ Nhánh phân đoạn trực tiếp (Nguồn cha: ${pole.parent_feeder_id || 'Tủ đỉnh'}) - Bấm xem chi tiết tủ`
-                                : `Tủ Đỉnh nguồn tổng tuyến - Bấm xem chi tiết tủ`
-                            }
+                            className="cursor-pointer inline-flex flex-col items-start text-left group transition"
+                            title={`Tủ điện: ${pole.cabinet_name || pole.cabinet_id} - Bấm xem chi tiết`}
                           >
-                            {pole.feeder_role === 'sub_cabinet' ? (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 font-semibold shadow-2xs group-hover:border-amber-400 group-hover:bg-amber-100/70 transition">
-                                <Zap className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />
-                                <span className="font-bold tracking-tight">{pole.feeder_id}</span>
-                                <span className="text-[9px] px-1 py-0.2 bg-amber-200/70 dark:bg-amber-800/80 text-amber-900 dark:text-amber-100 rounded font-bold uppercase tracking-wider">
-                                  Tủ Nhánh
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs group-hover:border-indigo-400 group-hover:bg-indigo-100/70 transition">
+                              <Zap className="w-3 h-3 text-indigo-500 fill-indigo-500 shrink-0" />
+                              <span className="font-bold tracking-tight font-mono text-xs">{pole.cabinet_id}</span>
+                              {pole.lamp_code && (
+                                <span className="text-[9px] px-1 py-0.2 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 rounded font-bold uppercase tracking-wider border border-amber-300/60">
+                                  {pole.lamp_code}
                                 </span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60 font-semibold shadow-2xs group-hover:border-blue-400 group-hover:bg-blue-100/70 transition">
-                                <span className="text-amber-500 text-xs shrink-0">⭐️</span>
-                                <span className="font-bold tracking-tight">{pole.feeder_id}</span>
-                                <span className="text-[9px] px-1 py-0.2 bg-blue-200/70 dark:bg-blue-800/80 text-blue-900 dark:text-blue-100 rounded font-bold uppercase tracking-wider">
-                                  Tủ Đỉnh
-                                </span>
-                              </span>
-                            )}
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 pl-0.5">
+                              Lộ: {pole.feeder_id}
+                            </span>
                           </button>
                         </td>
                         <td className="p-3.5 text-slate-500 dark:text-slate-300">{pole.commune_name}</td>
@@ -956,8 +903,9 @@ export const AssetManagementPage: React.FC = () => {
                 <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="p-3.5">Mã tủ điện</th>
-                    <th className="p-3.5">Tên tủ & Phân cấp</th>
-                    <th className="p-3.5">Tuyến đường cấp nguồn</th>
+                    <th className="p-3.5">Tên tủ điện</th>
+                    <th className="p-3.5">Tuyến đường</th>
+                    <th className="p-3.5">Tuyến điện (Feeder)</th>
                     <th className="p-3.5">Số cột quản lý</th>
                     <th className="p-3.5">Điện áp & Tải</th>
                     <th className="p-3.5">Tọa độ GIS</th>
@@ -968,7 +916,7 @@ export const AssetManagementPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {paginatedCabinets.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
+                      <td colSpan={9} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
                         Không tìm thấy tủ điện nào phù hợp với bộ lọc hiện tại.
                       </td>
                     </tr>
@@ -980,29 +928,18 @@ export const AssetManagementPage: React.FC = () => {
                         </td>
                         <td className="p-3.5">
                           <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            {cab.role === 'root_cabinet' ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-[10px] font-bold text-amber-700 dark:text-amber-400">
-                                ⭐️ ROOT
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold text-indigo-700 dark:text-indigo-400">
-                                ⚡️ SUB
-                              </span>
-                            )}
+                            <Zap className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                             <span>{cab.cabinet_name}</span>
                           </div>
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                            {cab.role === 'root_cabinet'
-                              ? (cab.subordinated_cabinets && cab.subordinated_cabinets.length > 0
-                                  ? `Tủ chính toàn tuyến • Có ${cab.subordinated_cabinets.length} tủ nhánh`
-                                  : 'Tủ xuất tuyến chính (Root)')
-                              : (cab.parent_cabinet_id
-                                  ? `Tủ nhánh • Nguồn từ ${cab.parent_cabinet_id}${cab.branch_start_pole ? ` (sau ${cab.branch_start_pole})` : ''}`
-                                  : 'Tủ phân đoạn nhánh (Sub)')}
+                            Mốc: {cab.landmark_note}
                           </div>
                         </td>
                         <td className="p-3.5 font-medium text-slate-700 dark:text-slate-200 max-w-50 truncate" title={cab.segment_name}>
                           {cab.segment_name}
+                        </td>
+                        <td className="p-3.5 font-mono text-xs font-bold text-purple-700 dark:text-purple-300">
+                          {cab.feeder_id}
                         </td>
                         <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200 font-mono">
                           {cab.total_poles_managed} cột

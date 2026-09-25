@@ -602,7 +602,7 @@
       "properties": {
         "pole_id": "POLE-0022",
         "segment_id": "SEG-001",
-        "fixture_status": "out",
+        "fixture_status": "normal",
         "status_confidence": 0.97,
         "power_source": "grid",
         "fixture_type": "led_road_lamp",
@@ -612,7 +612,7 @@
         "commune_id": "COM-001",
         "last_seen_at": "2026-08-17T12:00:00Z",
         "last_sweep_id": "SWEEP-2026-08-19-01",
-        "open_fault_count": 1,
+        "open_fault_count": 0,
         "has_iot_node": false,
         "near_sensitive_poi": false,
         "atlas": "Gần nhà ông Chín, cạnh quán nước mía"
@@ -630,7 +630,7 @@
       "properties": {
         "pole_id": "POLE-0023",
         "segment_id": "SEG-001",
-        "fixture_status": "normal",
+        "fixture_status": "dim",
         "status_confidence": 0.98,
         "power_source": "grid",
         "fixture_type": "led_road_lamp",
@@ -640,10 +640,10 @@
         "commune_id": "COM-001",
         "last_seen_at": "2026-08-19T12:00:00Z",
         "last_sweep_id": "SWEEP-2026-08-19-01",
-        "open_fault_count": 0,
+        "open_fault_count": 1,
         "has_iot_node": false,
         "near_sensitive_poi": true,
-        "atlas": "Đối diện cổng Chợ Củ Chi (khu A)"
+        "atlas": "Đối diện cổng Chợ Củ Chi (khu A) - Cột cuối lộ Tủ A"
       }
     },
     {
@@ -663,15 +663,15 @@
         "power_source": "grid",
         "fixture_type": "led_road_lamp",
         "lamp_watt": 60,
-        "install_date": "2024-08-28",
-        "warranty_expiry": "2029-08-28",
+        "install_date": "2022-06-25",
+        "warranty_expiry": "2025-06-25",
         "commune_id": "COM-001",
-        "last_seen_at": "2026-08-20T12:00:00Z",
+        "last_seen_at": "2026-08-19T12:00:00Z",
         "last_sweep_id": "SWEEP-2026-08-19-01",
         "open_fault_count": 0,
         "has_iot_node": false,
         "near_sensitive_poi": true,
-        "atlas": "Trước cổng Chợ Củ Chi (khu B), gần nhà ông An"
+        "atlas": "Trước cổng Chợ Củ Chi (khu B), gần nhà ông An - Cột đầu lộ Tủ B"
       }
     },
     {
@@ -686,8 +686,8 @@
       "properties": {
         "pole_id": "POLE-0025",
         "segment_id": "SEG-001",
-        "fixture_status": "dim",
-        "status_confidence": 0.83,
+        "fixture_status": "normal",
+        "status_confidence": 0.95,
         "power_source": "grid",
         "fixture_type": "led_road_lamp",
         "lamp_watt": 100,
@@ -696,7 +696,7 @@
         "commune_id": "COM-001",
         "last_seen_at": "2026-08-17T12:00:00Z",
         "last_sweep_id": "SWEEP-2026-08-19-01",
-        "open_fault_count": 1,
+        "open_fault_count": 0,
         "has_iot_node": false,
         "near_sensitive_poi": false,
         "atlas": "Gần nhà ông Mười, ngã ba vào chợ"
@@ -1302,8 +1302,8 @@
       "properties": {
         "pole_id": "POLE-0047",
         "segment_id": "SEG-002",
-        "fixture_status": "dim",
-        "status_confidence": 0.81,
+        "fixture_status": "normal",
+        "status_confidence": 0.95,
         "power_source": "grid",
         "fixture_type": "led_road_lamp",
         "lamp_watt": 60,
@@ -1312,10 +1312,10 @@
         "commune_id": "COM-001",
         "last_seen_at": "2026-08-18T12:00:00Z",
         "last_sweep_id": "SWEEP-2026-08-19-01",
-        "open_fault_count": 1,
+        "open_fault_count": 0,
         "has_iot_node": true,
         "near_sensitive_poi": false,
-        "atlas": "Trước cửa số nhà 196 Nguyễn Văn Ni"
+        "atlas": "Trước cửa số nhà 196 Nguyễn Văn Ni - Cột đầu lộ Tủ A"
       }
     },
     {
@@ -1750,8 +1750,8 @@
       "properties": {
         "pole_id": "POLE-0063",
         "segment_id": "SEG-002",
-        "fixture_status": "unknown",
-        "status_confidence": null,
+        "fixture_status": "normal",
+        "status_confidence": 0.96,
         "power_source": "grid",
         "fixture_type": "led_road_lamp",
         "lamp_watt": 40,
@@ -1763,7 +1763,7 @@
         "open_fault_count": 0,
         "has_iot_node": true,
         "near_sensitive_poi": false,
-        "atlas": "Trước cửa số nhà 260 Nguyễn Văn Ni"
+        "atlas": "Trước cửa số nhà 260 Nguyễn Văn Ni - Cột đầu lộ Tủ B"
       }
     },
     {
@@ -2534,8 +2534,8 @@
       "properties": {
         "pole_id": "POLE-0091",
         "segment_id": "SEG-003",
-        "fixture_status": "out",
-        "status_confidence": 0.97,
+        "fixture_status": "normal",
+        "status_confidence": 0.95,
         "power_source": "grid",
         "fixture_type": "led_road_lamp",
         "lamp_watt": 60,
@@ -2544,10 +2544,10 @@
         "commune_id": "COM-001",
         "last_seen_at": "2026-08-17T12:00:00Z",
         "last_sweep_id": "SWEEP-2026-08-19-01",
-        "open_fault_count": 1,
+        "open_fault_count": 0,
         "has_iot_node": false,
         "near_sensitive_poi": false,
-        "atlas": "Đối diện cửa hàng tạp hóa, cạnh số 372"
+        "atlas": "Đối diện cửa hàng tạp hóa, cạnh số 372 - Cột đầu lộ Tủ B"
       }
     },
     {

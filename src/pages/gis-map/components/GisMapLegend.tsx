@@ -239,28 +239,29 @@ export const GisMapLegend: React.FC = () => {
         {/* Cabinets */}
         <div className="flex items-center gap-2 col-span-2 pt-1.5 border-t border-slate-200">
           <div className="flex items-center gap-1.5 shrink-0">
-            <CabinetLegendIcon color="#f59e0b" size={16} isRoot={true} />
-          </div>
-          <span className="font-medium text-slate-700 text-[11px]">Tủ đỉnh (Nguồn chính)</span>
-        </div>
-
-        <div className="flex items-center gap-2 col-span-2">
-          <div className="flex items-center gap-1.5 shrink-0">
             <CabinetLegendIcon color="#059669" size={15} isRoot={false} />
             <CabinetLegendIcon color="#e11d48" size={15} isRoot={false} isFault={true} />
           </div>
-          <span className="font-medium text-slate-700 text-[11px]">Tủ nhánh (Bình thường / Lỗi)</span>
+          <span className="font-medium text-slate-700 text-[11px]">Tủ điện điều khiển (Cấp điện / Ngắt)</span>
         </div>
 
-        {/* Feeder lines */}
+        {/* Electrical Feeder lines */}
         <div className="col-span-2 pt-1.5 border-t border-slate-200 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="w-4 h-[2.5px] rounded-full bg-emerald-500 shrink-0" />
-            <span className="font-medium text-slate-700 text-[11px]">Tuyến cáp bình thường</span>
+            <span className="w-4 h-[2.5px] rounded-full bg-sky-500 shrink-0" />
+            <span className="font-medium text-slate-700 text-[11px]">Lộ điện Tủ A</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-4 h-[2.5px] rounded-full bg-purple-500 shrink-0" />
+            <span className="font-medium text-slate-700 text-[11px]">Lộ điện Tủ B</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-4 h-[2.5px] rounded-full bg-rose-500 shrink-0" />
-            <span className="font-medium text-slate-700 text-[11px]">Tuyến cáp sự cố / mất điện</span>
+            <span className="font-medium text-slate-700 text-[11px]">Lộ ngắt điện / Mất điện</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-4 h-[2px] border-b border-dashed border-slate-400 shrink-0" />
+            <span className="font-medium text-slate-500 text-[11px]">Tuyến đường giao thông</span>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-﻿import type { PoleFeature, SegmentInfo } from '../../pages/gis-map/GisMapPage'
+import type { PoleFeature, SegmentInfo } from '../../pages/gis-map/GisMapPage'
 
 export type SearchCategory = 'segment' | 'cabinet' | 'pole'
 
@@ -64,7 +64,6 @@ export function searchAllCategories({
   // 2. Tủ điện (Cabinets / Controllers) - Khớp mã, tên, và ghi chú Atlas thực địa
   cabinets.forEach((cab) => {
     const p = (cab.properties || {}) as any
-    const isRoot = p.role === 'root_cabinet'
     const name = p.cabinet_name || ''
     const code = p.cabinet_code || ''
     const id = p.cabinet_id || ''
@@ -82,7 +81,7 @@ export function searchAllCategories({
       results.push({
         id: id || code,
         title: name || code || id,
-        subtitle: atlas || `${isRoot ? 'Tủ đỉnh nguồn' : 'Tủ nhánh phân đoạn'}`,
+        subtitle: atlas || (p.feeder_id ? `Lộ: ${p.feeder_id}` : 'Tủ điện điều khiển'),
         category: 'cabinet',
         coordinates: coords,
         data: cab,
