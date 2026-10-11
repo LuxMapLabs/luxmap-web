@@ -14,7 +14,9 @@ import {
   ExternalLink,
   Play,
   Zap,
+  RotateCcw,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { ScheduleCase } from '../../../types/workSchedule'
 import { FieldReportDetailModal } from './FieldReportDetailModal'
 import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
@@ -27,7 +29,7 @@ interface CaseDetailModalProps {
   viewingPhaseIndex: number
   onClose: () => void
   onSwitchViewingPhase: (index: number) => void
-  onRejectCurrentPhase: (code: string) => void
+  onReturnCurrentPhase: (code: string, note: string) => void
   onEndNormally: (code: string, reason: string) => void
   onOpenCreateNextPhaseModal: (code: string, phaseType: 'inspection' | 'repair') => void
   onSubmitSuperior: (code: string, editedMaterialsNote: string) => void
@@ -46,12 +48,12 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   viewingPhaseIndex,
   onClose,
   onSwitchViewingPhase,
-  onRejectCurrentPhase,
+  onReturnCurrentPhase,
   onEndNormally,
   onOpenCreateNextPhaseModal,
   onSubmitSuperior,
 }) => {
-  // Trạng thái cục bộ khi duyệt khảo sát / kiểm tra để chuyển nút thành (Tạo tiếp / End)
+  // Trạng thái cục bộ khi duyệt khảo sát / kiểm tra
   const [isSurveyApprovedLocal, setIsSurveyApprovedLocal] = useState(false)
   const [isInspectionApprovedLocal, setIsInspectionApprovedLocal] = useState(false)
 
@@ -60,6 +62,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
 
   // State mở modal báo cáo hiện trường chi tiết (kèm video & ảnh)
   const [isFieldReportModalOpen, setIsFieldReportModalOpen] = useState(false)
+
+  // State mở modal Yêu cầu làm lại (POST /return)
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
+  const [returnReason, setReturnReason] = useState('')
 
   useEffect(() => {
     setIsSurveyApprovedLocal(false)
@@ -80,11 +86,24 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const isActivePhase = viewingPhaseIndex === caseItem.currentPhaseIndex
   const hasReport = currentPhase?.status === 'reported'
 
+  // Kiểm tra bước hiện tại đã được duyệt hay chưa
+  const isCurrentlyApproved =
+    (isSurveyApprovedLocal && currentPhase?.phaseType === 'survey') ||
+    (isInspectionApprovedLocal && currentPhase?.phaseType === 'inspection')
+
+  // Đóng modal: Nếu đã duyệt mà không tạo bước mới thì tự động kết thúc (END) sự vụ
+  const handleCloseModal = () => {
+    if (isCurrentlyApproved && !caseItem.isTerminated) {
+      onEndNormally(caseItem.code, 'Quản lý đã duyệt báo cáo và hoàn tất sự vụ.')
+    }
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden">
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70 shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="p-2 rounded-xl bg-blue-100 text-blue-700">
               <FileCheck className="w-5 h-5" />
@@ -103,7 +122,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseModal}
             className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/80 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -111,7 +130,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-5">
+        <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-5 custom-scrollbar">
           {/* ======================================================== */}
           {/* THANH TIẾN TRÌNH STEPPER 4 BƯỚC */}
           {/* ======================================================== */}
@@ -121,9 +140,16 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
             <div className="flex items-center justify-between relative select-none">
               {STEPPER_STEPS.map((step, idx) => {
-                const isCompleted = idx < caseItem.currentPhaseIndex
-                const isActive = idx === caseItem.currentPhaseIndex && !caseItem.isTerminated
-                const isEnded = idx === caseItem.currentPhaseIndex && caseItem.isTerminated
+                const phaseForStep = caseItem.phases[idx]
+                // Bất kỳ giai đoạn nào đã END hoặc đã hoàn thành đều có dấu tick
+                const isStepEnded =
+                  phaseForStep?.status === 'ended' ||
+                  (caseItem.isTerminated && idx <= caseItem.currentPhaseIndex)
+                const isCompleted = idx < caseItem.currentPhaseIndex || isStepEnded
+                const isActive =
+                  idx === caseItem.currentPhaseIndex &&
+                  !caseItem.isTerminated &&
+                  phaseForStep?.status !== 'ended'
                 const isViewing = idx === viewingPhaseIndex
 
                 let circleClass = 'bg-slate-200 text-slate-500 border-slate-300'
@@ -131,8 +157,6 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   circleClass = 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                 } else if (isActive) {
                   circleClass = 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100 shadow-xs'
-                } else if (isEnded) {
-                  circleClass = 'bg-slate-400 text-white border-slate-400'
                 }
 
                 return (
@@ -169,7 +193,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     {idx < 3 && (
                       <div
                         className={`flex-1 h-0.5 mx-2 rounded-full transition-colors ${
-                          idx < caseItem.currentPhaseIndex ? 'bg-emerald-500' : 'bg-slate-200'
+                          idx < caseItem.currentPhaseIndex ||
+                          (caseItem.isTerminated && idx < caseItem.phases.length)
+                            ? 'bg-emerald-500'
+                            : 'bg-slate-200'
                         }`}
                       />
                     )}
@@ -189,17 +216,19 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
           )}
 
-          {/* Chi tiết giai đoạn đang xem */}
+          {/* ======================================================== */}
+          {/* NỘI DUNG CHI TIẾT CỦA GIAI ĐOẠN ĐANG CHỌN */}
+          {/* ======================================================== */}
           {currentPhase ? (
             <div className="flex flex-col gap-4">
-              {/* Thông tin metadata */}
+              {/* Thẻ thông tin cơ bản của bước (Bố cục 2x2 như cũ để hiển thị trọn vẹn tuyến đường) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-slate-400" />
                     Tuyến đường thực hiện
                   </div>
-                  <div className="text-xs font-bold text-slate-800 mt-1 line-clamp-1">
+                  <div className="text-xs font-bold text-slate-800 mt-1">
                     {caseItem.segment}
                   </div>
                 </div>
@@ -229,7 +258,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   </div>
                   <div className="text-xs font-bold mt-1">
                     {currentPhase.status === 'ended' ? (
-                      <span className="text-slate-500">Đã END (Đã chốt)</span>
+                      <span className="text-slate-600 font-bold flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-600" />
+                        Đã kết thúc
+                      </span>
+                    ) : isCurrentlyApproved ? (
+                      <span className="text-emerald-600 font-extrabold flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        Đã duyệt
+                      </span>
                     ) : currentPhase.status === 'reported' ? (
                       <span className="text-blue-600">Đã có báo cáo (Chờ Quản lý duyệt)</span>
                     ) : (
@@ -240,7 +277,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               </div>
 
               {/* Cột đèn tác nghiệp (dành riêng cho Kiểm tra hoặc Sửa chữa) */}
-              {currentPhase.phaseType !== 'survey' ? (
+              {currentPhase.phaseType !== 'survey' && (
                 <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
@@ -268,16 +305,11 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       )}
                   </div>
                 </div>
-              ) : (
-                <div className="p-3 bg-indigo-50/70 border border-indigo-200/80 rounded-xl text-xs text-indigo-900 flex items-center gap-2">
-                  <span className="font-bold">Phạm vi tác nghiệp:</span>
-                  <span>Khảo sát ghi hình toàn tuyến (Quét AI Computer Vision, không giới hạn cột lẻ)</span>
-                </div>
               )}
 
-              {/* Chỉ đạo kỹ thuật ban đầu của Quản lý */}
-              <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl text-xs text-blue-900">
-                <strong>Chỉ đạo của Quản lý:</strong>{' '}
+              {/* Ghi chú */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700">
+                <strong>Ghi chú:</strong>{' '}
                 {currentPhase.notes || 'Thực hiện nghiêm túc quy chuẩn an toàn lao động.'}
               </div>
 
@@ -301,7 +333,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       {currentPhase.report.summary}
                     </p>
 
-                    {/* NÚT BẤM NỔI BẬT: XEM BÁO CÁO HIỆN TRƯỜNG (KÈM VIDEO & ẢNH) */}
+                    {/* NÚT BẤM DUY NHẤT: XEM BÁO CÁO HIỆN TRƯỜNG CHI TIẾT */}
                     <button
                       type="button"
                       onClick={() => setIsFieldReportModalOpen(true)}
@@ -319,19 +351,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </div>
                     </button>
 
-                    {/* Thư viện thumbnails bằng chứng hiện trường có thể click mở trực tiếp */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <div
-                        onClick={() => setIsFieldReportModalOpen(true)}
-                        className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 cursor-pointer group shadow-2xs hover:shadow-md transition-all"
-                        title="Bấm để xem video quét thực địa ban đêm"
-                      >
+                    {/* Thư viện thumbnails bằng chứng hiện trường: CHỈ PREVIEW TĨNH, KHÔNG CLICK */}
+                    <div className="grid grid-cols-3 gap-2 select-none">
+                      <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
                         <img
                           src={fieldSurveyNightImg}
                           alt="Video Khảo Sát Đêm"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          className="w-full h-full object-cover"
                         />
-                        <div className="absolute inset-0 bg-slate-950/40 group-hover:bg-slate-950/20 transition-colors flex items-center justify-center">
+                        <div className="absolute inset-0 bg-slate-950/30 flex items-center justify-center">
                           <span className="w-7 h-7 rounded-full bg-white/90 text-blue-600 flex items-center justify-center shadow">
                             <Play className="w-3.5 h-3.5 ml-0.5 fill-blue-600" />
                           </span>
@@ -341,30 +369,22 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         </span>
                       </div>
 
-                      <div
-                        onClick={() => setIsFieldReportModalOpen(true)}
-                        className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 cursor-pointer group shadow-2xs hover:shadow-md transition-all"
-                        title="Bấm để xem ảnh chi tiết đui đèn hỏng"
-                      >
+                      <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
                         <img
                           src={fieldBrokenFixtureImg}
                           alt="Chao đèn cháy hỏng"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          className="w-full h-full object-cover"
                         />
                         <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
                           Ảnh đui đèn hỏng
                         </span>
                       </div>
 
-                      <div
-                        onClick={() => setIsFieldReportModalOpen(true)}
-                        className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 cursor-pointer group shadow-2xs hover:shadow-md transition-all"
-                        title="Bấm để xem ảnh máy đo Luxmeter"
-                      >
+                      <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
                         <img
                           src={fieldLuxmeterImg}
                           alt="Đo Luxmeter"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          className="w-full h-full object-cover"
                         />
                         <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
                           Đo đạt 4.2 Lux
@@ -379,17 +399,17 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                           <span className="text-[11px] font-bold text-slate-600">
                             Phát hiện từ mô hình Computer Vision:
                           </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {currentPhase.report.aiDetections.map((d, i) => (
+                          <div className="flex flex-col gap-1.5">
+                            {currentPhase.report.aiDetections.map((ai, i) => (
                               <div
                                 key={i}
-                                className="p-2 rounded-lg bg-white border border-slate-200 text-xs flex items-center justify-between"
+                                className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/90 text-xs flex items-center justify-between"
                               >
-                                <span>
-                                  <strong>{d.poleId}</strong>: {d.issue}
+                                <span className="font-bold text-slate-900">
+                                  <strong className="font-mono text-blue-700">{ai.poleId}</strong>: {ai.issue}
                                 </span>
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                                  AI: {(d.confidence * 100).toFixed(0)}%
+                                <span className="px-2 py-0.5 bg-amber-200/80 text-amber-900 font-extrabold text-[10px] rounded-md font-mono">
+                                  AI: {Math.round(ai.confidence * 100)}%
                                 </span>
                               </div>
                             ))}
@@ -397,36 +417,42 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         </div>
                       )}
 
-                    {/* Đo Lux & Ghi chú vật tư đề xuất (nếu là Kiểm tra) */}
+                    {/* Đo độ rọi Luxmeter (nếu có) */}
                     {currentPhase.report.luxMeasured && (
-                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs">
-                        <strong>Độ rọi Lux đo thực tế:</strong> {currentPhase.report.luxMeasured}
+                      <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs flex items-center justify-between">
+                        <span className="font-semibold text-slate-700">Độ rọi mặt đường đo được:</span>
+                        <span className="font-black text-blue-800 font-mono bg-blue-100 px-2 py-0.5 rounded-md">
+                          {currentPhase.report.luxMeasured}
+                        </span>
                       </div>
                     )}
 
+                    {/* Đề xuất vật tư từ Kỹ sư */}
                     {currentPhase.report.suggestedMaterialsNote && (
-                      <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900">
-                        <strong>Ghi chú thiết bị & vật tư đề xuất (Kỹ sư tự nhập):</strong>
-                        <p className="mt-1 font-semibold">
+                      <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl text-xs flex flex-col gap-1">
+                        <span className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                          <Wrench className="w-3.5 h-3.5 text-amber-700" />
+                          Đề xuất vật tư từ Kỹ sư kiểm tra:
+                        </span>
+                        <p className="text-slate-800 font-medium">
                           {currentPhase.report.suggestedMaterialsNote}
                         </p>
                       </div>
                     )}
 
-                    {/* Ô GHI CHÚ VẬT TƯ THỰC TẾ (NẾU LÀ SỬA CHỮA) - QUẢN LÝ ĐƯỢC QUYỀN SỬA */}
+                    {/* Ghi chú vật tư thực tế (ở bước Sửa chữa: Quản lý tự do chỉnh sửa) */}
                     {currentPhase.phaseType === 'repair' && (
-                      <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs">
-                        <label className="font-bold text-emerald-950 flex items-center gap-1.5">
+                      <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl flex flex-col gap-2">
+                        <label className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-emerald-700" />
-                          Ghi chú thiết bị & vật tư thực tế đã sử dụng (Quản lý được quyền tự do
-                          chỉnh sửa):
+                          Vật tư thực tế đã sử dụng (Quản lý có thể hiệu chỉnh):
                         </label>
                         <textarea
                           rows={2}
                           value={editedMaterialsNote}
                           onChange={(e) => setEditedMaterialsNote(e.target.value)}
-                          placeholder="Ví dụ: 02 bóng LED 100W Rạng Đông, 01 cuộn cáp..."
-                          className="w-full p-2.5 bg-white border border-emerald-300 rounded-lg text-xs font-bold text-emerald-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                          placeholder="Nhập hoặc chỉnh sửa vật tư thực tế đã nghiệm thu..."
+                          className="p-2 bg-white border border-emerald-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>
                     )}
@@ -445,11 +471,11 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           )}
         </div>
 
-        {/* Modal Footer: Action Buttons */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+        {/* Modal Footer: Action Buttons - Luôn cố định ở đáy modal */}
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseModal}
             className="px-4 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-300 rounded-xl hover:bg-slate-100 transition cursor-pointer"
           >
             Đóng
@@ -465,10 +491,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     <>
                       <button
                         type="button"
-                        onClick={() => onRejectCurrentPhase(caseItem.code)}
-                        className="px-3.5 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition cursor-pointer"
+                        onClick={() => {
+                          setReturnReason('')
+                          setIsReturnModalOpen(true)
+                        }}
+                        className="flex items-center gap-1 px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition cursor-pointer active:scale-95"
+                        title="Yêu cầu kỹ sư hiện trường bổ sung hoặc làm lại khảo sát"
                       >
-                        ✕ Không duyệt (Tự END)
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Yêu cầu làm lại</span>
                       </button>
                       <button
                         type="button"
@@ -479,24 +510,13 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </button>
                     </>
                   ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onEndNormally(caseItem.code, 'Khảo sát hoàn tất, tuyến đèn đạt chuẩn.')
-                        }
-                        className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-                      >
-                        ⚪ End (Không có lỗi)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onOpenCreateNextPhaseModal(caseItem.code, 'inspection')}
-                        className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer"
-                      >
-                        ➕ Tạo lịch kiểm tra (Cùng mã {caseItem.code})
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => onOpenCreateNextPhaseModal(caseItem.code, 'inspection')}
+                      className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer"
+                    >
+                      ➕ Tạo lịch kiểm tra
+                    </button>
                   )}
                 </>
               )}
@@ -508,10 +528,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     <>
                       <button
                         type="button"
-                        onClick={() => onRejectCurrentPhase(caseItem.code)}
-                        className="px-3.5 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition cursor-pointer"
+                        onClick={() => {
+                          setReturnReason('')
+                          setIsReturnModalOpen(true)
+                        }}
+                        className="flex items-center gap-1 px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition cursor-pointer active:scale-95"
+                        title="Yêu cầu kỹ sư hiện trường đo lại hoặc bổ sung báo cáo kiểm tra"
                       >
-                        ✕ Không duyệt (Tự END)
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Yêu cầu làm lại</span>
                       </button>
                       <button
                         type="button"
@@ -522,27 +547,13 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </button>
                     </>
                   ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onEndNormally(
-                            caseItem.code,
-                            'Kiểm tra xác nhận tuyến đèn hoạt động bình thường.'
-                          )
-                        }
-                        className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-                      >
-                        ⚪ End (Không có sự cố thực tế)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onOpenCreateNextPhaseModal(caseItem.code, 'repair')}
-                        className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
-                      >
-                        🔧 Tạo lịch sửa chữa (Cùng mã {caseItem.code})
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => onOpenCreateNextPhaseModal(caseItem.code, 'repair')}
+                      className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
+                    >
+                      🔧 Tạo lịch sửa chữa
+                    </button>
                   )}
                 </>
               )}
@@ -552,10 +563,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 <>
                   <button
                     type="button"
-                    onClick={() => onRejectCurrentPhase(caseItem.code)}
-                    className="px-3.5 py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition cursor-pointer"
+                    onClick={() => {
+                      setReturnReason('')
+                      setIsReturnModalOpen(true)
+                    }}
+                    className="flex items-center gap-1 px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition cursor-pointer active:scale-95"
+                    title="Yêu cầu kỹ sư hiện trường sửa lại hoặc bổ sung ảnh sau sửa chữa"
                   >
-                    ✕ Không duyệt (Tự END)
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Yêu cầu làm lại</span>
                   </button>
                   <button
                     type="button"
@@ -563,7 +579,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Duyệt & Gửi Báo Cáo Lên Superior</span>
+                    <span>✓ Duyệt & Gửi lên cấp trên</span>
                   </button>
                 </>
               )}
@@ -571,6 +587,72 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Popup Nhập Lý Do Yêu Cầu Làm Lại (POST /work-orders/{id}/return) */}
+      {isReturnModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 p-5 flex flex-col gap-3.5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                <span className="p-1 rounded-lg bg-amber-100 text-amber-700">
+                  <RotateCcw className="w-4 h-4" />
+                </span>
+                Yêu Cầu Làm Lại Báo Cáo
+              </h4>
+              <button
+                type="button"
+                onClick={() => setIsReturnModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Lệnh công tác sẽ được chuyển về trạng thái <strong>Đang thực hiện</strong> để Kỹ sư hiện trường bổ sung hồ sơ nghiệm thu hoặc làm lại theo yêu cầu.
+            </p>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Lý do / Chỉ đạo yêu cầu làm lại (*):
+              </label>
+              <textarea
+                rows={3}
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                placeholder="Ví dụ: Ảnh sau sửa chữa bị mờ, đề nghị chụp lại góc cận cảnh và đo lại độ rọi tại mặt đường..."
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsReturnModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!returnReason.trim()) {
+                    toast.warning('Vui lòng nhập lý do yêu cầu làm lại!')
+                    return
+                  }
+                  onReturnCurrentPhase(caseItem.code, returnReason.trim())
+                  setIsReturnModalOpen(false)
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Gửi yêu cầu làm lại</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Xem Báo Cáo Hiện Trường Đa Phương Tiện (Ảnh & Video) */}
       <FieldReportDetailModal

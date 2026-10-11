@@ -1,13 +1,20 @@
-import React from 'react'
-import { ChevronLeft, ChevronRight, RotateCcw, Plus, Filter, Calendar } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import {
+  RotateCcw,
+  Plus,
+  Filter,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+} from 'lucide-react'
 import { WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
 
 interface ScheduleFilterBarProps {
   currentMonth: number
   currentYear: number
   filterPhase: WorkScheduleState['filterPhase']
-  onPrevMonth: () => void
-  onNextMonth: () => void
+  onSelectMonthYear: (month: number, year: number) => void
   onResetToday: () => void
   onFilterChange: (phase: WorkScheduleState['filterPhase']) => void
   onOpenCreateModal: () => void
@@ -28,49 +35,166 @@ const MONTH_NAMES = [
   'Tháng 12',
 ]
 
+const YEAR_OPTIONS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030]
+
 export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
   currentMonth,
   currentYear,
   filterPhase,
-  onPrevMonth,
-  onNextMonth,
+  onSelectMonthYear,
   onResetToday,
   onFilterChange,
   onOpenCreateModal,
 }) => {
+  const [isPickerOpen, setIsPickerOpen] = useState(false)
+  const [viewingYear, setViewingYear] = useState(currentYear)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Đồng bộ viewingYear khi currentYear bên ngoài thay đổi
+  useEffect(() => {
+    setViewingYear(currentYear)
+  }, [currentYear])
+
+  // Tự động đóng popup khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsPickerOpen(false)
+      }
+    }
+    if (isPickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isPickerOpen])
+
+  const availableYears = Array.from(new Set([...YEAR_OPTIONS, viewingYear, currentYear])).sort(
+    (a, b) => a - b
+  )
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3.5 sm:p-4 mb-5 flex flex-wrap items-center justify-between gap-4">
-      {/* Cụm điều hướng tháng */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onPrevMonth}
-          className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer active:scale-95"
-          title="Tháng trước"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
+      {/* Cụm chọn Tháng & Năm bằng Popover chuyên nghiệp (Chỉ chọn Tháng và Năm, không có ngày) */}
+      <div className="flex items-center gap-2.5">
+        <div className="relative" ref={dropdownRef}>
+          {/* Nút bấm hiển thị Tháng / Năm và kích hoạt Popover */}
+          <button
+            type="button"
+            onClick={() => {
+              setViewingYear(currentYear)
+              setIsPickerOpen(!isPickerOpen)
+            }}
+            className={`flex items-center gap-2 px-3.5 py-2 bg-slate-50 border rounded-xl font-extrabold text-xs sm:text-sm text-slate-800 hover:bg-slate-100 hover:border-blue-400 transition-all cursor-pointer shadow-2xs ${
+              isPickerOpen
+                ? 'border-blue-500 ring-2 ring-blue-500/20 bg-white text-blue-700'
+                : 'border-slate-200'
+            }`}
+            title="Bấm để chọn tháng và năm"
+          >
+            <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>
+              {MONTH_NAMES[currentMonth]} / {currentYear}
+            </span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                isPickerOpen ? 'rotate-180 text-blue-600' : ''
+              }`}
+            />
+          </button>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl min-w-40 justify-center">
-          <Calendar className="w-4 h-4 text-blue-600" />
-          <span className="font-extrabold text-sm text-slate-800">
-            {MONTH_NAMES[currentMonth]} / {currentYear}
-          </span>
+          {/* Bảng Popover chọn Tháng & Năm */}
+          {isPickerOpen && (
+            <div className="absolute top-full mt-2 left-0 z-50 w-[290px] sm:w-[310px] bg-white rounded-2xl border border-slate-200 shadow-xl p-3.5 animate-in fade-in zoom-in-95 duration-150 select-none">
+              {/* Header Popover: Chuyển năm */}
+              <div className="flex items-center justify-between px-1 pb-2.5 border-b border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setViewingYear((y) => y - 1)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-100 transition cursor-pointer active:scale-90"
+                  title="Năm trước"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={viewingYear}
+                    onChange={(e) => setViewingYear(Number(e.target.value))}
+                    className="text-xs sm:text-sm font-extrabold text-slate-800 bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 outline-none cursor-pointer"
+                  >
+                    {availableYears.map((y) => (
+                      <option key={y} value={y}>
+                        Năm {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewingYear((y) => y + 1)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-100 transition cursor-pointer active:scale-90"
+                  title="Năm tiếp theo"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body: Lưới 12 Tháng */}
+              <div className="grid grid-cols-3 gap-2 py-3">
+                {MONTH_NAMES.map((name, idx) => {
+                  const isSelected = viewingYear === currentYear && idx === currentMonth
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        onSelectMonthYear(idx, viewingYear)
+                        setIsPickerOpen(false)
+                      }}
+                      className={`py-2 px-1.5 rounded-xl text-xs font-bold transition-all text-center cursor-pointer active:scale-95 ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20'
+                          : 'text-slate-700 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 border border-slate-200/60'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Footer: Đóng & Hôm nay */}
+              <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsPickerOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 font-semibold px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onResetToday()
+                    setIsPickerOpen(false)
+                  }}
+                  className="text-blue-600 hover:text-blue-700 font-bold px-2.5 py-1 rounded-lg hover:bg-blue-50 transition cursor-pointer flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Hôm nay</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <button
           type="button"
-          onClick={onNextMonth}
-          className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer active:scale-95"
-          title="Tháng sau"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-
-        <button
-          type="button"
           onClick={onResetToday}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer active:scale-95 ml-1"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer active:scale-95"
           title="Về tháng hiện tại"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -80,19 +204,18 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
 
       {/* Cụm bộ lọc & Nút tạo sự vụ */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 hover:border-slate-300 transition-colors">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <label className="text-xs font-bold text-slate-600">Giai đoạn:</label>
           <select
             value={filterPhase}
             onChange={(e) => onFilterChange(e.target.value as any)}
             className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer"
           >
-            <option value="all">Tất cả giai đoạn</option>
-            <option value="survey">🟡 1. Khảo sát (Survey)</option>
-            <option value="inspection">🔵 2. Kiểm tra (Inspection)</option>
-            <option value="repair">🟢 3. Sửa chữa (Repair)</option>
-            <option value="ended">⚪ Đã kết thúc (END)</option>
+            <option value="all">Tất cả các giai đoạn</option>
+            <option value="survey">🟡 1. Khảo sát</option>
+            <option value="inspection">🔵 2. Kiểm tra</option>
+            <option value="repair">🟢 3. Sửa chữa</option>
+            <option value="ended">⚪ Đã kết thúc</option>
           </select>
         </div>
 

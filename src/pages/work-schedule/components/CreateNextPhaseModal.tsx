@@ -35,7 +35,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.userId || 'USR-004')
+  const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || 'USR-004')
   const [date, setDate] = useState('2026-10-06')
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(defaultPoleIds)
   const [materialsNote, setMaterialsNote] = useState(
@@ -71,8 +71,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
       return
     }
 
-    const selectedAssignee = assignees.find((a) => a.userId === assigneeId)
-    const assigneeName = selectedAssignee ? selectedAssignee.fullName.split(' (')[0] : 'Khang Lê'
+    const selectedAssignee = assignees.find((a) => a.user_id === assigneeId)
+    const assigneeName = selectedAssignee?.full_name ? selectedAssignee.full_name.split(' (')[0] : 'Khang Lê'
 
     onSubmit({
       code: caseCode,
@@ -120,7 +120,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
             <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
               <CheckCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <div>
-                Tiến trình cũ sẽ tự động <strong>END (Đã hoàn tất)</strong>. Giữ nguyên mã{' '}
+                Tiến trình cũ sẽ tự động <strong>chốt hoàn tất</strong>. Giữ nguyên mã{' '}
                 <strong className="font-mono text-blue-700">{caseCode}</strong> và kế thừa toàn bộ hồ
                 sơ cho giai đoạn mới.
               </div>
@@ -154,8 +154,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {assignees.map((a) => (
-                  <option key={a.userId} value={a.userId}>
-                    {a.fullName}
+                  <option key={a.user_id || ''} value={a.user_id || ''}>
+                    {a.full_name || a.user_id || ''}
                   </option>
                 ))}
               </select>
@@ -193,11 +193,11 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
               </div>
             )}
 
-            {/* Chỉ đạo kỹ thuật */}
+            {/* Ghi chú kỹ thuật */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-slate-500" />
-                Chỉ đạo kỹ thuật của Quản lý:
+                Ghi chú kỹ thuật:
               </label>
               <textarea
                 rows={2}
@@ -224,7 +224,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
                 isRepair ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
               }`}
             >
-              ✓ Xác nhận mở giai đoạn tiếp theo
+              ✓ Mở giai đoạn tiếp theo
             </button>
           </div>
         </form>
