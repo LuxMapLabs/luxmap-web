@@ -385,6 +385,7 @@ export const GisMapPage: React.FC = () => {
           selectedCabinet={selectedCabinet}
           setSelectedCabinet={setSelectedCabinet}
           cabinets={cabinets}
+          effectivePoles={effectivePoles}
           onToggleCabinet={(cabId) => handleToggleCabinet(cabId, setSelectedCabinet)}
         />
       )}

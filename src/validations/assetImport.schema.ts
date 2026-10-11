@@ -84,15 +84,14 @@ export const cabinetImportSchema = z
     feeder_name: z.string().optional().nullable(),
     geom_wkt: z
       .string()
+      .min(1, 'Tọa độ tủ điện (geom_wkt) không được để trống')
       .refine(
-        (val) => !val || val.trim() === '' || /^LINESTRING\s*\(|^POINT\s*\(/i.test(val.trim()),
+        (val) => /^LINESTRING\s*\(|^POINT\s*\(/i.test(val.trim()),
         {
           message:
             'Tọa độ tủ điện phải là định dạng WKT hợp lệ (Ví dụ: POINT(lng lat) hoặc LINESTRING(lng1 lat1, lng2 lat2))',
         }
-      )
-      .optional()
-      .nullable(),
+      ),
     data_source: z
       .enum(['field', 'public_imagery', 'calibration_rig', 'simulated'] as const satisfies readonly [
         DataSource,
@@ -209,6 +208,47 @@ function extractLineFirstPointCoords(wkt: string | null | undefined, defaultLat 
 // 3. MASTER VALIDATOR & CONSTRAINT CHECKER
 // ==========================================
 
+export const REQUIRED_COLUMNS_BY_CATEGORY: Record<string, { key: string; label: string }[]> = {
+  segments: [
+    { key: 'external_ref', label: 'external_ref' },
+    { key: 'segment_name', label: 'segment_name' },
+    { key: 'road_class', label: 'road_class' },
+    { key: 'length_m', label: 'length_m' },
+    { key: 'geom_wkt', label: 'geom_wkt' },
+    { key: 'commune_id', label: 'commune_id' },
+    { key: 'data_source', label: 'data_source' },
+  ],
+  cabinets: [
+    { key: 'external_ref', label: 'external_ref' },
+    { key: 'cabinet_name', label: 'cabinet_name' },
+    { key: 'commune_id', label: 'commune_id' },
+    { key: 'geom_wkt', label: 'geom_wkt' },
+    { key: 'data_source', label: 'data_source' },
+  ],
+  poles: [
+    { key: 'external_ref', label: 'external_ref' },
+    { key: 'segment_external_ref', label: 'segment_external_ref' },
+    { key: 'commune_id', label: 'commune_id' },
+    { key: 'geom_wkt', label: 'geom_wkt' },
+    { key: 'data_source', label: 'data_source' },
+  ],
+  poles_and_fixtures: [
+    { key: 'external_ref', label: 'external_ref' },
+    { key: 'segment_external_ref', label: 'segment_external_ref' },
+    { key: 'commune_id', label: 'commune_id' },
+    { key: 'geom_wkt', label: 'geom_wkt' },
+    { key: 'data_source', label: 'data_source' },
+  ],
+  fixtures: [
+    { key: 'pole_external_ref', label: 'pole_external_ref' },
+    { key: 'fixture_type', label: 'fixture_type' },
+    { key: 'power_source', label: 'power_source' },
+    { key: 'lamp_watt', label: 'lamp_watt' },
+    { key: 'install_date', label: 'install_date' },
+    { key: 'data_source', label: 'data_source' },
+  ],
+}
+
 /**
  * Validate một dòng dữ liệu CSV tùy theo category, kiểm tra Schema + Ràng buộc quan hệ GIS
  */
@@ -219,6 +259,43 @@ export function validateImportRow(
   rowIndex: number
 ): ParsedItemReview {
   const { segments, cabinets, poles } = context
+
+  // 0. KIỂM TRA TÍNH TOÀN VẸN 100%: Mọi cột bắt buộc không được để trống bất kỳ ô nào
+  const requiredCols = REQUIRED_COLUMNS_BY_CATEGORY[category] || []
+  for (const col of requiredCols) {
+    if (category === 'cabinets' && col.key === 'cabinet_name') {
+      const cabName = rowObj['cabinet_name'] || rowObj['feeder_name']
+      if (!cabName || cabName.trim() === '') {
+        return {
+          category: 'cabinets',
+          externalRef: rowObj.external_ref || `CAB-ROW-${rowIndex + 1}`,
+          actionType: 'invalid',
+          errorMsg: `Dòng ${rowIndex + 1}: Cột 'cabinet_name' không có dữ liệu (bắt buộc điền đầy đủ).`,
+          data: {
+            external_ref: rowObj.external_ref || null,
+            cabinet_name: null,
+            commune_id: rowObj.commune_id || null,
+            geom_wkt: rowObj.geom_wkt || null,
+            data_source: (rowObj.data_source as DataSource) || 'field',
+          },
+          diffs: [],
+        }
+      }
+      continue
+    }
+
+    const val = rowObj[col.key]
+    if (val === undefined || val === null || val.trim() === '') {
+      return {
+        category: category as any,
+        externalRef: rowObj.external_ref || rowObj.pole_external_ref || `ROW-${rowIndex + 1}`,
+        actionType: 'invalid',
+        errorMsg: `Dòng ${rowIndex + 1}: Cột '${col.label}' không có dữ liệu (bắt buộc điền đầy đủ).`,
+        data: {} as any,
+        diffs: [],
+      }
+    }
+  }
 
   // ----------------------------------------------------
   // CASE A: SEGMENTS (Tuyến đường chiếu sáng) - ROOT ENTITY
@@ -478,11 +555,39 @@ export function validateImportRow(
         newVal: `Đèn LED ${data.lamp_watt}W`,
       })
     } else {
-      if (existingFixture.lamp_watt !== data.lamp_watt) {
+      if (Number(existingFixture.lamp_watt) !== Number(data.lamp_watt)) {
         diffs.push({
           label: 'Công suất đèn',
           oldVal: `${existingFixture.lamp_watt}W`,
           newVal: `${data.lamp_watt}W`,
+        })
+      }
+      if (data.install_date && existingFixture.install_date !== data.install_date) {
+        diffs.push({
+          label: 'Ngày lắp đặt',
+          oldVal: existingFixture.install_date || 'Chưa thiết lập',
+          newVal: data.install_date,
+        })
+      }
+      if (data.data_source && existingFixture.data_source !== data.data_source) {
+        const getSourceLabel = (src: DataSource) => {
+          switch (src) {
+            case 'field':
+              return 'Khảo sát thực địa'
+            case 'public_imagery':
+              return 'Ảnh công cộng'
+            case 'calibration_rig':
+              return 'Giàn chuẩn'
+            case 'simulated':
+              return 'Mô phỏng'
+            default:
+              return src
+          }
+        }
+        diffs.push({
+          label: 'Nguồn dữ liệu',
+          oldVal: getSourceLabel(existingFixture.data_source),
+          newVal: getSourceLabel(data.data_source),
         })
       }
       if (data.warranty_expiry && existingFixture.warranty_expiry !== data.warranty_expiry) {
@@ -673,7 +778,7 @@ export function validateImportRow(
     }
 
     // 4. So sánh Công suất đèn
-    if (data.lamp_watt && existingPole.active_fixture?.lamp_watt !== data.lamp_watt) {
+    if (data.lamp_watt && Number(existingPole.active_fixture?.lamp_watt) !== Number(data.lamp_watt)) {
       diffs.push({
         label: 'Công suất đèn',
         oldVal: `${existingPole.active_fixture?.lamp_watt ?? 100}W`,

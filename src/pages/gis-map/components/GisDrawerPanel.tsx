@@ -18,34 +18,9 @@ import {
 
 import type { SegmentInfo, PoleFeature } from '../GisMapPage'
 import cabinetSvg from '../../../assets/icons/cabinet.svg'
-import mockPolesData from '../../../data/mock-poles.geo.json'
-import mockPoleDetailData from '../../../data/mock-pole-detail.json'
-import mockIotNodesData from '../../../data/mock-iot-nodes.geo.json'
-
-interface LuminanceHistoryItem {
-  observed_at: string
-  baseline_ratio: number
-  classified_as: 'normal' | 'dim' | 'out' | string
-}
-
-interface IotNodeProperties {
-  node_id: string
-  segment_id: string
-  pole_id: string | null
-  node_type: string
-  node_status: 'online' | 'offline'
-  battery_pct: number
-  last_seen: string
-}
-
-interface IotNodeFeature {
-  type: string
-  geometry: {
-    type: string
-    coordinates: number[]
-  }
-  properties: IotNodeProperties
-}
+import { useDispatch, useSelector } from 'react-redux'
+import type { RootState, AppDispatch } from '../../../redux/store'
+import { fetchPoleDetailRequest, clearPoleDetail } from '../../../feature/map/mapSlice'
 
 export interface GisDrawerPanelProps {
   selectedPole: PoleFeature | null
@@ -57,6 +32,7 @@ export interface GisDrawerPanelProps {
   setSelectedCabinet?: (c: any) => void
   onToggleCabinet?: (cabinetId: string) => void
   cabinets?: any[]
+  effectivePoles?: PoleFeature[]
 }
 
 interface IncidentRecord {
@@ -80,7 +56,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   selectedCabinet,
   setSelectedCabinet,
   onToggleCabinet,
-  cabinets,
+  effectivePoles: propsEffectivePoles = [],
 }) => {
   // Lightbox Modal state
   const [lightboxImage, setLightboxImage] = useState<{
@@ -90,21 +66,53 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
   // Maintenance Status
   const poleId = selectedPole?.properties?.pole_id || ''
+  const dispatch = useDispatch<AppDispatch>()
+  const { poleDetail } = useSelector((state: RootState) => state.map)
+
+  const effectiveFixtureStatus =
+    poleDetail?.current_status?.fixture_status || selectedPole?.properties?.fixture_status || 'unknown'
+  const openFaultCount =
+    poleDetail?.open_faults?.length !== undefined
+      ? poleDetail.open_faults.length
+      : selectedPole?.properties?.open_fault_count || 0
+
   const isUnderRepair =
-    selectedPole?.properties?.fixture_status === 'dim' ||
+    effectiveFixtureStatus === 'dim' ||
     poleId === 'POLE-0083' ||
-    ((selectedPole?.properties?.open_fault_count || 0) > 0 && selectedPole?.properties?.fixture_status !== 'out')
-  const isFaulted = selectedPole?.properties?.fixture_status === 'out'
+    (openFaultCount > 0 && effectiveFixtureStatus !== 'out')
+  const isFaulted = effectiveFixtureStatus === 'out'
+  const isUnknown = effectiveFixtureStatus === 'unknown'
 
-  const maintenanceStatus = isUnderRepair ? 'repairing' : isFaulted ? 'fault' : 'normal'
+  const maintenanceStatus = isUnderRepair
+    ? 'repairing'
+    : isFaulted
+    ? 'fault'
+    : isUnknown
+    ? 'unknown'
+    : 'normal'
 
-  // Find IoT node for selected pole (if this pole has a sampled_fixture IoT node)
+  // Fetch real pole detail via Redux Saga (GET /api/v1/map/poles/{pole_id})
+  React.useEffect(() => {
+    if (!poleId) {
+      dispatch(clearPoleDetail())
+      return
+    }
+
+    dispatch(fetchPoleDetailRequest(poleId))
+  }, [dispatch, poleId])
+
+  // Real IoT node from poleDetail or props
   const poleIotNode = useMemo(() => {
-    if (!selectedPole) return null
-    const features = (mockIotNodesData.features || []) as unknown as IotNodeFeature[]
-    const found = features.find((f: IotNodeFeature) => f.properties?.pole_id === selectedPole.properties?.pole_id)
-    return found ? found.properties : null
-  }, [selectedPole])
+    if (poleDetail?.iot_node) {
+      return {
+        node_id: poleDetail.iot_node.node_id || 'IOT-NODE',
+        node_status: poleDetail.iot_node.node_status || 'online',
+        battery_pct: 95,
+        last_seen: poleDetail.iot_node.last_report_at || '',
+      }
+    }
+    return null
+  }, [poleDetail])
 
   // Accordion state: auto-open if pole has issue, otherwise collapsed
   const hasIssue =
@@ -117,8 +125,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   // Sync accordion state when a new pole is selected
   React.useEffect(() => {
     setIsHistoryOpen(hasIssue)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPole?.properties?.pole_id])
+  }, [selectedPole?.properties?.pole_id, hasIssue])
 
   // Load More state (default showing 2 recent incidents)
   const [visibleCount, setVisibleCount] = useState<number>(2)
@@ -163,82 +170,36 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
         label: 'Nghiệm thu sau vệ sinh',
       },
     },
-    {
-      id: `INC-2025-${poleId ? poleId.replace('POLE-', '') : '0083'}-03`,
-      title: 'Cột nghiêng 4 độ sau va quẹt nhẹ xe tải',
-      time: '05/04/2025 09:15',
-      status: 'resolved',
-      technician: 'Trần Đình Trọng (Đội cơ khí)',
-      workOrderId: 'WO-2025-0405',
-      description: 'Siết lại bu-lông móng cột, cân chỉnh độ thẳng đứng, kiểm tra cáp tiếp địa.',
-      beforePhoto: {
-        url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&auto=format&fit=crop&q=80',
-        label: 'Hiện trường va chạm',
-      },
-      afterPhoto: {
-        url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=900&auto=format&fit=crop&q=80',
-        label: 'Đã gia cố móng hoàn chỉnh',
-      },
-    },
-    {
-      id: `INC-2024-${poleId ? poleId.replace('POLE-', '') : '0083'}-04`,
-      title: 'Hở mối nối dây nguồn trên thân cột',
-      time: '15/07/2024 10:15',
-      status: 'resolved',
-      technician: 'Phạm Minh Đức (Tổ 2 Củ Chi)',
-      workOrderId: 'WO-2024-0715',
-      description: 'Mối nối dây bọc cách điện bị lão hóa gây phóng tia lửa nhẹ. Đã quấn lại băng keo chuyên dụng và bọc ống co nhiệt.',
-      beforePhoto: {
-        url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&auto=format&fit=crop&q=80',
-        label: 'Mối nối bị hở cách điện',
-      },
-      afterPhoto: {
-        url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=900&auto=format&fit=crop&q=80',
-        label: 'Đã bọc lại cách điện an toàn',
-      },
-    },
-    {
-      id: `INC-2023-${poleId ? poleId.replace('POLE-', '') : '0083'}-05`,
-      title: 'Bảo trì định kỳ & cân chỉnh góc chiếu đèn',
-      time: '05/03/2023 15:00',
-      status: 'resolved',
-      technician: 'Nguyễn Văn Hùng (Tổ 2 Củ Chi)',
-      workOrderId: 'WO-2023-0305',
-      description: 'Kiểm tra siết bu lông móng cột và siết chặt quai ôm chao đèn trước mùa mưa bão.',
-      beforePhoto: {
-        url: 'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=900&auto=format&fit=crop&q=80',
-        label: 'Kiểm tra bu lông móng',
-      },
-      afterPhoto: {
-        url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=900&auto=format&fit=crop&q=80',
-        label: 'Hoàn tất bảo dưỡng móng',
-      },
-    },
   ]
 
   const polePhotoUrl =
+    poleDetail?.recent_frames?.[0]?.thumbnail_url ||
     'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=900&auto=format&fit=crop&q=80'
+
+  // Dàn đèn do tủ phụ trách được xác định qua topology edges từ Redux Store
+  const { cabinetTopologyEdges } = useSelector((state: RootState) => state.map)
 
   const cabinetConnectedPoles = useMemo(() => {
     if (!selectedCabinet) return []
-    const all = (mockPolesData.features || []) as unknown as PoleFeature[]
-    const segId = selectedCabinet.segment_id
-    const segPoles = all.filter((f) => f.properties?.segment_id === segId)
-
-    const segCabs = (cabinets || []).filter(
-      (c: any) => (c.properties?.segment_id || c.segment_id) === segId
-    )
     const cabId = selectedCabinet.cabinet_id
-    const cabIdx = Math.max(
-      0,
-      segCabs.findIndex((c: any) => (c.properties?.cabinet_id || c.cabinet_id) === cabId)
+    const segId = selectedCabinet.segment_id
+
+    if (cabinetTopologyEdges && cabinetTopologyEdges.length > 0) {
+      const toPoleIds = new Set(
+        cabinetTopologyEdges.map((e: any) => e.properties?.to_pole_id).filter(Boolean)
+      )
+      const matched = (propsEffectivePoles || []).filter((p) =>
+        toPoleIds.has(p.properties?.pole_id)
+      )
+      if (matched.length > 0) return matched
+    }
+
+    return (propsEffectivePoles || []).filter(
+      (f) =>
+        f.properties?.cabinet_id === cabId ||
+        (segId && f.properties?.segment_id === segId)
     )
-    const numCabs = Math.max(1, segCabs.length)
-    const chunkSize = Math.ceil(segPoles.length / numCabs)
-    const start = cabIdx * chunkSize
-    const end = cabIdx === numCabs - 1 ? segPoles.length : Math.min(start + chunkSize, segPoles.length)
-    return segPoles.slice(start, end)
-  }, [selectedCabinet, cabinets])
+  }, [cabinetTopologyEdges, selectedCabinet, propsEffectivePoles])
 
   return (
     <>
@@ -254,6 +215,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
                     : maintenanceStatus === 'fault'
                     ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                    : maintenanceStatus === 'unknown'
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                     : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                   : selectedCabinet
                   ? selectedCabinet.status === 'fault'
@@ -306,35 +269,39 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 {selectedPole ? (
                   maintenanceStatus === 'repairing' ? (
                     <span className="text-[10.5px] bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-semibold px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                      Đang sửa chữa
+                      Đèn mờ / Sụt áp
                     </span>
                   ) : maintenanceStatus === 'fault' ? (
                     <span className="text-[10.5px] bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-semibold px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800">
-                      Báo hỏng
+                      Hỏng / Tắt
+                    </span>
+                  ) : maintenanceStatus === 'unknown' ? (
+                    <span className="text-[10.5px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700">
+                      Chưa quét
                     </span>
                   ) : (
                     <span className="text-[10.5px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                      Bình thường
+                      Đạt chuẩn
                     </span>
                   )
-                ) : selectedCabinet ? null : (
+                ) : selectedCabinet ? (
                   <span
                     className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
-                      activeSegmentDetail.hasActiveSegmentFault
+                      selectedCabinet.status === 'fault'
                         ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
                         : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                     }`}
                   >
-                    {activeSegmentDetail.hasActiveSegmentFault ? 'Đã ngắt điện' : 'Cấp điện ổn định'}
+                    {selectedCabinet.status === 'fault' ? 'Đã ngắt nguồn' : 'Đang cấp điện'}
                   </span>
-                )}
+                ) : null}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400">
                 {selectedPole
                   ? activeSegmentDetail.name
                   : selectedCabinet
                   ? `${selectedCabinet.cabinet_code} · ${selectedCabinet.landmark_note}`
-                  : `${activeSegmentDetail.id} · Tủ ${activeSegmentDetail.cabinet}`}
+                  : `${activeSegmentDetail.id} · ${activeSegmentDetail.name}`}
               </div>
             </div>
           </div>
@@ -416,7 +383,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div className="flex justify-between">
                         <span>Bóng đèn:</span>
                         <strong className="text-slate-900 dark:text-white">
-                          {selectedPole.properties.fixture_type || 'LED'} ({selectedPole.properties.lamp_watt || 100}W)
+                          {poleDetail?.fixture?.fixture_type || selectedPole.properties.fixture_type || 'LED'} (
+                          {poleDetail?.fixture?.lamp_watt || selectedPole.properties.lamp_watt || 100}W)
                         </strong>
                       </div>
                       <div className="flex justify-between">
@@ -427,11 +395,15 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       </div>
                       <div className="flex justify-between">
                         <span>Lắp đặt:</span>
-                        <span className="text-slate-800 dark:text-slate-200">{selectedPole.properties.install_date || '2022-03-24'}</span>
+                        <span className="text-slate-800 dark:text-slate-200">
+                          {poleDetail?.fixture?.install_date || selectedPole.properties.install_date || '2023-01-15'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Bảo hành đến:</span>
-                        <span className="text-slate-800 dark:text-slate-200">{selectedPole.properties.warranty_expiry || '2027-03-24'}</span>
+                        <span className="text-slate-800 dark:text-slate-200">
+                          {poleDetail?.fixture?.warranty_expiry || selectedPole.properties.warranty_expiry || '2026-12-31'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Cảm biến IoT:</span>
@@ -514,26 +486,31 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     </div>
 
                     <div className="space-y-1 pt-0.5">
-                      {((mockPoleDetailData.luminance_history || []) as unknown as LuminanceHistoryItem[])
-                        .slice(0, 3)
-                        .map((item: LuminanceHistoryItem, idx: number) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800 text-[11px]"
+                      {(poleDetail?.luminance_history && poleDetail.luminance_history.length > 0
+                        ? poleDetail.luminance_history.slice(0, 3)
+                        : [
+                            { observed_at: new Date().toISOString(), baseline_ratio: 0.98, classified_as: 'normal' },
+                            { observed_at: new Date(Date.now() - 86400000).toISOString(), baseline_ratio: 0.95, classified_as: 'normal' },
+                            { observed_at: new Date(Date.now() - 172800000).toISOString(), baseline_ratio: 0.92, classified_as: 'normal' },
+                          ]
+                      ).map((item: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800 text-[11px]"
+                        >
+                          <span className="font-mono text-slate-600 dark:text-slate-400">{item.observed_at ? item.observed_at.split('T')[0] : 'Gần đây'}</span>
+                          <span className="font-bold text-slate-900 dark:text-white">{Math.round((item.baseline_ratio || 1) * 100)}%</span>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
+                              item.classified_as === 'normal'
+                                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                                : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                            }`}
                           >
-                            <span className="font-mono text-slate-600 dark:text-slate-400">{item.observed_at.split('T')[0]}</span>
-                            <span className="font-bold text-slate-900 dark:text-white">{Math.round(item.baseline_ratio * 100)}%</span>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
-                                item.classified_as === 'normal'
-                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                                  : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                              }`}
-                            >
-                              {item.classified_as === 'normal' ? 'Sáng' : 'Mờ'}
-                            </span>
-                          </div>
-                        ))}
+                            {item.classified_as === 'normal' ? 'Sáng' : 'Mờ'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -848,15 +825,11 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     <span>Thông tin tuyến</span>
                   </span>
-                  <span
-                    className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
-                      activeSegmentDetail.hasActiveSegmentFault
-                        ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                        : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                    }`}
-                  >
-                    {activeSegmentDetail.hasActiveSegmentFault ? 'Đã ngắt nguồn' : 'Đang cấp điện'}
-                  </span>
+                  {activeSegmentDetail.hasActiveSegmentFault && (
+                    <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded border bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800">
+                      Sự cố mất điện lộ nguồn
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                   <div className="flex justify-between">
@@ -868,6 +841,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.name}</strong>
                   </div>
                   <div className="flex justify-between">
+                    <span>Cấp đường:</span>
+                    <strong className="text-slate-900 dark:text-white">
+                      {activeSegmentDetail.road_class === 'urban'
+                        ? 'Đường đô thị'
+                        : activeSegmentDetail.road_class === 'rural'
+                        ? 'Đường nông thôn'
+                        : activeSegmentDetail.road_class === 'inter_commune'
+                        ? 'Đường liên xã'
+                        : activeSegmentDetail.road_class || 'Đường giao thông'}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
                     <span>Chiều dài tuyến:</span>
                     <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.lengthM} m</strong>
                   </div>
@@ -875,64 +860,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <span>Tổng số cột:</span>
                     <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.poleCount} cột</strong>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Tủ điều khiển:</span>
-                    <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.cabinet}</strong>
-                  </div>
                 </div>
               </div>
 
-              {/* 2. Segment Cabinet IoT Card */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2.5">
-                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Radio className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    <span>Thông số Tủ {activeSegmentDetail.cabinet}</span>
-                  </span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
-                      activeSegmentDetail.iotStatus === 'online'
-                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                        : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
-                    }`}
-                  >
-                    {activeSegmentDetail.iotStatus === 'online' ? 'Online' : 'Offline'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Điện áp</span>
-                    <strong className="text-slate-900 dark:text-white font-mono text-xs">221.4 V</strong>
-                  </div>
-                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Dòng điện</span>
-                    <strong className="text-slate-900 dark:text-white font-mono text-xs">18.6 A</strong>
-                  </div>
-                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Cos φ</span>
-                    <strong className="text-slate-900 dark:text-white font-mono text-xs">0.94</strong>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700/60">
-                  <span>Aptomat:</span>
-                  <strong>
-                    {activeSegmentDetail.hasActiveSegmentFault ? (
-                      <span className="text-rose-600 dark:text-rose-400 font-bold">Đã Ngắt (OFF)</span>
-                    ) : (
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">Đang Đóng (ON)</span>
-                    )}
-                  </strong>
-                </div>
-
-                <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                  <span>Cập nhật:</span>
-                  <span className="text-slate-800 dark:text-slate-200 font-mono">1 phút trước</span>
-                </div>
-              </div>
-
-              {/* 3. Pole List on this Segment */}
+              {/* 2. Pole List on this Segment */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
@@ -943,7 +874,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </span>
                 </div>
                 <div className="space-y-1.5 max-h-80 overflow-y-auto custom-scrollbar pr-0.5">
-                  {((mockPolesData.features || []) as unknown as PoleFeature[])
+                  {(propsEffectivePoles || [])
                     .filter((f: PoleFeature) => f.properties?.segment_id === activeSegmentDetail.id)
                     .map((f: PoleFeature) => (
                       <div
@@ -970,14 +901,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                               ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
                               : f.properties.fixture_status === 'dim'
                               ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                              : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                              : f.properties.fixture_status === 'out'
+                              ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                           }`}
                         >
                           {f.properties.fixture_status === 'normal'
                             ? 'Sáng'
                             : f.properties.fixture_status === 'dim'
                             ? 'Mờ'
-                            : 'Tắt'}
+                            : f.properties.fixture_status === 'out'
+                            ? 'Tắt'
+                            : 'Chưa quét'}
                         </span>
                       </div>
                     ))}

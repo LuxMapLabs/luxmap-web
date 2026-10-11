@@ -18,4 +18,5 @@ export const store = configureStore({
 sagaMiddleware.run(rootSaga)
 
 export type AppDispatch = typeof store.dispatch
+export type { RootState } from './rootReducer'
 export default store

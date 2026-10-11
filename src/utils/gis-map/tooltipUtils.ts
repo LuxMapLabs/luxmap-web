@@ -78,16 +78,27 @@ interface FeederTooltipParams {
 
 export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): string {
   const isLineFault = p.status === 'fault'
-  const cabName = p.cabinet_name || p.cabinet_code || p.cabinet_id || 'Tủ điện'
+  const cabName = p.cabinet_name || p.cabinet_code || p.cabinet_id || p.from_id || 'Tủ điện'
   const feederId = p.feeder_id || 'FDR-001'
-  const segName = p.segment_name || 'Tuyến đường'
-  const poleCount = p.pole_count || 0
+  const segName = p.segment_name || p.segment_id || 'Tuyến đường'
+  const branch = p.branch != null ? `Nhánh ${p.branch}` : undefined
+  const order = p.order != null ? `Cạnh thứ ${p.order}` : undefined
+  const fromId = p.from_id
+  const toPoleId = p.to_pole_id
+  const feederSource = p.feeder_source
+
+  // Xác thực nguồn quan hệ lộ điện
+  const isVerified = feederSource === 'verified'
+  const sourceLabel = isVerified ? 'Đã xác minh' : 'Quan hệ suy luận từ khảo sát, chưa xác minh'
+  const sourceBadgeClass = isVerified
+    ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800'
+    : 'text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800'
 
   const statusBg = isLineFault ? 'bg-rose-500' : 'bg-emerald-500'
   const statusText = isLineFault ? 'Đã ngắt nguồn' : 'Đang cấp điện'
 
   return `
-    <div class="bg-white/98 dark:bg-slate-900/98 text-slate-800 dark:text-slate-100 p-3 rounded-2xl shadow-xl border border-slate-200/90 dark:border-slate-700 backdrop-blur-md min-w-56 font-sans">
+    <div class="bg-white/98 dark:bg-slate-900/98 text-slate-800 dark:text-slate-100 p-3 rounded-2xl shadow-xl border border-slate-200/90 dark:border-slate-700 backdrop-blur-md min-w-60 font-sans">
       <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800 gap-2">
         <span class="font-bold text-xs ${isLineFault ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'} flex items-center gap-1.5 truncate">
           <span class="w-2 h-2 rounded-full ${statusBg} ${isLineFault ? 'animate-pulse' : ''} shrink-0"></span>
@@ -97,13 +108,17 @@ export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): 
           ${statusText}
         </span>
       </div>
-      <div class="pt-2 space-y-1 text-[11.5px]">
+      <div class="pt-2 space-y-1.5 text-[11.5px]">
         <div>Tủ cấp nguồn: <strong class="text-slate-900 dark:text-white font-semibold">${cabName}</strong></div>
+        ${fromId && toPoleId ? `<div class="font-mono text-[11px] text-slate-600 dark:text-slate-300">Liên kết: <strong class="text-blue-600 dark:text-blue-400">${fromId}</strong> ➔ <strong class="text-emerald-600 dark:text-emerald-400">${toPoleId}</strong></div>` : ''}
+        ${branch || order ? `<div class="text-[11px] text-slate-500 dark:text-slate-400">${[branch, order].filter(Boolean).join(' • ')}</div>` : ''}
         <div>Tuyến đường: <strong class="text-slate-700 dark:text-slate-300 font-medium">${segName}</strong></div>
-        <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
-          <span>Phụ trách chiếu sáng:</span>
-          <span class="font-mono text-slate-700 dark:text-slate-200 font-bold">${poleCount} cột đèn</span>
-        </div>
+        ${feederSource ? `
+          <div class="pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1">
+            <span class="text-[10px] text-slate-500 dark:text-slate-400">Nguồn dữ liệu:</span>
+            <span class="text-[9.5px] px-1.5 py-0.5 rounded font-semibold border ${sourceBadgeClass}">${sourceLabel}</span>
+          </div>
+        ` : ''}
       </div>
     </div>
   `

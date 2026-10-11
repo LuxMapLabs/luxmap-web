@@ -137,11 +137,11 @@ function parseCsvLine(line: string): string[] {
 }
 
 const REQUIRED_HEADERS_BY_CATEGORY: Record<string, string[]> = {
-  poles: ['external_ref', 'commune_id', 'segment_external_ref', 'geom_wkt'],
-  poles_and_fixtures: ['external_ref', 'commune_id', 'segment_external_ref', 'geom_wkt'],
-  fixtures: ['pole_external_ref', 'lamp_watt', 'install_date'],
+  poles: ['external_ref', 'segment_external_ref', 'commune_id', 'geom_wkt', 'data_source'],
+  poles_and_fixtures: ['external_ref', 'segment_external_ref', 'commune_id', 'geom_wkt', 'data_source'],
+  fixtures: ['pole_external_ref', 'fixture_type', 'power_source', 'lamp_watt', 'install_date', 'data_source'],
   cabinets: ['external_ref', 'cabinet_name', 'commune_id', 'geom_wkt', 'data_source'],
-  segments: ['external_ref', 'commune_id', 'segment_name', 'road_class', 'length_m', 'geom_wkt'],
+  segments: ['external_ref', 'segment_name', 'road_class', 'length_m', 'geom_wkt', 'commune_id', 'data_source'],
 }
 
 export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
@@ -319,6 +319,11 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
   const handleExecuteImport = () => {
     if (!selectedFile) {
       setErrorMessage('Vui lòng chọn một tệp dữ liệu CSV trước khi nạp!')
+      return
+    }
+
+    if (invalidCount > 0) {
+      setErrorMessage(`Tệp chứa ${invalidCount} dòng dữ liệu không hợp lệ hoặc thiếu thông tin. Vui lòng kiểm tra lại bảng xem trước!`)
       return
     }
 

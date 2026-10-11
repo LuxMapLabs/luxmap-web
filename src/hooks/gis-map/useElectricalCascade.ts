@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react'
-import type { PoleFeature, SegmentFeature, SegmentInfo } from '../../pages/gis-map/GisMapPage'
+import { useMemo, useState, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { RootState, AppDispatch } from '../../redux/store'
+import type { PoleFeature, SegmentInfo } from '../../pages/gis-map/GisMapPage'
+import type { PolePropertiesFeature } from '../../types/map/poles'
+import type { SegmentPropertiesFeature } from '../../types/map/segments'
 import {
   searchAllCategories,
   type SearchResultItem,
 } from '../../utils/gis-map/gisSearchUtils'
-import mockPolesData from '../../data/mock-poles.geo.json'
-import mockSegmentsData from '../../data/mock-segments.geo.json'
-import mockCabinetsData from '../../data/mock-cabinets.geo.json'
+import { fetchMapLayersRequest } from '../../feature/map/mapSlice'
 import { showToast } from '../../utils/toastUtils'
 
 interface UseElectricalCascadeProps {
@@ -22,21 +24,44 @@ export function useElectricalCascade({
   searchQuery,
   searchInput = '',
 }: UseElectricalCascadeProps) {
-  // Dynamic Cabinets State for Cascade Simulation
-  const [cabinets, setCabinets] = useState<any[]>(() => {
-    const raw = (mockCabinetsData.features || []) as any[]
-    return raw.map((c) => {
-      const p = c.properties || {}
-      const atlas = p.atlas || p.landmark_note || ''
-      return {
-        ...c,
-        properties: {
-          ...p,
-          atlas,
-        },
-      }
-    })
-  })
+  const dispatch = useDispatch<AppDispatch>()
+  const {
+    poles: rawPoles,
+    cabinets: rawCabinets,
+    segments: rawSegments,
+    isLoadingMap: isLoadingMapData,
+  } = useSelector((state: RootState) => state.map)
+
+  // Dispatch Saga action to load map layers if not yet loaded
+  useEffect(() => {
+    dispatch(fetchMapLayersRequest({ bbox: '106.35,10.85,106.65,11.10' }))
+  }, [dispatch])
+
+  // Local state for Cabinet Trip/Restore (Simulation)
+  const [cabinets, setCabinets] = useState<any[]>([])
+
+  // Đồng bộ cabinets từ Redux Store vào local simulation state
+  useEffect(() => {
+    if (rawCabinets && rawCabinets.length > 0) {
+      const formattedCabs = rawCabinets.map((c: any) => {
+        const p = (c.properties || {}) as any
+        const landmark = p.landmark_note || p.atlas || ''
+        return {
+          ...c,
+          properties: {
+            ...p,
+            atlas: landmark,
+            landmark_note: landmark,
+            status: p.status || 'active',
+            voltage_v: p.voltage_v != null ? p.voltage_v : 220,
+            current_load_kw: p.current_load_kw != null ? p.current_load_kw : 12.5,
+            power_factor: p.power_factor != null ? p.power_factor : 0.95,
+          },
+        }
+      })
+      setCabinets(formattedCabs)
+    }
+  }, [rawCabinets])
 
   // Toggle Cabinet breaker (Trip / Restore) - Independent Cabinet Control
   const handleToggleCabinet = (cabId: string, onSelectedCabinetUpdate?: (updater: (prev: any) => any) => void) => {
@@ -98,84 +123,70 @@ export function useElectricalCascade({
     }
   }
 
-  // Physical electrical cascade: sequential pole assignment per cabinet on each segment
-  const effectivePoles = useMemo(() => {
-    const rawPoles = (mockPolesData.features || []) as unknown as PoleFeature[]
-
-    // Count total poles per segment to divide evenly between cabinets
-    const totalPolesBySeg: Record<string, number> = {}
-    rawPoles.forEach((f) => {
-      const sId = f.properties?.segment_id
-      if (sId) totalPolesBySeg[sId] = (totalPolesBySeg[sId] || 0) + 1
+  // Dữ liệu cột điện thực tế từ Backend API (Không còn logic chunkSize tự chia cột)
+  const effectivePoles: PoleFeature[] = useMemo(() => {
+    // Map từ cabinet_id -> cabinet status để cập nhật trực tiếp vào pole
+    const cabinetStatusMap: Record<string, any> = {}
+    cabinets.forEach((c) => {
+      const p = c.properties || {}
+      if (p.cabinet_id) {
+        cabinetStatusMap[p.cabinet_id] = p
+      }
     })
 
-    const counter: Record<string, number> = {}
-
-    return rawPoles.map((f) => {
-      const segId = f.properties?.segment_id
+    return rawPoles.map((f: PolePropertiesFeature) => {
       const p = (f.properties || {}) as any
-      const atlas = p.atlas || p.atlas_note || ''
+      const cabProps = p.cabinet_id ? cabinetStatusMap[p.cabinet_id] : null
+      const isCabFault = cabProps?.status === 'fault'
 
-      const segIdx = counter[segId] || 0
-      counter[segId] = segIdx + 1
-
-      // Find Cabinets of this segment
-      const segCabs = cabinets.filter((c) => c.properties?.segment_id === segId)
-      const numCabs = segCabs.length || 1
-      const totalInSeg = totalPolesBySeg[segId] || 1
-      const chunkSize = Math.ceil(totalInSeg / numCabs)
-      const cabIdx = Math.min(Math.floor(segIdx / chunkSize), numCabs - 1)
-      const chosenCab = segCabs[cabIdx] || segCabs[0]
-      const cabProps = chosenCab?.properties || {}
-      const isCabFault = cabProps.status === 'fault'
-
-      const poleNum = segIdx + 1
-      const lampLabel = `Đèn số ${poleNum}`
+      const geom = f.geometry || { type: 'Point', coordinates: [106.6, 10.8] }
 
       if (isCabFault) {
         return {
-          ...f,
+          type: 'Feature',
+          geometry: geom as any,
           properties: {
-            ...f.properties,
-            lamp_code: lampLabel,
-            cabinet_id: cabProps.cabinet_id,
-            feeder_id: cabProps.feeder_id,
-            atlas: atlas ? `${lampLabel} - ${atlas}` : atlas || lampLabel,
+            ...p,
+            cabinet_name: cabProps.cabinet_name || cabProps.cabinet_id,
             fixture_status: 'out',
             power_loss_reason: `Mất điện do ${cabProps.cabinet_name || cabProps.cabinet_id} bị ngắt điện`,
           },
-        }
+        } as PoleFeature
       }
 
       return {
-        ...f,
+        type: 'Feature',
+        geometry: geom as any,
         properties: {
-          ...f.properties,
-          lamp_code: lampLabel,
-          cabinet_id: cabProps.cabinet_id,
-          feeder_id: cabProps.feeder_id,
-          atlas: atlas ? `${lampLabel} - ${atlas}` : atlas || lampLabel,
+          ...p,
+          cabinet_name: cabProps?.cabinet_name || p.cabinet_name || p.cabinet_id,
         },
-      }
+      } as PoleFeature
     })
-  }, [cabinets])
+  }, [rawPoles, cabinets])
 
-  // Calculate Dynamic Segments List & Info
+  // Calculate Dynamic Segments List & Info from rawSegments (API)
   const segmentsList = useMemo(() => {
-    const rawSegments = (mockSegmentsData.features || []) as unknown as SegmentFeature[]
-
-    return rawSegments.map((f: SegmentFeature, idx: number) => {
-      const p = f.properties || {}
+    return rawSegments.map((f: SegmentPropertiesFeature, idx: number) => {
+      const p = (f.properties || {}) as any
       const segId = p.segment_id || `SEG-00${idx + 1}`
-      
+
       const segCabs = cabinets.filter((c) => c.properties?.segment_id === segId)
       const isFault = segCabs.some((c) => c.properties?.status === 'fault')
-      
-      const poleCount = effectivePoles.filter(
-        (pole: PoleFeature) => pole.properties?.segment_id === segId
-      ).length || p.pole_count || 0
 
-      let cleanName = segId === 'SEG-001' ? 'Tuyến A' : segId === 'SEG-002' ? 'Tuyến B' : segId === 'SEG-003' ? 'Tuyến C' : segId
+      const poleCount =
+        effectivePoles.filter((pole: PoleFeature) => pole.properties?.segment_id === segId).length ||
+        p.pole_count ||
+        0
+
+      let cleanName =
+        segId === 'SEG-001'
+          ? 'Tuyến A'
+          : segId === 'SEG-002'
+          ? 'Tuyến B'
+          : segId === 'SEG-003'
+          ? 'Tuyến C'
+          : segId
       if (p.segment_name) {
         const raw = p.segment_name.split(' - ')[0]
         if (raw.toLowerCase().includes('tuyen a')) cleanName = 'Tuyến A'
@@ -187,19 +198,19 @@ export function useElectricalCascade({
       return {
         id: segId,
         name: cleanName,
-        cabinet: p.controller_node_id || `NODE-00${idx + 1}-CTRL`,
+        cabinet: (p.controller_node_ids && p.controller_node_ids[0]) || `NODE-00${idx + 1}-CTRL`,
         road: cleanName,
         poleCount,
         lengthM: p.length_m || 0,
-        hasActiveSegmentFault: isFault,
+        hasActiveSegmentFault: isFault || Boolean(p.has_active_segment_fault),
         iotStatus: isFault ? 'offline' : 'online',
       } as SegmentInfo
     })
-  }, [cabinets, effectivePoles])
+  }, [rawSegments, cabinets, effectivePoles])
 
   const segmentInfoMap: Record<string, SegmentInfo> = useMemo(() => {
     const map: Record<string, SegmentInfo> = {}
-    segmentsList.forEach((s) => {
+    segmentsList.forEach((s: SegmentInfo) => {
       map[s.id] = s
     })
     return map
@@ -222,7 +233,7 @@ export function useElectricalCascade({
   const filteredFeatures = useMemo(() => {
     return effectivePoles.filter((f: PoleFeature) => {
       const p = f.properties || {}
-      
+
       if (selectedSegment !== 'all' && p.segment_id !== selectedSegment) {
         return false
       }
@@ -291,94 +302,29 @@ export function useElectricalCascade({
     })
   }, [cabinets, selectedSegment, searchQuery])
 
-  // 1. Road Segments Centerline Data (Tuyến đường giao thông cơ sở - đường nét đứt xám)
+  // 1. Road Segments Centerline Data (Tuyến đường giao thông từ Backend API - nét liền to bản)
   const roadSegmentsData = useMemo(() => {
-    const allSegments = (mockSegmentsData.features || []) as unknown as SegmentFeature[]
-    return allSegments
-      .filter((seg) => {
+    return rawSegments
+      .filter((seg: any) => {
         const segId = seg.properties?.segment_id
         if (!segId) return false
         if (selectedSegment !== 'all' && segId !== selectedSegment) return false
         return true
       })
-      .map((seg) => ({
+      .map((seg: any) => ({
         ...seg,
         properties: {
           ...seg.properties,
           is_road_centerline: true,
         },
       }))
-  }, [selectedSegment])
+  }, [rawSegments, selectedSegment])
 
-  // 2. Feeder Lines Data per Cabinet (Tuyến dây điện độc lập của từng Tủ điện)
+  // 2. Feeder Lines Data: Không còn logic tự stitching tọa độ ở Frontend.
+  // Dữ liệu dây điện/topology thực tế được nạp động từ GET /map/cabinets/{id}/topology
   const feederLinesData = useMemo(() => {
-    const builtFeeders: any[] = []
-
-    cabinets.forEach((cab) => {
-      const p = cab.properties || {}
-      const cabId = p.cabinet_id
-      const segId = p.segment_id
-      if (!cabId || !segId) return
-
-      if (selectedSegment !== 'all' && segId !== selectedSegment) return
-
-      // Filter poles belonging to this specific cabinet
-      const cabPoles = effectivePoles.filter(
-        (f) => f.properties?.cabinet_id === cabId && f.properties?.segment_id === segId
-      )
-
-      if (cabPoles.length === 0) return
-
-      const cabCoords = cab.geometry?.coordinates as [number, number]
-      const poleCoords = cabPoles.map((f) => f.geometry.coordinates as [number, number])
-
-      // Route connects from Cabinet position through all of its managed lamps
-      const lineCoords = cabCoords ? [cabCoords, ...poleCoords] : poleCoords
-
-      const feederId = p.feeder_id || `FDR-${cabId}`
-
-      const segCabs = cabinets.filter((c) => c.properties?.segment_id === segId)
-      const cabIdx = segCabs.findIndex((c) => c.properties?.cabinet_id === cabId)
-      const isSecondCab = cabIdx % 2 !== 0
-
-      const lineColor = p.status === 'fault'
-        ? '#f43f5e'
-        : isSecondCab
-        ? '#06b6d4'
-        : '#10b981'
-
-      const lineGlow = p.status === 'fault'
-        ? '#e11d48'
-        : isSecondCab
-        ? '#0891b2'
-        : '#059669'
-
-      builtFeeders.push({
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: lineCoords,
-        },
-        properties: {
-          feeder_id: feederId,
-          cabinet_id: cabId,
-          cabinet_code: p.cabinet_code || cabId,
-          cabinet_name: p.cabinet_name || cabId,
-          segment_id: segId,
-          segment_name: p.segment_name || segId,
-          status: p.status || 'active',
-          color: lineColor,
-          glow_color: lineGlow,
-          is_second_feeder: isSecondCab,
-          pole_count: cabPoles.length,
-          first_pole: cabPoles[0]?.properties?.pole_id,
-          last_pole: cabPoles[cabPoles.length - 1]?.properties?.pole_id,
-        },
-      })
-    })
-
-    return builtFeeders
-  }, [cabinets, selectedSegment, effectivePoles])
+    return []
+  }, [])
 
   return {
     cabinets: filteredCabinets,
@@ -392,5 +338,6 @@ export function useElectricalCascade({
     roadSegmentsData,
     feederLinesData,
     filteredSegmentsData: feederLinesData,
+    isLoadingMapData,
   }
 }

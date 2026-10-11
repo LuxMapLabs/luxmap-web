@@ -245,23 +245,19 @@ export const GisMapLegend: React.FC = () => {
           <span className="font-medium text-slate-700 text-[11px]">Tủ điện điều khiển (Cấp điện / Ngắt)</span>
         </div>
 
-        {/* Electrical Feeder lines */}
+        {/* Electrical Feeder lines & Topology */}
         <div className="col-span-2 pt-1.5 border-t border-slate-200 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="w-4 h-[2.5px] rounded-full bg-sky-500 shrink-0" />
-            <span className="font-medium text-slate-700 text-[11px]">Lộ điện Tủ A</span>
+            <span className="w-4 h-[2px] rounded-full bg-emerald-500 shrink-0" />
+            <span className="font-medium text-slate-700 text-[11px]">Sơ đồ cấp nguồn (Trụ → Cột)</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-4 h-[2.5px] rounded-full bg-purple-500 shrink-0" />
-            <span className="font-medium text-slate-700 text-[11px]">Lộ điện Tủ B</span>
+            <span className="w-4 h-[2px] rounded-full bg-rose-500 shrink-0" />
+            <span className="font-medium text-slate-700 text-[11px]">Lộ ngắt điện / Mất nguồn</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-4 h-[2.5px] rounded-full bg-rose-500 shrink-0" />
-            <span className="font-medium text-slate-700 text-[11px]">Lộ ngắt điện / Mất điện</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-4 h-[2px] border-b border-dashed border-slate-400 shrink-0" />
-            <span className="font-medium text-slate-500 text-[11px]">Tuyến đường giao thông</span>
+            <span className="w-4 h-[4.5px] rounded-sm bg-slate-400 shrink-0" />
+            <span className="font-medium text-slate-600 text-[11px]">Tuyến đường giao thông (Trục tim đường)</span>
           </div>
         </div>
       </div>

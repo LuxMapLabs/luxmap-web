@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { RootState, AppDispatch } from '../../redux/store'
 import * as maplibregl from 'maplibre-gl'
 import type { SegmentInfo } from '../../pages/gis-map/GisMapPage'
 import { getFeederTooltipHtml, getRoadSegmentTooltipHtml } from '../../utils/gis-map/tooltipUtils'
+import { fetchCabinetTopologyRequest, clearCabinetTopology } from '../../feature/map/mapSlice'
 
 interface UseFeederLinesLayerProps {
   map: maplibregl.Map | null
@@ -31,11 +34,13 @@ export function useFeederLinesLayer({
   onSelectSegment,
   onSelectCabinet,
 }: UseFeederLinesLayerProps) {
+  const dispatch = useDispatch<AppDispatch>()
+  const { cabinetTopologyEdges } = useSelector((state: RootState) => state.map)
   // 1. Add Sources & Layers on Map Load
   useEffect(() => {
     if (!map || !isMapLoaded) return
 
-    // A. Road Segments Centerline (Trục tim đường giao thông cơ sở - đường nét đứt xám bạc / xanh slate)
+    // A. Road Segments Centerline (Hành lang trục tuyến đường - Nét liền to bản, vững chắc)
     if (!map.getSource('road-segments')) {
       map.addSource('road-segments', {
         type: 'geojson',
@@ -45,7 +50,7 @@ export function useFeederLinesLayer({
         },
       })
 
-      // Lớp viền nền mờ cho tim đường (nổi bật trên ảnh vệ tinh)
+      // Lớp viền nền đậm tạo độ tương phản cho tuyến đường trên nền ảnh vệ tinh / bản đồ
       map.addLayer({
         id: 'road-segments-bg',
         type: 'line',
@@ -54,12 +59,12 @@ export function useFeederLinesLayer({
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': '#0f172a',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2.5, 12, 4.0, 16, 5.5],
-          'line-opacity': 0.45,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 4.0, 12, 7.5, 16, 12.0],
+          'line-opacity': 0.55,
         },
       })
 
-      // Lớp nét đứt màu slate thể hiện trục tuyến đường giao thông
+      // Lớp mặt tuyến đường nét liền (Solid line, không nét đứt) to bản màu xám slate
       map.addLayer({
         id: 'road-segments-line',
         type: 'line',
@@ -67,15 +72,14 @@ export function useFeederLinesLayer({
         minzoom: 8.5,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#94a3b8',
-          'line-dasharray': [4, 2.5],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.8, 12, 2.6, 16, 3.8],
+          'line-color': '#64748b',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 3.0, 12, 5.5, 16, 9.0],
           'line-opacity': 0.85,
         },
       })
     }
 
-    // B. Electrical Feeder Lines (Tuyến dây điện chiếu sáng nổi phía trên tim đường)
+    // B. Electrical Feeder & Topology Edges (Sơ đồ cấp nguồn Trụ → Cột, thanh mảnh nằm ĐÈ LÊN TRÊN tuyến đường)
     const initialFeeders = feederLinesData || filteredSegmentsData
     if (!map.getSource('feeder-lines')) {
       map.addSource('feeder-lines', {
@@ -86,7 +90,7 @@ export function useFeederLinesLayer({
         },
       })
 
-      // Glow layer (Hào quang phát sáng nhận diện đường dây)
+      // Glow layer (Hào quang nhẹ quanh đường dây điện)
       map.addLayer({
         id: 'feeder-lines-glow',
         type: 'line',
@@ -94,14 +98,18 @@ export function useFeederLinesLayer({
         minzoom: 9.5,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['coalesce', ['get', 'glow_color'], ['case', ['==', ['get', 'status'], 'fault'], '#e11d48', '#059669']],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 13, 5.5, 16, 8],
-          'line-opacity': ['interpolate', ['linear'], ['zoom'], 12.0, 0, 13.0, 0.45],
-          'line-blur': 2.5,
+          'line-color': [
+            'coalesce',
+            ['get', 'glow_color'],
+            ['case', ['==', ['get', 'status'], 'fault'], '#e11d48', '#10b981'],
+          ],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 13, 4.0, 16, 5.5],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, 0, 12.5, 0.45],
+          'line-blur': 1.5,
         },
       })
 
-      // Core layer (Đường dây điện sắc nét, liên tục từ Tủ điện qua các cột đèn)
+      // Core layer (Đường nét liền thanh mảnh, sắc nét 1.4px - 2.8px, nổi trên lòng đường)
       map.addLayer({
         id: 'feeder-lines-core',
         type: 'line',
@@ -109,9 +117,13 @@ export function useFeederLinesLayer({
         minzoom: 9.5,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['coalesce', ['get', 'color'], ['case', ['==', ['get', 'status'], 'fault'], '#f43f5e', '#10b981']],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.8, 13, 2.6, 16, 3.6],
-          'line-opacity': ['interpolate', ['linear'], ['zoom'], 12.0, 0, 13.0, 0.95],
+          'line-color': [
+            'coalesce',
+            ['get', 'color'],
+            ['case', ['==', ['get', 'status'], 'fault'], '#f43f5e', '#10b981'],
+          ],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.4, 13, 2.0, 16, 2.8],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, 0, 12.5, 0.95],
         },
       })
     }
@@ -218,11 +230,8 @@ export function useFeederLinesLayer({
       const p = e.features[0].properties || {}
       const segId = p.segment_id || 'SEG-001'
 
-      if (onSelectCabinet && p.cabinet_id) {
-        onSelectCabinet(p, [e.lngLat.lng, e.lngLat.lat])
-      } else {
-        onSelectSegment(segId)
-      }
+      // BẮT BUỘC: Khi click vào đường dây điện chạy dọc theo tuyến đường, luôn mở Panel Tuyến đường (Segment), tuyệt đối không mở panel Feeder hay Cabinet.
+      onSelectSegment(segId)
     }
 
     map.on('mousemove', 'feeder-lines-core', handleFeederMouseMove)
@@ -243,7 +252,80 @@ export function useFeederLinesLayer({
     }
   }, [map, isMapLoaded, onSelectSegment, onSelectCabinet])
 
-  // 2. Update Source data when dynamic data changes
+  // 2. Fetch and render Cabinet Topology Edges via Redux Saga when a Cabinet is selected
+  useEffect(() => {
+    if (!map || !isMapLoaded) return
+
+    const selCabId = selectedCabinet?.cabinet_id
+
+    if (selCabId) {
+      dispatch(fetchCabinetTopologyRequest(selCabId))
+    } else {
+      dispatch(clearCabinetTopology())
+    }
+  }, [dispatch, map, isMapLoaded, selectedCabinet])
+
+  // 3. Render Topology Edges into MapLibre Source when Redux edges change
+  useEffect(() => {
+    if (!map || !isMapLoaded) return
+
+    const feederSrc = map.getSource('feeder-lines') as maplibregl.GeoJSONSource | undefined
+    if (!feederSrc) return
+
+    const selCabId = selectedCabinet?.cabinet_id
+
+    if (!selCabId || !cabinetTopologyEdges || cabinetTopologyEdges.length === 0) {
+      feederSrc.setData({
+        type: 'FeatureCollection',
+        features: feederLinesData || filteredSegmentsData || [],
+      })
+      return
+    }
+
+    const FEEDER_COLOR_PALETTE = [
+      { core: '#10b981', glow: '#059669' }, // Emerald
+      { core: '#3b82f6', glow: '#2563eb' }, // Blue
+      { core: '#f59e0b', glow: '#d97706' }, // Amber
+      { core: '#8b5cf6', glow: '#7c3aed' }, // Purple
+      { core: '#06b6d4', glow: '#0891b2' }, // Cyan
+      { core: '#ec4899', glow: '#db2777' }, // Pink
+      { core: '#f97316', glow: '#ea580c' }, // Orange
+    ]
+
+    const getFeederTheme = (feederId?: string | null) => {
+      if (!feederId) return FEEDER_COLOR_PALETTE[0]
+      let hash = 0
+      for (let i = 0; i < feederId.length; i++) {
+        hash = feederId.charCodeAt(i) + ((hash << 5) - hash)
+      }
+      const index = Math.abs(hash) % FEEDER_COLOR_PALETTE.length
+      return FEEDER_COLOR_PALETTE[index]
+    }
+
+    const features = cabinetTopologyEdges.map((feat: any) => {
+      const p = feat.properties || {}
+      const isFault = selectedCabinet?.status === 'fault'
+      const theme = getFeederTheme(p.feeder_id)
+      return {
+        ...feat,
+        properties: {
+          ...p,
+          cabinet_id: selCabId,
+          cabinet_name: selectedCabinet?.cabinet_name || selCabId,
+          status: isFault ? 'fault' : 'active',
+          color: isFault ? '#f43f5e' : theme.core,
+          glow_color: isFault ? '#e11d48' : theme.glow,
+        },
+      }
+    })
+
+    feederSrc.setData({
+      type: 'FeatureCollection',
+      features,
+    })
+  }, [map, isMapLoaded, selectedCabinet, cabinetTopologyEdges, feederLinesData, filteredSegmentsData])
+
+  // 3. Update Road Segments Source data
   useEffect(() => {
     if (!map || !isMapLoaded) return
 
@@ -254,94 +336,5 @@ export function useFeederLinesLayer({
         features: roadSegmentsData || [],
       })
     }
-
-    const feederSrc = map.getSource('feeder-lines') as maplibregl.GeoJSONSource | undefined
-    const feats = feederLinesData || filteredSegmentsData || []
-    if (feederSrc) {
-      feederSrc.setData({
-        type: 'FeatureCollection',
-        features: feats,
-      })
-    }
-  }, [map, isMapLoaded, roadSegmentsData, feederLinesData, filteredSegmentsData])
-
-  // 3. Highlight Selected Cabinet's Feeder Line (Làm nổi bật tuyến dây của Tủ đang chọn)
-  useEffect(() => {
-    if (!map || !isMapLoaded) return
-    if (!map.getLayer('feeder-lines-core')) return
-
-    const selCabId = selectedCabinet?.cabinet_id
-
-    if (selCabId) {
-      map.setPaintProperty('feeder-lines-core', 'line-opacity', [
-        'case',
-        ['==', ['get', 'cabinet_id'], selCabId],
-        1.0,
-        0.2,
-      ])
-      map.setPaintProperty('feeder-lines-core', 'line-width', [
-        'case',
-        ['==', ['get', 'cabinet_id'], selCabId],
-        4.5,
-        1.8,
-      ])
-      if (map.getLayer('feeder-lines-glow')) {
-        map.setPaintProperty('feeder-lines-glow', 'line-opacity', [
-          'case',
-          ['==', ['get', 'cabinet_id'], selCabId],
-          0.85,
-          0.05,
-        ])
-        map.setPaintProperty('feeder-lines-glow', 'line-width', [
-          'case',
-          ['==', ['get', 'cabinet_id'], selCabId],
-          9.0,
-          3.0,
-        ])
-      }
-    } else {
-      map.setPaintProperty('feeder-lines-core', 'line-opacity', [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        12.0,
-        0,
-        13.0,
-        0.95,
-      ])
-      map.setPaintProperty('feeder-lines-core', 'line-width', [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        1.8,
-        13,
-        2.6,
-        16,
-        3.6,
-      ])
-      if (map.getLayer('feeder-lines-glow')) {
-        map.setPaintProperty('feeder-lines-glow', 'line-opacity', [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          12.0,
-          0,
-          13.0,
-          0.45,
-        ])
-        map.setPaintProperty('feeder-lines-glow', 'line-width', [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          10,
-          3,
-          13,
-          5.5,
-          16,
-          8,
-        ])
-      }
-    }
-  }, [map, isMapLoaded, selectedCabinet])
+  }, [map, isMapLoaded, roadSegmentsData])
 }
