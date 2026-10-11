@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   X,
   Play,
@@ -13,6 +13,8 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { ScheduleCase, SchedulePhase } from '../../../types/workSchedule'
+import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
+import { EvidenceItem } from '../../../types/workorders/orders'
 import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
 import fieldBrokenFixtureImg from '../../../assets/images/field-broken-fixture.jpg'
 import fieldLuxmeterImg from '../../../assets/images/field-luxmeter-4lux.jpg'
@@ -33,32 +35,64 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const [activeTab, setActiveTab] = useState<'video' | 'photos' | 'ai'>('video')
   const [isPlaying, setIsPlaying] = useState(false)
   const [zoomImage, setZoomImage] = useState<string | null>(null)
+  const [backendEvidence, setBackendEvidence] = useState<EvidenceItem[]>([])
+
+  // Tải ảnh bằng chứng nghiệm thu từ Backend nếu có mã lệnh công tác
+  useEffect(() => {
+    if (isOpen && phase?.workOrderId) {
+      workScheduleAPI
+        .getWorkOrderEvidence(phase.workOrderId)
+        .then((res) => {
+          if (res.items && res.items.length > 0) {
+            setBackendEvidence(res.items)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [isOpen, phase?.workOrderId])
 
   if (!isOpen || !caseItem || !phase || !phase.report) return null
 
   const report = phase.report
 
-  // Danh sách hình ảnh bằng chứng thực địa
-  const evidencePhotos = [
-    {
-      src: fieldSurveyNightImg,
-      title: 'Ảnh 1: Cột đèn thực địa ban đêm (POLE-0041)',
-      desc: 'Chiếu sáng chập chờn, quang thông suy giảm nghiêm trọng khi xe tải đi qua.',
-      tag: 'Hiện trường đêm',
-    },
-    {
-      src: fieldBrokenFixtureImg,
-      title: 'Ảnh 2: Chao đèn & Đui đèn bị cháy hỏng',
-      desc: 'Cận cảnh đui đèn bị nứt vỡ cách điện, tiếp xúc lỏng gây phóng điện hồ quang.',
-      tag: 'Chi tiết hỏng hóc',
-    },
-    {
-      src: fieldLuxmeterImg,
-      title: 'Ảnh 3: Kết quả đo máy Luxmeter tại mặt đường',
-      desc: 'Độ rọi đo được chỉ 4.2 Lux (Tiêu chuẩn kỹ thuật chiếu sáng nông thôn: ≥ 15 Lux).',
-      tag: 'Đo kiểm thiết bị',
-    },
-  ]
+  // Danh sách hình ảnh bằng chứng thực địa (Ưu tiên ảnh từ Backend, fallback demo nếu chưa có)
+  const displayPhotos =
+    backendEvidence.length > 0
+      ? backendEvidence.map((ev, idx) => ({
+          src:
+            ev.original_url ||
+            ev.thumbnail_url ||
+            workScheduleAPI.getEvidenceImageUrl(ev.evidence_id || '', 'original'),
+          title: `Ảnh ${idx + 1}: ${
+            ev.kind === 'before'
+              ? 'Trước sửa chữa'
+              : ev.kind === 'after'
+              ? 'Sau sửa chữa'
+              : 'Hiện trường'
+          }`,
+          desc: `Thời điểm ghi nhận: ${ev.captured_at || ev.uploaded_at || 'Đã ghi nhận'}`,
+          tag: ev.kind === 'before' ? 'Trước sửa' : ev.kind === 'after' ? 'Sau sửa' : 'Hiện trường',
+        }))
+      : [
+          {
+            src: fieldSurveyNightImg,
+            title: 'Ảnh 1: Cột đèn thực địa ban đêm (POLE-0041)',
+            desc: 'Chiếu sáng chập chờn, quang thông suy giảm nghiêm trọng khi xe tải đi qua.',
+            tag: 'Hiện trường đêm',
+          },
+          {
+            src: fieldBrokenFixtureImg,
+            title: 'Ảnh 2: Chao đèn & Đui đèn bị cháy hỏng',
+            desc: 'Cận cảnh đui đèn bị nứt vỡ cách điện, tiếp xúc lỏng gây phóng điện hồ quang.',
+            tag: 'Chi tiết hỏng hóc',
+          },
+          {
+            src: fieldLuxmeterImg,
+            title: 'Ảnh 3: Kết quả đo máy Luxmeter tại mặt đường',
+            desc: 'Độ rọi đo được chỉ 4.2 Lux (Tiêu chuẩn kỹ thuật chiếu sáng nông thôn: ≥ 15 Lux).',
+            tag: 'Đo kiểm thiết bị',
+          },
+        ]
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -120,7 +154,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
             }`}
           >
             <Camera className="w-4 h-4" />
-            <span>Ảnh Chụp Bằng Chứng ({evidencePhotos.length})</span>
+            <span>Ảnh Chụp Bằng Chứng ({displayPhotos.length})</span>
           </button>
 
           <button
@@ -237,7 +271,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           {activeTab === 'photos' && (
             <div className="flex flex-col gap-4 animate-in fade-in duration-150">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {evidencePhotos.map((photo, idx) => (
+                {displayPhotos.map((photo, idx) => (
                   <div
                     key={idx}
                     onClick={() => setZoomImage(photo.src)}

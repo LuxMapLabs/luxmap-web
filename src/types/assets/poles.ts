@@ -31,6 +31,9 @@ export interface PoleListItem {
     segment_id: string | null
     feeder_id?: string | null
     feeder_source?: TopologySource
+    cabinet_id?: string | null
+    cabinet_name?: string | null
+    cabinet_source?: TopologySource
     commune_id: string | null
     data_source: DataSource
     near_sensitive_poi: boolean

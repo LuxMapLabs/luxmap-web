@@ -7,100 +7,135 @@ import {
 } from '../../types/workSchedule'
 import { workScheduleAPI, GetWorkOrdersFilter } from './workScheduleAPI'
 
-// Dữ liệu mẫu chuẩn nghiệp vụ v1.3 khi chưa có dữ liệu hoặc offline
-const INITIAL_DEMO_CASES: ScheduleCase[] = [
-  {
-    code: 'SCH-001',
-    title: 'Sự cố mất điện & đứt bóng Tuyến A',
-    segment: 'Tuyến A - Trục chính liên xã Phước Hậu (SEG-001)',
-    currentPhaseIndex: 0,
-    isTerminated: false,
-    phases: [
-      {
-        phaseType: 'survey',
-        name: '1. Khảo sát',
-        date: '2026-10-02',
-        assigneeId: 'USR-004',
-        assigneeName: 'Khang Lê',
-        status: 'reported',
-        notes: 'Tiến hành quét video AI dọc tuyến 3.2km vào ban đêm.',
-        report: {
-          submittedAt: '2026-10-02 22:30',
-          summary: 'Quét 3.2km tuyến A phát hiện 2 cột POLE-0019 (tắt) và POLE-0022 (mờ).',
-          videoUrl: 'survey_tuyenA.mp4',
-          aiDetections: [
-            { poleId: 'POLE-0019', issue: 'Đèn tắt hoàn toàn', confidence: 0.95 },
-            { poleId: 'POLE-0022', issue: 'Đèn mờ quang thông thấp', confidence: 0.88 },
-          ],
-        },
-      },
-    ],
-  },
-  {
-    code: 'SCH-002',
-    title: 'Kiểm tra đo độ rọi & an toàn điện Tuyến B',
-    segment: 'Tuyến B - Đường liên thôn Mỹ Hạnh Bắc (SEG-002)',
-    currentPhaseIndex: 1,
-    isTerminated: false,
-    phases: [
-      {
-        phaseType: 'survey',
-        name: '1. Khảo sát',
-        date: '2026-10-01',
-        assigneeId: 'USR-004',
-        assigneeName: 'Khang Lê',
-        status: 'ended', // Đã END khi mở bước Kiểm tra
-        notes: 'Khảo sát định kỳ ban đêm',
-        report: {
-          submittedAt: '2026-10-01 21:00',
-          summary: 'Phát hiện bóng POLE-0041 chập chờn khi có phương tiện trọng tải lớn đi qua.',
-          aiDetections: [
-            { poleId: 'POLE-0041', issue: 'Đèn chập chờn đui lỏng', confidence: 0.91 },
-          ],
-        },
-      },
-      {
-        phaseType: 'inspection',
-        name: '2. Kiểm tra',
-        date: '2026-10-04',
-        assigneeId: 'USR-004',
-        assigneeName: 'Khang Lê',
-        status: 'reported',
-        notes: 'Đo độ rọi và kiểm tra tủ điều khiển cụm B',
-        report: {
-          submittedAt: '2026-10-04 15:30',
-          summary: 'Đo luxmeter tại mặt đường đạt 4 Lux. Cần thay bóng LED 100W và siết lại đui đèn.',
-          luxMeasured: '4 Lux (Rất yếu)',
-          suggestedMaterialsNote: '01 bóng LED 100W Rạng Đông, cờ lê 17, băng keo cách điện 3M',
-        },
-      },
-    ],
-  },
-  {
-    code: 'SCH-003',
-    title: 'Khảo sát định kỳ chiếu sáng xã Đức Hòa Đông',
-    segment: 'Tuyến C - Đường liên thôn Đức Hòa Đông (SEG-003)',
-    currentPhaseIndex: 0,
-    isTerminated: true,
-    endReason: 'Khảo sát hoàn tất, toàn bộ 42 cột đạt chuẩn ánh sáng nông thôn, không có sự cố.',
-    phases: [
-      {
-        phaseType: 'survey',
-        name: '1. Khảo sát',
-        date: '2026-10-03',
-        assigneeId: 'USR-005',
-        assigneeName: 'Nguyễn Văn Hoàng',
-        status: 'ended',
-        notes: 'Khảo sát định kỳ quý 4',
-        report: {
-          submittedAt: '2026-10-03 23:00',
-          summary: 'Đèn sáng đều toàn tuyến, dây dẫn an toàn.',
-          aiDetections: [],
-        },
-      },
-    ],
-  },
-]
+import mockWorkOrdersData from '../../data/mock-work-orders.json'
+
+function parseWorkOrderItem(raw: any) {
+  return {
+    workOrderId: raw.work_order_id || raw.workOrderId || '',
+    caseId: raw.case_id || raw.caseId || raw.work_order_id || raw.workOrderId || '',
+    parentWorkOrderId: raw.parent_work_order_id || raw.parentWorkOrderId,
+    title: raw.title || 'Lệnh công tác',
+    segment: raw.segment_name || raw.segment || raw.segment_id || 'Tuyến chiếu sáng phụ trách',
+    taskKind: String(raw.task_kind || raw.taskKind || 'inspection').toLowerCase(),
+    woStatus: String(raw.wo_status || raw.woStatus || 'open').toLowerCase(),
+    assignedTo: raw.assigned_to || raw.assignedTo,
+    assigneeName: raw.assignee_name || raw.assigneeName,
+    scheduledDate: raw.scheduled_date || raw.scheduledDate,
+    createdAt: raw.created_at || raw.createdAt,
+    note: raw.note,
+    materialsNote: raw.materials_note || raw.materialsNote,
+    materialsUsed: raw.materials_used || raw.materialsUsed,
+    reportNote: raw.report_note || raw.reportNote,
+    reviewNote: raw.review_note || raw.reviewNote,
+    videoUrl: raw.video_url || raw.videoUrl,
+    aiDetections: raw.ai_detections || raw.aiDetections,
+    luxMeasured: raw.lux_measured || raw.luxMeasured,
+    endReason: raw.end_reason || raw.endReason,
+    allowedActions: raw.allowed_actions || raw.allowedActions || [],
+  }
+}
+
+const ASSIGNEE_DISPLAY_NAMES: Record<string, string> = {
+  'USR-004': 'Khang Lê',
+  'USR-005': 'Nguyễn Văn Hoàng',
+  'USR-006': 'Trần Minh Tuấn',
+  'USR-khang': 'Khang Lê',
+}
+
+function mapBackendItemsToScheduleCases(rawItems: any[]): ScheduleCase[] {
+  if (!rawItems || rawItems.length === 0) return []
+
+  const casesMap: Record<string, ScheduleCase> = {}
+
+  rawItems.forEach((raw) => {
+    const item = parseWorkOrderItem(raw)
+    const caseKey = item.caseId
+
+    if (!casesMap[caseKey]) {
+      casesMap[caseKey] = {
+        code: caseKey,
+        title: item.title,
+        segment: item.segment,
+        currentPhaseIndex: 0,
+        isTerminated: item.woStatus === 'cancelled' || Boolean(item.endReason),
+        endReason: item.endReason,
+        phases: [],
+      }
+    }
+
+    const isRepair = item.taskKind.includes('repair')
+    const isSurvey = item.taskKind.includes('survey')
+    const phaseType: TaskKind = isRepair ? 'repair' : isSurvey ? 'survey' : 'inspection'
+    const phaseName = isRepair ? '3. Sửa chữa' : isSurvey ? '1. Khảo sát' : '2. Kiểm tra'
+
+    let status: 'pending' | 'reported' | 'ended' = 'pending'
+    if (item.woStatus === 'done') status = 'reported'
+    else if (item.woStatus === 'verified' || item.woStatus === 'cancelled') status = 'ended'
+
+    casesMap[caseKey].phases.push({
+      phaseType,
+      name: phaseName,
+      date: item.scheduledDate || item.createdAt?.substring(0, 10) || '2026-10-01',
+      assigneeId: item.assignedTo || 'USR-004',
+      assigneeName:
+        item.assigneeName ||
+        ASSIGNEE_DISPLAY_NAMES[item.assignedTo] ||
+        item.assignedTo ||
+        'Kỹ sư hiện trường',
+      status,
+      notes: item.note || item.title,
+      materialsNote: item.materialsNote,
+      workOrderId: item.workOrderId,
+      report:
+        item.reportNote || item.woStatus === 'done' || item.woStatus === 'verified'
+          ? {
+              submittedAt: item.createdAt || `${item.scheduledDate} 17:00`,
+              summary: item.reportNote || 'Báo cáo kỹ thuật hiện trường',
+              usedMaterialsNote: item.materialsUsed,
+              suggestedMaterialsNote: item.materialsNote,
+              luxMeasured: item.luxMeasured,
+              videoUrl: item.videoUrl,
+              aiDetections: item.aiDetections,
+            }
+          : undefined,
+    })
+  })
+
+  const result = Object.values(casesMap)
+  result.forEach((c) => {
+    c.currentPhaseIndex = Math.max(0, c.phases.length - 1)
+  })
+
+  return result
+}
+
+// Khởi tạo dữ liệu mẫu chuẩn từ file src/data/mock-work-orders.json
+const INITIAL_DEMO_CASES: ScheduleCase[] = mapBackendItemsToScheduleCases(mockWorkOrdersData.items)
+
+const STORAGE_KEY = 'luxmap_work_schedule_cases_v4'
+
+function loadSavedCases(): ScheduleCase[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    }
+  } catch (e) {
+    console.warn('Lỗi đọc dữ liệu lịch làm việc từ localStorage:', e)
+  }
+  return INITIAL_DEMO_CASES
+}
+
+function saveCasesToStorage(cases: ScheduleCase[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cases))
+  } catch (e) {
+    console.warn('Lỗi lưu dữ liệu lịch làm việc vào localStorage:', e)
+  }
+}
 
 export interface WorkScheduleState {
   cases: ScheduleCase[]
@@ -115,7 +150,7 @@ export interface WorkScheduleState {
 }
 
 const initialState: WorkScheduleState = {
-  cases: INITIAL_DEMO_CASES,
+  cases: loadSavedCases(),
   selectedCaseCode: null,
   viewingPhaseIndex: 0,
   currentMonth: 9, // Tháng 10/2026
@@ -218,80 +253,18 @@ export const cancelWorkOrderBackendThunk = createAsyncThunk(
   }
 )
 
-function parseWorkOrderItem(raw: any) {
-  return {
-    workOrderId: raw.work_order_id || raw.workOrderId || '',
-    caseId: raw.case_id || raw.caseId || raw.work_order_id || raw.workOrderId || '',
-    parentWorkOrderId: raw.parent_work_order_id || raw.parentWorkOrderId,
-    title: raw.title || 'Lệnh công tác',
-    taskKind: String(raw.task_kind || raw.taskKind || 'inspection').toLowerCase(),
-    woStatus: String(raw.wo_status || raw.woStatus || 'open').toLowerCase(),
-    assignedTo: raw.assigned_to || raw.assignedTo,
-    scheduledDate: raw.scheduled_date || raw.scheduledDate,
-    createdAt: raw.created_at || raw.createdAt,
-    materialsNote: raw.materials_note || raw.materialsNote,
-    materialsUsed: raw.materials_used || raw.materialsUsed,
-    reportNote: raw.report_note || raw.reportNote,
-    reviewNote: raw.review_note || raw.reviewNote,
-    allowedActions: raw.allowed_actions || raw.allowedActions || [],
-  }
-}
-
-function mapBackendItemsToScheduleCases(rawItems: any[]): ScheduleCase[] {
-  if (!rawItems || rawItems.length === 0) return []
-
-  const casesMap: Record<string, ScheduleCase> = {}
-
-  rawItems.forEach((raw) => {
-    const item = parseWorkOrderItem(raw)
-    const caseKey = item.caseId
-
-    if (!casesMap[caseKey]) {
-      casesMap[caseKey] = {
-        code: caseKey,
-        title: item.title,
-        segment: 'Tuyến chiếu sáng phụ trách',
-        currentPhaseIndex: 0,
-        isTerminated: item.woStatus === 'cancelled',
-        phases: [],
-      }
+export const returnWorkOrderBackendThunk = createAsyncThunk(
+  'workSchedule/returnWorkOrderBackend',
+  async ({ workOrderId, note }: { workOrderId: string; note: string }, { dispatch, rejectWithValue }) => {
+    try {
+      const result = await workScheduleAPI.returnWorkOrder(workOrderId, { note })
+      dispatch(fetchWorkOrdersThunk(undefined))
+      return result
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Không thể yêu cầu làm lại trên máy chủ')
     }
-
-    const isRepair = item.taskKind.includes('repair')
-    const phaseType: TaskKind = isRepair ? 'repair' : 'inspection'
-
-    let status: 'pending' | 'reported' | 'ended' = 'pending'
-    if (item.woStatus === 'done') status = 'reported'
-    else if (item.woStatus === 'verified' || item.woStatus === 'cancelled') status = 'ended'
-
-    casesMap[caseKey].phases.push({
-      phaseType,
-      name: isRepair ? '3. Sửa chữa' : '2. Kiểm tra',
-      date: item.scheduledDate || item.createdAt?.substring(0, 10) || '2026-10-01',
-      assigneeId: item.assignedTo || 'USR-004',
-      assigneeName: item.assignedTo || 'Kỹ sư bảo trì',
-      status,
-      notes: item.title,
-      materialsNote: item.materialsNote,
-      workOrderId: item.workOrderId,
-      report:
-        item.woStatus === 'done' || item.woStatus === 'verified'
-          ? {
-              submittedAt: item.createdAt || '2026-10-02 21:00',
-              summary: item.reportNote || 'Báo cáo kỹ thuật hiện trường',
-              usedMaterialsNote: item.materialsUsed,
-            }
-          : undefined,
-    })
-  })
-
-  const result = Object.values(casesMap)
-  result.forEach((c) => {
-    c.currentPhaseIndex = Math.max(0, c.phases.length - 1)
-  })
-
-  return result
-}
+  }
+)
 
 const workScheduleSlice = createSlice({
   name: 'workSchedule',
@@ -376,6 +349,7 @@ const workScheduleSlice = createSlice({
         ],
       }
       state.cases.unshift(newCase)
+      saveCasesToStorage(state.cases)
     },
 
     // -------------------------------------------------------------
@@ -426,6 +400,7 @@ const workScheduleSlice = createSlice({
       c.phases.push(newPhase)
       c.currentPhaseIndex = c.phases.length - 1
       state.viewingPhaseIndex = c.currentPhaseIndex
+      saveCasesToStorage(state.cases)
     },
 
     // -------------------------------------------------------------
@@ -461,6 +436,7 @@ const workScheduleSlice = createSlice({
               ]
             : undefined,
       }
+      saveCasesToStorage(state.cases)
     },
 
     // -------------------------------------------------------------
@@ -476,6 +452,7 @@ const workScheduleSlice = createSlice({
       if (currP) {
         currP.status = 'ended'
       }
+      saveCasesToStorage(state.cases)
     },
 
     // -------------------------------------------------------------
@@ -491,6 +468,7 @@ const workScheduleSlice = createSlice({
       if (currP) {
         currP.status = 'ended'
       }
+      saveCasesToStorage(state.cases)
     },
 
     // -------------------------------------------------------------
@@ -512,6 +490,38 @@ const workScheduleSlice = createSlice({
       }
       c.isTerminated = true
       c.endReason = 'Đã hoàn tất sửa chữa và gửi hồ sơ nghiệm thu lên Superior.'
+      saveCasesToStorage(state.cases)
+    },
+
+    // -------------------------------------------------------------
+    // QUẢN LÝ YÊU CẦU LÀM LẠI (TRẢ VỀ CHO KỸ SƯ BỔ SUNG BÁO CÁO)
+    // -------------------------------------------------------------
+    returnPhaseToEngineer(
+      state,
+      action: PayloadAction<{ code: string; reviewNote: string }>
+    ) {
+      const c = state.cases.find((item) => item.code === action.payload.code)
+      if (!c) return
+
+      const currP = c.phases[c.currentPhaseIndex]
+      if (currP) {
+        currP.status = 'pending'
+        currP.notes = `Yêu cầu làm lại: ${action.payload.reviewNote}`
+        if (currP.report) {
+          currP.report.summary = `[CẦN BỔ SUNG / SỬA LẠI]: ${action.payload.reviewNote} (Báo cáo trước: ${currP.report.summary})`
+        }
+      }
+      saveCasesToStorage(state.cases)
+    },
+
+    // -------------------------------------------------------------
+    // KHÔI PHỤC LẠI DỮ LIỆU GỐC BAN ĐẦU
+    // -------------------------------------------------------------
+    resetScheduleToDefault(state) {
+      try {
+        localStorage.removeItem(STORAGE_KEY)
+      } catch {}
+      state.cases = INITIAL_DEMO_CASES
     },
   },
   extraReducers: (builder) => {
@@ -526,6 +536,7 @@ const workScheduleSlice = createSlice({
         const mapped = mapBackendItemsToScheduleCases(items)
         if (mapped.length > 0) {
           state.cases = mapped
+          saveCasesToStorage(state.cases)
         }
       })
       .addCase(fetchWorkOrdersThunk.rejected, (state, action) => {
@@ -553,6 +564,8 @@ export const {
   rejectAndEndCase,
   endCaseNormally,
   approveRepairAndSubmitSuperior,
+  returnPhaseToEngineer,
+  resetScheduleToDefault,
 } = workScheduleSlice.actions
 
 export default workScheduleSlice.reducer

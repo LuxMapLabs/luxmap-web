@@ -162,8 +162,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   }
 
                   if (isEnded) {
-                    badgeBg = 'bg-slate-100 text-slate-500 border-slate-200 opacity-75'
-                    phaseTitle += ' [ĐÃ END]'
+                    badgeBg = 'bg-slate-100 text-slate-500 border-slate-200 opacity-80'
+                    phaseTitle += ' • Đã chốt'
                   }
 
                   return (

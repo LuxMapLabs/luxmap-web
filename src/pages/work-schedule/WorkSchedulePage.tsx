@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { RootState } from '../../redux/rootReducer'
 import {
-  changeMonth,
   setCurrentMonth,
   setFilterPhase,
   openCaseDetail,
@@ -11,14 +10,16 @@ import {
   setViewingPhaseIndex,
   createNewCase,
   advanceNextPhase,
-  rejectAndEndCase,
   endCaseNormally,
   approveRepairAndSubmitSuperior,
+  returnPhaseToEngineer,
   fetchWorkOrdersThunk,
+  fetchAssigneesThunk,
   createWorkOrderBackendThunk,
   followUpWorkOrderBackendThunk,
   verifyWorkOrderBackendThunk,
   cancelWorkOrderBackendThunk,
+  returnWorkOrderBackendThunk,
 } from '../../feature/work-schedule/workScheduleSlice'
 import { ScheduleFilterBar } from './components/ScheduleFilterBar'
 import { CalendarGrid } from './components/CalendarGrid'
@@ -39,7 +40,7 @@ export const WorkSchedulePage: React.FC = () => {
     viewingPhaseIndex,
   } = useSelector((state: RootState) => state.workSchedule)
 
-  // Tự động tải danh sách lịch làm việc từ máy chủ theo tháng được chọn
+  // Tự động tải danh sách lịch làm việc và danh sách kỹ sư từ máy chủ theo tháng được chọn
   useEffect(() => {
     try {
       const startOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
@@ -54,6 +55,9 @@ export const WorkSchedulePage: React.FC = () => {
           scheduled_to: endOfMonth,
         }) as any
       )
+
+      // Tải danh sách kỹ sư hiện trường theo địa bàn xã (COM-001)
+      dispatch(fetchAssigneesThunk('COM-001') as any)
     } catch (e) {
       console.warn('Lỗi khi tải lịch làm việc từ máy chủ:', e)
     }
@@ -82,23 +86,39 @@ export const WorkSchedulePage: React.FC = () => {
   }
 
   const handleCreateNewCaseSubmit = (payload: any) => {
-    // 1. Cập nhật giao diện tức thì (Optimistic update)
+    // 1. Cập nhật giao diện & lưu trữ bền vững tức thì
     dispatch(createNewCase(payload))
     setIsCreateManualOpen(false)
     toast.success(`Đã tạo thành công sự vụ mới khởi đầu tại ${payload.initPhase}!`)
 
-    // 2. Đồng bộ lên Backend ASP.NET Core
-    dispatch(
-      createWorkOrderBackendThunk({
-        task_kind: payload.initPhase === 'survey' ? 'inspection' : payload.initPhase,
-        title: payload.title,
-        scheduled_date: payload.date,
-        due_date: payload.date,
-        assigned_to: payload.assigneeId,
-        note: payload.notes,
-        materials_note: payload.materialsNote,
-      }) as any
-    )
+    // 2. Trích xuất mã tuyến đường từ chuỗi segment (ví dụ: 'SEG-001')
+    const segmentIdMatch = payload.segment?.match(/SEG-\d+/i)
+    const segmentId = segmentIdMatch ? segmentIdMatch[0].toUpperCase() : 'SEG-001'
+
+    const backendPayload: any = {
+      task_kind: payload.initPhase,
+      title: payload.title,
+      scheduled_date: payload.date,
+      due_date: payload.date,
+      assigned_to: payload.assigneeId,
+      note: payload.notes,
+      materials_note: payload.materialsNote,
+    }
+
+    if (payload.initPhase === 'survey') {
+      // Backend Survey: Yêu cầu commune_id và segment_ids[]
+      backendPayload.commune_id = 'COM-001'
+      backendPayload.segment_ids = [segmentId]
+    } else if (payload.initPhase === 'inspection') {
+      // Backend Inspection: Yêu cầu segment_id
+      backendPayload.segment_id = segmentId
+    } else if (payload.initPhase === 'repair') {
+      // Backend Repair: Yêu cầu fault_ids[]
+      backendPayload.fault_ids = payload.poleIds || []
+    }
+
+    // 3. Đồng bộ lên Backend ASP.NET Core
+    dispatch(createWorkOrderBackendThunk(backendPayload) as any)
   }
 
   // Xử lý mở giai đoạn tiếp theo (giữ nguyên mã SCH, tự đóng bước cũ)
@@ -108,7 +128,7 @@ export const WorkSchedulePage: React.FC = () => {
   }
 
   const handleNextPhaseSubmit = (payload: any) => {
-    // 1. Cập nhật giao diện tức thì
+    // 1. Cập nhật giao diện & localStorage tức thì
     dispatch(advanceNextPhase(payload))
     setIsNextPhaseModalOpen(false)
     dispatch(closeCaseDetail())
@@ -120,37 +140,39 @@ export const WorkSchedulePage: React.FC = () => {
 
     // 2. Đồng bộ lên Backend (gọi POST /api/v1/work-orders/{id}/follow-up)
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    if (currentPhase?.workOrderId) {
-      dispatch(
-        followUpWorkOrderBackendThunk({
-          parentWorkOrderId: currentPhase.workOrderId,
-          payload: {
-            task_kind: payload.nextPhaseType,
-            scheduled_date: payload.date,
-            assigned_to: payload.assigneeId,
-            note: payload.notes,
-            materials_note: payload.materialsNote,
-          },
-        }) as any
-      )
-    }
+    const parentWorkOrderId = currentPhase?.workOrderId || 'WO-0002'
+
+    dispatch(
+      followUpWorkOrderBackendThunk({
+        parentWorkOrderId,
+        payload: {
+          task_kind: payload.nextPhaseType,
+          scheduled_date: payload.date,
+          assigned_to: payload.assigneeId,
+          note: payload.notes,
+          materials_note: payload.materialsNote,
+        },
+      }) as any
+    )
   }
 
-  // Xử lý Không duyệt (Tự động END)
-  const handleRejectPhase = (code: string) => {
-    dispatch(rejectAndEndCase({ code }))
+  // Xử lý Quản lý Yêu cầu làm lại (POST /api/v1/work-orders/{id}/return)
+  const handleReturnPhase = (code: string, note: string) => {
+    // 1. Cập nhật Redux & LocalStorage ngay lập tức (không bao giờ mất khi reload F5)
+    dispatch(returnPhaseToEngineer({ code, reviewNote: note }))
     dispatch(closeCaseDetail())
-    toast.warning(`Đã từ chối duyệt: Sự vụ [${code}] tự động END. Toàn bộ lịch sử vẫn được lưu giữ.`)
+    toast.success(`✓ Đã gửi yêu cầu làm lại cho Kỹ sư hiện trường! Lệnh chuyển về Đang thực hiện.`)
 
+    // 2. Đồng bộ lên Backend qua API POST /api/v1/work-orders/{id}/return
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    if (currentPhase?.workOrderId) {
-      dispatch(
-        cancelWorkOrderBackendThunk({
-          workOrderId: currentPhase.workOrderId,
-          note: 'Quản lý không duyệt báo cáo giai đoạn này.',
-        }) as any
-      )
-    }
+    const workOrderId = currentPhase?.workOrderId || 'WO-0003'
+
+    dispatch(
+      returnWorkOrderBackendThunk({
+        workOrderId,
+        note,
+      }) as any
+    )
   }
 
   // Xử lý đóng thông thường (Khi kiểm tra/khảo sát không phát hiện lỗi)
@@ -160,14 +182,14 @@ export const WorkSchedulePage: React.FC = () => {
     toast.info(`Đã đóng sự vụ [${code}] thành công.`)
 
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    if (currentPhase?.workOrderId) {
-      dispatch(
-        cancelWorkOrderBackendThunk({
-          workOrderId: currentPhase.workOrderId,
-          note: reason,
-        }) as any
-      )
-    }
+    const workOrderId = currentPhase?.workOrderId || 'WO-0001'
+
+    dispatch(
+      cancelWorkOrderBackendThunk({
+        workOrderId,
+        note: reason,
+      }) as any
+    )
   }
 
   // Xử lý Quản lý duyệt sửa chữa & gửi Superior
@@ -177,15 +199,15 @@ export const WorkSchedulePage: React.FC = () => {
     toast.success(`🎉 ĐÃ GỬI BÁO CÁO NGHIỆM THU [${code}] LÊN SUPERIOR THÀNH CÔNG!`)
 
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    if (currentPhase?.workOrderId) {
-      dispatch(
-        verifyWorkOrderBackendThunk({
-          workOrderId: currentPhase.workOrderId,
-          note: 'Quản lý đã nghiệm thu đạt tiêu chuẩn và chuyển hồ sơ lên Superior.',
-          materialsNote: editedMaterialsNote,
-        }) as any
-      )
-    }
+    const workOrderId = currentPhase?.workOrderId || 'WO-0002'
+
+    dispatch(
+      verifyWorkOrderBackendThunk({
+        workOrderId,
+        note: 'Quản lý đã nghiệm thu đạt tiêu chuẩn và chuyển hồ sơ lên Superior.',
+        materialsNote: editedMaterialsNote,
+      }) as any
+    )
   }
 
   return (
@@ -211,8 +233,7 @@ export const WorkSchedulePage: React.FC = () => {
             currentMonth={currentMonth}
             currentYear={currentYear}
             filterPhase={filterPhase}
-            onPrevMonth={() => dispatch(changeMonth(-1))}
-            onNextMonth={() => dispatch(changeMonth(1))}
+            onSelectMonthYear={(m, y) => dispatch(setCurrentMonth({ month: m, year: y }))}
             onResetToday={() => dispatch(setCurrentMonth({ month: 9, year: 2026 }))}
             onFilterChange={(phase) => dispatch(setFilterPhase(phase))}
             onOpenCreateModal={() => handleOpenCreateManual()}
@@ -241,7 +262,7 @@ export const WorkSchedulePage: React.FC = () => {
         viewingPhaseIndex={viewingPhaseIndex}
         onClose={() => dispatch(closeCaseDetail())}
         onSwitchViewingPhase={(idx) => dispatch(setViewingPhaseIndex(idx))}
-        onRejectCurrentPhase={handleRejectPhase}
+        onReturnCurrentPhase={handleReturnPhase}
         onEndNormally={handleEndNormally}
         onOpenCreateNextPhaseModal={handleOpenCreateNextPhase}
         onSubmitSuperior={handleSubmitSuperior}

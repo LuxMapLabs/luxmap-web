@@ -4,6 +4,8 @@ import type {
   WorkOrderDetail,
   WorkOrderItemPagedResult,
   WorkOrderAssigneePagedResult,
+  WorkOrderPolePagedResult,
+  EvidenceItemPagedResult,
   CreateWorkOrderRequest,
   PatchWorkOrderRequest,
   AssignWorkOrderRequest,
@@ -134,5 +136,32 @@ export const workScheduleAPI = {
   async followUpWorkOrder(id: string, payload: FollowUpWorkOrderRequest): Promise<WorkOrderDetail> {
     const response = await apiClient.post<WorkOrderDetail>(`/work-orders/${id}/follow-up`, payload)
     return response.data
+  },
+
+  /**
+   * Lấy danh sách cột đèn theo lệnh công tác từ Backend
+   */
+  async getWorkOrderPoles(id: string, page = 1): Promise<WorkOrderPolePagedResult> {
+    const response = await apiClient.get<WorkOrderPolePagedResult>(`/work-orders/${id}/poles`, {
+      params: { page },
+    })
+    return response.data
+  },
+
+  /**
+   * Lấy danh sách ảnh chụp bằng chứng nghiệm thu từ Backend
+   */
+  async getWorkOrderEvidence(id: string, page = 1): Promise<EvidenceItemPagedResult> {
+    const response = await apiClient.get<EvidenceItemPagedResult>(`/work-orders/${id}/evidence`, {
+      params: { page },
+    })
+    return response.data
+  },
+
+  /**
+   * Helper lấy URL trực tiếp của ảnh bằng chứng (thumbnail hoặc ảnh gốc)
+   */
+  getEvidenceImageUrl(evidenceId: string, type: 'thumbnail' | 'original' = 'thumbnail'): string {
+    return `/api/v1/evidence/${evidenceId}/${type}`
   },
 }
