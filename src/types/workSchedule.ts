@@ -1,92 +1,50 @@
 /**
- * Loại tác vụ của lịch làm việc:
- * - survey: Khảo sát tuyến (quét video AI)
- * - inspection: Kiểm tra hiện trường (đo Lux, kiểm tra cột)
- * - repair: Sửa chữa / Thay thế thiết bị
+ * Types cho Work Schedule (Lịch làm việc & Tiến trình sự vụ)
+ * Tái sử dụng trực tiếp 100% các kiểu dữ liệu đã sinh từ Backend (API Types First).
+ * Chỉ định nghĩa tay các kiểu dữ liệu phục vụ riêng cho UI State (ScheduleCase, SchedulePhase).
  */
-export type TaskKind = 'survey' | 'inspection' | 'repair'
 
-/**
- * Trạng thái của lệnh theo đặc tả Backend:
- * - open: Mới tạo
- * - assigned: Đã giao kỹ sư
- * - in_progress: Đang thực hiện
- * - done: Kỹ sư đã nộp báo cáo (chờ duyệt)
- * - verified: Quản lý đã duyệt nghiệm thu
- * - returned: Quản lý trả về yêu cầu sửa lại
- * - closed: Đã hoàn tất và đóng
- * - canceled: Bị hủy / Quản lý không duyệt (Tự END)
- */
-export type WorkOrderStatus =
-  | 'open'
-  | 'assigned'
-  | 'in_progress'
-  | 'done'
-  | 'verified'
-  | 'returned'
-  | 'closed'
-  | 'canceled'
-
-export type InspectionOutcome = 'fault_present' | 'fault_absent' | 'inconclusive'
-
-export interface WorkOrderLocation {
-  lat: number
-  lng: number
-}
-
-export interface WorkOrderFaultDetail {
-  faultId: string
-  poleId?: string
-  segmentId?: string
-  location: WorkOrderLocation
-  faultType: string
-  faultStatus: string
-  severity: string
-  inspectionOutcome?: InspectionOutcome
-}
-
-export interface WorkOrderAssignee {
-  userId: string
-  fullName: string
-}
-
-export interface WorkOrderItem {
-  workOrderId: string
-  title: string
-  communeId: string
-  taskKind: TaskKind
-  segmentId?: string
-  clusterId?: string
-  faultIds: string[]
-  woStatus: WorkOrderStatus
-  assignedTo?: string
-  priorityScore?: number
-  createdAt: string
-  updatedAt: string
-  dueDate?: string
-  scheduledDate?: string
-  caseCode?: string
-  materialsNote?: string
-}
-
-export interface WorkOrderDetail extends WorkOrderItem {
-  note?: string
-  reviewNote?: string
-  reportNote?: string
-  createdBy: string
-  assignedAt?: string
-  startedAt?: string
-  completedAt?: string
-  closedAt?: string
-  assigneeEligible?: boolean
-  allowedActions: string[]
-  faults: WorkOrderFaultDetail[]
-  videoUrl?: string
-  evidenceUrls?: string[]
-}
+import type { TaskKind } from './common/enums'
 
 // ==========================================
-// CẤU TRÚC HỒ SƠ SỰ VỤ & THANH TIẾN TRÌNH (STEPPER)
+// 1. RE-EXPORT TRỰC TIẾP TỪ COMMON ENUMS & ORDERS
+// Tuyệt đối không tự viết tay lại các enum / DTO đã có
+// ==========================================
+
+export type {
+  TaskKind,
+  WorkOrderStatus,
+  InspectionOutcome,
+  Severity,
+  FaultType,
+  FaultStatus,
+  AgendaFlag,
+} from './common/enums'
+
+export type {
+  WorkOrderLocation,
+  WorkOrderFaultDetail,
+  WorkOrderAssignee,
+  WorkOrderItem,
+  WorkOrderDetail,
+  WorkOrderItemPagedResult,
+  WorkOrderAssigneePagedResult,
+  WorkOrderPole,
+  WorkOrderPolePagedResult,
+  CreateWorkOrderRequest,
+  PatchWorkOrderRequest,
+  AssignWorkOrderRequest,
+  CompleteWorkOrderRequest,
+  ReviewWorkOrderRequest,
+  FollowUpWorkOrderRequest,
+  StartWorkOrderRequest,
+  FaultOutcomeRequest,
+} from './workorders/orders'
+
+// ==========================================
+// 2. CẤU TRÚC HỒ SƠ SỰ VỤ & THANH TIẾN TRÌNH (STEPPER) - DÀNH RIÊNG CHO GIAO DIỆN (UI STATE)
+// Backend trả về từng WorkOrderItem độc lập có case_id,
+// Frontend gom nhóm và hiển thị dưới dạng Stepper 3 giai đoạn (Khảo sát -> Kiểm tra -> Sửa chữa).
 // ==========================================
 
 export interface SchedulePhase {
@@ -125,50 +83,4 @@ export interface ScheduleCase {
   endReason?: string
   poleIds?: string[]            // Cột đèn liên quan của sự vụ
   phases: SchedulePhase[]       // Lịch sử các giai đoạn
-}
-
-// ==========================================
-// PAYLOADS GỬI LÊN BACKEND API
-// ==========================================
-
-export interface CreateWorkOrderPayload {
-  taskKind: TaskKind
-  title: string
-  segmentId?: string
-  assignedTo?: string
-  scheduledDate?: string
-  dueDate?: string
-  note?: string
-  faultIds?: string[]
-  poleIds?: string[]
-  communeId?: string
-  caseCode?: string
-  materialsNote?: string
-}
-
-export interface PatchWorkOrderPayload {
-  title?: string
-  dueDate?: string
-  scheduledDate?: string
-  assignedTo?: string
-  segmentId?: string
-  taskKind?: TaskKind
-}
-
-export interface AssignWorkOrderPayload {
-  assignedTo: string
-}
-
-export interface CompleteWorkOrderPayload {
-  reportNote: string
-  faultOutcomes?: Array<{
-    faultId: string
-    outcome: InspectionOutcome
-  }>
-  materialsNote?: string
-}
-
-export interface ReviewWorkOrderPayload {
-  note?: string
-  materialsNote?: string
 }

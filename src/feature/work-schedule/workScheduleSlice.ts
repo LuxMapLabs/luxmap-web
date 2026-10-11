@@ -122,9 +122,9 @@ const initialState: WorkScheduleState = {
   currentYear: 2026,
   filterPhase: 'all',
   assignees: [
-    { userId: 'USR-004', fullName: 'Khang Lê (Field Crew 1)' },
-    { userId: 'USR-005', fullName: 'Nguyễn Văn Hoàng (Field Crew 2)' },
-    { userId: 'USR-006', fullName: 'Trần Minh Tuấn (Field Crew 3)' },
+    { user_id: 'USR-004', full_name: 'Khang Lê (Field Crew 1)' },
+    { user_id: 'USR-005', full_name: 'Nguyễn Văn Hoàng (Field Crew 2)' },
+    { user_id: 'USR-006', full_name: 'Trần Minh Tuấn (Field Crew 3)' },
   ],
   isLoading: false,
   error: null,
@@ -196,7 +196,7 @@ export const verifyWorkOrderBackendThunk = createAsyncThunk(
     { dispatch, rejectWithValue }
   ) => {
     try {
-      const result = await workScheduleAPI.verifyWorkOrder(workOrderId, { note, materialsNote })
+      const result = await workScheduleAPI.verifyWorkOrder(workOrderId, { note, materials_note: materialsNote })
       dispatch(fetchWorkOrdersThunk(undefined))
       return result
     } catch (err: any) {

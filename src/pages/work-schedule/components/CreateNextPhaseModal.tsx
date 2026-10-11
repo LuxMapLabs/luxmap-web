@@ -35,7 +35,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.userId || 'USR-004')
+  const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || 'USR-004')
   const [date, setDate] = useState('2026-10-06')
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(defaultPoleIds)
   const [materialsNote, setMaterialsNote] = useState(
@@ -71,8 +71,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
       return
     }
 
-    const selectedAssignee = assignees.find((a) => a.userId === assigneeId)
-    const assigneeName = selectedAssignee ? selectedAssignee.fullName.split(' (')[0] : 'Khang Lê'
+    const selectedAssignee = assignees.find((a) => a.user_id === assigneeId)
+    const assigneeName = selectedAssignee?.full_name ? selectedAssignee.full_name.split(' (')[0] : 'Khang Lê'
 
     onSubmit({
       code: caseCode,
@@ -154,8 +154,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {assignees.map((a) => (
-                  <option key={a.userId} value={a.userId}>
-                    {a.fullName}
+                  <option key={a.user_id || ''} value={a.user_id || ''}>
+                    {a.full_name || a.user_id || ''}
                   </option>
                 ))}
               </select>
