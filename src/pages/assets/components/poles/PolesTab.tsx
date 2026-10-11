@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, Upload, Filter } from 'lucide-react'
+import { Search, Plus, Upload, Filter, Printer } from 'lucide-react'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../types/assets/segments'
@@ -7,6 +7,8 @@ import { PoleTable } from './PoleTable'
 import { AddPoleModal } from './AddPoleModal'
 import { EditPoleModal } from './EditPoleModal'
 import { PoleDetailModal } from './PoleDetailModal'
+import { PoleQrModal } from './PoleQrModal'
+import { BulkPoleQrPrintModal } from './BulkPoleQrPrintModal'
 import { CabinetDetailModal } from '../cabinets/CabinetDetailModal'
 import { TablePagination } from '../common/TablePagination'
 
@@ -54,6 +56,8 @@ export const PolesTab: React.FC<PolesTabProps> = ({
   const [isAddPoleModalOpen, setIsAddPoleModalOpen] = useState(false)
   const [detailPole, setDetailPole] = useState<PoleListItem | null>(null)
   const [editPole, setEditPole] = useState<PoleListItem | null>(null)
+  const [qrPole, setQrPole] = useState<PoleListItem | null>(null)
+  const [isBulkPrintModalOpen, setIsBulkPrintModalOpen] = useState(false)
   const [internalCabinetDetail, setInternalCabinetDetail] = useState<CabinetListItem | null>(null)
 
   // Filtered Poles
@@ -170,8 +174,17 @@ export const PolesTab: React.FC<PolesTabProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons: Add & Import */}
+        {/* Action Buttons: Add, Bulk QR Print & Import */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsBulkPrintModalOpen(true)}
+            className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-100 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Dàn trang và in hàng loạt tem mã QR decal (khổ A4)"
+          >
+            <Printer className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+            <span>In Tem QR</span>
+          </button>
           <button
             type="button"
             onClick={onOpenImport}
@@ -243,6 +256,28 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         segments={segments}
         cabinets={cabinets}
         onClose={() => setDetailPole(null)}
+        onViewQr={(pole) => setQrPole(pole)}
+      />
+
+      {/* Modal QR Code */}
+      <PoleQrModal
+        isOpen={!!qrPole}
+        pole={qrPole}
+        segmentName={
+          segments.find((s) => s.segment_id === qrPole?.segment_id)?.segment_name ||
+          qrPole?.segment_id ||
+          ''
+        }
+        communeName={qrPole?.commune_id || ''}
+        onClose={() => setQrPole(null)}
+      />
+
+      {/* Modal In Tem QR Hàng Loạt */}
+      <BulkPoleQrPrintModal
+        isOpen={isBulkPrintModalOpen}
+        poles={filteredPoles}
+        segments={segments}
+        onClose={() => setIsBulkPrintModalOpen(false)}
       />
 
       {/* Modal Detail Cabinet (when clicked inside pole row) */}

@@ -1,10 +1,11 @@
 import { z } from 'zod'
 import type { LoginRequest } from '../types/auth/web'
+import { VIETNAM_PHONE_REGEX } from './common.schema'
 
 /**
- * Regex kiểm tra số điện thoại Việt Nam (10 số)
+ * Regex kiểm tra số điện thoại Việt Nam (10 số) - Re-export từ common.schema để giữ tương thích ngược
  */
-export const PHONE_REGEX = /^(03|05|07|08|09)\d{8}$/
+export const PHONE_REGEX = VIETNAM_PHONE_REGEX
 
 /**
  * Schema xác thực Đăng nhập

@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, MapPin, Zap, Lightbulb, AlertTriangle, Bookmark } from 'lucide-react'
+import { X, MapPin, Zap, Lightbulb, AlertTriangle, Bookmark, QrCode } from 'lucide-react'
 import { StatusBadge } from '../../../../components/StatusBadge'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../types/assets/segments'
@@ -12,6 +12,7 @@ interface PoleDetailModalProps {
   segments?: SegmentListItem[]
   cabinets?: CabinetListItem[]
   onClose: () => void
+  onViewQr?: (pole: PoleListItem) => void
 }
 
 export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
@@ -20,6 +21,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
   segments = [],
   cabinets = [],
   onClose,
+  onViewQr,
 }) => {
   if (!isOpen || !pole) return null
 
@@ -176,7 +178,21 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end gap-2">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-between items-center gap-2">
+          {onViewQr ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose()
+                onViewQr(pole)
+              }}
+              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Xem / Tải mã QR</span>
+            </button>
+          ) : <div />}
+
           <button
             type="button"
             onClick={onClose}
