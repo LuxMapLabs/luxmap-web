@@ -14,6 +14,7 @@ export interface PoleProperties {
   lamp_watt?: number
   install_date?: string | null
   warranty_expiry?: string | null
+  warranty_status?: 'active' | 'expiring' | 'expired' | 'unknown' | string
   near_sensitive_poi?: boolean
   data_source?: DataSource | string
   lux_value?: number

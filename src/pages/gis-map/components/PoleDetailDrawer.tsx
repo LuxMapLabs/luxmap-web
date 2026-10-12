@@ -26,6 +26,7 @@ export interface PoleDetail {
     lamp_watt: number
     install_date: string
     warranty_expiry: string
+    warranty_status?: 'active' | 'expiring' | 'expired' | 'unknown' | string
     supplier?: string
   }
   current_status?: {
@@ -198,12 +199,17 @@ export const PoleDetailDrawer: React.FC<PoleDetailDrawerProps> = ({
 
             <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
               <span className="text-slate-400 block text-[10px]">Ngày lắp đặt</span>
-              <span className="font-bold text-slate-800">{pole.fixture?.install_date || '2022-03-24'}</span>
+              <span className="font-bold text-slate-800">{pole.fixture?.install_date || '—'}</span>
             </div>
 
             <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
               <span className="text-slate-400 block text-[10px]">Hạn bảo hành</span>
-              <span className="font-bold text-emerald-700">{pole.fixture?.warranty_expiry || '2027-03-24'}</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="font-bold text-slate-800 font-mono text-xs">{pole.fixture?.warranty_expiry || '—'}</span>
+                {pole.fixture?.warranty_status && (
+                  <StatusBadge type="warranty" status={pole.fixture.warranty_status} size="sm" />
+                )}
+              </div>
             </div>
 
           </div>

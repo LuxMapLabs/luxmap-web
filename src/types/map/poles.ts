@@ -2,7 +2,7 @@
  * Auto-generated Types for: map/poles
  * Sinh tự động từ endpoint Backend
  */
-import type { FaultStatus, FaultType, FixtureStatus, FixtureType, NodeStatus, PowerSource, Severity, SourceChannel } from '../common/enums'
+import type { FaultStatus, FaultType, FixtureStatus, FixtureType, NodeStatus, PowerSource, Severity, SourceChannel, WarrantyStatus } from '../common/enums'
 import type { Geometry } from '../common/base'
 
 export interface PoleMapBaseline {
@@ -38,6 +38,7 @@ export interface PoleMapFixture {
     lamp_watt?: number
     install_date?: string | null
     warranty_expiry?: string | null
+    warranty_status?: WarrantyStatus
 }
 
 export interface PoleMapFrame {
@@ -103,6 +104,7 @@ export interface PoleProperties {
     lamp_watt?: number
     install_date?: string | null
     warranty_expiry?: string | null
+    warranty_status?: WarrantyStatus
     commune_id: string | null
     last_seen_at?: string | null
     last_sweep_id?: string | null

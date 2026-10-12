@@ -2,7 +2,7 @@
  * Auto-generated Types for: assets/fixtures
  * Sinh tự động từ endpoint Backend
  */
-import type { DataSource, FixtureType, PowerSource } from '../common/enums'
+import type { DataSource, FixtureType, PowerSource, WarrantyStatus } from '../common/enums'
 
 export interface ActiveFixture {
     fixture_id: string | null
@@ -11,6 +11,7 @@ export interface ActiveFixture {
     lamp_watt: number
     install_date: string | null
     warranty_expiry?: string | null
+    warranty_status?: WarrantyStatus
     data_source: DataSource
 }
 

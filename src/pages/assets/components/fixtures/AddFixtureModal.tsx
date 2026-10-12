@@ -19,14 +19,13 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
   onAddFixture,
 }) => {
   const today = new Date().toISOString().split('T')[0]
-  const defaultExpiry = new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   const [poleId, setPoleId] = useState(poles[0]?.pole_id || '')
   const [lampWatt, setLampWatt] = useState<number>(100)
   const [fixtureType, setFixtureType] = useState<FixtureType>('led_road_lamp')
   const [powerSource, setPowerSource] = useState<PowerSource>('grid')
   const [installDate, setInstallDate] = useState(today)
-  const [warrantyExpiry, setWarrantyExpiry] = useState(defaultExpiry)
+  const [warrantyExpiry, setWarrantyExpiry] = useState('')
   const [dataSource, setDataSource] = useState<DataSource>('field')
 
   if (!isOpen) return null
