@@ -3,6 +3,7 @@ import authSaga from '../feature/auth/authSaga'
 import assetSaga from '../feature/assets/assetSaga'
 import adminUserSaga from '../feature/admin/adminUserSaga'
 import mapSaga from '../feature/map/mapSaga'
+import citizenReportSaga from '../feature/citizen-report/citizenReportSaga'
 
 export default function* rootSaga() {
     yield all([
@@ -10,5 +11,6 @@ export default function* rootSaga() {
         fork(assetSaga),
         fork(adminUserSaga),
         fork(mapSaga),
+        fork(citizenReportSaga),
     ])
 }
