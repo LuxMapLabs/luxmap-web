@@ -57,5 +57,7 @@ export type TopologySource = 'verified' | 'inferred'
 
 export type UserRole = 'superior' | 'manager' | 'field_engineer' | 'system_admin'
 
+export type WarrantyStatus = 'active' | 'expiring' | 'expired' | 'unknown'
+
 export type WorkOrderStatus = 'open' | 'assigned' | 'in_progress' | 'done' | 'verified' | 'cancelled'
 

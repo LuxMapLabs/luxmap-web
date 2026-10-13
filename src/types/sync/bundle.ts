@@ -5,7 +5,7 @@
 import type { FaultItem } from '../faults/faults'
 import type { SegmentPropertiesFeatureCollection } from '../map/segments'
 import type { WorkOrderDetail } from '../workorders/orders'
-import type { FixtureStatus, FixtureType, PowerSource } from '../common/enums'
+import type { FixtureStatus, FixtureType, PowerSource, WarrantyStatus } from '../common/enums'
 import type { Geometry } from '../common/base'
 
 export interface SyncBundle {
@@ -27,6 +27,7 @@ export interface SyncPoleProperties {
     lamp_watt?: number
     install_date?: string | null
     warranty_expiry?: string | null
+    warranty_status: WarrantyStatus
     commune_id: string | null
     last_seen_at?: string | null
     last_sweep_id?: string | null

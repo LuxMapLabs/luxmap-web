@@ -41,6 +41,10 @@ export const PoleTableSkeleton: React.FC<PoleTableSkeletonProps> = ({ rowCount =
           <td className="p-3.5">
             <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded-full" />
           </td>
+          {/* Bảo hành */}
+          <td className="p-3.5">
+            <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
+          </td>
           {/* Thao tác */}
           <td className="p-3.5 text-right">
             <div className="h-6 w-12 bg-slate-200 dark:bg-slate-800 rounded-lg ml-auto" />

@@ -729,7 +729,7 @@ export function validateImportRow(
   const watt = data.lamp_watt || existingPole?.active_fixture?.lamp_watt || 100
   const powerSource = data.power_source || existingPole?.active_fixture?.power_source || 'grid'
   const fixtureType = data.fixture_type || existingPole?.active_fixture?.fixture_type || 'led_road_lamp'
-  const warrantyExpiry = data.warranty_expiry || existingPole?.active_fixture?.warranty_expiry || '2026-12-31'
+  const warrantyExpiry = data.warranty_expiry || existingPole?.active_fixture?.warranty_expiry || null
 
   let actionType: 'new' | 'updated' | 'unchanged' = 'new'
   const diffs: FieldDiff[] = []

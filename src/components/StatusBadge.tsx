@@ -1,12 +1,14 @@
 import React from 'react'
 
+import type { WarrantyStatus } from '../types/common/enums'
+
 export type FixtureStatus = 'normal' | 'dim' | 'out' | 'unknown'
 export type WorkOrderStatus = 'draft' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'
 export type SlaStatus = 'ontime' | 'warning' | 'overdue'
 
 export interface StatusBadgeProps {
-  type: 'fixture' | 'order' | 'sla' | 'custom'
-  status?: FixtureStatus | WorkOrderStatus | SlaStatus | string
+  type: 'fixture' | 'order' | 'sla' | 'warranty' | 'custom'
+  status?: FixtureStatus | WorkOrderStatus | SlaStatus | WarrantyStatus | string
   label?: string
   size?: 'sm' | 'md'
   showDot?: boolean
@@ -92,6 +94,30 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         displayLabel = label || 'Quá hạn SLA'
         bgClass = 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800/60'
         dotClass = 'bg-rose-500'
+        break
+    }
+  } else if (type === 'warranty') {
+    switch (status) {
+      case 'active':
+        displayLabel = label || 'Còn hạn'
+        bgClass = 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
+        dotClass = 'bg-emerald-500'
+        break
+      case 'expiring':
+        displayLabel = label || 'Sắp hết hạn'
+        bgClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+        dotClass = 'bg-amber-500'
+        break
+      case 'expired':
+        displayLabel = label || 'Hết hạn'
+        bgClass = 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60'
+        dotClass = 'bg-rose-500'
+        break
+      case 'unknown':
+      default:
+        displayLabel = label || 'Chưa rõ'
+        bgClass = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+        dotClass = 'bg-slate-400'
         break
     }
   }
