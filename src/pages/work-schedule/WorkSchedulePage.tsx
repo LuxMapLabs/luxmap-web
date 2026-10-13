@@ -8,14 +8,10 @@ import {
   openCaseDetail,
   closeCaseDetail,
   setViewingPhaseIndex,
-  createNewCase,
-  advanceNextPhase,
-  endCaseNormally,
-  approveRepairAndSubmitSuperior,
-  returnPhaseToEngineer,
   fetchWorkOrdersThunk,
   fetchAssigneesThunk,
   createWorkOrderBackendThunk,
+  patchWorkOrderBackendThunk,
   followUpWorkOrderBackendThunk,
   verifyWorkOrderBackendThunk,
   cancelWorkOrderBackendThunk,
@@ -26,7 +22,6 @@ import { CalendarGrid } from './components/CalendarGrid'
 import { CaseDetailModal } from './components/CaseDetailModal'
 import { CreateNextPhaseModal } from './components/CreateNextPhaseModal'
 import { CreateManualModal } from './components/CreateManualModal'
-import { CalendarDays } from 'lucide-react'
 
 export const WorkSchedulePage: React.FC = () => {
   const dispatch = useDispatch()
@@ -39,6 +34,8 @@ export const WorkSchedulePage: React.FC = () => {
     selectedCaseCode,
     viewingPhaseIndex,
   } = useSelector((state: RootState) => state.workSchedule)
+  const currentUser = useSelector((state: RootState) => state.auth.user)
+  const activeCommuneId = currentUser?.administrativeUnitId || currentUser?.communeIds?.[0] || 'COM-001'
 
   // Tự động tải danh sách lịch làm việc và danh sách kỹ sư từ máy chủ theo tháng được chọn
   useEffect(() => {
@@ -56,16 +53,21 @@ export const WorkSchedulePage: React.FC = () => {
         }) as any
       )
 
-      // Tải danh sách kỹ sư hiện trường theo địa bàn xã (COM-001)
-      dispatch(fetchAssigneesThunk('COM-001') as any)
+      // Tải danh sách kỹ sư hiện trường theo địa bàn xã của người dùng
+      dispatch(fetchAssigneesThunk(activeCommuneId) as any)
     } catch (e) {
       console.warn('Lỗi khi tải lịch làm việc từ máy chủ:', e)
     }
-  }, [dispatch, currentMonth, currentYear])
+  }, [dispatch, currentMonth, currentYear, activeCommuneId])
+
+  const getTodayStr = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
 
   // Modals state
   const [isCreateManualOpen, setIsCreateManualOpen] = useState(false)
-  const [manualDefaultDate, setManualDefaultDate] = useState('2026-10-10')
+  const [manualDefaultDate, setManualDefaultDate] = useState(getTodayStr)
   const [isDateLockedFromCell, setIsDateLockedFromCell] = useState(false)
 
   const [isNextPhaseModalOpen, setIsNextPhaseModalOpen] = useState(false)
@@ -79,35 +81,30 @@ export const WorkSchedulePage: React.FC = () => {
       setManualDefaultDate(dateStr)
       setIsDateLockedFromCell(true) // Khóa và lấy đúng ngày của ô vừa bấm
     } else {
-      setManualDefaultDate('2026-10-10')
+      setManualDefaultDate(getTodayStr())
       setIsDateLockedFromCell(false) // Tự do chọn ngày bất kỳ
     }
     setIsCreateManualOpen(true)
   }
 
-  const handleCreateNewCaseSubmit = (payload: any) => {
-    // 1. Cập nhật giao diện & lưu trữ bền vững tức thì
-    dispatch(createNewCase(payload))
-    setIsCreateManualOpen(false)
-    toast.success(`Đã tạo thành công sự vụ mới khởi đầu tại ${payload.initPhase}!`)
-
-    // 2. Trích xuất mã tuyến đường từ chuỗi segment (ví dụ: 'SEG-001')
+  const handleCreateNewCaseSubmit = async (payload: any) => {
+    // 1. Trích xuất mã tuyến đường từ chuỗi segment (ví dụ: 'SEG-001')
     const segmentIdMatch = payload.segment?.match(/SEG-\d+/i)
     const segmentId = segmentIdMatch ? segmentIdMatch[0].toUpperCase() : 'SEG-001'
 
     const backendPayload: any = {
       task_kind: payload.initPhase,
-      title: payload.title,
+      title: payload.title?.trim() || 'Lệnh công tác mới',
       scheduled_date: payload.date,
       due_date: payload.date,
-      assigned_to: payload.assigneeId,
-      note: payload.notes,
-      materials_note: payload.materialsNote,
+      assigned_to: payload.assigneeId || undefined,
+      note: payload.notes?.trim() || undefined,
+      materials_note: payload.materialsNote?.trim() || undefined,
     }
 
     if (payload.initPhase === 'survey') {
       // Backend Survey: Yêu cầu commune_id và segment_ids[]
-      backendPayload.commune_id = 'COM-001'
+      backendPayload.commune_id = activeCommuneId
       backendPayload.segment_ids = [segmentId]
     } else if (payload.initPhase === 'inspection') {
       // Backend Inspection: Yêu cầu segment_id
@@ -117,116 +114,204 @@ export const WorkSchedulePage: React.FC = () => {
       backendPayload.fault_ids = payload.poleIds || []
     }
 
-    // 3. Đồng bộ lên Backend ASP.NET Core
-    dispatch(createWorkOrderBackendThunk(backendPayload) as any)
+    try {
+      await (dispatch(createWorkOrderBackendThunk(backendPayload) as any) as any).unwrap()
+      setIsCreateManualOpen(false)
+      toast.success(`Đã tạo thành công lệnh công tác mới trên máy chủ!`)
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Không thể tạo lệnh công tác trên máy chủ')
+    }
   }
 
-  // Xử lý mở giai đoạn tiếp theo (giữ nguyên mã SCH, tự đóng bước cũ)
+  // Xử lý mở giai đoạn tiếp theo (gọi API /follow-up trên máy chủ)
   const handleOpenCreateNextPhase = (_code: string, phaseType: 'inspection' | 'repair') => {
     setTargetNextPhaseType(phaseType)
     setIsNextPhaseModalOpen(true)
   }
 
-  const handleNextPhaseSubmit = (payload: any) => {
-    // 1. Cập nhật giao diện & localStorage tức thì
-    dispatch(advanceNextPhase(payload))
-    setIsNextPhaseModalOpen(false)
-    dispatch(closeCaseDetail())
-    toast.success(
-      `✓ Đã đóng tiến trình cũ và mở tiếp ${
-        payload.nextPhaseType === 'repair' ? 'Sửa chữa' : 'Kiểm tra'
-      } cho mã ${payload.code}!`
-    )
-
-    // 2. Đồng bộ lên Backend (gọi POST /api/v1/work-orders/{id}/follow-up)
+  const handleNextPhaseSubmit = async (payload: any) => {
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    const parentWorkOrderId = currentPhase?.workOrderId || 'WO-0002'
+    const parentWorkOrderId = currentPhase?.workOrderId
 
-    dispatch(
-      followUpWorkOrderBackendThunk({
-        parentWorkOrderId,
-        payload: {
-          task_kind: payload.nextPhaseType,
-          scheduled_date: payload.date,
-          assigned_to: payload.assigneeId,
-          note: payload.notes,
-          materials_note: payload.materialsNote,
-        },
-      }) as any
-    )
+    if (!parentWorkOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để chuyển tiếp trên máy chủ.')
+      return
+    }
+
+    try {
+      await (dispatch(
+        followUpWorkOrderBackendThunk({
+          parentWorkOrderId,
+          payload: {
+            task_kind: payload.nextPhaseType,
+            scheduled_date: payload.date,
+            assigned_to: payload.assigneeId,
+            note: payload.notes,
+            materials_note: payload.materialsNote,
+          },
+        }) as any
+      ) as any).unwrap()
+
+      setIsNextPhaseModalOpen(false)
+      dispatch(closeCaseDetail())
+      toast.success(
+        `✓ Đã mở tiếp ${
+          payload.nextPhaseType === 'repair' ? 'Sửa chữa' : 'Kiểm tra'
+        } cho mã lệnh công tác trên máy chủ!`
+      )
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Không thể mở giai đoạn tiếp theo trên máy chủ')
+    }
   }
 
   // Xử lý Quản lý Yêu cầu làm lại (POST /api/v1/work-orders/{id}/return)
-  const handleReturnPhase = (code: string, note: string) => {
-    // 1. Cập nhật Redux & LocalStorage ngay lập tức (không bao giờ mất khi reload F5)
-    dispatch(returnPhaseToEngineer({ code, reviewNote: note }))
-    dispatch(closeCaseDetail())
-    toast.success(`✓ Đã gửi yêu cầu làm lại cho Kỹ sư hiện trường! Lệnh chuyển về Đang thực hiện.`)
-
-    // 2. Đồng bộ lên Backend qua API POST /api/v1/work-orders/{id}/return
+  const handleReturnPhase = async (_code: string, note: string) => {
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    const workOrderId = currentPhase?.workOrderId || 'WO-0003'
+    const workOrderId = currentPhase?.workOrderId
 
-    dispatch(
-      returnWorkOrderBackendThunk({
-        workOrderId,
-        note,
-      }) as any
-    )
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để yêu cầu làm lại.')
+      return
+    }
+
+    try {
+      await (dispatch(
+        returnWorkOrderBackendThunk({
+          workOrderId,
+          note,
+        }) as any
+      ) as any).unwrap()
+
+      dispatch(closeCaseDetail())
+      toast.success(`✓ Đã gửi yêu cầu làm lại cho Kỹ sư hiện trường trên máy chủ!`)
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Không thể gửi yêu cầu làm lại trên máy chủ')
+    }
   }
 
-  // Xử lý đóng thông thường (Khi kiểm tra/khảo sát không phát hiện lỗi)
-  const handleEndNormally = (code: string, reason: string) => {
-    dispatch(endCaseNormally({ code, reason }))
-    dispatch(closeCaseDetail())
-    toast.info(`Đã đóng sự vụ [${code}] thành công.`)
-
+  // Xử lý đóng thông thường (Khi kiểm tra/khảo sát không phát hiện lỗi - POST /api/v1/work-orders/{id}/cancel)
+  const handleEndNormally = async (_code: string, reason: string) => {
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    const workOrderId = currentPhase?.workOrderId || 'WO-0001'
+    const workOrderId = currentPhase?.workOrderId
 
-    dispatch(
-      cancelWorkOrderBackendThunk({
-        workOrderId,
-        note: reason,
-      }) as any
-    )
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để hủy.')
+      return
+    }
+
+    try {
+      await (dispatch(
+        cancelWorkOrderBackendThunk({
+          workOrderId,
+          note: reason,
+        }) as any
+      ) as any).unwrap()
+
+      dispatch(closeCaseDetail())
+      toast.info(`Đã đóng sự vụ thành công trên máy chủ.`)
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Không thể hủy sự vụ trên máy chủ')
+    }
   }
 
-  // Xử lý Quản lý duyệt sửa chữa & gửi Superior
-  const handleSubmitSuperior = (code: string, editedMaterialsNote: string) => {
-    dispatch(approveRepairAndSubmitSuperior({ code, editedMaterialsNote }))
-    dispatch(closeCaseDetail())
-    toast.success(`🎉 ĐÃ GỬI BÁO CÁO NGHIỆM THU [${code}] LÊN SUPERIOR THÀNH CÔNG!`)
-
+  // Xử lý Quản lý duyệt sửa chữa & gửi Superior (POST /api/v1/work-orders/{id}/verify)
+  const handleSubmitSuperior = async (_code: string, editedMaterialsNote: string) => {
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    const workOrderId = currentPhase?.workOrderId || 'WO-0002'
+    const workOrderId = currentPhase?.workOrderId
 
-    dispatch(
-      verifyWorkOrderBackendThunk({
-        workOrderId,
-        note: 'Quản lý đã nghiệm thu đạt tiêu chuẩn và chuyển hồ sơ lên Superior.',
-        materialsNote: editedMaterialsNote,
-      }) as any
-    )
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để nghiệm thu.')
+      return
+    }
+
+    try {
+      await (dispatch(
+        verifyWorkOrderBackendThunk({
+          workOrderId,
+          note: 'Quản lý đã nghiệm thu đạt tiêu chuẩn và chuyển hồ sơ lên Superior.',
+          materialsNote: editedMaterialsNote,
+        }) as any
+      ) as any).unwrap()
+
+      dispatch(closeCaseDetail())
+      toast.success(`🎉 Đã duyệt nghiệm thu và gửi báo cáo lên Superior thành công!`)
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Không thể duyệt nghiệm thu trên máy chủ')
+    }
+  }
+
+  // Xử lý Quản lý chỉnh sửa lịch (PATCH /api/v1/work-orders/{id} và PUT /assignee nếu đổi kỹ sư)
+  const handleEditSchedule = async (payload: {
+    title: string
+    scheduledDate: string
+    dueDate: string
+    newAssigneeId: string
+    materialsNote?: string
+  }) => {
+    const currentPhase =
+      selectedCase?.phases[viewingPhaseIndex] ||
+      selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const workOrderId = currentPhase?.workOrderId
+
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để cập nhật trên máy chủ.')
+      return
+    }
+
+    try {
+      await (dispatch(
+        patchWorkOrderBackendThunk({
+          workOrderId,
+          payload: {
+            title: payload.title,
+            scheduled_date: payload.scheduledDate,
+            due_date: payload.dueDate,
+            materials_note: payload.materialsNote,
+          },
+          newAssigneeId: payload.newAssigneeId,
+          currentAssigneeId: currentPhase.assigneeId,
+        }) as any
+      ) as any).unwrap()
+
+      toast.success('Đã cập nhật lịch làm việc thành công trên máy chủ!')
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Không thể cập nhật lịch làm việc trên máy chủ')
+      throw err
+    }
+  }
+
+  // Xử lý Quản lý hủy lịch (POST /api/v1/work-orders/{id}/cancel)
+  const handleCancelSchedule = async (reason: string) => {
+    const currentPhase =
+      selectedCase?.phases[viewingPhaseIndex] ||
+      selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const workOrderId = currentPhase?.workOrderId
+
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để hủy.')
+      return
+    }
+
+    try {
+      await (dispatch(
+        cancelWorkOrderBackendThunk({
+          workOrderId,
+          note: reason,
+        }) as any
+      ) as any).unwrap()
+
+      dispatch(closeCaseDetail())
+      toast.success(`Đã hủy lịch công tác [${workOrderId}] thành công!`)
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Không thể hủy lịch trên máy chủ')
+      throw err
+    }
   }
 
   return (
     <div className="h-full w-full overflow-y-auto custom-scrollbar bg-slate-50 select-none">
       {/* Vùng nội dung toàn trang: Tự do giãn nở và cuộn mượt mà */}
       <div className="p-4 sm:p-6 flex flex-col gap-4 pb-24">
-        {/* Header Title */}
-        <div className="flex items-center justify-between shrink-0">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-              <CalendarDays className="w-6 h-6 text-blue-600" />
-              Lịch Làm Việc Chiếu Sáng
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Điều phối, phân lịch khảo sát, kiểm tra, sửa chữa và thẩm định báo cáo nghiệm thu
-            </p>
-          </div>
-        </div>
-
         {/* Filter Bar */}
         <div className="shrink-0">
           <ScheduleFilterBar
@@ -234,7 +319,10 @@ export const WorkSchedulePage: React.FC = () => {
             currentYear={currentYear}
             filterPhase={filterPhase}
             onSelectMonthYear={(m, y) => dispatch(setCurrentMonth({ month: m, year: y }))}
-            onResetToday={() => dispatch(setCurrentMonth({ month: 9, year: 2026 }))}
+            onResetToday={() => {
+              const d = new Date()
+              dispatch(setCurrentMonth({ month: d.getMonth(), year: d.getFullYear() }))
+            }}
             onFilterChange={(phase) => dispatch(setFilterPhase(phase))}
             onOpenCreateModal={() => handleOpenCreateManual()}
           />
@@ -260,12 +348,15 @@ export const WorkSchedulePage: React.FC = () => {
         isOpen={Boolean(selectedCaseCode)}
         caseItem={selectedCase}
         viewingPhaseIndex={viewingPhaseIndex}
+        assignees={assignees}
         onClose={() => dispatch(closeCaseDetail())}
         onSwitchViewingPhase={(idx) => dispatch(setViewingPhaseIndex(idx))}
         onReturnCurrentPhase={handleReturnPhase}
         onEndNormally={handleEndNormally}
         onOpenCreateNextPhaseModal={handleOpenCreateNextPhase}
         onSubmitSuperior={handleSubmitSuperior}
+        onEditSchedule={handleEditSchedule}
+        onCancelSchedule={handleCancelSchedule}
       />
 
       {/* Modal 2: Tạo giai đoạn tiếp theo (giữ nguyên mã SCH) */}

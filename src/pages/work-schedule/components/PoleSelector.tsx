@@ -219,12 +219,8 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
         </div>
       )}
 
-      {/* Ghi chú nhắc nhở */}
-      {selectedPoleIds.length === 0 ? (
-        <div className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
-          <span>⚠️ Vui lòng chọn ít nhất 01 cột đèn để kỹ sư hiện trường biết chính xác vị trí tác nghiệp.</span>
-        </div>
-      ) : (
+      {/* Hiển thị số lượng cột đã chọn */}
+      {selectedPoleIds.length > 0 && (
         <div className="text-[11px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl flex items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           <span className="truncate">

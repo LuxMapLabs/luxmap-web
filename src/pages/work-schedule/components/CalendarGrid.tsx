@@ -41,7 +41,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   ;(cases || []).forEach((sc) => {
     ;(sc?.phases || []).forEach((p, pIndex) => {
-      if (!p || !p.date) return
+      if (!p || !p.date || p.rawStatus === 'cancelled') return
 
       // Áp dụng bộ lọc
       if (filterPhase !== 'all') {
@@ -74,6 +74,12 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const remainingSlots = (7 - (totalSlotsSoFar % 7)) % 7
   const nextDays = Array.from({ length: remainingSlots }, (_, i) => i + 1)
 
+  // Lấy thông tin ngày thực tế hiện tại
+  const today = new Date()
+  const todayDate = today.getDate()
+  const todayMonth = today.getMonth()
+  const todayYear = today.getFullYear()
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
       {/* Header thứ trong tuần */}
@@ -104,7 +110,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(
             day
           ).padStart(2, '0')}`
-          const isToday = day === 5 && currentMonth === 9 // Demo: 05/10/2026
+          const isToday =
+            day === todayDate &&
+            currentMonth === todayMonth &&
+            currentYear === todayYear
           const dayEvents = eventsByDate[dateStr] || []
 
           return (

@@ -26,13 +26,17 @@ interface CreateManualModalProps {
 const SEGMENTS = [
   'Tuyến A - Trục chính liên xã Phước Hậu (SEG-001)',
   'Tuyến B - Đường liên thôn Mỹ Hạnh Bắc (SEG-002)',
-  'Tuyến C - Đường liên thôn Đức Hòa Đông (SEG-003)',
-  'Tuyến D - Đường bờ kênh ấp 4 (SEG-004)',
+  'Tuyến C - Tuyến đường ra cầu (SEG-003)',
 ]
+
+const getTodayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   isOpen,
-  defaultDate = '2026-10-10',
+  defaultDate,
   assignees,
   onClose,
   onSubmit,
@@ -42,13 +46,13 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   const [segment, setSegment] = useState(SEGMENTS[0])
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>([])
   const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || 'USR-004')
-  const [date, setDate] = useState(defaultDate)
+  const [date, setDate] = useState(defaultDate || getTodayStr())
   const [notes, setNotes] = useState('')
 
   // Đồng bộ ngày khi mở modal từ ô lịch hoặc nút tạo mới
   useEffect(() => {
     if (isOpen) {
-      setDate(defaultDate || '2026-10-10')
+      setDate(defaultDate || getTodayStr())
     }
   }, [defaultDate, isOpen])
 

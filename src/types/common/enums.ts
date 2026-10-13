@@ -33,9 +33,9 @@ export type NodeRole = 'segment_controller'
 
 export type NodeStatus = 'online' | 'offline' | 'never_reported'
 
-export type NotificationEntityType = 'work_order' | 'survey_sweep' | 'fault'
+export type NotificationEntityType = 'work_order' | 'survey_sweep' | 'fault' | 'citizen_report'
 
-export type NotificationType = 'work_order_assigned' | 'work_order_unassigned' | 'work_order_rescheduled' | 'work_order_returned' | 'work_order_cancelled' | 'work_order_completed' | 'work_order_verified' | 'survey_returned' | 'survey_ready_for_review' | 'survey_processing_failed' | 'fault_reported'
+export type NotificationType = 'work_order_assigned' | 'work_order_unassigned' | 'work_order_rescheduled' | 'work_order_returned' | 'work_order_cancelled' | 'work_order_completed' | 'work_order_verified' | 'survey_returned' | 'survey_ready_for_review' | 'survey_processing_failed' | 'fault_reported' | 'citizen_report_received'
 
 export type PowerSource = 'grid'
 
@@ -56,6 +56,8 @@ export type TaskKind = 'inspection' | 'repair' | 'survey'
 export type TopologySource = 'verified' | 'inferred'
 
 export type UserRole = 'superior' | 'manager' | 'field_engineer' | 'system_admin'
+
+export type WarrantyStatus = 'active' | 'expiring' | 'expired' | 'unknown'
 
 export type WorkOrderStatus = 'open' | 'assigned' | 'in_progress' | 'done' | 'verified' | 'cancelled'
 
