@@ -25,6 +25,11 @@ interface CreateNextPhaseModalProps {
   }) => void
 }
 
+const getTodayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   isOpen,
   caseCode,
@@ -36,7 +41,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   onSubmit,
 }) => {
   const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || 'USR-004')
-  const [date, setDate] = useState('2026-10-06')
+  const [date, setDate] = useState(getTodayStr())
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(defaultPoleIds)
   const [materialsNote, setMaterialsNote] = useState(
     '02 bóng LED 100W Rạng Đông, 01 aptomat 16A, 01 cuộn cáp mạ kẽm'
@@ -45,6 +50,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setDate(getTodayStr())
       if (defaultPoleIds && defaultPoleIds.length > 0) {
         setSelectedPoleIds(defaultPoleIds)
       } else {

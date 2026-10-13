@@ -1,7 +1,7 @@
 {
   "page": 1,
   "page_size": 50,
-  "total": 17,
+  "total": 21,
   "items": [
     {
       "work_order_id": "WO-0001",
@@ -148,6 +148,22 @@
       "title": "Xử lý rò rỉ điện tủ điều khiển T-02 Tuyến A",
       "segment_id": "SEG-001",
       "segment_name": "Tuyến A - Trục chính liên xã Phước Hậu (SEG-001)",
+      "task_kind": "survey",
+      "wo_status": "verified",
+      "assigned_to": "USR-005",
+      "assignee_name": "Nguyễn Văn Hoàng",
+      "scheduled_date": "2026-10-09",
+      "created_at": "2026-10-09 20:00",
+      "note": "Khảo sát tầm soát rò rỉ điện và an toàn lưới chiếu sáng sau phản ánh của người dân",
+      "report_note": "Phát hiện tủ T-02 có dấu hiệu nhiễm ẩm và đèn tín hiệu chớp báo lỗi."
+    },
+    {
+      "work_order_id": "WO-0010",
+      "case_id": "SCH-006",
+      "parent_work_order_id": "WO-0009",
+      "title": "Xử lý rò rỉ điện tủ điều khiển T-02 Tuyến A",
+      "segment_id": "SEG-001",
+      "segment_name": "Tuyến A - Trục chính liên xã Phước Hậu (SEG-001)",
       "task_kind": "inspection",
       "wo_status": "verified",
       "assigned_to": "USR-005",
@@ -159,9 +175,9 @@
       "materials_note": "01 cọc tiếp địa đồng mạ D16 dài 2.4m, 10m dây đồng trần M25"
     },
     {
-      "work_order_id": "WO-0010",
+      "work_order_id": "WO-0011",
       "case_id": "SCH-006",
-      "parent_work_order_id": "WO-0009",
+      "parent_work_order_id": "WO-0010",
       "title": "Xử lý rò rỉ điện tủ điều khiển T-02 Tuyến A",
       "segment_id": "SEG-001",
       "segment_name": "Tuyến A - Trục chính liên xã Phước Hậu (SEG-001)",
@@ -175,8 +191,24 @@
       "materials_note": "01 cọc tiếp địa đồng mạ D16, 10m dây đồng trần M25"
     },
     {
-      "work_order_id": "WO-0011",
+      "work_order_id": "WO-0012",
       "case_id": "SCH-007",
+      "title": "Đo kiểm quang thông & an toàn chiếu sáng Tuyến F",
+      "segment_id": "SEG-006",
+      "segment_name": "Tuyến F - Khu dân cư Phước Lý (SEG-006)",
+      "task_kind": "survey",
+      "wo_status": "verified",
+      "assigned_to": "USR-006",
+      "assignee_name": "Trần Minh Tuấn",
+      "scheduled_date": "2026-10-13",
+      "created_at": "2026-10-13 21:00",
+      "note": "Khảo sát sơ bộ toàn tuyến chiếu sáng khu dân cư Phước Lý",
+      "report_note": "Tuyến hoạt động ổn định, cần đo đạc chi tiết độ rọi luxmeter theo kiến nghị cử tri."
+    },
+    {
+      "work_order_id": "WO-0013",
+      "case_id": "SCH-007",
+      "parent_work_order_id": "WO-0012",
       "title": "Đo kiểm quang thông & an toàn chiếu sáng Tuyến F",
       "segment_id": "SEG-006",
       "segment_name": "Tuyến F - Khu dân cư Phước Lý (SEG-006)",
@@ -191,7 +223,7 @@
       "lux_measured": "18.5 Lux (Đạt chuẩn)"
     },
     {
-      "work_order_id": "WO-0012",
+      "work_order_id": "WO-0014",
       "case_id": "SCH-008",
       "title": "Khảo sát định kỳ cụm đèn ngã ba chợ Tân Kim",
       "segment_id": "SEG-005",
@@ -209,9 +241,9 @@
       ]
     },
     {
-      "work_order_id": "WO-0013",
+      "work_order_id": "WO-0015",
       "case_id": "SCH-008",
-      "parent_work_order_id": "WO-0012",
+      "parent_work_order_id": "WO-0014",
       "title": "Khảo sát định kỳ cụm đèn ngã ba chợ Tân Kim",
       "segment_id": "SEG-005",
       "segment_name": "Tuyến E - Đường liên xã Tân Kim (SEG-005)",
@@ -226,8 +258,27 @@
       "materials_note": "Cần xe thang nâng và cờ lê lực siết bu lông neo M22"
     },
     {
-      "work_order_id": "WO-0014",
+      "work_order_id": "WO-0016",
       "case_id": "SCH-009",
+      "title": "Khắc phục cột đèn nghiêng POLE-0089 Tuyến B",
+      "segment_id": "SEG-002",
+      "segment_name": "Tuyến B - Đường liên thôn Mỹ Hạnh Bắc (SEG-002)",
+      "task_kind": "survey",
+      "wo_status": "verified",
+      "assigned_to": "USR-005",
+      "assignee_name": "Nguyễn Văn Hoàng",
+      "scheduled_date": "2026-10-19",
+      "created_at": "2026-10-19 18:30",
+      "note": "Khảo sát vị trí va quẹt cột đèn nghiêng gần cống ấp 2",
+      "report_note": "Cột POLE-0089 bị xe tải va chạm làm nứt đế bê tông và nghiêng 15 độ hướng lòng đường.",
+      "ai_detections": [
+        { "poleId": "POLE-0089", "issue": "Cột nghiêng 15 độ nguy hiểm", "confidence": 0.94 }
+      ]
+    },
+    {
+      "work_order_id": "WO-0017",
+      "case_id": "SCH-009",
+      "parent_work_order_id": "WO-0016",
       "title": "Khắc phục cột đèn nghiêng POLE-0089 Tuyến B",
       "segment_id": "SEG-002",
       "segment_name": "Tuyến B - Đường liên thôn Mỹ Hạnh Bắc (SEG-002)",
@@ -242,9 +293,9 @@
       "materials_note": "02 bao xi măng Nghi Sơn, cát đá và bu lông neo M20"
     },
     {
-      "work_order_id": "WO-0015",
+      "work_order_id": "WO-0018",
       "case_id": "SCH-009",
-      "parent_work_order_id": "WO-0014",
+      "parent_work_order_id": "WO-0017",
       "title": "Khắc phục cột đèn nghiêng POLE-0089 Tuyến B",
       "segment_id": "SEG-002",
       "segment_name": "Tuyến B - Đường liên thôn Mỹ Hạnh Bắc (SEG-002)",
@@ -260,8 +311,24 @@
       "end_reason": "Đã nắn chỉnh móng cột, đổ bê tông gia cố chân cột POLE-0089 và nghiệm thu đạt chuẩn an toàn."
     },
     {
-      "work_order_id": "WO-0016",
+      "work_order_id": "WO-0019",
       "case_id": "SCH-010",
+      "title": "Kiểm tra đo sụt áp cuối tuyến Tuyến C",
+      "segment_id": "SEG-003",
+      "segment_name": "Tuyến C - Đường liên thôn Đức Hòa Đông (SEG-003)",
+      "task_kind": "survey",
+      "wo_status": "verified",
+      "assigned_to": "USR-006",
+      "assignee_name": "Trần Minh Tuấn",
+      "scheduled_date": "2026-10-25",
+      "created_at": "2026-10-25 21:00",
+      "note": "Khảo sát tuyến đường ghi nhận phản ánh đèn mờ dần về cuối nguồn",
+      "report_note": "Đoạn 1.5km cuối nguồn ánh sáng suy giảm rõ rệt so với đầu tuyến."
+    },
+    {
+      "work_order_id": "WO-0020",
+      "case_id": "SCH-010",
+      "parent_work_order_id": "WO-0019",
       "title": "Kiểm tra đo sụt áp cuối tuyến Tuyến C",
       "segment_id": "SEG-003",
       "segment_name": "Tuyến C - Đường liên thôn Đức Hòa Đông (SEG-003)",
@@ -274,7 +341,7 @@
       "note": "Đo điện áp cuối nguồn tải giờ cao điểm lúc 19h-21h để đánh giá công suất cung cấp."
     },
     {
-      "work_order_id": "WO-0017",
+      "work_order_id": "WO-0021",
       "case_id": "SCH-011",
       "title": "Khảo sát nâng cấp chiếu sáng khu lễ hội Phước Lý",
       "segment_id": "SEG-006",

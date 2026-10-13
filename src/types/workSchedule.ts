@@ -51,6 +51,9 @@ export interface SchedulePhase {
   phaseType: TaskKind
   name: string
   date: string
+  dueDate?: string
+  createdAt?: string
+  rawStatus?: string
   assigneeId: string
   assigneeName: string
   status: 'pending' | 'reported' | 'ended'
@@ -78,6 +81,7 @@ export interface ScheduleCase {
   code: string                  // Ví dụ: SCH-001 (giữ nguyên xuyên suốt)
   title: string
   segment: string
+  createdAt?: string            // Ngày giờ tạo của vụ việc
   currentPhaseIndex: number     // 0: Khảo sát, 1: Kiểm tra, 2: Sửa chữa, 3: Cấp trên
   isTerminated: boolean         // True nếu bị từ chối duyệt hoặc đóng sớm
   endReason?: string

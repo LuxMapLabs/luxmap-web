@@ -15,10 +15,15 @@ import {
   Play,
   Zap,
   RotateCcw,
+  Edit3,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { ScheduleCase } from '../../../types/workSchedule'
+import { ScheduleCase, WorkOrderAssignee } from '../../../types/workSchedule'
 import { FieldReportDetailModal } from './FieldReportDetailModal'
+import { EditScheduleModal } from './EditScheduleModal'
+import { CancelScheduleModal } from './CancelScheduleModal'
+import { checkScheduleModificationAllowed } from '../scheduleRules'
 import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
 import fieldBrokenFixtureImg from '../../../assets/images/field-broken-fixture.jpg'
 import fieldLuxmeterImg from '../../../assets/images/field-luxmeter-4lux.jpg'
@@ -27,12 +32,21 @@ interface CaseDetailModalProps {
   isOpen: boolean
   caseItem: ScheduleCase | null
   viewingPhaseIndex: number
+  assignees?: WorkOrderAssignee[]
   onClose: () => void
   onSwitchViewingPhase: (index: number) => void
   onReturnCurrentPhase: (code: string, note: string) => void
   onEndNormally: (code: string, reason: string) => void
   onOpenCreateNextPhaseModal: (code: string, phaseType: 'inspection' | 'repair') => void
   onSubmitSuperior: (code: string, editedMaterialsNote: string) => void
+  onEditSchedule?: (payload: {
+    title: string
+    scheduledDate: string
+    dueDate: string
+    newAssigneeId: string
+    materialsNote?: string
+  }) => Promise<void>
+  onCancelSchedule?: (reason: string) => Promise<void>
 }
 
 const STEPPER_STEPS = [
@@ -46,12 +60,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   isOpen,
   caseItem,
   viewingPhaseIndex,
+  assignees = [],
   onClose,
   onSwitchViewingPhase,
   onReturnCurrentPhase,
   onEndNormally,
   onOpenCreateNextPhaseModal,
   onSubmitSuperior,
+  onEditSchedule,
+  onCancelSchedule,
 }) => {
   // Trạng thái cục bộ khi duyệt khảo sát / kiểm tra
   const [isSurveyApprovedLocal, setIsSurveyApprovedLocal] = useState(false)
@@ -66,6 +83,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   // State mở modal Yêu cầu làm lại (POST /return)
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
   const [returnReason, setReturnReason] = useState('')
+
+  // State mở modal Chỉnh sửa & Hủy lịch
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
 
   useEffect(() => {
     setIsSurveyApprovedLocal(false)
@@ -85,6 +106,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const currentPhase = caseItem.phases[viewingPhaseIndex]
   const isActivePhase = viewingPhaseIndex === caseItem.currentPhaseIndex
   const hasReport = currentPhase?.status === 'reported'
+
+  // Kiểm tra quy chế: nếu lịch thực hiện trong ngày hôm nay thì không được sửa/hủy, lịch sau ngày hôm nay thì được sửa/hủy
+  const modificationCheck = checkScheduleModificationAllowed(
+    currentPhase?.date || currentPhase?.dueDate,
+    currentPhase?.status,
+    caseItem.isTerminated
+  )
+  const canModify = modificationCheck.canModify
 
   // Kiểm tra bước hiện tại đã được duyệt hay chưa
   const isCurrentlyApproved =
@@ -140,20 +169,38 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
             <div className="flex items-center justify-between relative select-none">
               {STEPPER_STEPS.map((step, idx) => {
-                const phaseForStep = caseItem.phases[idx]
-                // Bất kỳ giai đoạn nào đã END hoặc đã hoàn thành đều có dấu tick
+                const phaseForStep =
+                  caseItem.phases.find((p) => p.phaseType === step.type) || caseItem.phases[idx]
+                const actualPhaseIndex = phaseForStep ? caseItem.phases.indexOf(phaseForStep) : -1
+
+                // Bất kỳ giai đoạn nào đã END hoặc đã hoàn thành đều có dấu tick (trừ khi bị hủy)
+                const isStepCancelled = phaseForStep?.rawStatus === 'cancelled'
                 const isStepEnded =
-                  phaseForStep?.status === 'ended' ||
-                  (caseItem.isTerminated && idx <= caseItem.currentPhaseIndex)
-                const isCompleted = idx < caseItem.currentPhaseIndex || isStepEnded
+                  (phaseForStep?.status === 'ended' && !isStepCancelled) ||
+                  (caseItem.isTerminated &&
+                    !isStepCancelled &&
+                    actualPhaseIndex >= 0 &&
+                    actualPhaseIndex <= caseItem.currentPhaseIndex)
+                const isCompleted =
+                  Boolean(
+                    phaseForStep &&
+                      !isStepCancelled &&
+                      (actualPhaseIndex < caseItem.currentPhaseIndex || isStepEnded)
+                  )
                 const isActive =
-                  idx === caseItem.currentPhaseIndex &&
-                  !caseItem.isTerminated &&
-                  phaseForStep?.status !== 'ended'
-                const isViewing = idx === viewingPhaseIndex
+                  Boolean(
+                    phaseForStep &&
+                      !isStepCancelled &&
+                      actualPhaseIndex === caseItem.currentPhaseIndex &&
+                      !caseItem.isTerminated &&
+                      phaseForStep.status !== 'ended'
+                  )
+                const isViewing = actualPhaseIndex >= 0 && actualPhaseIndex === viewingPhaseIndex
 
                 let circleClass = 'bg-slate-200 text-slate-500 border-slate-300'
-                if (isCompleted) {
+                if (isStepCancelled) {
+                  circleClass = 'bg-rose-500 text-white border-rose-500 shadow-xs'
+                } else if (isCompleted) {
                   circleClass = 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                 } else if (isActive) {
                   circleClass = 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100 shadow-xs'
@@ -163,20 +210,28 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   <React.Fragment key={step.type}>
                     <div
                       onClick={() => {
-                        if (idx < caseItem.phases.length) {
-                          onSwitchViewingPhase(idx)
+                        if (actualPhaseIndex >= 0) {
+                          onSwitchViewingPhase(actualPhaseIndex)
                         }
                       }}
                       className={`flex flex-col items-center gap-1.5 cursor-pointer z-10 transition-transform ${
-                        idx < caseItem.phases.length ? 'hover:scale-105' : 'opacity-40 cursor-not-allowed'
+                        actualPhaseIndex >= 0 ? 'hover:scale-105' : 'opacity-40 cursor-not-allowed'
                       }`}
                     >
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${circleClass} ${
-                          isViewing ? 'scale-110 ring-4 ring-blue-500/25 ring-offset-2 ring-offset-white shadow-md' : ''
+                          isViewing
+                            ? 'scale-110 ring-4 ring-blue-500/25 ring-offset-2 ring-offset-white shadow-md'
+                            : ''
                         }`}
                       >
-                        {isCompleted ? <Check className="w-4 h-4 stroke-[3]" /> : idx + 1}
+                        {isStepCancelled ? (
+                          <X className="w-4 h-4 stroke-[3]" />
+                        ) : isCompleted ? (
+                          <Check className="w-4 h-4 stroke-[3]" />
+                        ) : (
+                          idx + 1
+                        )}
                       </div>
                       <span
                         className={`text-[11px] font-bold ${
@@ -194,7 +249,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       <div
                         className={`flex-1 h-0.5 mx-2 rounded-full transition-colors ${
                           idx < caseItem.currentPhaseIndex ||
-                          (caseItem.isTerminated && idx < caseItem.phases.length)
+                          (caseItem.isTerminated && !isStepCancelled && idx < caseItem.phases.length)
                             ? 'bg-emerald-500'
                             : 'bg-slate-200'
                         }`}
@@ -206,12 +261,32 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Thông báo sự vụ nếu đã kết thúc (Terminated / END) */}
+          {/* Thông báo sự vụ nếu đã kết thúc (Terminated / END / CANCELLED) */}
           {caseItem.isTerminated && (
-            <div className="p-3.5 rounded-xl bg-slate-100 border border-slate-300 flex items-start gap-2.5 text-xs text-slate-700">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div
+              className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${
+                caseItem.endReason?.toLowerCase().includes('hủy') ||
+                caseItem.phases.some((p) => p.rawStatus === 'cancelled')
+                  ? 'bg-rose-50 border-rose-200 text-rose-800'
+                  : 'bg-slate-100 border-slate-300 text-slate-700'
+              }`}
+            >
+              <AlertTriangle
+                className={`w-4 h-4 shrink-0 mt-0.5 ${
+                  caseItem.endReason?.toLowerCase().includes('hủy') ||
+                  caseItem.phases.some((p) => p.rawStatus === 'cancelled')
+                    ? 'text-rose-600'
+                    : 'text-amber-600'
+                }`}
+              />
               <div>
-                <strong>Sự vụ đã đóng (END):</strong> {caseItem.endReason || 'Đã hoàn tất vòng đời.'}
+                <strong>
+                  {caseItem.endReason?.toLowerCase().includes('hủy') ||
+                  caseItem.phases.some((p) => p.rawStatus === 'cancelled')
+                    ? 'Sự vụ / Lịch đã hủy:'
+                    : 'Sự vụ đã đóng (END):'}
+                </strong>{' '}
+                {caseItem.endReason || 'Đã hoàn tất vòng đời.'}
               </div>
             </div>
           )}
@@ -221,6 +296,32 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           {/* ======================================================== */}
           {currentPhase ? (
             <div className="flex flex-col gap-4">
+              {/* Thông báo quy chế Chỉnh sửa & Hủy lịch */}
+              {!caseItem.isTerminated && currentPhase.status !== 'ended' && (
+                <>
+                  {!canModify ? (
+                    <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900 leading-relaxed shadow-2xs">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-amber-950">Quy chế chỉnh sửa & hủy lịch:</strong>{' '}
+                        {modificationCheck.reason}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-50/70 border border-emerald-200/90 rounded-2xl flex items-center justify-between text-xs text-emerald-950 shadow-2xs">
+                      <span className="flex items-center gap-2 font-bold">
+                        <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
+                        Đủ điều kiện chỉnh sửa / hủy lịch (Ngày thực hiện:{' '}
+                        {modificationCheck.scheduledDateFormatted})
+                      </span>
+                      <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                        Lịch sau ngày hôm nay
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* Thẻ thông tin cơ bản của bước (Bố cục 2x2 như cũ để hiển thị trọn vẹn tuyến đường) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
@@ -257,7 +358,12 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     Trạng thái bước này
                   </div>
                   <div className="text-xs font-bold mt-1">
-                    {currentPhase.status === 'ended' ? (
+                    {currentPhase.rawStatus === 'cancelled' ? (
+                      <span className="text-rose-600 font-bold flex items-center gap-1">
+                        <X className="w-3.5 h-3.5 stroke-[3] text-rose-600" />
+                        Đã hủy
+                      </span>
+                    ) : currentPhase.status === 'ended' ? (
                       <span className="text-slate-600 font-bold flex items-center gap-1">
                         <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-600" />
                         Đã kết thúc
@@ -472,14 +578,51 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         </div>
 
         {/* Modal Footer: Action Buttons - Luôn cố định ở đáy modal */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={handleCloseModal}
-            className="px-4 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-300 rounded-xl hover:bg-slate-100 transition cursor-pointer"
-          >
-            Đóng
-          </button>
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="px-4 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-300 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+            >
+              Đóng
+            </button>
+
+            {/* Nút Chỉnh sửa & Hủy lịch theo quy chế 1 ngày */}
+            {!caseItem.isTerminated && currentPhase && currentPhase.status !== 'ended' && (
+              <>
+                <button
+                  type="button"
+                  disabled={!canModify}
+                  onClick={() => setIsEditModalOpen(true)}
+                  title={!canModify ? modificationCheck.reason : 'Chỉnh sửa ngày hẹn, hạn chót hoặc kỹ sư phụ trách'}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${
+                    canModify
+                      ? 'text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 cursor-pointer active:scale-95'
+                      : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Chỉnh sửa lịch</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!canModify}
+                  onClick={() => setIsCancelModalOpen(true)}
+                  title={!canModify ? modificationCheck.reason : 'Hủy lịch công tác này'}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${
+                    canModify
+                      ? 'text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer active:scale-95'
+                      : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hủy lịch</span>
+                </button>
+              </>
+            )}
+          </div>
 
           {/* Các nút hành động tác nghiệp Quản lý */}
           {isActivePhase && hasReport && !caseItem.isTerminated && (
@@ -579,7 +722,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>✓ Duyệt & Gửi lên cấp trên</span>
+                    <span>Duyệt & Gửi lên cấp trên</span>
                   </button>
                 </>
               )}
@@ -661,6 +804,29 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         phase={currentPhase || null}
         onClose={() => setIsFieldReportModalOpen(false)}
       />
+
+      {/* Modal Chỉnh Sửa Lịch Công Tác */}
+      {onEditSchedule && (
+        <EditScheduleModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          caseItem={caseItem}
+          currentPhase={currentPhase || null}
+          assignees={assignees}
+          onSubmit={onEditSchedule}
+        />
+      )}
+
+      {/* Modal Hủy Lịch Công Tác */}
+      {onCancelSchedule && (
+        <CancelScheduleModal
+          isOpen={isCancelModalOpen}
+          onClose={() => setIsCancelModalOpen(false)}
+          caseCode={caseItem.code}
+          workOrderId={currentPhase?.workOrderId || caseItem.code}
+          onSubmit={onCancelSchedule}
+        />
+      )}
     </div>
   )
 }
