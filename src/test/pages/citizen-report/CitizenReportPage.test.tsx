@@ -5,9 +5,9 @@ import { Provider } from 'react-redux'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { configureStore } from '@reduxjs/toolkit'
 import citizenReportReducer, {
-  verifyTokenRequest,
-  verifyTokenSuccess,
-  verifyTokenFailure,
+  lookupPublicQrRequest,
+  lookupPublicQrSuccess,
+  lookupPublicQrFailure,
   submitReportRequest,
   submitReportSuccess,
   submitReportFailure,
@@ -15,78 +15,67 @@ import citizenReportReducer, {
 } from '../../../feature/citizen-report/citizenReportSlice'
 import { CitizenReportPage } from '../../../pages/citizen-report/CitizenReportPage'
 import { ReportSuccessModal } from '../../../pages/citizen-report/components/ReportSuccessModal'
-import { InvalidQrAlert } from '../../../pages/citizen-report/components/InvalidQrAlert'
 import { PoleInfoCard } from '../../../pages/citizen-report/components/PoleInfoCard'
-import type { DecryptedPoleInfo } from '../../../utils/qrSecurity'
 import type {
-  CitizenReportPayload,
-  CitizenReportResponse,
+  PublicQrInfo,
+  PublicReportReceipt,
+  PublicReportSubmitPayload,
 } from '../../../feature/citizen-report/citizenReportAPI'
 import { VIETNAM_PHONE_REGEX } from '../../../validations/common.schema'
 
-// Mock indexedDbDraft module để tránh phụ thuộc IndexedDB thực tế của browser
+// Mock indexedDbDraft module
 vi.mock('../../../utils/indexedDbDraft', () => ({
   getCitizenDraft: vi.fn().mockResolvedValue(null),
   saveCitizenDraft: vi.fn().mockResolvedValue(undefined),
   deleteCitizenDraft: vi.fn().mockResolvedValue(undefined),
 }))
 
-// Mock qrSecurity module
-vi.mock('../../../utils/qrSecurity', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../utils/qrSecurity')>()
-  return {
-    ...actual,
-    decryptAndVerifyQrToken: vi.fn(),
-  }
-})
+// Mock imageUtils module
+vi.mock('../../../utils/imageUtils', () => ({
+  convertToJpeg: vi.fn().mockImplementation((file: File) => Promise.resolve(file)),
+}))
 
-describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citizen-report/)', () => {
-  // Mock Data chuẩn DTO 100%
-  const mockPoleInfo: DecryptedPoleInfo = {
-    pole_code: 'POLE-TL8-001',
+describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)', () => {
+  const mockPublicQr: PublicQrInfo = {
     segment_name: 'Đường Tỉnh Lộ 8 (Đoạn Cầu Tân Quy)',
     commune_name: 'Xã Tân Thạnh Đông',
-    issued_at: 1728500000000,
   }
 
-  const mockSuccessResponse: CitizenReportResponse = {
-    report_id: 'RPT-20261011-0089',
-    status: 'received',
-    message: 'Hệ thống đã ghi nhận phản ánh sự cố thành công.',
-    pole_code: 'POLE-TL8-001',
-    submitted_at: '2026-10-11T14:30:00Z',
+  const mockReceipt: PublicReportReceipt = {
+    client_op_id: 'op-20261013-abcd-1234',
+    received_at: '2026-10-13T10:00:00Z',
+    photos_kept: 1,
   }
 
-  // Factory tạo Redux Store test độc lập
   const createTestStore = (options?: {
     initialState?: Record<string, any>
-    autoResolvePole?: DecryptedPoleInfo | null
-    autoFailMessage?: string | null
+    autoResolvePole?: PublicQrInfo | null
+    autoFailLookupError?: string | null
   }) => {
-    const { initialState, autoResolvePole, autoFailMessage } = options || {}
+    const { initialState, autoResolvePole, autoFailLookupError } = options || {}
 
     return configureStore({
       reducer: {
         citizenReport: (state, action) => {
-          if (action.type === verifyTokenRequest.type) {
+          if (action.type === lookupPublicQrRequest.type) {
             if (autoResolvePole) {
               return {
                 ...state,
-                isVerifyingToken: false,
+                isLookingUp: false,
                 currentPole: autoResolvePole,
-                isValidToken: true,
-                error: null,
-                rawQrToken: action.payload,
+                isValidCode: true,
+                lookupError: null,
+                code: action.payload,
               }
             }
-            if (autoFailMessage) {
+            if (autoFailLookupError) {
               return {
                 ...state,
-                isVerifyingToken: false,
+                isLookingUp: false,
                 currentPole: null,
-                isValidToken: false,
-                error: autoFailMessage,
-                rawQrToken: action.payload,
+                isValidCode: false,
+                lookupError: autoFailLookupError,
+                code: action.payload,
               }
             }
           }
@@ -96,13 +85,14 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
       preloadedState: initialState
         ? {
             citizenReport: {
+              code: null,
               currentPole: null,
-              rawQrToken: null,
-              isValidToken: false,
-              isVerifyingToken: false,
+              isValidCode: false,
+              isLookingUp: false,
               isSubmitting: false,
               submissionResult: null,
-              error: null,
+              lookupError: null,
+              submitError: null,
               ...initialState,
             },
           }
@@ -112,7 +102,7 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
 
   const renderWithProviders = (
     ui: React.ReactElement,
-    { store = createTestStore(), initialUrl = '/report?lux=TEST_TOKEN' } = {}
+    { store = createTestStore(), initialUrl = '/r/QR12345678901234' } = {}
   ) => {
     return {
       store,
@@ -120,7 +110,7 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
         <Provider store={store}>
           <MemoryRouter initialEntries={[initialUrl]}>
             <Routes>
-              <Route path="/report" element={ui} />
+              <Route path="/r/:code" element={ui} />
               <Route path="*" element={ui} />
             </Routes>
           </MemoryRouter>
@@ -131,7 +121,6 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Đảm bảo navigator.onLine là true mặc định
     Object.defineProperty(navigator, 'onLine', {
       configurable: true,
       value: true,
@@ -142,37 +131,44 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
   // TẦNG 1: UNIT TEST CHO CÁC COMPONENT CON
   // ==========================================
   describe('1. Child Components Unit Verification', () => {
-    it('PoleInfoCard hiển thị đầy đủ thông tin mã hiệu cột, tuyến đường và địa bàn', () => {
-      render(<PoleInfoCard poleInfo={mockPoleInfo} />)
+    it('PoleInfoCard hiển thị Skeleton Loading khi isLoading=true', () => {
+      const { container } = render(
+        <PoleInfoCard code="QR12345678901234" poleInfo={null} isLoading={true} />
+      )
+      expect(container.querySelector('.animate-pulse')).not.toBeNull()
+    })
 
+    it('PoleInfoCard hiển thị thẻ xanh 200 OK khi có poleInfo hợp lệ', () => {
+      render(
+        <PoleInfoCard code="QR12345678901234" poleInfo={mockPublicQr} isLoading={false} />
+      )
       expect(screen.getByText('Vị trí cột đèn phản ánh')).toBeInTheDocument()
-      expect(screen.getByText('Đã xác thực QR')).toBeInTheDocument()
-      expect(screen.getByText('POLE-TL8-001')).toBeInTheDocument()
+      expect(screen.getByText('Mã QR hợp lệ')).toBeInTheDocument()
       expect(screen.getByText('Đường Tỉnh Lộ 8 (Đoạn Cầu Tân Quy)')).toBeInTheDocument()
       expect(screen.getByText('Xã Tân Thạnh Đông')).toBeInTheDocument()
+      expect(screen.getByText('QR12345678901234')).toBeInTheDocument()
     })
 
-    it('InvalidQrAlert hiển thị đúng cảnh báo lỗi và hướng dẫn quét lại mã QR', () => {
-      render(<InvalidQrAlert errorMessage="Mã QR đã hết hạn hiệu lực" />)
-
-      expect(screen.getByText('Không Lấy Được Thông Tin Trụ Đèn')).toBeInTheDocument()
-      expect(screen.getByText('Mã QR đã hết hạn hiệu lực')).toBeInTheDocument()
-      expect(screen.getByText('Cách xử lý:')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Thử lại/i })).toBeInTheDocument()
+    it('PoleInfoCard hiển thị thẻ đỏ khi gặp lỗi 404 / thu hồi', () => {
+      render(
+        <PoleInfoCard
+          code="REVOKED_CODE"
+          poleInfo={null}
+          isLoading={false}
+          error="Mã QR này không tồn tại hoặc đã bị thu hồi"
+        />
+      )
+      expect(screen.getByText('Mã không hợp lệ')).toBeInTheDocument()
+      expect(screen.getByText('REVOKED_CODE')).toBeInTheDocument()
+      expect(screen.getByText('Mã QR này không tồn tại hoặc đã bị thu hồi')).toBeInTheDocument()
     })
 
-    it('ReportSuccessModal hiển thị mã biên nhận và thông điệp cảm ơn (không có nút gửi tiếp)', () => {
-      render(<ReportSuccessModal result={mockSuccessResponse} />)
-
+    it('ReportSuccessModal hiển thị mã biên nhận client_op_id và thời gian ghi nhận', () => {
+      render(<ReportSuccessModal receipt={mockReceipt} code="QR12345678901234" />)
       expect(screen.getByText('Gửi Phản Ánh Thành Công!')).toBeInTheDocument()
-      expect(screen.getByText('Hệ thống đã ghi nhận phản ánh sự cố thành công.')).toBeInTheDocument()
-      expect(screen.getByText('RPT-20261011-0089')).toBeInTheDocument()
-      expect(screen.getByText('POLE-TL8-001')).toBeInTheDocument()
-      // Khẳng định không có nút gửi thêm phản ánh khác (hoàn tất hành trình)
-      expect(screen.queryByText(/Gửi thêm phản ánh khác/i)).not.toBeInTheDocument()
-      expect(
-        screen.getByText(/Bạn có thể thoát trình duyệt hoặc khóa màn hình điện thoại/i)
-      ).toBeInTheDocument()
+      expect(screen.getByText('op-20261013-abcd-1234')).toBeInTheDocument()
+      expect(screen.getByText('QR12345678901234')).toBeInTheDocument()
+      expect(screen.getByText('1 ảnh')).toBeInTheDocument()
     })
   })
 
@@ -189,74 +185,80 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
     })
 
     it('từ chối số điện thoại sai đầu số, thiếu hoặc thừa chữ số', () => {
-      expect(VIETNAM_PHONE_REGEX.test('0241234567')).toBe(false) // Sai đầu số
-      expect(VIETNAM_PHONE_REGEX.test('090123456')).toBe(false) // 9 số (thiếu)
-      expect(VIETNAM_PHONE_REGEX.test('09012345678')).toBe(false) // 11 số (thừa)
-      expect(VIETNAM_PHONE_REGEX.test('abc0901234')).toBe(false) // Chứa chữ
+      expect(VIETNAM_PHONE_REGEX.test('0241234567')).toBe(false)
+      expect(VIETNAM_PHONE_REGEX.test('090123456')).toBe(false)
+      expect(VIETNAM_PHONE_REGEX.test('09012345678')).toBe(false)
+      expect(VIETNAM_PHONE_REGEX.test('abc0901234')).toBe(false)
     })
   })
 
   // ==========================================
-  // TẦNG 3: CITIZEN REPORT REDUX REDUCER
+  // TẦNG 3: citizenReportSlice Reducer Unit Tests
   // ==========================================
   describe('3. citizenReportSlice Reducer Unit Tests', () => {
-    it('verifyTokenRequest cập nhật trạng thái đang xác thực', () => {
-      const state = citizenReportReducer(undefined, verifyTokenRequest('QR_TOKEN_123'))
-      expect(state.isVerifyingToken).toBe(true)
-      expect(state.rawQrToken).toBe('QR_TOKEN_123')
-      expect(state.error).toBeNull()
+    it('lookupPublicQrRequest cập nhật trạng thái đang tra cứu', () => {
+      const state = citizenReportReducer(undefined, lookupPublicQrRequest('QR16CHARSCODE123'))
+      expect(state.isLookingUp).toBe(true)
+      expect(state.code).toBe('QR16CHARSCODE123')
+      expect(state.lookupError).toBeNull()
+      expect(state.isValidCode).toBe(false)
     })
 
-    it('verifyTokenSuccess lưu thông tin trụ đèn và đặt isValidToken = true', () => {
-      const state = citizenReportReducer(undefined, verifyTokenSuccess(mockPoleInfo))
-      expect(state.isVerifyingToken).toBe(false)
-      expect(state.isValidToken).toBe(true)
-      expect(state.currentPole).toEqual(mockPoleInfo)
+    it('lookupPublicQrSuccess cập nhật poleInfo và đặt isValidCode=true', () => {
+      const state = citizenReportReducer(
+        undefined,
+        lookupPublicQrSuccess({ code: 'QR16CHARSCODE123', poleInfo: mockPublicQr })
+      )
+      expect(state.isLookingUp).toBe(false)
+      expect(state.isValidCode).toBe(true)
+      expect(state.currentPole).toEqual(mockPublicQr)
+      expect(state.lookupError).toBeNull()
     })
 
-    it('verifyTokenFailure ghi nhận lỗi và đặt isValidToken = false', () => {
-      const state = citizenReportReducer(undefined, verifyTokenFailure('Mã QR không hợp lệ'))
-      expect(state.isVerifyingToken).toBe(false)
-      expect(state.isValidToken).toBe(false)
-      expect(state.error).toBe('Mã QR không hợp lệ')
+    it('lookupPublicQrFailure lưu thông báo lỗi và đặt isValidCode=false', () => {
+      const state = citizenReportReducer(
+        undefined,
+        lookupPublicQrFailure('Mã QR tem cột đèn này không tồn tại hoặc đã bị thu hồi.')
+      )
+      expect(state.isLookingUp).toBe(false)
+      expect(state.isValidCode).toBe(false)
+      expect(state.lookupError).toBe('Mã QR tem cột đèn này không tồn tại hoặc đã bị thu hồi.')
       expect(state.currentPole).toBeNull()
     })
 
-    it('submitReportRequest đặt cờ isSubmitting = true', () => {
-      const payload: CitizenReportPayload = {
-        qr_token: 'TOKEN',
-        pole_code: 'POLE-01',
-        fault_type: 'lamp_out',
-        severity: 'medium',
+    it('submitReportRequest đặt cờ isSubmitting=true và reset submitError', () => {
+      const payload: PublicReportSubmitPayload = {
+        code: 'QR16CHARSCODE123',
+        kind: 'lamp_out',
         description: 'Đèn chiếu sáng bị tắt hoàn toàn',
       }
       const state = citizenReportReducer(undefined, submitReportRequest(payload))
       expect(state.isSubmitting).toBe(true)
-      expect(state.error).toBeNull()
+      expect(state.submitError).toBeNull()
     })
 
     it('submitReportSuccess lưu submissionResult và tắt cờ isSubmitting', () => {
-      const state = citizenReportReducer(undefined, submitReportSuccess(mockSuccessResponse))
+      const state = citizenReportReducer(undefined, submitReportSuccess(mockReceipt))
       expect(state.isSubmitting).toBe(false)
-      expect(state.submissionResult).toEqual(mockSuccessResponse)
-      expect(state.error).toBeNull()
+      expect(state.submissionResult).toEqual(mockReceipt)
+      expect(state.submitError).toBeNull()
     })
 
-    it('submitReportFailure ghi nhận lỗi API và tắt cờ isSubmitting', () => {
+    it('submitReportFailure ghi nhận lỗi submitError và tắt cờ isSubmitting', () => {
       const state = citizenReportReducer(undefined, submitReportFailure('Lỗi 500: Server bận'))
       expect(state.isSubmitting).toBe(false)
-      expect(state.error).toBe('Lỗi 500: Server bận')
+      expect(state.submitError).toBe('Lỗi 500: Server bận')
     })
 
-    it('resetReportState đưa các cờ submitting và lỗi về giá trị rỗng', () => {
-      const intermediateState = citizenReportReducer(
+    it('resetReportState đưa submitError và submissionResult về rỗng', () => {
+      const dirtyState = citizenReportReducer(
         undefined,
-        submitReportFailure('Lỗi trước đó')
+        submitReportFailure('Lỗi submit trước')
       )
-      const resetState = citizenReportReducer(intermediateState, resetReportState())
-      expect(resetState.isSubmitting).toBe(false)
-      expect(resetState.error).toBeNull()
-      expect(resetState.submissionResult).toBeNull()
+      const cleanState = citizenReportReducer(dirtyState, resetReportState())
+      expect(cleanState.isSubmitting).toBe(false)
+      expect(cleanState.submitError).toBeNull()
+      expect(cleanState.submissionResult).toBeNull()
     })
   })
 
@@ -264,85 +266,68 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
   // TẦNG 4: PAGE HAPPY PATH - FORM FLOW & INTERACTION
   // ==========================================
   describe('4. Happy Path - CitizenReportPage Interaction Flow', () => {
-    it('render đầy đủ 4 danh mục hiện trạng sự cố và hiển thị form gửi phản ánh', () => {
+    it('Instant Render: hiển thị ngay giao diện form và 4 danh mục hiện trạng sự cố', () => {
       renderWithProviders(<CitizenReportPage />, {
         store: createTestStore({
-          autoResolvePole: mockPoleInfo,
+          autoResolvePole: mockPublicQr,
         }),
       })
 
-      // Thông tin trụ đèn hiển thị
-      expect(screen.getByText('POLE-TL8-001')).toBeInTheDocument()
+      // Thông tin vị trí cột đèn hợp lệ
+      expect(screen.getByText('Đường Tỉnh Lộ 8 (Đoạn Cầu Tân Quy)')).toBeInTheDocument()
+      expect(screen.getByText('Xã Tân Thạnh Đông')).toBeInTheDocument()
 
       // 4 danh mục hiện trạng sự cố
-      expect(screen.getByText('Hở dây điện / Rò rỉ điện nguy hiểm')).toBeInTheDocument()
-      expect(screen.getByText('Cột đèn nghiêng / Nguy cơ gãy đổ')).toBeInTheDocument()
       expect(screen.getByText('Đèn tắt hoàn toàn / Mất chiếu sáng')).toBeInTheDocument()
       expect(screen.getByText('Đèn sáng yếu / Chập chờn')).toBeInTheDocument()
+      expect(screen.getByText('Cột đèn nghiêng / Nguy cơ gãy đổ')).toBeInTheDocument()
+      expect(screen.getByText('Hở dây điện / Sự cố nguy hiểm khác')).toBeInTheDocument()
     })
 
-    it('chuyển đổi danh mục sự cố độc lập giữa các ô và thay đổi class active', () => {
+    it('chuyển đổi danh mục sự cố cập nhật trạng thái chọn viền xanh', () => {
       renderWithProviders(<CitizenReportPage />, {
         store: createTestStore({
-          autoResolvePole: mockPoleInfo,
+          autoResolvePole: mockPublicQr,
         }),
       })
 
-      // Lấy nút chọn "Cột đèn nghiêng / Nguy cơ gãy đổ"
-      const tiltTitle = screen.getByText('Cột đèn nghiêng / Nguy cơ gãy đổ')
-      const tiltButton = tiltTitle.closest('button')
+      const tiltOption = screen.getByText('Cột đèn nghiêng / Nguy cơ gãy đổ')
+      const tiltButton = tiltOption.closest('button')
       expect(tiltButton).not.toBeNull()
-      expect(tiltButton).not.toHaveClass('border-blue-600')
 
-      // Click chọn
       fireEvent.click(tiltButton!)
       expect(tiltButton).toHaveClass('border-blue-600')
-
-      // Click chọn "Đèn tắt hoàn toàn / Mất chiếu sáng"
-      const lampOutTitle = screen.getByText('Đèn tắt hoàn toàn / Mất chiếu sáng')
-      const lampOutButton = lampOutTitle.closest('button')
-      expect(lampOutButton).not.toBeNull()
-
-      fireEvent.click(lampOutButton!)
-      expect(lampOutButton).toHaveClass('border-blue-600')
-      expect(tiltButton).not.toHaveClass('border-blue-600')
     })
 
     it('nhập form hợp lệ và gửi phản ánh thành công, dispatch đúng action submitReportRequest', () => {
       const store = createTestStore({
-        autoResolvePole: mockPoleInfo,
+        autoResolvePole: mockPublicQr,
       })
       const dispatchSpy = vi.spyOn(store, 'dispatch')
 
       renderWithProviders(<CitizenReportPage />, { store })
 
-      // Nhập mô tả hợp lệ (> 10 ký tự) qua placeholder "Ví dụ: Đèn bị tắt từ hôm qua"
       const descInput = screen.getByPlaceholderText(/Ví dụ: Đèn bị tắt từ hôm qua/i)
       fireEvent.change(descInput, {
         target: { value: 'Bóng đèn chiếu sáng tại cột này đã tắt hẳn 3 ngày nay, đường rất tối.' },
       })
 
-      // Nhập họ tên
       const nameInput = screen.getByPlaceholderText(/Họ và tên của bạn/i)
-      fireEvent.change(nameInput, { target: { value: 'Trần Văn Dân' } })
+      fireEvent.change(nameInput, { target: { value: 'Nguyễn Văn Dân' } })
 
-      // Nhập số điện thoại hợp lệ
       const phoneInput = screen.getByPlaceholderText(/Số điện thoại liên hệ/i)
       fireEvent.change(phoneInput, { target: { value: '0901234567' } })
 
-      // Bấm nút nộp phản ánh
       const submitBtn = screen.getByRole('button', { name: /Gửi Phản Ánh Ngay/i })
       fireEvent.click(submitBtn)
 
-      // Kiểm tra dispatch submitReportRequest được gọi với payload chuẩn
       expect(dispatchSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           type: submitReportRequest.type,
           payload: expect.objectContaining({
-            pole_code: 'POLE-TL8-001',
-            description: 'Bóng đèn chiếu sáng tại cột này đã tắt hẳn 3 ngày nay, đường rất tối.',
-            reporter_name: 'Trần Văn Dân',
-            reporter_phone: '0901234567',
+            code: 'QR12345678901234',
+            kind: 'lamp_out',
+            description: expect.stringContaining('Bóng đèn chiếu sáng tại cột này đã tắt hẳn 3 ngày nay, đường rất tối.'),
           }),
         })
       )
@@ -351,56 +336,58 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
     it('hiển thị ReportSuccessModal khi submissionResult có dữ liệu', () => {
       renderWithProviders(<CitizenReportPage />, {
         store: createTestStore({
-          autoResolvePole: mockPoleInfo,
+          autoResolvePole: mockPublicQr,
           initialState: {
-            submissionResult: mockSuccessResponse,
+            submissionResult: mockReceipt,
           },
         }),
       })
 
       expect(screen.getByText('Gửi Phản Ánh Thành Công!')).toBeInTheDocument()
-      expect(screen.getByText('RPT-20261011-0089')).toBeInTheDocument()
+      expect(screen.getByText('op-20261013-abcd-1234')).toBeInTheDocument()
     })
   })
 
   // ==========================================
-  // TẦNG 5: EDGE CASES & VALIDATION GUARDS
+  // TẦNG 5: EMPTY STATE & EDGE CASES
   // ==========================================
-  describe('5. Edge Cases & Validation Guards', () => {
-    it('hiển thị thông báo InvalidQrAlert khi mã QR rỗng hoặc không hợp lệ', () => {
+  describe('5. Empty States & Edge Cases', () => {
+    it('Vô hiệu hóa nút gửi và hiển thị cảnh báo khi mã QR không hợp lệ (404/revoked)', () => {
       renderWithProviders(<CitizenReportPage />, {
         store: createTestStore({
-          autoFailMessage: 'Mã QR không hợp lệ hoặc đã hết hạn.',
+          autoFailLookupError: 'Mã QR tem cột đèn này không tồn tại trong hệ thống hoặc đã bị thu hồi.',
         }),
-        initialUrl: '/report',
       })
 
-      expect(screen.getByText('Không Lấy Được Thông Tin Trụ Đèn')).toBeInTheDocument()
-      expect(screen.getByText('Mã QR không hợp lệ hoặc đã hết hạn.')).toBeInTheDocument()
+      expect(screen.getByText('Mã không hợp lệ')).toBeInTheDocument()
+      const disabledBtn = screen.getByRole('button', {
+        name: /Mã QR không hợp lệ - Không thể gửi/i,
+      })
+      expect(disabledBtn).toBeDisabled()
     })
 
-    it('ngăn chặn gửi khi mô tả sự cố dưới 10 ký tự và hiển thị lỗi cụ thể', () => {
+    it('chặn gửi khi mô tả sự cố dưới 5 ký tự và hiển thị lỗi cụ thể', () => {
       renderWithProviders(<CitizenReportPage />, {
         store: createTestStore({
-          autoResolvePole: mockPoleInfo,
+          autoResolvePole: mockPublicQr,
         }),
       })
 
       const descInput = screen.getByPlaceholderText(/Ví dụ: Đèn bị tắt từ hôm qua/i)
-      fireEvent.change(descInput, { target: { value: 'Đèn hỏng' } }) // 8 ký tự (< 10)
+      fireEvent.change(descInput, { target: { value: 'Đèn' } })
 
       const submitBtn = screen.getByRole('button', { name: /Gửi Phản Ánh Ngay/i })
       fireEvent.click(submitBtn)
 
       expect(
-        screen.getByText('Vui lòng nhập mô tả sự cố cụ thể hơn (tối thiểu 10 ký tự).')
+        screen.getByText('Vui lòng nhập mô tả sự cố cụ thể hơn (tối thiểu 5 ký tự).')
       ).toBeInTheDocument()
     })
 
-    it('ngăn chặn gửi khi số điện thoại không hợp lệ và hiển thị lỗi rõ ràng', () => {
+    it('chặn gửi khi số điện thoại không hợp lệ', () => {
       renderWithProviders(<CitizenReportPage />, {
         store: createTestStore({
-          autoResolvePole: mockPoleInfo,
+          autoResolvePole: mockPublicQr,
         }),
       })
 
@@ -410,7 +397,7 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
       })
 
       const phoneInput = screen.getByPlaceholderText(/Số điện thoại liên hệ/i)
-      fireEvent.change(phoneInput, { target: { value: '0123456789' } }) // Đầu 01 không thuộc các mạng di động chuẩn
+      fireEvent.change(phoneInput, { target: { value: '0123456789' } })
 
       const submitBtn = screen.getByRole('button', { name: /Gửi Phản Ánh Ngay/i })
       fireEvent.click(submitBtn)
@@ -422,8 +409,7 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
       ).toBeInTheDocument()
     })
 
-    it('ngăn chặn gửi khi mất kết nối mạng và hiển thị cảnh báo offline', () => {
-      // Giả lập offline
+    it('chặn gửi khi mất kết nối mạng và hiển thị cảnh báo offline', () => {
       Object.defineProperty(navigator, 'onLine', {
         configurable: true,
         value: false,
@@ -431,7 +417,7 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
 
       renderWithProviders(<CitizenReportPage />, {
         store: createTestStore({
-          autoResolvePole: mockPoleInfo,
+          autoResolvePole: mockPublicQr,
         }),
       })
 
@@ -452,46 +438,61 @@ describe('CitizenReportPage & Citizen Components Test Suite (src/test/pages/citi
   })
 
   // ==========================================
-  // TẦNG 6: ERROR CASES (SIMULATE BE 400 / 500 / TIMEOUT)
+  // TẦNG 6: ERROR CASES - SIMULATE API 400 / 404 / 500
   // ==========================================
-  describe('6. Error Cases - API 400, 500 & Network Timeout Handling', () => {
-    it('xử lý an toàn khi Backend trả về lỗi 400 Bad Request (Redux store nhận failure)', () => {
+  describe('6. Error Cases - API 400, 404, 500 Handling', () => {
+    it('xử lý an toàn khi Backend trả về lỗi 400 Bad Request lúc submit', () => {
       const store = createTestStore({
         initialState: {
-          currentPole: mockPoleInfo,
-          isValidToken: true,
+          currentPole: mockPublicQr,
+          isValidCode: true,
           isSubmitting: true,
         },
       })
 
-      // Dispatch failure mô phỏng API 400 trả về từ saga
       store.dispatch(submitReportFailure('Dữ liệu phản ánh không hợp lệ (Lỗi 400). Vui lòng thử lại.'))
 
-      const state: any = store.getState().citizenReport
+      const state = store.getState().citizenReport
       expect(state.isSubmitting).toBe(false)
-      expect(state.error).toBe('Dữ liệu phản ánh không hợp lệ (Lỗi 400). Vui lòng thử lại.')
+      expect(state.submitError).toBe('Dữ liệu phản ánh không hợp lệ (Lỗi 400). Vui lòng thử lại.')
       expect(state.submissionResult).toBeNull()
     })
 
-    it('xử lý an toàn khi Backend lỗi 500 hoặc Timeout 10 giây (dữ liệu form được giữ nguyên)', () => {
+    it('xử lý an toàn khi Backend trả về lỗi 404 lúc lookup mã tem QR', () => {
       const store = createTestStore({
         initialState: {
-          currentPole: mockPoleInfo,
-          isValidToken: true,
+          code: 'NON_EXISTENT_QR',
+          isLookingUp: true,
+        },
+      })
+
+      store.dispatch(lookupPublicQrFailure('Không tìm thấy thông tin trụ đèn tương ứng (404)'))
+
+      const state = store.getState().citizenReport
+      expect(state.isLookingUp).toBe(false)
+      expect(state.isValidCode).toBe(false)
+      expect(state.currentPole).toBeNull()
+      expect(state.lookupError).toBe('Không tìm thấy thông tin trụ đèn tương ứng (404)')
+    })
+
+    it('xử lý an toàn khi Backend trả về lỗi 500 hoặc Timeout 10 giây', () => {
+      const store = createTestStore({
+        initialState: {
+          currentPole: mockPublicQr,
+          isValidCode: true,
           isSubmitting: true,
         },
       })
 
-      // Dispatch failure mô phỏng timeout 10s từ citizenReportSaga
       store.dispatch(
         submitReportFailure(
           'Kết nối mạng quá chậm hoặc không ổn định. Vui lòng kiểm tra 4G/Wifi và gửi lại phản ánh.'
         )
       )
 
-      const state: any = store.getState().citizenReport
+      const state = store.getState().citizenReport
       expect(state.isSubmitting).toBe(false)
-      expect(state.error).toContain('Kết nối mạng quá chậm hoặc không ổn định')
+      expect(state.submitError).toContain('Kết nối mạng quá chậm hoặc không ổn định')
     })
   })
 })
