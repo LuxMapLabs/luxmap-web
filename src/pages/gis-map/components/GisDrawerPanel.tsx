@@ -21,6 +21,7 @@ import cabinetSvg from '../../../assets/icons/cabinet.svg'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../../../redux/store'
 import { fetchPoleDetailRequest, clearPoleDetail } from '../../../feature/map/mapSlice'
+import { StatusBadge } from '../../../components/StatusBadge'
 
 export interface GisDrawerPanelProps {
   selectedPole: PoleFeature | null
@@ -396,13 +397,21 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div className="flex justify-between">
                         <span>Lắp đặt:</span>
                         <span className="text-slate-800 dark:text-slate-200">
-                          {poleDetail?.fixture?.install_date || selectedPole.properties.install_date || '2023-01-15'}
+                          {poleDetail?.fixture?.install_date || selectedPole.properties.install_date || '—'}
                         </span>
                       </div>
+                      <div className="flex justify-between items-center">
+                        <span>Trạng thái bảo hành:</span>
+                        <StatusBadge
+                          type="warranty"
+                          status={poleDetail?.fixture?.warranty_status || selectedPole.properties.warranty_status || 'unknown'}
+                          size="sm"
+                        />
+                      </div>
                       <div className="flex justify-between">
-                        <span>Bảo hành đến:</span>
-                        <span className="text-slate-800 dark:text-slate-200">
-                          {poleDetail?.fixture?.warranty_expiry || selectedPole.properties.warranty_expiry || '2026-12-31'}
+                        <span>Hạn bảo hành:</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-mono">
+                          {poleDetail?.fixture?.warranty_expiry || selectedPole.properties.warranty_expiry || '—'}
                         </span>
                       </div>
                       <div className="flex justify-between">

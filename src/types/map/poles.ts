@@ -104,7 +104,7 @@ export interface PoleProperties {
     lamp_watt?: number
     install_date?: string | null
     warranty_expiry?: string | null
-    warranty_status: WarrantyStatus
+    warranty_status?: WarrantyStatus
     commune_id: string | null
     last_seen_at?: string | null
     last_sweep_id?: string | null

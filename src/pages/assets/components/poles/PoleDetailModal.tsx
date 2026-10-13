@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, MapPin, Zap, Lightbulb, AlertTriangle, Bookmark, QrCode } from 'lucide-react'
+import { X, MapPin, Zap, Lightbulb, AlertTriangle, Bookmark, QrCode, ShieldCheck } from 'lucide-react'
 import { StatusBadge } from '../../../../components/StatusBadge'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../types/assets/segments'
@@ -77,8 +77,8 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
 
         {/* Content Body */}
         <div className="p-6 space-y-5 text-xs text-slate-800 dark:text-slate-200 max-h-[75vh] overflow-y-auto">
-          {/* 3 KPI Cards */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* 4 KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xs">
               <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
                 <Zap className="w-3 h-3 text-amber-500" />
@@ -105,8 +105,25 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
 
             <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xs">
               <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                <span>Bảo hành bóng</span>
+              </div>
+              <div className="mt-1 flex items-center">
+                <StatusBadge
+                  type="warranty"
+                  status={pole.active_fixture?.warranty_status || 'unknown'}
+                  size="sm"
+                />
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
+                Hạn: {pole.active_fixture?.warranty_expiry || '—'}
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xs">
+              <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 text-amber-500" />
-                <span>Khu vực nhạy cảm (POI)</span>
+                <span>Khu vực nhạy cảm</span>
               </div>
               <div className={`text-sm font-black mt-1 ${pole.near_sensitive_poi ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>
                 {pole.near_sensitive_poi ? 'Khu vực nhạy cảm' : 'Bình thường'}

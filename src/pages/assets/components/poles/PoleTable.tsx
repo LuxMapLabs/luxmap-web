@@ -59,6 +59,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               <th className="p-3.5">Địa bàn</th>
               <th className="p-3.5">Mã bóng</th>
               <th className="p-3.5">Trạng thái</th>
+              <th className="p-3.5">Bảo hành</th>
               <th className="p-3.5 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -67,7 +68,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               <PoleTableSkeleton rowCount={8} />
             ) : poles.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
+                <td colSpan={10} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
                   Không tìm thấy cột đèn nào phù hợp với bộ lọc hiện tại.
                 </td>
               </tr>
@@ -185,6 +186,24 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                     </td>
                     <td className="p-3.5">
                       <StatusBadge type="fixture" status={fixtureStatus} size="sm" />
+                    </td>
+                    <td className="p-3.5">
+                      {pole.active_fixture ? (
+                        <div className="flex flex-col items-start gap-0.5">
+                          <StatusBadge
+                            type="warranty"
+                            status={pole.active_fixture.warranty_status || 'unknown'}
+                            size="sm"
+                          />
+                          {pole.active_fixture.warranty_expiry && (
+                            <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 pl-0.5">
+                              {pole.active_fixture.warranty_expiry}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 dark:text-slate-500 font-mono">—</span>
+                      )}
                     </td>
                     <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                       <button
