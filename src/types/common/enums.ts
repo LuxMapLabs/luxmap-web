@@ -5,6 +5,12 @@
 
 export type AgendaFlag = 'in_progress' | 'scheduled_tonight' | 'carried_over' | 'unscheduled' | 'overdue'
 
+export type CitizenPhotoHint = 'lamp_on' | 'lamp_off' | 'inconclusive'
+
+export type CitizenReportKind = 'lamp_out' | 'lamp_dim' | 'pole_damaged' | 'other'
+
+export type CitizenReportStatus = 'pending' | 'accepted' | 'merged' | 'rejected'
+
 export type DataSource = 'field' | 'public_imagery' | 'calibration_rig' | 'simulated'
 
 export type EvidenceKind = 'before' | 'after' | 'observation'
@@ -36,6 +42,8 @@ export type NodeStatus = 'online' | 'offline' | 'never_reported'
 export type NotificationEntityType = 'work_order' | 'survey_sweep' | 'fault' | 'citizen_report'
 
 export type NotificationType = 'work_order_assigned' | 'work_order_unassigned' | 'work_order_rescheduled' | 'work_order_returned' | 'work_order_cancelled' | 'work_order_completed' | 'work_order_verified' | 'survey_returned' | 'survey_ready_for_review' | 'survey_processing_failed' | 'fault_reported' | 'citizen_report_received'
+
+export type PhotosDroppedReason = 'over_quota' | 'over_budget'
 
 export type PowerSource = 'grid'
 

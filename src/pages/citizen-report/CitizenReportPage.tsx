@@ -3,27 +3,25 @@ import { useSearchParams, useParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../../redux/store'
 import {
-  verifyTokenRequest,
+  lookupPublicQrRequest,
   submitReportRequest,
   resetReportState,
 } from '../../feature/citizen-report/citizenReportSlice'
 import { PoleInfoCard } from './components/PoleInfoCard'
-import { InvalidQrAlert } from './components/InvalidQrAlert'
 import { ReportSuccessModal } from './components/ReportSuccessModal'
-import type { FaultType, Severity } from '../../types/common/enums'
-import type { CitizenReportPayload } from '../../feature/citizen-report/citizenReportAPI'
 import { VIETNAM_PHONE_REGEX } from '../../validations/common.schema'
 import {
   getCitizenDraft,
   saveCitizenDraft,
   deleteCitizenDraft,
 } from '../../utils/indexedDbDraft'
+import { convertToJpeg } from '../../utils/imageUtils'
+import type { CitizenReportKind } from '../../types/common/enums'
 import {
   LightbulbOff,
   AlertTriangle,
   ZapOff,
   Camera,
-  Film,
   Plus,
   X,
   Send,
@@ -32,120 +30,113 @@ import {
   Phone,
   User,
   Shield,
+  Ban,
 } from 'lucide-react'
 
-// Các danh mục hiện trạng sự cố chiếu sáng (phù hợp với FaultType của hệ thống)
-const FAULT_OPTIONS: Array<{
-  id: string
-  type: FaultType
+interface FaultOptionItem {
+  id: CitizenReportKind
+  kind: CitizenReportKind
   title: string
   desc: string
-  defaultSeverity: Severity
-  icon: React.ElementType
-}> = [
-  {
-    id: 'electric_leak',
-    type: 'node_offline',
-    title: 'Hở dây điện / Rò rỉ điện nguy hiểm',
-    desc: 'Ưu tiên khẩn cấp: Rò rỉ điện, đứt dây hoặc chạm chập có nguy cơ tai nạn',
-    defaultSeverity: 'critical',
-    icon: AlertTriangle,
-  },
-  {
-    id: 'pole_tilt',
-    type: 'node_offline',
-    title: 'Cột đèn nghiêng / Nguy cơ gãy đổ',
-    desc: 'Móng cột bị lún nứt, thân cột bị va quẹt hoặc nghiêng ngả nguy hiểm',
-    defaultSeverity: 'high',
-    icon: AlertTriangle,
-  },
+  icon: React.ComponentType<{ className?: string }>
+}
+
+// Các danh mục hiện trạng sự cố chiếu sáng (phù hợp với kind của Backend)
+const FAULT_OPTIONS: readonly FaultOptionItem[] = [
   {
     id: 'lamp_out',
-    type: 'lamp_out',
+    kind: 'lamp_out',
     title: 'Đèn tắt hoàn toàn / Mất chiếu sáng',
     desc: 'Bóng đèn tắt hẳn vào ban đêm, chập chờn hoặc cháy hỏng chấn lưu',
-    defaultSeverity: 'medium',
     icon: LightbulbOff,
   },
   {
     id: 'lamp_dim',
-    type: 'lamp_dim',
+    kind: 'lamp_dim',
     title: 'Đèn sáng yếu / Chập chờn',
     desc: 'Ánh sáng mờ suy giảm độ rọi, nhấp nháy liên tục không đủ quan sát',
-    defaultSeverity: 'low',
     icon: ZapOff,
   },
-]
+  {
+    id: 'pole_damaged',
+    kind: 'pole_damaged',
+    title: 'Cột đèn nghiêng / Nguy cơ gãy đổ',
+    desc: 'Móng cột bị lún nứt, thân cột bị va quẹt hoặc nghiêng ngả nguy hiểm',
+    icon: AlertTriangle,
+  },
+  {
+    id: 'other',
+    kind: 'other',
+    title: 'Hở dây điện / Sự cố nguy hiểm khác',
+    desc: 'Ưu tiên khẩn cấp: Rò rỉ điện, đứt dây hoặc chạm chập có nguy cơ tai nạn',
+    icon: AlertTriangle,
+  },
+] as const
 
 export const CitizenReportPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
+  const routeParams = useParams<{ code?: string }>()
   const [searchParams] = useSearchParams()
-  const routeParams = useParams<{ token?: string }>()
 
-  // Lấy mã từ query params (?lux=...) theo chuẩn thương hiệu LuxMap
-  const luxParam = searchParams.get('lux') || searchParams.get('token') || routeParams.token || ''
+  // Lấy mã tem QR 16 ký tự từ đường dẫn chuẩn /r/:code hoặc query param ?code=
+  const qrCode = (routeParams.code || searchParams.get('code') || '').trim()
 
   // Trạng thái từ Redux Store
   const {
     currentPole,
-    isValidToken,
-    isVerifyingToken,
+    isValidCode,
+    isLookingUp,
     isSubmitting,
     submissionResult,
-    error: verificationError,
+    lookupError,
+    submitError,
   } = useSelector((state: RootState) => state.citizenReport)
 
   // Form local state
-  const [selectedOptionId, setSelectedOptionId] = useState<string>('electric_leak')
-  const [selectedFaultType, setSelectedFaultType] = useState<FaultType>('node_offline')
-  const [selectedSeverity, setSelectedSeverity] = useState<Severity>('critical')
+  const [selectedOptionId, setSelectedOptionId] = useState<CitizenReportKind>('lamp_out')
   const [description, setDescription] = useState<string>('')
   const [reporterName, setReporterName] = useState<string>('')
   const [reporterPhone, setReporterPhone] = useState<string>('')
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [mediaPreviews, setMediaPreviews] = useState<
-    Array<{ id: string; file: File; url: string; isVideo: boolean }>
+    Array<{ id: string; file: File; url: string }>
   >([])
   const [formError, setFormError] = useState<string | null>(null)
+  const [isPendingSubmit, setIsPendingSubmit] = useState<boolean>(false)
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Khởi chạy xác thực mã QR (?lux=) khi tải trang
+  // 1. Khởi chạy tra cứu mã QR từ Backend ngay khi tải trang
   useEffect(() => {
-    // Nếu có tham số lux trên URL, gửi request xác thực
-    // Nếu không có tham số lux, verifyTokenRequest('') sẽ kích hoạt Strict Guard báo lỗi ngay lập tức
-    dispatch(verifyTokenRequest(luxParam))
-  }, [dispatch, luxParam])
+    dispatch(lookupPublicQrRequest(qrCode))
+  }, [dispatch, qrCode])
 
-  // Khôi phục bản nháp (Draft Cache từ IndexedDB) theo mã cột đèn nếu còn hạn TTL
+  // 2. Khôi phục bản nháp (Draft Cache từ IndexedDB) theo mã tem QR
   useEffect(() => {
-    if (!currentPole?.pole_code) return
+    if (!qrCode) return
     let isCancelled = false
 
     const loadDraft = async () => {
-      const draft = await getCitizenDraft(currentPole.pole_code)
+      const draft = await getCitizenDraft(qrCode)
       if (!draft || isCancelled) return
 
       if (draft.selectedOptionId) {
         const found = FAULT_OPTIONS.find((opt) => opt.id === draft.selectedOptionId)
         if (found) {
           setSelectedOptionId(found.id)
-          setSelectedFaultType(found.type)
-          setSelectedSeverity(found.defaultSeverity)
         }
       }
       if (typeof draft.description === 'string') setDescription(draft.description)
       if (typeof draft.reporterName === 'string') setReporterName(draft.reporterName)
       if (typeof draft.reporterPhone === 'string') setReporterPhone(draft.reporterPhone)
 
-      // Khôi phục danh sách tệp ảnh/video gốc từ IndexedDB
+      // Khôi phục danh sách tệp ảnh gốc từ IndexedDB
       if (Array.isArray(draft.mediaFiles) && draft.mediaFiles.length > 0) {
         setMediaFiles(draft.mediaFiles)
         const previews = draft.mediaFiles.map((file) => ({
           id: `${file.name}-${file.lastModified}-${Math.random()}`,
           file,
           url: URL.createObjectURL(file),
-          isVideo: file.type.startsWith('video/'),
         }))
         setMediaPreviews(previews)
       }
@@ -156,28 +147,26 @@ export const CitizenReportPage: React.FC = () => {
     return () => {
       isCancelled = true
     }
-  }, [currentPole])
+  }, [qrCode])
 
-  // Tự động lưu hoặc xóa bản nháp trong IndexedDB khi người dân sửa đổi dữ liệu
+  // 3. Tự động lưu hoặc xóa bản nháp trong IndexedDB khi người dân sửa đổi dữ liệu
   useEffect(() => {
-    if (!currentPole?.pole_code) return
+    if (!qrCode) return
 
-    // Kiểm tra xem form có còn dữ liệu nào không
     const hasData =
       Boolean(description.trim()) ||
       Boolean(reporterName.trim()) ||
       Boolean(reporterPhone.trim()) ||
-      selectedOptionId !== 'electric_leak' ||
+      selectedOptionId !== 'lamp_out' ||
       mediaFiles.length > 0
 
     const timeoutId = setTimeout(() => {
       if (hasData) {
-        // Cập nhật bản nháp mới nhất (bao gồm cả trường hợp description vừa bị xóa trắng)
         saveCitizenDraft({
-          pole_code: currentPole.pole_code,
+          pole_code: qrCode,
           selectedOptionId,
-          selectedFaultType,
-          selectedSeverity,
+          selectedFaultType: 'lamp_out',
+          selectedSeverity: 'medium',
           description,
           reporterName,
           reporterPhone,
@@ -185,80 +174,82 @@ export const CitizenReportPage: React.FC = () => {
           saved_at: Date.now(),
         })
       } else {
-        // Nếu người dùng đã xóa trắng toàn bộ dữ liệu, xóa sạch bản nháp khỏi IndexedDB
-        deleteCitizenDraft(currentPole.pole_code)
+        deleteCitizenDraft(qrCode)
       }
     }, 400)
 
     return () => clearTimeout(timeoutId)
-  }, [
-    currentPole,
-    selectedOptionId,
-    selectedFaultType,
-    selectedSeverity,
-    description,
-    reporterName,
-    reporterPhone,
-    mediaFiles,
-  ])
+  }, [qrCode, selectedOptionId, description, reporterName, reporterPhone, mediaFiles])
 
-  // Xóa bản nháp khỏi IndexedDB khi gửi phản ánh thành công
-  useEffect(() => {
-    if (submissionResult && currentPole?.pole_code) {
-      deleteCitizenDraft(currentPole.pole_code)
-    }
-  }, [submissionResult, currentPole])
-
-  // Cập nhật tình trạng sự cố và tự động khớp mức độ nghiêm trọng tương ứng
-  const handleSelectFault = (opt: (typeof FAULT_OPTIONS)[number]) => {
-    setSelectedOptionId(opt.id)
-    setSelectedFaultType(opt.type)
-    setSelectedSeverity(opt.defaultSeverity)
+  const handleClearAllMedia = () => {
+    mediaPreviews.forEach((item) => URL.revokeObjectURL(item.url))
+    setMediaFiles([])
+    setMediaPreviews([])
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  // Xử lý chọn ảnh / video (tối đa 3 tệp, video <= 20MB, ảnh <= 10MB)
-  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Reset toàn bộ các trường trong form về trạng thái ban đầu
+  const resetFormFields = () => {
+    setDescription('')
+    setReporterName('')
+    setReporterPhone('')
+    setSelectedOptionId('lamp_out')
+    setFormError(null)
+    handleClearAllMedia()
+  }
+
+  // 4. Xóa bản nháp khỏi IndexedDB và reset trắng form khi gửi phản ánh thành công
+  useEffect(() => {
+    if (submissionResult && qrCode) {
+      deleteCitizenDraft(qrCode)
+      resetFormFields()
+    }
+  }, [submissionResult, qrCode])
+
+  // Xử lý chọn ảnh (tối đa 3 ảnh, tự động chuyển đổi sang chuẩn JPEG qua Canvas)
+  const handleMediaChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || [])
     if (!selected.length) return
 
     if (mediaFiles.length + selected.length > 3) {
-      setFormError('Bạn chỉ có thể đính kèm tối đa 3 hình ảnh hoặc video ngắn.')
+      setFormError('Bạn chỉ có thể đính kèm tối đa 3 hình ảnh hiện trường.')
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
     const newFiles: File[] = []
-    const newPreviews: Array<{ id: string; file: File; url: string; isVideo: boolean }> = []
+    const newPreviews: Array<{ id: string; file: File; url: string }> = []
 
     for (const file of selected) {
-      const isVideo = file.type.startsWith('video/')
-      const isImage = file.type.startsWith('image/')
+      const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|bmp)$/i.test(file.name)
 
-      if (!isVideo && !isImage) {
-        setFormError('Định dạng tệp không được hỗ trợ. Vui lòng chọn ảnh (JPG, PNG, WEBP) hoặc video (MP4, MOV).')
+      if (!isImage) {
+        setFormError(`Tệp "${file.name}" không phải là ảnh. Vui lòng chỉ chọn hình ảnh (JPG, PNG...).`)
         if (fileInputRef.current) fileInputRef.current.value = ''
         return
       }
 
-      if (isVideo && file.size > 20 * 1024 * 1024) {
-        setFormError(`Video "${file.name}" vượt quá dung lượng tối đa 20MB. Vui lòng chọn video ngắn hơn.`)
+      try {
+        // Tự động convert sang chuẩn JPEG có magic bytes FF D8 FF
+        const jpegFile = await convertToJpeg(file)
+
+        if (jpegFile.size > 10 * 1024 * 1024) {
+          setFormError(`Hình ảnh "${file.name}" sau khi xử lý vượt quá dung lượng tối đa 10MB.`)
+          if (fileInputRef.current) fileInputRef.current.value = ''
+          return
+        }
+
+        newFiles.push(jpegFile)
+        newPreviews.push({
+          id: `${jpegFile.name}-${jpegFile.lastModified}-${Math.random()}`,
+          file: jpegFile,
+          url: URL.createObjectURL(jpegFile),
+        })
+      } catch {
+        setFormError(`Không thể đọc hoặc chuyển đổi định dạng ảnh "${file.name}".`)
         if (fileInputRef.current) fileInputRef.current.value = ''
         return
       }
-
-      if (isImage && file.size > 10 * 1024 * 1024) {
-        setFormError(`Hình ảnh "${file.name}" vượt quá dung lượng tối đa 10MB.`)
-        if (fileInputRef.current) fileInputRef.current.value = ''
-        return
-      }
-
-      newFiles.push(file)
-      newPreviews.push({
-        id: `${file.name}-${file.lastModified}-${Math.random()}`,
-        file,
-        url: URL.createObjectURL(file),
-        isVideo,
-      })
     }
 
     setMediaFiles((prev) => [...prev, ...newFiles])
@@ -277,14 +268,6 @@ export const CitizenReportPage: React.FC = () => {
     setFormError(null)
   }
 
-  const handleClearAllMedia = () => {
-    mediaPreviews.forEach((item) => URL.revokeObjectURL(item.url))
-    setMediaFiles([])
-    setMediaPreviews([])
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  // Xử lý nhập số điện thoại: chỉ cho phép nhập số (và dấu + ở đầu nếu có), tối đa 11 ký tự
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/[^\d+]/g, '')
     if (val.length <= 11) {
@@ -293,28 +276,27 @@ export const CitizenReportPage: React.FC = () => {
     }
   }
 
-  // Xử lý nộp phản ánh
+  // Xử lý nộp phản ánh sự cố lên Backend
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
 
-    // Kiểm tra kết nối mạng trực tiếp trước khi gửi
     if (!navigator.onLine) {
       setFormError('Không có kết nối mạng. Vui lòng kiểm tra lại Wifi/4G trên điện thoại và thử gửi lại.')
       return
     }
 
-    if (!currentPole) {
-      setFormError('Không tìm thấy thông tin cột đèn để gửi phản ánh.')
+    // Nếu mã QR không hợp lệ hoặc đang tra cứu, chặn gửi
+    if (!isValidCode || !currentPole) {
+      setFormError('Mã QR cột đèn không hợp lệ hoặc đã bị thu hồi. Bạn không thể gửi phản ánh.')
       return
     }
 
-    if (description.trim().length < 10) {
-      setFormError('Vui lòng nhập mô tả sự cố cụ thể hơn (tối thiểu 10 ký tự).')
+    if (description.trim().length < 5) {
+      setFormError('Vui lòng nhập mô tả sự cố cụ thể hơn (tối thiểu 5 ký tự).')
       return
     }
 
-    // Kiểm tra định dạng số điện thoại nếu người dùng có nhập
     if (reporterPhone.trim().length > 0) {
       const normalizedPhone = reporterPhone.replace(/^\+84/, '0').trim()
       if (!VIETNAM_PHONE_REGEX.test(normalizedPhone)) {
@@ -325,45 +307,81 @@ export const CitizenReportPage: React.FC = () => {
       }
     }
 
-    const payload: CitizenReportPayload = {
-      qr_token: luxParam,
-      pole_code: currentPole.pole_code,
-      fault_type: selectedFaultType,
-      severity: selectedSeverity,
-      description: description.trim(),
-      media_files: mediaFiles.length > 0 ? mediaFiles : undefined,
-      photo_file: mediaFiles.length > 0 ? mediaFiles[0] : null,
-      reporter_name: reporterName.trim() || undefined,
-      reporter_phone: reporterPhone.trim() || undefined,
+    // Ghép thông tin người phản ánh vào phần mô tả nếu có
+    let fullDescription = description.trim()
+    const contactParts: string[] = []
+    if (reporterName.trim()) contactParts.push(`Họ tên: ${reporterName.trim()}`)
+    if (reporterPhone.trim()) contactParts.push(`SĐT: ${reporterPhone.trim()}`)
+    if (contactParts.length > 0) {
+      fullDescription += `\n[Người dân phản ánh: ${contactParts.join(' - ')}]`
     }
 
-    dispatch(submitReportRequest(payload))
+    // Đã vượt qua các bước xác thực cơ bản -> Bật trạng thái pending submit ngay lập tức
+    setIsPendingSubmit(true)
+
+    const clientOpId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `op-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+
+    // Thử lấy vị trí GPS hiện tại của người dân (nếu người dân cấp quyền)
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setIsPendingSubmit(false)
+          dispatch(
+            submitReportRequest({
+              code: qrCode,
+              kind: selectedOptionId,
+              description: fullDescription,
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              photos: mediaFiles,
+              client_op_id: clientOpId,
+            })
+          )
+        },
+        () => {
+          // Người dân từ chối GPS hoặc không hỗ trợ, vẫn nộp bình thường
+          setIsPendingSubmit(false)
+          dispatch(
+            submitReportRequest({
+              code: qrCode,
+              kind: selectedOptionId,
+              description: fullDescription,
+              lat: null,
+              lng: null,
+              photos: mediaFiles,
+              client_op_id: clientOpId,
+            })
+          )
+        },
+        { timeout: 5000, enableHighAccuracy: false }
+      )
+    } else {
+      setIsPendingSubmit(false)
+      dispatch(
+        submitReportRequest({
+          code: qrCode,
+          kind: selectedOptionId,
+          description: fullDescription,
+          lat: null,
+          lng: null,
+          photos: mediaFiles,
+          client_op_id: clientOpId,
+        })
+      )
+    }
   }
 
   const handleNewReport = () => {
     dispatch(resetReportState())
-    setDescription('')
-    handleClearAllMedia()
+    resetFormFields()
   }
 
-  // Màn hình đang kiểm tra mã QR
-  if (isVerifyingToken) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium">
-            Đang xác thực thông tin cột đèn qua mã QR...
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  // Màn hình mã QR không hợp lệ
-  if (!isValidToken || !currentPole) {
-    return <InvalidQrAlert errorMessage={verificationError} />
-  }
+  // Xác định xem nút Submit có bị vô hiệu hóa không
+  const isSubmitDisabled =
+    isSubmitting || isPendingSubmit || isLookingUp || !isValidCode || !currentPole
 
   return (
     <div className="min-h-screen bg-slate-100/70 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col items-center p-3 sm:p-6 antialiased">
@@ -383,10 +401,15 @@ export const CitizenReportPage: React.FC = () => {
           </p>
         </header>
 
-        {/* 1. Thẻ thông tin cột đèn (Read-Only / Disabled) */}
-        <PoleInfoCard poleInfo={currentPole} />
+        {/* 1. Thẻ thông tin vị trí cột đèn: Instant render với Skeleton Loading cục bộ và Cảnh báo lỗi 404 */}
+        <PoleInfoCard
+          code={qrCode}
+          poleInfo={currentPole}
+          isLoading={isLookingUp}
+          error={lookupError}
+        />
 
-        {/* 2. Biểu mẫu gửi phản ánh */}
+        {/* 2. Biểu mẫu gửi phản ánh: Hiển thị tức thì (Instant Render) */}
         <form
           onSubmit={handleSubmit}
           className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-5"
@@ -404,7 +427,7 @@ export const CitizenReportPage: React.FC = () => {
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => handleSelectFault(opt)}
+                    onClick={() => setSelectedOptionId(opt.id)}
                     className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer ${
                       isSelected
                         ? 'border-blue-600 dark:border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 shadow-xs'
@@ -451,27 +474,28 @@ export const CitizenReportPage: React.FC = () => {
             />
           </div>
 
-          {/* Đính kèm ảnh / video chụp hiện trường (Tối đa 3 tệp) */}
+          {/* Đính kèm ảnh chụp hiện trường (Tối đa 3 ảnh, chuẩn JPEG) */}
           <div className="space-y-2.5">
             <div className="flex justify-between items-center text-xs">
               <label className="font-bold text-slate-800 dark:text-slate-200">
-                3. Hình ảnh / Video chụp hiện trường (Khuyến khích)
+                3. Hình ảnh chụp hiện trường (Khuyến khích)
               </label>
               <span className="text-[11px] text-slate-400 font-medium">
-                {mediaFiles.length}/3 tệp
+                {mediaFiles.length}/3 ảnh
               </span>
             </div>
 
             <input
               type="file"
               ref={fileInputRef}
-              accept="image/*,video/*"
+              accept="image/jpeg,image/jpg,image/png,image/*"
+              capture="environment"
               multiple
               onChange={handleMediaChange}
               className="hidden"
             />
 
-            {/* Lưới thumbnail xem trước hình ảnh & video */}
+            {/* Lưới thumbnail xem trước hình ảnh */}
             {mediaPreviews.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {mediaPreviews.map((item, idx) => (
@@ -479,36 +503,17 @@ export const CitizenReportPage: React.FC = () => {
                     key={item.id}
                     className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-900 aspect-4/3 flex items-center justify-center group"
                   >
-                    {item.isVideo ? (
-                      <div className="w-full h-full relative flex items-center justify-center">
-                        <video
-                          src={item.url}
-                          className="w-full h-full object-cover"
-                          muted
-                          playsInline
-                        />
-                        <div className="absolute inset-0 bg-black/35 flex items-center justify-center pointer-events-none">
-                          <div className="p-2 rounded-full bg-black/60 text-white shadow-xs">
-                            <Film className="w-4 h-4" />
-                          </div>
-                        </div>
-                        <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/75 text-[9px] font-bold text-white uppercase tracking-wider">
-                          Video
-                        </span>
-                      </div>
-                    ) : (
-                      <img
-                        src={item.url}
-                        alt={`Ảnh sự cố ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
+                    <img
+                      src={item.url}
+                      alt={`Ảnh sự cố ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
 
                     <button
                       type="button"
                       onClick={() => handleRemoveMedia(idx)}
                       className="absolute top-1.5 right-1.5 p-1 bg-black/70 hover:bg-black/90 text-white rounded-full transition shadow-xs cursor-pointer"
-                      title="Xóa tệp này"
+                      title="Xóa ảnh này"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -517,7 +522,7 @@ export const CitizenReportPage: React.FC = () => {
               </div>
             )}
 
-            {/* Nút thêm ảnh / video (tự động ẩn khi đã đủ 3 tệp) */}
+            {/* Nút thêm ảnh (tự động ẩn khi đã đủ 3 ảnh) */}
             {mediaFiles.length < 3 && (
               <button
                 type="button"
@@ -529,16 +534,16 @@ export const CitizenReportPage: React.FC = () => {
                 {mediaPreviews.length > 0 ? (
                   <>
                     <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    <span className="text-xs font-semibold">Thêm ảnh / video ({mediaFiles.length}/3)</span>
+                    <span className="text-xs font-semibold">Thêm ảnh ({mediaFiles.length}/3)</span>
                   </>
                 ) : (
                   <>
                     <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                       <Camera className="w-5 h-5" />
                     </div>
-                    <span className="text-xs font-semibold">Chụp ảnh / quay video hoặc tải từ máy</span>
+                    <span className="text-xs font-semibold">Chụp ảnh hoặc tải ảnh từ máy</span>
                     <span className="text-[10.5px] text-slate-400 text-center">
-                      Hỗ trợ tối đa 3 tệp · Ảnh tối đa 10MB, Video tối đa 20MB
+                      Hỗ trợ tối đa 3 ảnh · Dung lượng tối đa 10MB/ảnh
                     </span>
                   </>
                 )}
@@ -583,24 +588,34 @@ export const CitizenReportPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Cảnh báo lỗi biểu mẫu */}
-          {formError && (
+          {/* Cảnh báo lỗi biểu mẫu hoặc lỗi gửi phản ánh từ Backend */}
+          {(formError || submitError) && (
             <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{formError}</span>
+              <span>{formError || submitError}</span>
             </div>
           )}
 
-          {/* Nút gửi phản ánh */}
+          {/* Nút gửi phản ánh (vô hiệu hóa nếu mã QR không hợp lệ hoặc đang tra cứu) */}
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold text-xs sm:text-sm transition shadow-md hover:shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+            disabled={isSubmitDisabled}
+            className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm transition shadow-md hover:shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2"
           >
-            {isSubmitting ? (
+            {isSubmitting || isPendingSubmit ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Đang gửi phản ánh...</span>
+              </>
+            ) : isLookingUp ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Đang kiểm tra mã QR...</span>
+              </>
+            ) : !isValidCode || !currentPole ? (
+              <>
+                <Ban className="w-4 h-4" />
+                <span>Mã QR không hợp lệ - Không thể gửi</span>
               </>
             ) : (
               <>
@@ -619,7 +634,11 @@ export const CitizenReportPage: React.FC = () => {
 
       {/* Modal báo nộp thành công */}
       {submissionResult && (
-        <ReportSuccessModal result={submissionResult} onNewReport={handleNewReport} />
+        <ReportSuccessModal
+          receipt={submissionResult}
+          code={qrCode}
+          onNewReport={handleNewReport}
+        />
       )}
     </div>
   )

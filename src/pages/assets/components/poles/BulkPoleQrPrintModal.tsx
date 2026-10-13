@@ -4,10 +4,10 @@ import { X, Loader2, AlertCircle, FileCheck, MapPin, FileDown } from 'lucide-rea
 import QRCode from 'qrcode'
 import { jsPDF } from 'jspdf'
 import { renderDecalToCanvas } from '../../../../utils/decalCanvas'
+import { qrCodeAPI } from '../../../../feature/qr-code/qrCodeAPI'
 import { toast } from 'sonner'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../types/assets/segments'
-import { buildPoleReportUrl } from '../../../../utils/qrSecurity'
 
 interface BulkPoleQrPrintModalProps {
   isOpen: boolean
@@ -21,6 +21,7 @@ interface DecalItem {
   segmentName: string
   communeName: string
   qrDataUrl: string
+  qrCodeText?: string | null
 }
 
 export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
@@ -50,7 +51,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
     return poles.filter((p) => Boolean(p.external_ref && p.external_ref.trim()))
   }, [poles])
 
-  // Tạo hàng loạt mã QR Data URL
+  // Tạo hàng loạt mã QR Data URL từ Backend
   useEffect(() => {
     if (!isOpen || validPoles.length === 0) {
       setDecals([])
@@ -77,27 +78,49 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
           (pole.segment_id ? `Tuyến ${pole.segment_id}` : 'Chưa gắn tuyến')
         const comName = pole.commune_id || 'Địa bàn chung'
 
-        const reportUrl = buildPoleReportUrl(poleCode, segName, comName)
-
         try {
-          const qrDataUrl = await QRCode.toDataURL(reportUrl, {
-            width: 300,
-            margin: 1,
-            color: {
-              dark: '#0f172a',
-              light: '#ffffff',
-            },
-            errorCorrectionLevel: 'M',
+          // 1. Kiểm tra mã QR active của cột đèn từ Backend
+          let activeQrUrl = ''
+          let activeQrCode = ''
+
+          const listRes = await qrCodeAPI.getQrCodes({
+            pole_id: pole.pole_id,
+            active: true,
+            page: 1,
+            page_size: 1,
           })
 
-          results.push({
-            poleCode,
-            segmentName: segName,
-            communeName: comName,
-            qrDataUrl,
-          })
+          if (listRes.items && listRes.items.length > 0 && listRes.items[0]?.url) {
+            activeQrUrl = listRes.items[0].url
+            activeQrCode = listRes.items[0].code || ''
+          } else {
+            // Cấp mã mới từ Backend nếu chưa có mã active
+            const issueRes = await qrCodeAPI.issueQrCode({ pole_id: pole.pole_id })
+            activeQrUrl = issueRes.url || ''
+            activeQrCode = issueRes.code || ''
+          }
+
+          if (activeQrUrl) {
+            const qrDataUrl = await QRCode.toDataURL(activeQrUrl, {
+              width: 300,
+              margin: 1,
+              color: {
+                dark: '#0f172a',
+                light: '#ffffff',
+              },
+              errorCorrectionLevel: 'M',
+            })
+
+            results.push({
+              poleCode,
+              segmentName: segName,
+              communeName: comName,
+              qrDataUrl,
+              qrCodeText: activeQrCode,
+            })
+          }
         } catch (err) {
-          console.error(`Lỗi tạo mã QR cho ${poleCode}:`, err)
+          console.error(`Lỗi đồng bộ mã QR cho cột ${poleCode}:`, err)
         }
 
         setProgress(Math.round(((i + 1) / total) * 100))
@@ -106,6 +129,9 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
       if (!isCancelled) {
         setDecals(results)
         setIsGenerating(false)
+        if (results.length > 0) {
+          toast.success(`Đã chuẩn bị xong tem QR cho ${validPoles.length} cột đèn!`)
+        }
       }
     }
 
@@ -130,6 +156,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
 
     try {
       setIsExportingPdf(true)
+      toast.info('Đang kết xuất tệp PDF dàn trang tem...', { duration: 3000 })
 
       const doc = new jsPDF({
         orientation: 'portrait',
@@ -167,6 +194,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
           segmentName: item.segmentName,
           communeName: item.communeName,
           qrDataUrl: item.qrDataUrl,
+          qrCodeText: item.qrCodeText,
         })
 
         const imgData = canvas.toDataURL('image/png')
@@ -239,7 +267,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-200 dark:text-slate-400">
-                Chuẩn tem dán thân trụ đèn: Có logo, mã cột, tuyến đường và mã QR bảo mật
+                Chuẩn tem dán thân trụ đèn: Có logo, mã cột, tuyến đường và mã QR bảo mật Backend
               </p>
             </div>
           </div>
@@ -279,7 +307,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
           <div className="px-5 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-100 dark:border-blue-900/40 flex items-center justify-between text-xs text-blue-700 dark:text-blue-300 shrink-0 print:hidden">
             <div className="flex items-center gap-2 font-medium">
               <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              <span>Đang sinh mã QR chất lượng cao cho danh sách {validPoles.length} cột đèn...</span>
+              <span>Đang đồng bộ và cấp mã QR từ máy chủ cho {validPoles.length} cột đèn...</span>
             </div>
             <div className="w-36 bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
               <div
@@ -341,28 +369,33 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
                     </div>
 
                     {/* Thông tin mốc dán cột */}
-                    <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex-1 min-w-0 space-y-1.5">
                       <div>
-                        <span className="text-[9px] font-bold text-slate-600 uppercase block">
-                          MÃ CỘT ĐÈN
-                        </span>
-                        <strong className="text-base font-black font-mono text-blue-900 tracking-wider block">
-                          {decal.poleCode}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span className="text-[9px] font-bold text-slate-600 uppercase block">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase block">
                           TUYẾN ĐƯỜNG
                         </span>
-                        <p className="text-[11px] font-bold text-slate-800 truncate" title={decal.segmentName}>
+                        <p className="text-xs font-bold text-slate-800 truncate" title={decal.segmentName}>
                           {decal.segmentName}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-1 text-[10px] text-slate-600">
-                        <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
-                        <span className="truncate">{decal.communeName}</span>
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase block">
+                          ĐỊA BÀN QUẢN LÝ
+                        </span>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                          <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span className="truncate">{decal.communeName}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase block">
+                          MÃ TEM QUÉT
+                        </span>
+                        <strong className="text-[10px] font-black font-mono text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 inline-block tracking-wider">
+                          {decal.qrCodeText || decal.poleCode}
+                        </strong>
                       </div>
                     </div>
                   </div>
