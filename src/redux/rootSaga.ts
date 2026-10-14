@@ -4,6 +4,7 @@ import assetSaga from '../feature/assets/assetSaga'
 import adminUserSaga from '../feature/admin/adminUserSaga'
 import mapSaga from '../feature/map/mapSaga'
 import citizenReportSaga from '../feature/citizen-report/citizenReportSaga'
+import { citizenReportsSaga } from '../feature/citizen-reports/citizenReportsSaga'
 import qrCodeSaga from '../feature/qr-code/qrCodeSaga'
 
 export default function* rootSaga() {
@@ -13,6 +14,7 @@ export default function* rootSaga() {
         fork(adminUserSaga),
         fork(mapSaga),
         fork(citizenReportSaga),
+        fork(citizenReportsSaga),
         fork(qrCodeSaga),
     ])
 }

@@ -19,6 +19,7 @@ import { AssetManagementPage } from './pages/assets/AssetManagementPage'
 import { AdminManagementPage } from './pages/admin/AdminManagementPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
+import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
@@ -119,6 +120,16 @@ function App() {
               }
             />
             <Route path="/superior-reports" element={<Navigate to="/reports" replace />} />
+
+            {/* Tuyến Hàng đợi Phê duyệt Phản ánh Người dân: Dành cho Manager & Superior */}
+            <Route
+              path="/citizen-reports"
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]}>
+                  <CitizenReviewPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Tuyến đường Quản trị: CHỈ CHO PHÉP Quản trị viên (Admin) */}
             <Route

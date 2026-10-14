@@ -5,6 +5,7 @@ import workScheduleReducer from '../feature/work-schedule/workScheduleSlice'
 import adminUserReducer from '../feature/admin/adminUserSlice'
 import mapReducer from '../feature/map/mapSlice'
 import citizenReportReducer from '../feature/citizen-report/citizenReportSlice'
+import citizenReportsReducer from '../feature/citizen-reports/citizenReportsSlice'
 import qrCodeReducer from '../feature/qr-code/qrCodeSlice'
 
 const rootReducer = combineReducers({
@@ -14,6 +15,7 @@ const rootReducer = combineReducers({
     adminUsers: adminUserReducer,
     map: mapReducer,
     citizenReport: citizenReportReducer,
+    citizenReports: citizenReportsReducer,
     qrCode: qrCodeReducer,
 })
 
