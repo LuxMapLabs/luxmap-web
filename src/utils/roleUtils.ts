@@ -268,19 +268,23 @@ export const isFieldCrew = (role?: UserRole | string | number): boolean => {
 
 /**
  * Kiểm tra quyền hiển thị và truy cập tab trên Sidebar / Navigation Bar
- * - system_admin: Chỉ truy cập 'admin-system'
- * - manager: Truy cập 'gis-map', 'work-schedule', 'assets'
+ * - system_admin: Truy cập 'admin-system', 'reports'
+ * - manager: Truy cập 'gis-map', 'work-schedule', 'assets', 'reports'
+ * - management_agency (superior): Truy cập 'reports', 'gis-map'
  * - các vai trò khác: Tạm thời chưa có tab
  */
 export const canAccessTab = (
-  tabId: 'gis-map' | 'work-schedule' | 'assets' | 'admin-system',
+  tabId: 'gis-map' | 'work-schedule' | 'assets' | 'admin-system' | 'reports',
   role?: UserRole | string | number
 ): boolean => {
   if (isSystemAdmin(role)) {
-    return tabId === 'admin-system'
+    return tabId === 'admin-system' || tabId === 'reports'
+  }
+  if (isManagementAgency(role)) {
+    return tabId === 'reports' || tabId === 'gis-map'
   }
   if (isManager(role)) {
-    return tabId === 'gis-map' || tabId === 'work-schedule' || tabId === 'assets'
+    return tabId === 'gis-map' || tabId === 'work-schedule' || tabId === 'assets' || tabId === 'reports'
   }
   return false
 }

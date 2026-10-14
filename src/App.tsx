@@ -5,7 +5,7 @@ import { Toaster } from 'sonner'
 import { checkAuth } from './feature/auth/authSlice'
 import { UserRole } from './types/auth/web'
 import type { RootState } from './redux/rootReducer'
-import { isSystemAdmin } from './utils/roleUtils'
+import { isSystemAdmin, isManagementAgency } from './utils/roleUtils'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { DefaultLayout } from './layout/DefaultLayout'
 
@@ -42,6 +42,11 @@ const AdminManagementPage = React.lazy(() =>
 const NotFoundPage = React.lazy(() =>
   import('./pages/not-found/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
 )
+const SuperiorReportsPage = React.lazy(() =>
+  import('./pages/reports/SuperiorReportsPage').then((m) => ({
+    default: m.SuperiorReportsPage,
+  }))
+)
 
 /**
  * Hiệu ứng chuyển trang nhẹ nhàng cho React Suspense
@@ -61,6 +66,9 @@ const RootRedirect: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
   if (isSystemAdmin(user?.role)) {
     return <Navigate to="/admin/system" replace />
+  }
+  if (isManagementAgency(user?.role)) {
+    return <Navigate to="/reports" replace />
   }
   return <Navigate to="/gis-map" replace />
 }
@@ -104,11 +112,11 @@ function App() {
             {/* Điều hướng thông minh theo vai trò */}
             <Route path="/" element={<RootRedirect />} />
 
-            {/* Tuyến bản đồ GIS: Dành cho Cán bộ Quản lý (Manager) */}
+            {/* Tuyến bản đồ GIS: Dành cho Cán bộ Quản lý (Manager) & Cấp trên Giám sát (Superior) */}
             <Route
               path="/gis-map"
               element={
-                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]}>
+                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]}>
                   <GisMapPage />
                 </ProtectedRoute>
               }
@@ -137,6 +145,17 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Tuyến Báo cáo & Nghiệm thu: Dành cho Cấp trên (Superior), Cán bộ Quản lý (Manager) & Admin */}
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.ManagementAgency, UserRole.MaintenanceEngineer, UserRole.Admin]}>
+                  <SuperiorReportsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/superior-reports" element={<Navigate to="/reports" replace />} />
 
             {/* Tuyến đường Quản trị: CHỈ CHO PHÉP Quản trị viên (Admin) */}
             <Route
