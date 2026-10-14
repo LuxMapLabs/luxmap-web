@@ -5,11 +5,11 @@ import { Toaster } from 'sonner'
 import { checkAuth } from './feature/auth/authSlice'
 import { UserRole } from './types/auth/web'
 import type { RootState } from './redux/rootReducer'
-import { isSystemAdmin } from './utils/roleUtils'
+import { isSystemAdmin, isManagementAgency } from './utils/roleUtils'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { DefaultLayout } from './layout/DefaultLayout'
 
-// Import trực tiếp tất cả các trang theo yêu cầu refactor
+// Import trực tiếp tất cả các trang
 import { LoginPage } from './pages/login/LoginPage'
 import { CitizenReportPage } from './pages/citizen-report/CitizenReportPage'
 import { ForbiddenPage } from './pages/forbidden/ForbiddenPage'
@@ -18,6 +18,7 @@ import { WorkSchedulePage } from './pages/work-schedule/WorkSchedulePage'
 import { AssetManagementPage } from './pages/assets/AssetManagementPage'
 import { AdminManagementPage } from './pages/admin/AdminManagementPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
+import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
@@ -28,6 +29,9 @@ const RootRedirect: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
   if (isSystemAdmin(user?.role)) {
     return <Navigate to="/admin/system" replace />
+  }
+  if (isManagementAgency(user?.role)) {
+    return <Navigate to="/reports" replace />
   }
   return <Navigate to="/gis-map" replace />
 }
@@ -71,11 +75,11 @@ function App() {
             {/* Điều hướng thông minh theo vai trò */}
             <Route path="/" element={<RootRedirect />} />
 
-            {/* Tuyến bản đồ GIS: Dành cho Cán bộ Quản lý (Manager) */}
+            {/* Tuyến bản đồ GIS: Dành cho Cán bộ Quản lý (Manager) & Cấp trên Giám sát (Superior) */}
             <Route
               path="/gis-map"
               element={
-                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]}>
+                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]}>
                   <GisMapPage />
                 </ProtectedRoute>
               }
@@ -104,6 +108,17 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Tuyến Báo cáo & Nghiệm thu: Dành cho Cấp trên (Superior), Cán bộ Quản lý (Manager) & Admin */}
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.ManagementAgency, UserRole.MaintenanceEngineer, UserRole.Admin]}>
+                  <SuperiorReportsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/superior-reports" element={<Navigate to="/reports" replace />} />
 
             {/* Tuyến đường Quản trị: CHỈ CHO PHÉP Quản trị viên (Admin) */}
             <Route

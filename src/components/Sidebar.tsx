@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  FileCheck2,
 } from 'lucide-react'
 import { User } from '../types/auth/web'
 import { canAccessTab } from '../utils/roleUtils'
@@ -35,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isGisMap = location.pathname.startsWith('/gis-map') || location.pathname === '/'
   const isWorkSchedule = location.pathname.startsWith('/work-schedule')
   const isAssets = location.pathname.startsWith('/assets')
+  const isReports = location.pathname.startsWith('/reports')
   const isAdminPath = location.pathname.startsWith('/admin')
 
   // Phân quyền hiển thị từng tab theo vai trò người dùng (RBAC)
@@ -42,6 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const showGisMap = canAccessTab('gis-map', userRole)
   const showWorkSchedule = canAccessTab('work-schedule', userRole)
   const showAssets = canAccessTab('assets', userRole)
+  const showReports = canAccessTab('reports', userRole)
   const showAdmin = isAdminUser !== undefined ? isAdminUser : canAccessTab('admin-system', userRole)
 
   return (
@@ -156,7 +159,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab 4: Quản trị hệ thống (Chỉ dành cho Admin) */}
+        {/* Tab 4: Báo cáo & Nghiệm thu (Dành cho Superior và Manager) */}
+        {showReports && (
+          <NavLink
+            to="/reports"
+            title="Báo cáo & Nghiệm thu"
+            className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
+              isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
+            } ${
+              isReports
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+            }`}
+          >
+            <FileCheck2
+              className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
+                isReports ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+              }`}
+            />
+            {!isCollapsed && (
+              <span className="flex-1 tracking-tight whitespace-nowrap">Báo cáo & Nghiệm thu</span>
+            )}
+            {!isCollapsed && isReports && (
+              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
+            )}
+          </NavLink>
+        )}
+
+        {/* Tab 5: Quản trị hệ thống (Chỉ dành cho Admin) */}
         {showAdmin && (
           <NavLink
             to="/admin/system"
