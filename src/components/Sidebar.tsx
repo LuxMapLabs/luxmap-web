@@ -159,7 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab 4: Báo cáo & Nghiệm thu (Dành cho Superior và Manager) */}
+        {/* Tab 4: Báo cáo & Nghiệm thu (Chỉ dành riêng cho Superior) */}
         {showReports && (
           <NavLink
             to="/reports"

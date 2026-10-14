@@ -268,9 +268,9 @@ export const isFieldCrew = (role?: UserRole | string | number): boolean => {
 
 /**
  * Kiểm tra quyền hiển thị và truy cập tab trên Sidebar / Navigation Bar
- * - system_admin: Truy cập 'admin-system', 'reports'
- * - manager: Truy cập 'gis-map', 'work-schedule', 'assets', 'reports'
- * - management_agency (superior): Truy cập 'reports', 'gis-map'
+ * - system_admin: Truy cập 'admin-system'
+ * - manager: Truy cập 'gis-map', 'work-schedule', 'assets'
+ * - management_agency (superior): Truy cập 'reports', 'gis-map' (chỉ Superior mới có tab 'reports')
  * - các vai trò khác: Tạm thời chưa có tab
  */
 export const canAccessTab = (
@@ -278,13 +278,13 @@ export const canAccessTab = (
   role?: UserRole | string | number
 ): boolean => {
   if (isSystemAdmin(role)) {
-    return tabId === 'admin-system' || tabId === 'reports'
+    return tabId === 'admin-system'
   }
   if (isManagementAgency(role)) {
     return tabId === 'reports' || tabId === 'gis-map'
   }
   if (isManager(role)) {
-    return tabId === 'gis-map' || tabId === 'work-schedule' || tabId === 'assets' || tabId === 'reports'
+    return tabId === 'gis-map' || tabId === 'work-schedule' || tabId === 'assets'
   }
   return false
 }
