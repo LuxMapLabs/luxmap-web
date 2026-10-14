@@ -109,11 +109,11 @@ function App() {
               }
             />
 
-            {/* Tuyến Báo cáo & Nghiệm thu: Dành cho Cấp trên (Superior), Cán bộ Quản lý (Manager) & Admin */}
+            {/* Tuyến Báo cáo & Nghiệm thu: CHỈ DÀNH RIÊNG CHO Cấp trên Giám sát (Superior) */}
             <Route
               path="/reports"
               element={
-                <ProtectedRoute allowedRoles={[UserRole.ManagementAgency, UserRole.MaintenanceEngineer, UserRole.Admin]}>
+                <ProtectedRoute allowedRoles={[UserRole.ManagementAgency]}>
                   <SuperiorReportsPage />
                 </ProtectedRoute>
               }
