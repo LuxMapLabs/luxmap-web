@@ -460,6 +460,16 @@ export function validateImportRow(
           oldVal: 'Chưa định vị',
           newVal: `Định vị tọa độ (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
         })
+      } else if (existing.location && data.geom_wkt) {
+        const latDiff = Math.abs(existing.location.lat - lat)
+        const lngDiff = Math.abs(existing.location.lng - lng)
+        if (latDiff > 0.00001 || lngDiff > 0.00001) {
+          diffs.push({
+            label: 'Tọa độ GIS',
+            oldVal: `${existing.location.lat.toFixed(5)}, ${existing.location.lng.toFixed(5)}`,
+            newVal: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+          })
+        }
       }
 
       actionType = diffs.length > 0 ? 'updated' : 'unchanged'

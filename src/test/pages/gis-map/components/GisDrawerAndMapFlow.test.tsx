@@ -248,6 +248,128 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getAllByText('Chưa quét').length).toBeGreaterThan(0)
     })
 
+    it('GisDrawerPanel Zero-Mock: render đúng placeholder khi không có ảnh khảo sát và badge "Bình thường" khi không có lỗi', () => {
+      const normalPole: PoleFeature = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [106.4899, 10.9705] },
+        properties: {
+          pole_id: 'POL-002',
+          segment_id: 'SEG-001',
+          fixture_status: 'normal',
+          open_fault_count: 0,
+        },
+      }
+
+      // Đưa poleDetail không có ảnh và không có lỗi vào Redux Store
+      const cleanPoleDetail: PoleMapDetail = {
+        ...mockPoleDetail,
+        pole_id: 'POL-002',
+        current_status: { fixture_status: 'normal' },
+        open_faults: [],
+        recent_frames: [],
+      }
+
+      const testStore = store
+      testStore.dispatch(fetchPoleDetailSuccess(cleanPoleDetail))
+
+      render(
+        <Provider store={testStore}>
+          <GisDrawerPanel
+            {...defaultDrawerProps}
+            selectedPole={normalPole}
+            effectivePoles={[normalPole]}
+          />
+        </Provider>
+      )
+
+      // 1. Kiểm tra placeholder khi không có ảnh (không còn ảnh Unsplash ngẫu nhiên)
+      expect(screen.getByText('Chưa có ảnh khảo sát thực địa')).toBeInTheDocument()
+
+      // 2. Kiểm tra badge "Bình thường" trên accordion khi không có lỗi
+      expect(screen.getByText('Sự cố đang ghi nhận')).toBeInTheDocument()
+      expect(screen.getByText('Bình thường')).toBeInTheDocument()
+
+      // 3. Không còn bất kỳ dấu vết nào của mock data incidentHistory cũ
+      expect(screen.queryByText(/Cháy chấn lưu LED 60W/i)).toBeNull()
+      expect(screen.queryByText(/Nguyễn Văn Hùng/i)).toBeNull()
+      expect(screen.queryByText(/WO-2026-0824/i)).toBeNull()
+    })
+
+    it('GisDrawerPanel Zero-Mock: render đúng danh sách open_faults thực tế từ Backend và tự động mở accordion', () => {
+      const faultyPole: PoleFeature = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [106.4896, 10.9701] },
+        properties: {
+          pole_id: 'POL-001',
+          segment_id: 'SEG-001',
+          fixture_status: 'out',
+          open_fault_count: 2,
+        },
+      }
+
+      const faultyPoleDetail: PoleMapDetail = {
+        ...mockPoleDetail,
+        pole_id: 'POL-001',
+        current_status: { fixture_status: 'out' },
+        open_faults: [
+          {
+            fault_id: 'FLT-2026-001',
+            fault_type: 'lamp_out',
+            severity: 'critical',
+            fault_status: 'detected',
+            priority_score: 95,
+          },
+          {
+            fault_id: 'FLT-2026-002',
+            fault_type: 'node_offline',
+            severity: 'medium',
+            fault_status: 'confirmed',
+            priority_score: 60,
+          },
+        ],
+        recent_frames: [
+          {
+            frame_id: 'FRM-001',
+            sweep_id: 'SWP-001',
+            thumbnail_url: 'https://cdn.luxmap.vn/frames/frm-001-thumb.jpg',
+          },
+        ],
+      }
+
+      const testStore = store
+      testStore.dispatch(fetchPoleDetailSuccess(faultyPoleDetail))
+
+      render(
+        <Provider store={testStore}>
+          <GisDrawerPanel
+            {...defaultDrawerProps}
+            selectedPole={faultyPole}
+            effectivePoles={[faultyPole]}
+          />
+        </Provider>
+      )
+
+      // 1. Kiểm tra ảnh hiện trường thực tế render đúng
+      const actualImg = screen.getByRole('img', { name: 'POL-001' })
+      expect(actualImg).toHaveAttribute('src', 'https://cdn.luxmap.vn/frames/frm-001-thumb.jpg')
+
+      // 2. Kiểm tra header Accordion hiển thị đúng số lượng sự cố
+      expect(screen.getByText('2 sự cố')).toBeInTheDocument()
+
+      // 3. Kiểm tra danh sách open_faults render với mã sự cố và tên tiếng Việt
+      expect(screen.getByText('FLT-2026-001')).toBeInTheDocument()
+      expect(screen.getByText('Đèn tắt hoàn toàn')).toBeInTheDocument()
+      expect(screen.getByText('Khẩn cấp')).toBeInTheDocument()
+      expect(screen.getByText('Mới phát hiện')).toBeInTheDocument()
+      expect(screen.getByText('Ưu tiên: 95đ')).toBeInTheDocument()
+
+      expect(screen.getByText('FLT-2026-002')).toBeInTheDocument()
+      expect(screen.getByText('Cảm biến IoT mất tín hiệu')).toBeInTheDocument()
+      expect(screen.getByText('Trung bình')).toBeInTheDocument()
+      expect(screen.getByText('Đã xác nhận')).toBeInTheDocument()
+      expect(screen.getByText('Ưu tiên: 60đ')).toBeInTheDocument()
+    })
+
     it('GisDrawerPanel chế độ xem Tuyến đường chỉ hiển thị thông số hạ tầng và KHÔNG CÒN thông số IoT rác', () => {
       render(
         <Provider store={store}>

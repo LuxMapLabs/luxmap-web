@@ -1,7 +1,7 @@
 external_ref,cabinet_name,commune_id,geom_wkt,data_source
-CAB-TL8-A,"Tủ A - Tỉnh Lộ 8",COM-001,"POINT(106.489639 10.970187)",field
-CAB-TL8-B,"Tủ B - Tỉnh Lộ 8",COM-001,"POINT(106.496112 10.973888)",field
-CAB-NVN-A,"Tủ A - Nguyễn Văn Ni",COM-001,"POINT(106.495788 10.964558)",field
-CAB-NVN-B,"Tủ B - Nguyễn Văn Ni",COM-001,"POINT(106.497153 10.969275)",field
-CAB-HVC-A,"Tủ A - Huỳnh Văn Cọ",COM-001,"POINT(106.498048 10.963327)",field
-CAB-HVC-B,"Tủ B - Huỳnh Văn Cọ",COM-001,"POINT(106.499212 10.968037)",field
+CAB-TL8-A,"Tủ A - Tỉnh Lộ 8",COM-001,"POINT(106.489480 10.970080)",field
+CAB-TL8-B,"Tủ B - Tỉnh Lộ 8",COM-001,"POINT(106.496240 10.973760)",field
+CAB-NVN-A,"Tủ A - Nguyễn Văn Ni",COM-001,"POINT(106.495650 10.964440)",field
+CAB-NVN-B,"Tủ B - Nguyễn Văn Ni",COM-001,"POINT(106.497280 10.969160)",field
+CAB-HVC-A,"Tủ A - Huỳnh Văn Cọ",COM-001,"POINT(106.497910 10.963210)",field
+CAB-HVC-B,"Tủ B - Huỳnh Văn Cọ",COM-001,"POINT(106.499340 10.967920)",field

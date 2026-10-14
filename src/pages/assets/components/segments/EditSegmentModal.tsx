@@ -1,11 +1,12 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useSelector } from 'react-redux'
 import { Route, X, CheckCircle2, MapPin, RotateCcw } from 'lucide-react'
-import { SegmentRouteMap } from '../../../../components/SegmentRouteMap'
+import { SegmentRouteMap, SegmentPoleItem } from '../../../../components/SegmentRouteMap'
 import { calculateRouteLengthMeters } from '../../../../utils/gis-map/routeUtils'
 import type { RoadClass } from '../../../../types/common/enums'
 import type { SegmentListItem } from '../../../../types/assets/segments'
-import mockPolesGeoJson from '../../../../data/mock-poles.geo.json'
+import type { RootState } from '../../../../redux/rootReducer'
 
 export interface EditSegmentModalProps {
   isOpen: boolean
@@ -20,14 +21,132 @@ interface EditSegmentModalContentProps {
   onSave: (updated: SegmentListItem) => void
 }
 
+/**
+ * Trích xuất mảng tọa độ [lng, lat] từ chuỗi WKT LINESTRING
+ */
+function parseLineStringWkt(wkt?: string | null): [number, number][] {
+  if (!wkt) return []
+  const match = wkt.match(/LINESTRING\s*\(([^)]+)\)/i)
+  if (!match) return []
+  const parts = match[1].split(',')
+  const coords: [number, number][] = []
+  for (const part of parts) {
+    const tokens = part.trim().split(/\s+/)
+    if (tokens.length >= 2) {
+      const lng = parseFloat(tokens[0])
+      const lat = parseFloat(tokens[1])
+      if (Number.isFinite(lng) && Number.isFinite(lat)) {
+        coords.push([lng, lat])
+      }
+    }
+  }
+  return coords
+}
+
+/**
+ * Trích xuất tọa độ điểm đầu, điểm cuối và toàn bộ lộ trình thực tế của tuyến đường
+ * Thứ tự ưu tiên: geom_wkt -> Cột đèn thực tế thuộc tuyến -> Tọa độ mặc định Củ Chi
+ */
+function extractSegmentCoordinates(
+  segment: SegmentListItem,
+  poles: SegmentPoleItem[]
+): {
+  initialStart: [number, number]
+  initialEnd: [number, number]
+  initialCoords: [number, number][]
+} {
+  // 1. Ưu tiên trích xuất từ geom_wkt của segment
+  const geomWkt = (segment as any).geom_wkt
+  if (typeof geomWkt === 'string') {
+    const parsed = parseLineStringWkt(geomWkt)
+    if (parsed.length >= 2) {
+      return {
+        initialStart: parsed[0],
+        initialEnd: parsed[parsed.length - 1],
+        initialCoords: parsed,
+      }
+    }
+  }
+
+  // 2. Ưu tiên trích xuất từ geometry GeoJSON nếu có
+  const geojsonCoords = (segment as any).geometry?.coordinates
+  if (Array.isArray(geojsonCoords) && geojsonCoords.length >= 2) {
+    const valid = geojsonCoords.filter(
+      (c: any) => Array.isArray(c) && c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])
+    ) as [number, number][]
+    if (valid.length >= 2) {
+      return {
+        initialStart: valid[0],
+        initialEnd: valid[valid.length - 1],
+        initialCoords: valid,
+      }
+    }
+  }
+
+  // 3. Trích xuất từ danh sách cột đèn thực tế thuộc tuyến
+  if (poles.length >= 2) {
+    const poleCoords = poles.map((p) => p.coord)
+    return {
+      initialStart: poleCoords[0],
+      initialEnd: poleCoords[poleCoords.length - 1],
+      initialCoords: poleCoords,
+    }
+  }
+
+  if (poles.length === 1) {
+    const singleCoord = poles[0].coord
+    return {
+      initialStart: singleCoord,
+      initialEnd: singleCoord,
+      initialCoords: [singleCoord, singleCoord],
+    }
+  }
+
+  // 4. Fallback mặc định khu vực trung tâm Củ Chi khi tuyến chưa có hình học & chưa có cột
+  const fallbackStart: [number, number] = [106.4896, 10.9701]
+  const fallbackEnd: [number, number] = [106.4950, 10.9750]
+  return {
+    initialStart: fallbackStart,
+    initialEnd: fallbackEnd,
+    initialCoords: [fallbackStart, fallbackEnd],
+  }
+}
+
 const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   segment,
   onClose,
   onSave,
 }) => {
-  const initialStart: [number, number] = [106.485, 10.972]
-  const initialEnd: [number, number] = [106.495, 10.978]
-  const initialCoords: [number, number][] = [initialStart, initialEnd]
+  // Lấy danh sách cột thực tế từ Redux Store
+  const allPoles = useSelector((state: RootState) => state.assets.poles)
+
+  // Lọc danh sách cột đèn thực tế thuộc tuyến đường này
+  const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
+    if (!segment.segment_id) return []
+    return allPoles
+      .filter(
+        (p) =>
+          p.segment_id === segment.segment_id &&
+          p.location &&
+          Number.isFinite(p.location.lat) &&
+          Number.isFinite(p.location.lng)
+      )
+      .sort((a, b) =>
+        (a.external_ref || '').localeCompare(b.external_ref || '', undefined, { numeric: true })
+      )
+      .map((p) => ({
+        id: p.pole_id || p.external_ref || 'unknown',
+        code: p.external_ref || p.pole_id || undefined,
+        coord: [p.location.lng, p.location.lat] as [number, number],
+        status: p.active_fixture ? 'normal' : 'unknown',
+        atlas: p.active_fixture?.fixture_type,
+      }))
+  }, [allPoles, segment.segment_id])
+
+  // Trích xuất tọa độ điểm đầu, điểm cuối và lộ trình thực tế từ hình học hoặc cột đèn
+  const { initialStart, initialEnd, initialCoords } = useMemo(() => {
+    return extractSegmentCoordinates(segment, segmentPoles)
+  }, [segment, segmentPoles])
 
   const [segmentName, setSegmentName] = useState(segment.segment_name || '')
   const [roadClass, setRoadClass] = useState<RoadClass>(
@@ -37,7 +156,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   const [communeName, setCommuneName] = useState(segment.commune_id || 'Xã Tân An Hội')
   const [hasActiveFault, setHasActiveFault] = useState<boolean>(false)
 
-  // Coordinate States initialized with valid values immediately
+  // Coordinate States initialized with extracted coordinates
   const [startLat, setStartLat] = useState<number>(initialStart[1])
   const [startLng, setStartLng] = useState<number>(initialStart[0])
   const [endLat, setEndLat] = useState<number>(initialEnd[1])
@@ -47,21 +166,6 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   const originalStartRef = useRef<[number, number]>(initialStart)
   const originalEndRef = useRef<[number, number]>(initialEnd)
   const originalRouteCoordsRef = useRef<[number, number][]>([...initialCoords])
-
-  // Filter existing poles that belong to this segment
-  const segmentPoles = useMemo(() => {
-    const features = (mockPolesGeoJson as any).features || []
-    return features
-      .filter((f: any) => f.properties?.segment_id === segment.segment_id)
-      .map((f: any) => ({
-        id: f.properties?.pole_id,
-        code: f.properties?.pole_id,
-        coord: f.geometry?.coordinates as [number, number],
-        status: f.properties?.fixture_status,
-        atlas: f.properties?.atlas,
-      }))
-      .filter((p: any) => p.coord && p.coord.length === 2)
-  }, [segment.segment_id])
 
   // Start coordinate handlers
   const handleStartCoordChange = useCallback((coord: [number, number]) => {
@@ -121,14 +225,20 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const geomWkt =
+      routeCoords.length >= 2
+        ? `LINESTRING(${routeCoords.map((c) => `${c[0]} ${c[1]}`).join(', ')})`
+        : (segment as any).geom_wkt || null
+
     onSave({
       ...segment,
       segment_name: segmentName.trim() || segment.segment_id,
       road_class: roadClass,
       length_m: lengthM,
       commune_id: communeName.trim() || segment.commune_id || 'cuchi_01',
+      geom_wkt: geomWkt,
       updated_at: new Date().toISOString(),
-    })
+    } as SegmentListItem)
     onClose()
   }
 
