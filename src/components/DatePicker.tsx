@@ -118,7 +118,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const yearOptions = Array.from({ length: 71 }, (_, i) => currentYear - 50 + i)
 
   return (
-    <div className={`relative select-none ${fullWidth ? 'w-full' : 'w-full max-w-[240px]'}`} ref={containerRef}>
+    <div className={`relative select-none ${fullWidth ? 'w-full' : 'w-full max-w-60'}`} ref={containerRef}>
       {label && (
         <label className="block text-xs font-bold text-slate-700 mb-1.5">
           {label}
@@ -171,7 +171,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
 
       {/* Single Calendar Dropdown */}
       {isOpen && (
-        <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 z-50 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl p-3 animate-scaleUp w-[280px] sm:w-[290px]`}>
+        <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 z-50 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl p-3 animate-scaleUp w-70 sm:w-72.5`}>
           <div className="space-y-3">
             {/* Header: Month / Year Navigation */}
             <div className="flex items-center justify-between px-1 relative">

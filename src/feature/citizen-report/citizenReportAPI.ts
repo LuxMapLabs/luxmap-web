@@ -1,70 +1,72 @@
 import apiClient from '../../config/apiClient'
-import type { FaultType, Severity } from '../../types/common/enums'
-import type { PoleListItem } from '../../types/assets/poles'
+import type { PublicQrInfo, PublicQrLookupRequest } from '../../types/public/qr'
+import type { PublicReportReceipt } from '../../types/public/reports'
+import type { CitizenReportKind } from '../../types/common/enums'
+
+export type { PublicQrInfo, PublicQrLookupRequest, PublicReportReceipt, CitizenReportKind }
 
 /**
- * Payload người dân gửi báo cáo sự cố (Citizen Report - Local DTO trước khi Backend có Swagger chính thức)
+ * Payload người dân gửi báo cáo sự cố (CITIZEN-QR P2b)
  */
-export interface CitizenReportPayload {
-  qr_token: string
-  pole_code: NonNullable<PoleListItem['external_ref']>
-  fault_type: FaultType
-  severity: Severity
-  description: string
-  photo_file?: File | null
-  media_files?: File[]
-  reporter_name?: string
-  reporter_phone?: string
-}
-
-/**
- * Phản hồi thành công từ hệ thống tiếp nhận báo cáo
- */
-export interface CitizenReportResponse {
-  report_id: string
-  status: 'received' | 'processing'
-  message: string
-  pole_code: string
-  submitted_at: string
+export interface PublicReportSubmitPayload {
+  code: string
+  kind: CitizenReportKind
+  description?: string
+  lat?: number | null
+  lng?: number | null
+  client_op_id?: string
+  photos?: File[]
 }
 
 export const citizenReportAPI = {
   /**
-   * Gửi phản ánh sự cố công khai của người dân qua mã QR
-   * POST /api/v1/public/pole-reports
+   * Tra cứu thông tin vị trí cột đèn từ mã tem QR 16 ký tự (Public)
+   * POST /api/v1/public/qr/lookup
    */
-  submitReport: async (payload: CitizenReportPayload): Promise<CitizenReportResponse> => {
-    const hasMedia = (payload.media_files && payload.media_files.length > 0) || Boolean(payload.photo_file)
+  lookupPublicQr: async (payload: PublicQrLookupRequest): Promise<PublicQrInfo> => {
+    const response = await apiClient.post<PublicQrInfo>('/public/qr/lookup', payload)
+    return response.data
+  },
 
-    // Nếu có file ảnh / video, gửi dưới dạng FormData multipart
-    if (hasMedia) {
-      const formData = new FormData()
-      formData.append('qr_token', payload.qr_token)
-      formData.append('pole_code', payload.pole_code)
-      formData.append('fault_type', payload.fault_type)
-      formData.append('severity', payload.severity)
+  /**
+   * Nộp phản ánh sự cố công khai của người dân qua multipart/form-data (Public)
+   * POST /api/v1/public/reports
+   */
+  submitReport: async (payload: PublicReportSubmitPayload): Promise<PublicReportReceipt> => {
+    const formData = new FormData()
+    formData.append('code', payload.code)
+    formData.append('kind', payload.kind)
+
+    if (payload.description) {
       formData.append('description', payload.description)
-
-      if (payload.media_files && payload.media_files.length > 0) {
-        payload.media_files.forEach((file) => {
-          formData.append('media_files', file)
-        })
-      } else if (payload.photo_file) {
-        formData.append('photo_file', payload.photo_file)
-      }
-
-      if (payload.reporter_name) formData.append('reporter_name', payload.reporter_name)
-      if (payload.reporter_phone) formData.append('reporter_phone', payload.reporter_phone)
-
-      const response = await apiClient.post<CitizenReportResponse>('/public/pole-reports', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+    }
+    if (
+      typeof payload.lat === 'number' &&
+      Number.isFinite(payload.lat) &&
+      typeof payload.lng === 'number' &&
+      Number.isFinite(payload.lng)
+    ) {
+      // Chuyển dấu '.' thành ',' để phù hợp với Culture vi-VN của ASP.NET Core trên Windows local
+      formData.append('lat', payload.lat.toString().replace('.', ','))
+      formData.append('lng', payload.lng.toString().replace('.', ','))
+    }
+    const clientOpId =
+      payload.client_op_id ||
+      (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `op-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`)
+    formData.append('client_op_id', clientOpId)
+    if (payload.photos && payload.photos.length > 0) {
+      payload.photos.forEach((file) => {
+        formData.append('photos', file)
       })
-      return response.data
     }
 
-    const response = await apiClient.post<CitizenReportResponse>('/public/pole-reports', payload)
+    const response = await apiClient.post<PublicReportReceipt>('/public/reports', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
     return response.data
   },
 }

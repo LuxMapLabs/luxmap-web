@@ -1,4 +1,3 @@
-import CryptoJS from 'crypto-js'
 import type { PoleListItem } from '../types/assets/poles'
 import type { SegmentListItem } from '../types/assets/segments'
 
@@ -20,35 +19,9 @@ export interface GeneratePoleQrTokenParams {
   commune_name?: PoleListItem['commune_id']
 }
 
-// Khóa bí mật và Magic Prefix đọc từ biến môi trường Vite (.env)
-export const QR_SECRET_KEY =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_QR_SECRET_KEY) || ''
-
-export const QR_MAGIC_PREFIX =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_QR_MAGIC_PREFIX) || ''
-
 /**
- * Sinh chuỗi mã QR token bảo mật 2 lớp: Magic Prefix + AES-256 (crypto-js)
- * Đóng gói: `${QR_MAGIC_PREFIX}${poleCode}~${segmentName}~${communeName}`
- * Chuyển đổi an toàn sang Base64URL-safe cho query param ?lux=
- * Tuyệt đối không để lộ pole_id nội bộ của cơ sở dữ liệu.
- */
-export function generatePoleQrToken(params: GeneratePoleQrTokenParams): string {
-  const poleCode = (params.pole_code || '').trim()
-  const segmentName = (params.segment_name || '').trim()
-  const communeName = (params.commune_name || '').trim()
-
-  const payload = `${QR_MAGIC_PREFIX}${poleCode}~${segmentName}~${communeName}`
-  const encrypted = CryptoJS.AES.encrypt(payload, QR_SECRET_KEY).toString()
-
-  // Chuyển sang Base64URL-safe
-  return encrypted.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-/**
- * Giải mã token `lux` từ URL bằng AES-256 (crypto-js) và kiểm tra Magic Prefix
- * Trả về DecryptedPoleInfo nếu giải mã thành công và đúng prefix.
- * Trả về null nếu token bị sai, giả mạo, sai secret key hoặc không có Magic Prefix.
+ * Hàm giải mã token dự phòng cho CitizenReportSaga (Stub không dùng CryptoJS)
+ * Nếu token có định dạng Base64 hoặc chuỗi URL-encoded delimiter, parse an toàn.
  */
 export function decryptPoleQrToken(lux: string | null | undefined): DecryptedPoleInfo | null {
   if (!lux || typeof lux !== 'string') return null
@@ -56,63 +29,39 @@ export function decryptPoleQrToken(lux: string | null | undefined): DecryptedPol
   if (!cleanLux) return null
 
   try {
-    // Khôi phục chuẩn Base64 từ Base64URL
-    let base64 = cleanLux.replace(/-/g, '+').replace(/_/g, '/')
-    while (base64.length % 4 !== 0) {
-      base64 += '='
+    let decoded = ''
+    try {
+      let base64 = cleanLux.replace(/-/g, '+').replace(/_/g, '/')
+      while (base64.length % 4 !== 0) {
+        base64 += '='
+      }
+      decoded = atob(base64)
+    } catch {
+      decoded = cleanLux
     }
 
-    const decryptedBytes = CryptoJS.AES.decrypt(base64, QR_SECRET_KEY)
-    const decryptedText = decryptedBytes.toString(CryptoJS.enc.Utf8)
-
-    if (!decryptedText) {
-      return null
+    if (decoded.includes('~')) {
+      const parts = decoded.replace(/^LUX#/, '').split('~')
+      if (parts.length >= 3 && parts[0] && parts[1] && parts[2]) {
+        return {
+          pole_code: parts[0],
+          segment_name: parts[1],
+          commune_name: parts[2],
+          issued_at: Math.floor(Date.now() / 1000),
+        }
+      }
     }
-
-    // 2. Kiểm tra tính toàn vẹn 2 lớp bằng Magic Prefix (LUX#)
-    if (!decryptedText.startsWith(QR_MAGIC_PREFIX)) {
-      return null
-    }
-
-    // Cắt bỏ prefix
-    const rawData = decryptedText.slice(QR_MAGIC_PREFIX.length)
-    const parts = rawData.split('~')
-    if (parts.length < 3) {
-      return null
-    }
-
-    const [poleCode, segmentName, communeName] = parts
-    if (!poleCode || !segmentName || !communeName) {
-      return null
-    }
-
-    return {
-      pole_code: poleCode,
-      segment_name: segmentName,
-      commune_name: communeName,
-      issued_at: Math.floor(Date.now() / 1000),
-    }
+    return null
   } catch {
     return null
   }
 }
 
 /**
- * Xây dựng URL báo cáo sự cố chuẩn: `${origin}/report?lux=<aes_token>`
+ * Hàm wrapper tương thích ngược với CitizenReportSaga
  */
-export function buildPoleReportUrl(
-  poleCode: NonNullable<PoleListItem['external_ref']>,
-  segmentName: string = '',
-  communeName: string = '',
-  origin?: string
-): string {
-  const token = generatePoleQrToken({
-    pole_code: poleCode,
-    segment_name: segmentName,
-    commune_name: communeName,
-  })
-  const base = origin || (typeof window !== 'undefined' ? window.location.origin : '')
-  return `${base}/report?lux=${token}`
+export function decryptAndVerifyQrToken(luxParam: string | null | undefined): DecryptedPoleInfo | null {
+  return decryptPoleQrToken(luxParam)
 }
 
 /**
@@ -126,11 +75,4 @@ export function removeVietnameseTones(str: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'D')
-}
-
-/**
- * Hàm wrapper tương thích ngược với CitizenReportSaga
- */
-export function decryptAndVerifyQrToken(luxParam: string | null | undefined): DecryptedPoleInfo | null {
-  return decryptPoleQrToken(luxParam)
 }
