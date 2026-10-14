@@ -1,4 +1,4 @@
-import React, { useEffect, Suspense } from 'react'
+import React, { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Toaster } from 'sonner'
@@ -9,53 +9,16 @@ import { isSystemAdmin, isManagementAgency } from './utils/roleUtils'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { DefaultLayout } from './layout/DefaultLayout'
 
-// Tải động (Code-Splitting) toàn bộ các trang qua React.lazy
-const LoginPage = React.lazy(() =>
-  import('./pages/login/LoginPage').then((m) => ({ default: m.LoginPage }))
-)
-const CitizenReportPage = React.lazy(() =>
-  import('./pages/citizen-report/CitizenReportPage').then((m) => ({
-    default: m.CitizenReportPage,
-  }))
-)
-const ForbiddenPage = React.lazy(() =>
-  import('./pages/forbidden/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage }))
-)
-const GisMapPage = React.lazy(() =>
-  import('./pages/gis-map/GisMapPage').then((m) => ({ default: m.GisMapPage }))
-)
-const WorkSchedulePage = React.lazy(() =>
-  import('./pages/work-schedule/WorkSchedulePage').then((m) => ({
-    default: m.WorkSchedulePage,
-  }))
-)
-const AssetManagementPage = React.lazy(() =>
-  import('./pages/assets/AssetManagementPage').then((m) => ({
-    default: m.AssetManagementPage,
-  }))
-)
-const AdminManagementPage = React.lazy(() =>
-  import('./pages/admin/AdminManagementPage').then((m) => ({
-    default: m.AdminManagementPage,
-  }))
-)
-const NotFoundPage = React.lazy(() =>
-  import('./pages/not-found/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
-)
-const SuperiorReportsPage = React.lazy(() =>
-  import('./pages/reports/SuperiorReportsPage').then((m) => ({
-    default: m.SuperiorReportsPage,
-  }))
-)
-
-/**
- * Hiệu ứng chuyển trang nhẹ nhàng cho React Suspense
- */
-const RouteLoadingSpinner: React.FC = () => (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-    <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-  </div>
-)
+// Import trực tiếp tất cả các trang
+import { LoginPage } from './pages/login/LoginPage'
+import { CitizenReportPage } from './pages/citizen-report/CitizenReportPage'
+import { ForbiddenPage } from './pages/forbidden/ForbiddenPage'
+import { GisMapPage } from './pages/gis-map/GisMapPage'
+import { WorkSchedulePage } from './pages/work-schedule/WorkSchedulePage'
+import { AssetManagementPage } from './pages/assets/AssetManagementPage'
+import { AdminManagementPage } from './pages/admin/AdminManagementPage'
+import { NotFoundPage } from './pages/not-found/NotFoundPage'
+import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
@@ -77,8 +40,8 @@ function App() {
   const dispatch = useDispatch()
 
   useEffect(() => {
-    // Không chạy checkAuth() nếu đang truy cập trang công khai /report (tránh request thừa và lỗi 401 console)
-    if (window.location.pathname.startsWith('/report')) {
+    // Không chạy checkAuth() nếu đang truy cập trang công khai /r/ hoặc /report (tránh request thừa và lỗi 401 console)
+    if (window.location.pathname.startsWith('/report') || window.location.pathname.startsWith('/r/')) {
       return
     }
     // Khởi chạy kiểm tra phiên làm việc qua HttpOnly Cookie ngay khi load app
@@ -90,12 +53,12 @@ function App() {
       {/* Global Toast Notifications (Sonner) */}
       <Toaster richColors position="top-right" />
 
-      <Suspense fallback={<RouteLoadingSpinner />}>
-        <Routes>
+      <Routes>
           {/* Route đăng nhập công khai */}
           <Route path="/login" element={<LoginPage />} />
 
           {/* Route báo cáo sự cố ẩn danh dành cho người dân qua quét mã QR (Public, Không cần đăng nhập) */}
+          <Route path="/r/:code" element={<CitizenReportPage />} />
           <Route path="/report" element={<CitizenReportPage />} />
 
           {/* Route thông báo từ chối quyền truy cập (403 Forbidden) */}
@@ -171,7 +134,6 @@ function App() {
           {/* 404 Not Found Page */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
-      </Suspense>
     </BrowserRouter>
   )
 }

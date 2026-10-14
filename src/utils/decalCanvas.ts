@@ -3,14 +3,16 @@
  * - Hoàn toàn độc lập với CSS Tailwind v4 (Triệt tiêu 100% lỗi parse màu "oklch" của html2canvas)
  * - Hỗ trợ hiển thị 100% TIẾNG VIỆT CÓ DẤU sắc nét bằng Canvas 2D Text API
  * - Chuẩn kích thước tỉ lệ tem decal: 105mm x 60mm (Tỉ lệ 7:4, render ở độ phân giải 1050px x 600px cho độ sắc nét cực cao)
- * - Thiết kế đồng bộ 100% với giao diện xem trước HTML
+ * - Thiết kế tối ưu không gian: Bỏ mã cột POLE-xxxx, mở rộng kích thước mã QR to rõ,
+ *   bên phải hiển thị nổi bật: TUYẾN ĐƯỜNG, ĐỊA BÀN QUẢN LÝ và MÃ TEM QUÉT 16 ký tự Backend.
  */
 
 export interface DecalCanvasData {
-  poleCode: string
+  poleCode?: string | null
   segmentName?: string | null
   communeName?: string | null
   qrDataUrl: string
+  qrCodeText?: string | null
 }
 
 /**
@@ -144,7 +146,7 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
 
   // Nhãn phụ bên phải
   ctx.fillStyle = '#475569'
-  ctx.font = 'bold 19px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+  ctx.font = 'bold 20px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
   ctx.textAlign = 'right'
   ctx.fillText('Tem Quét Báo Sự Cố', margin + cardW - 35, headerY - 10)
 
@@ -156,13 +158,13 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
   ctx.lineWidth = 2
   ctx.stroke()
 
-  // 4. Vẽ Mã QR (Khối bên trái)
+  // 4. Vẽ Mã QR (Khối bên trái - Phóng to lên 360px cho quét cực nhạy)
   const qrBoxX = margin + 35
-  const qrBoxY = margin + 105
-  const qrBoxSize = 340
+  const qrBoxY = margin + 100
+  const qrBoxSize = 360
 
   // Hộp viền chứa QR
-  roundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 22)
+  roundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 24)
   ctx.fillStyle = '#f8fafc'
   ctx.fill()
   ctx.lineWidth = 3
@@ -173,7 +175,7 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
   if (data.qrDataUrl) {
     try {
       const qrImg = await loadImage(data.qrDataUrl)
-      const qrPadding = 18
+      const qrPadding = 16
       ctx.drawImage(
         qrImg,
         qrBoxX + qrPadding,
@@ -186,44 +188,64 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
     }
   }
 
-  // 5. Thông tin định danh cột đèn (Khối bên phải)
-  const infoX = qrBoxX + qrBoxSize + 42
+  // 5. Khối thông tin định danh (Bên phải - Tối ưu hiển thị Tuyến, Địa bàn và Mã tem quét 16 ký tự)
+  const infoX = qrBoxX + qrBoxSize + 40
   const maxInfoWidth = margin + cardW - infoX - 35
 
-  // 5.1. Nhãn & Mã Cột Đèn
-  let currentY = qrBoxY + 32
+  let currentY = qrBoxY + 36
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
 
-  ctx.fillStyle = '#64748b'
-  ctx.font = 'bold 18px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  ctx.fillText('MÃ CỘT ĐÈN', infoX, currentY)
-
-  currentY += 48
-  ctx.fillStyle = '#1e3a8a'
-  ctx.font = '900 48px "Consolas", "Courier New", monospace'
-  ctx.fillText(data.poleCode || '---', infoX, currentY)
-
-  // 5.2. Nhãn & Tuyến Đường
-  currentY += 50
+  // 5.1. TUYẾN ĐƯỜNG
   ctx.fillStyle = '#64748b'
   ctx.font = 'bold 18px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
   ctx.fillText('TUYẾN ĐƯỜNG', infoX, currentY)
 
-  currentY += 36
+  currentY += 40
   ctx.fillStyle = '#0f172a'
-  ctx.font = 'bold 26px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+  ctx.font = 'bold 30px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
   const segText = fitText(ctx, data.segmentName || 'Chưa gắn tuyến', maxInfoWidth)
   ctx.fillText(segText, infoX, currentY)
 
-  // 5.3. Địa bàn xã / phường (kèm icon MapPin vector xanh ngọc chuẩn Lucide)
-  currentY += 46
-  drawMapPinIcon(ctx, infoX, currentY - 22, 26, '#059669')
+  // 5.2. ĐỊA BÀN QUẢN LÝ (kèm icon MapPin)
+  currentY += 56
+  ctx.fillStyle = '#64748b'
+  ctx.font = 'bold 18px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+  ctx.fillText('ĐỊA BÀN QUẢN LÝ', infoX, currentY)
 
-  ctx.fillStyle = '#334155'
-  ctx.font = 'bold 22px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  const comText = fitText(ctx, data.communeName || 'Địa bàn chung', maxInfoWidth - 36)
-  ctx.fillText(comText, infoX + 34, currentY)
+  currentY += 40
+  drawMapPinIcon(ctx, infoX, currentY - 24, 28, '#059669')
+
+  ctx.fillStyle = '#1e293b'
+  ctx.font = 'bold 26px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+  const comText = fitText(ctx, data.communeName || 'Địa bàn chung', maxInfoWidth - 40)
+  ctx.fillText(comText, infoX + 38, currentY)
+
+  // 5.3. MÃ TEM QUÉT (16 KÝ TỰ BACKEND)
+  currentY += 56
+  ctx.fillStyle = '#64748b'
+  ctx.font = 'bold 18px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+  ctx.fillText('MÃ TEM QUÉT', infoX, currentY)
+
+  currentY += 46
+  const displayCode = data.qrCodeText || data.poleCode || '---'
+
+  // Badge nền nổi bật cho Mã tem quét
+  const badgePadX = 16
+  const badgeH = 46
+  ctx.font = '900 32px "Consolas", "Courier New", monospace'
+  const codeWidth = ctx.measureText(displayCode).width
+  const badgeW = Math.min(codeWidth + badgePadX * 2, maxInfoWidth)
+
+  roundRect(ctx, infoX, currentY - 34, badgeW, badgeH, 10)
+  ctx.fillStyle = '#eff6ff'
+  ctx.fill()
+  ctx.lineWidth = 2
+  ctx.strokeStyle = '#bfdbfe'
+  ctx.stroke()
+
+  ctx.fillStyle = '#1d4ed8'
+  ctx.fillText(fitText(ctx, displayCode, badgeW - badgePadX * 2), infoX + badgePadX, currentY)
 
   // 6. Đường kẻ phân cách Footer
   const footerDividerY = margin + cardH - 65
