@@ -2,11 +2,18 @@
  * Auto-generated Types for: sweeps/sweeps
  * Sinh tự động từ endpoint Backend
  */
+import type { Geometry } from '../common/base'
 import type { DataSource, FixtureStatus, SurveyRawKind, SweepProcessingStatus, SweepStatus } from '../common/enums'
 
 export interface ClipManifest {
     clip_no?: number
     sha256?: string | null
+}
+
+export interface CoverageGap {
+    from_m?: number
+    to_m?: number
+    geometry?: Geometry
 }
 
 export interface CreateSweepRequest {
@@ -18,6 +25,13 @@ export interface CreateSweepRequest {
     utc_uncertainty_ms?: number
     data_source?: DataSource
     started_elapsed_ns?: string | null
+}
+
+export interface PassCoverage {
+    pass_no?: number
+    direction?: string | null
+    from_m?: number
+    to_m?: number
 }
 
 export interface ReviewSweepRequest {
@@ -36,6 +50,17 @@ export interface ReviewSweepResponse {
     reviewed_at?: string | null
     note?: string | null
     version?: number
+}
+
+export interface SegmentCoverage {
+    segment_id?: string | null
+    length_m?: number
+    covered_ratio?: number
+    passes?: PassCoverage[]
+    gaps?: CoverageGap[]
+    poles_expected?: number
+    poles_observed?: number
+    not_observed_pole_ids?: string[]
 }
 
 export interface SubmitSweepRequest {
@@ -88,6 +113,31 @@ export interface SurveyResultItemPagedResult {
     items?: SurveyResultItem[]
 }
 
+export interface SweepCoverageResponse {
+    sweep_id?: string | null
+    run_id?: number
+    coverage_pct?: number
+    segments?: SegmentCoverage[]
+}
+
+export interface SweepDetailResponse {
+    sweep_id?: string | null
+    work_order_id?: string | null
+    started_at?: string | null
+    ended_at?: string | null
+    segment_ids?: string[]
+    frame_count?: number
+    coverage_pct?: number
+    processing_status?: SweepProcessingStatus
+    status?: SweepStatus
+    data_source?: DataSource
+    submitted_at?: string | null
+    clips?: SurveyClipResponse[]
+    raw_files?: SurveyRawResponse[]
+    version?: number
+    latest_run?: SweepRunSummary
+}
+
 export interface SweepManifest {
     clips?: ClipManifest[]
     gps_hash?: string | null
@@ -117,5 +167,19 @@ export interface SweepResponsePagedResult {
     page_size?: number
     total?: number
     items?: SweepResponse[]
+}
+
+export interface SweepRunSummary {
+    run_id?: number
+    attempt?: number
+    result_state?: string | null
+    stage?: string | null
+    error_code?: string | null
+    started_at?: string | null
+    finished_at?: string | null
+    coverage_pct?: number
+    detection_coverage_pct?: number
+    dim_coverage_pct?: number
+    coverage_reason?: string | null
 }
 

@@ -4,6 +4,7 @@ import assetSaga from '../feature/assets/assetSaga'
 import adminUserSaga from '../feature/admin/adminUserSaga'
 import mapSaga from '../feature/map/mapSaga'
 import citizenReportSaga from '../feature/citizen-report/citizenReportSaga'
+import qrCodeSaga from '../feature/qr-code/qrCodeSaga'
 
 export default function* rootSaga() {
     yield all([
@@ -12,5 +13,6 @@ export default function* rootSaga() {
         fork(adminUserSaga),
         fork(mapSaga),
         fork(citizenReportSaga),
+        fork(qrCodeSaga),
     ])
 }
