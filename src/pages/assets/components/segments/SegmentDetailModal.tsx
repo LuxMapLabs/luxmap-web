@@ -1,8 +1,11 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useSelector } from 'react-redux'
 import { X, Route, MapPin, CheckCircle2 } from 'lucide-react'
-import { SegmentRouteMap } from '../../../../components/SegmentRouteMap'
+import { SegmentRouteMap, SegmentPoleItem } from '../../../../components/SegmentRouteMap'
+import { extractSegmentCoordinates } from '../../../../utils/gis-map/routeUtils'
 import type { SegmentListItem } from '../../../../types/assets/segments'
+import type { RootState } from '../../../../redux/rootReducer'
 import { getDataSourceDisplayName } from '../../../../constants/enums'
 import { formatCommuneDisplayName } from '../../../../constants/communes'
 
@@ -15,6 +18,41 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
   segment,
   onClose,
 }) => {
+  const allPoles = useSelector((state: RootState) => state.assets.poles)
+
+  const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
+    if (!segment?.segment_id) return []
+    return allPoles
+      .filter(
+        (p) =>
+          p.segment_id === segment.segment_id &&
+          p.location &&
+          Number.isFinite(p.location.lat) &&
+          Number.isFinite(p.location.lng)
+      )
+      .sort((a, b) =>
+        (a.external_ref || '').localeCompare(b.external_ref || '', undefined, { numeric: true })
+      )
+      .map((p) => ({
+        id: p.pole_id || p.external_ref || 'unknown',
+        code: p.external_ref || p.pole_id || undefined,
+        coord: [p.location.lng, p.location.lat] as [number, number],
+        status: p.active_fixture ? 'normal' : 'unknown',
+        atlas: p.active_fixture?.fixture_type,
+      }))
+  }, [allPoles, segment?.segment_id])
+
+  const { initialStart, initialEnd, initialCoords } = useMemo(() => {
+    if (!segment) {
+      return {
+        initialStart: [106.4896, 10.9701] as [number, number],
+        initialEnd: [106.4950, 10.9750] as [number, number],
+        initialCoords: [] as [number, number][],
+      }
+    }
+    return extractSegmentCoordinates(segment, segmentPoles)
+  }, [segment, segmentPoles])
+
   if (!segment) return null
 
   return createPortal(
@@ -114,8 +152,11 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
               <span>Lộ trình Tuyến đường Chiếu sáng:</span>
             </label>
             <SegmentRouteMap
-              startCoord={[106.485, 10.972]}
-              endCoord={[106.495, 10.978]}
+              coordinates={initialCoords}
+              startCoord={initialStart}
+              endCoord={initialEnd}
+              poles={segmentPoles}
+              editable={false}
               height="220px"
             />
           </div>
