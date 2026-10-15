@@ -99,9 +99,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
           <div className="flex items-center gap-2">
             <span
-              className={`p-2 rounded-xl ${
-                isRepair ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
-              }`}
+              className={`p-2 rounded-xl ${isRepair ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                }`}
             >
               {isRepair ? <Wrench className="w-5 h-5" /> : <Search className="w-5 h-5" />}
             </span>
@@ -175,6 +174,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
               </label>
               <input
                 type="date"
+                min={getTodayStr()}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
@@ -226,9 +226,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
             </button>
             <button
               type="submit"
-              className={`px-4 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition cursor-pointer active:scale-98 ${
-                isRepair ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
-              }`}
+              className={`px-4 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition cursor-pointer active:scale-98 ${isRepair ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
             >
               ✓ Mở giai đoạn tiếp theo
             </button>

@@ -155,8 +155,7 @@ export const WorkSchedulePage: React.FC = () => {
       setIsNextPhaseModalOpen(false)
       dispatch(closeCaseDetail())
       toast.success(
-        `✓ Đã mở tiếp ${
-          payload.nextPhaseType === 'repair' ? 'Sửa chữa' : 'Kiểm tra'
+        `✓ Đã mở tiếp ${payload.nextPhaseType === 'repair' ? 'Sửa chữa' : 'Kiểm tra'
         } cho mã lệnh công tác trên máy chủ!`
       )
     } catch (err: any) {
