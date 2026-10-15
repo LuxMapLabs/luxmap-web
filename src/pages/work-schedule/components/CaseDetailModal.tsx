@@ -177,9 +177,17 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   : caseItem.phases.find((p) => p.phaseType === step.type)
                 const actualPhaseIndex = phaseForStep ? caseItem.phases.indexOf(phaseForStep) : -1
 
+                // Bước 4 (Cấp trên) chỉ hoàn thành khi tiến trình Sửa chữa đã kết thúc và được nghiệm thu hợp lệ
+                const repairPhase = caseItem.phases.find((p) => p.phaseType === 'repair')
+                const isRepairEnded = Boolean(
+                  repairPhase &&
+                  repairPhase.status === 'ended' &&
+                  repairPhase.rawStatus !== 'cancelled'
+                )
+
                 const isStepCancelled = phaseForStep?.rawStatus === 'cancelled'
                 const isStepEnded = isSuperiorStep
-                  ? Boolean(caseItem.isTerminated)
+                  ? isRepairEnded
                   : phaseForStep?.status === 'ended' && !isStepCancelled
                 const isCompleted = isStepEnded
                 const isActive =
@@ -232,7 +240,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         className={`text-[11px] font-bold ${
                           isViewing
                             ? 'text-blue-700 font-extrabold underline underline-offset-4 decoration-2 decoration-blue-600'
-                            : isClickable
+                            : isClickable || (isSuperiorStep && isCompleted)
                             ? 'text-slate-700'
                             : 'text-slate-400 font-medium'
                         }`}
