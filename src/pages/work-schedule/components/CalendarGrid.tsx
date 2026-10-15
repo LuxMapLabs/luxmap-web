@@ -39,26 +39,26 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     }>
   > = {}
 
-  ;(cases || []).forEach((sc) => {
-    ;(sc?.phases || []).forEach((p, pIndex) => {
-      if (!p || !p.date || p.rawStatus === 'cancelled') return
+    ; (cases || []).forEach((sc) => {
+      ; (sc?.phases || []).forEach((p, pIndex) => {
+        if (!p || !p.date || p.rawStatus === 'cancelled') return
 
-      // Áp dụng bộ lọc
-      if (filterPhase !== 'all') {
-        if (filterPhase === 'ended' && p.status !== 'ended' && !sc.isTerminated) return
-        if (filterPhase !== 'ended' && p.phaseType !== filterPhase) return
-      }
+        // Áp dụng bộ lọc
+        if (filterPhase !== 'all') {
+          if (filterPhase === 'ended' && p.status !== 'ended' && !sc.isTerminated) return
+          if (filterPhase !== 'ended' && p.phaseType !== filterPhase) return
+        }
 
-      if (!eventsByDate[p.date]) {
-        eventsByDate[p.date] = []
-      }
-      eventsByDate[p.date].push({
-        caseItem: sc,
-        phaseIndex: pIndex,
-        phase: p,
+        if (!eventsByDate[p.date]) {
+          eventsByDate[p.date] = []
+        }
+        eventsByDate[p.date].push({
+          caseItem: sc,
+          phaseIndex: pIndex,
+          phase: p,
+        })
       })
     })
-  })
 
   // Các ngày đệm tháng trước
   const prevDays = []
@@ -87,9 +87,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         {WEEKDAYS.map((w, idx) => (
           <div
             key={w}
-            className={`py-3 text-[11px] sm:text-xs font-bold uppercase tracking-wider ${
-              idx >= 5 ? 'text-blue-600' : 'text-slate-600'
-            }`}
+            className={`py-3 text-[11px] sm:text-xs font-bold uppercase tracking-wider ${idx >= 5 ? 'text-blue-600' : 'text-slate-600'
+              }`}
           >
             {w}
           </div>
@@ -119,21 +118,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           return (
             <div
               key={dateStr}
-              className={`p-2.5 min-h-[130px] flex flex-col gap-1.5 transition-all duration-200 relative group/cell ${
-                isToday
+              className={`p-2.5 min-h-[130px] flex flex-col gap-1.5 transition-all duration-200 relative group/cell ${isToday
                   ? 'bg-gradient-to-b from-blue-50/40 via-white to-white ring-2 ring-inset ring-blue-500/40 hover:bg-blue-50/60 hover:shadow-md hover:ring-blue-500/60 hover:z-10'
                   : 'bg-white hover:bg-sky-50/40 hover:shadow-md hover:ring-2 hover:ring-blue-400/50 hover:z-10'
-              }`}
+                }`}
             >
               {/* Header của ô ngày */}
               <div className="flex items-center justify-between shrink-0 mb-1">
                 <div className="flex items-center gap-1.5">
                   <span
-                    className={`text-xs font-black rounded-full w-6 h-6 flex items-center justify-center transition-all ${
-                      isToday
+                    className={`text-xs font-black rounded-full w-6 h-6 flex items-center justify-center transition-all ${isToday
                         ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-200 scale-105'
                         : 'text-slate-700 group-hover/cell:text-blue-600 group-hover/cell:font-black'
-                    }`}
+                      }`}
                   >
                     {day}
                   </span>

@@ -52,7 +52,9 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   // Đồng bộ ngày khi mở modal từ ô lịch hoặc nút tạo mới
   useEffect(() => {
     if (isOpen) {
-      setDate(defaultDate || getTodayStr())
+      const todayStr = getTodayStr()
+      const effectiveDate = defaultDate && defaultDate >= todayStr ? defaultDate : todayStr
+      setDate(effectiveDate)
     }
   }, [defaultDate, isOpen])
 
@@ -72,6 +74,14 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    const todayStr = getTodayStr()
+    if (date < todayStr) {
+      toast.error(
+        `Không thể tạo lịch cho ngày trong quá khứ (${date}). Vui lòng chọn từ ngày hôm nay (${todayStr}) trở đi.`
+      )
+      return
+    }
 
     if (initPhase !== 'survey' && selectedPoleIds.length === 0) {
       toast.warning(
@@ -208,6 +218,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               <input
                 type="date"
                 required
+                min={getTodayStr()}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="p-2.5 rounded-xl text-xs font-bold outline-none transition-all bg-slate-50 border border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"

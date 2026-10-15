@@ -169,32 +169,29 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
             <div className="flex items-center justify-between relative select-none">
               {STEPPER_STEPS.map((step, idx) => {
-                const phaseForStep =
-                  caseItem.phases.find((p) => p.phaseType === step.type) || caseItem.phases[idx]
+                const isSuperiorStep = step.type === 'superior'
+                // Tìm đúng phase trong sự vụ khớp với loại công tác của step (survey / inspection / repair)
+                // Tuyệt đối không fallback sang phases[idx] để tránh việc gán nhầm phase này vào phase khác
+                const phaseForStep = isSuperiorStep
+                  ? undefined
+                  : caseItem.phases.find((p) => p.phaseType === step.type)
                 const actualPhaseIndex = phaseForStep ? caseItem.phases.indexOf(phaseForStep) : -1
 
-                // Bất kỳ giai đoạn nào đã END hoặc đã hoàn thành đều có dấu tick (trừ khi bị hủy)
+                // Bước 4 (Cấp trên) chỉ hoàn thành khi tiến trình Sửa chữa đã kết thúc và được nghiệm thu hợp lệ
+                const repairPhase = caseItem.phases.find((p) => p.phaseType === 'repair')
+                const isRepairEnded = Boolean(
+                  repairPhase &&
+                  repairPhase.status === 'ended' &&
+                  repairPhase.rawStatus !== 'cancelled'
+                )
+
                 const isStepCancelled = phaseForStep?.rawStatus === 'cancelled'
-                const isStepEnded =
-                  (phaseForStep?.status === 'ended' && !isStepCancelled) ||
-                  (caseItem.isTerminated &&
-                    !isStepCancelled &&
-                    actualPhaseIndex >= 0 &&
-                    actualPhaseIndex <= caseItem.currentPhaseIndex)
-                const isCompleted =
-                  Boolean(
-                    phaseForStep &&
-                      !isStepCancelled &&
-                      (actualPhaseIndex < caseItem.currentPhaseIndex || isStepEnded)
-                  )
+                const isStepEnded = isSuperiorStep
+                  ? isRepairEnded
+                  : phaseForStep?.status === 'ended' && !isStepCancelled
+                const isCompleted = isStepEnded
                 const isActive =
-                  Boolean(
-                    phaseForStep &&
-                      !isStepCancelled &&
-                      actualPhaseIndex === caseItem.currentPhaseIndex &&
-                      !caseItem.isTerminated &&
-                      phaseForStep.status !== 'ended'
-                  )
+                  !isSuperiorStep && Boolean(phaseForStep && !isStepEnded && !isStepCancelled)
                 const isViewing = actualPhaseIndex >= 0 && actualPhaseIndex === viewingPhaseIndex
 
                 let circleClass = 'bg-slate-200 text-slate-500 border-slate-300'
@@ -206,16 +203,22 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   circleClass = 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100 shadow-xs'
                 }
 
+                // Nếu bước này không tồn tại trong sự vụ (chẳng hạn bắt đầu từ Sửa chữa thì Khảo sát và Kiểm tra không có):
+                // Hiển thị vòng tròn màu xám bình thường, mờ nhẹ, không sáng xanh, không click được (như bước 2 trong ảnh)
+                const isClickable = actualPhaseIndex >= 0
+
                 return (
                   <React.Fragment key={step.type}>
                     <div
                       onClick={() => {
-                        if (actualPhaseIndex >= 0) {
+                        if (isClickable) {
                           onSwitchViewingPhase(actualPhaseIndex)
                         }
                       }}
-                      className={`flex flex-col items-center gap-1.5 cursor-pointer z-10 transition-transform ${
-                        actualPhaseIndex >= 0 ? 'hover:scale-105' : 'opacity-40 cursor-not-allowed'
+                      className={`flex flex-col items-center gap-1.5 z-10 transition-transform ${
+                        isClickable
+                          ? 'cursor-pointer hover:scale-105'
+                          : 'cursor-not-allowed opacity-50'
                       }`}
                     >
                       <div
@@ -237,7 +240,9 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         className={`text-[11px] font-bold ${
                           isViewing
                             ? 'text-blue-700 font-extrabold underline underline-offset-4 decoration-2 decoration-blue-600'
-                            : 'text-slate-600'
+                            : isClickable || (isSuperiorStep && isCompleted)
+                            ? 'text-slate-700'
+                            : 'text-slate-400 font-medium'
                         }`}
                       >
                         {step.label}
@@ -248,8 +253,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     {idx < 3 && (
                       <div
                         className={`flex-1 h-0.5 mx-2 rounded-full transition-colors ${
-                          idx < caseItem.currentPhaseIndex ||
-                          (caseItem.isTerminated && !isStepCancelled && idx < caseItem.phases.length)
+                          isCompleted && !isStepCancelled
                             ? 'bg-emerald-500'
                             : 'bg-slate-200'
                         }`}
