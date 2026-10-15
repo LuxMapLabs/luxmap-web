@@ -3,6 +3,7 @@ import { Search, Plus, Upload, Filter } from 'lucide-react'
 import type { CreateFixtureRequest } from '../../../../types/assets/fixtures'
 import type { ManagedFixture } from '../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../types/assets/poles'
+import type { SegmentListItem } from '../../../../types/assets/segments'
 import { FixtureTable } from './FixtureTable'
 import { AddFixtureModal } from './AddFixtureModal'
 import { EditFixtureModal } from './EditFixtureModal'
@@ -11,10 +12,12 @@ import { TablePagination } from '../common/TablePagination'
 export interface FixturesTabProps {
   fixtures: ManagedFixture[]
   poles: PoleListItem[]
+  segments?: SegmentListItem[]
   activeFixtureCode?: string
   onClearActiveFixture?: () => void
   isLoading?: boolean
   onAddFixture: (data: CreateFixtureRequest) => void
+  onAddFixtures?: (data: CreateFixtureRequest[]) => void
   onUpdateFixture: (updated: ManagedFixture) => void
   onOpenImport: () => void
   onSelectPole?: (poleCode: string) => void
@@ -23,10 +26,12 @@ export interface FixturesTabProps {
 export const FixturesTab: React.FC<FixturesTabProps> = ({
   fixtures,
   poles,
+  segments = [],
   activeFixtureCode,
   isLoading = false,
   onClearActiveFixture,
   onAddFixture,
+  onAddFixtures,
   onUpdateFixture,
   onOpenImport,
   onSelectPole,
@@ -219,7 +224,9 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         poles={poles}
+        segments={segments}
         onAddFixture={onAddFixture}
+        onAddFixtures={onAddFixtures}
       />
 
       <EditFixtureModal
