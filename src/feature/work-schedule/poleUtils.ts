@@ -1,5 +1,3 @@
-import mockPolesData from '../../data/mock-poles.geo.json'
-
 export interface PoleItem {
   poleId: string
   segmentId: string
@@ -25,37 +23,33 @@ export function extractSegmentId(segmentStr: string): string {
 }
 
 /**
- * Lấy danh sách cột đèn theo tuyến đường
+ * Lấy danh sách cột đèn theo tuyến đường (sinh danh sách động không phụ thuộc mock json)
  */
 export function getPolesBySegment(segmentStr: string): PoleItem[] {
   const segmentId = extractSegmentId(segmentStr)
-  
-  const features = (mockPolesData as any)?.features || []
-  const filtered = features
-    .filter((f: any) => f?.properties?.segment_id === segmentId)
-    .map((f: any) => ({
-      poleId: f.properties.pole_id,
-      segmentId: f.properties.segment_id,
-      fixtureType: f.properties.fixture_type || 'led_road_lamp',
-      lampWatt: f.properties.lamp_watt || 100,
-      atlas: f.properties.atlas || `Vị trí cột dọc tuyến ${segmentId}`,
-      status: f.properties.fixture_status || 'normal',
-    }))
 
-  // Nếu SEG-004 chưa có trong mock geojson, sinh danh sách mẫu 15 cột
-  if (filtered.length === 0 && segmentId === 'SEG-004') {
-    return Array.from({ length: 15 }, (_, i) => {
-      const num = String(i + 1).padStart(4, '0')
-      return {
-        poleId: `POLE-01${num.substring(2)}`,
-        segmentId: 'SEG-004',
-        fixtureType: 'led_road_lamp',
-        lampWatt: 100,
-        atlas: `Cột đèn số ${i + 1} dọc bờ kênh ấp 4`,
-        status: 'normal',
-      }
-    })
+  const prefixMap: Record<string, { count: number; prefix: string; name: string }> = {
+    'SEG-001': { count: 20, prefix: 'POLE-00', name: 'Trục chính liên xã Phước Hậu' },
+    'SEG-002': { count: 18, prefix: 'POLE-01', name: 'Đường liên ấp 2 - Phước Vĩnh An' },
+    'SEG-003': { count: 22, prefix: 'POLE-02', name: 'Trục đường Kênh Đông Củ Chi' },
+    'SEG-004': { count: 15, prefix: 'POLE-03', name: 'Tuyến D - Bờ kênh ấp 4' },
   }
 
-  return filtered
+  const config = prefixMap[segmentId] || {
+    count: 15,
+    prefix: `POLE-${segmentId.replace(/\D/g, '').padStart(2, '0')}`,
+    name: `Tuyến ${segmentId}`,
+  }
+
+  return Array.from({ length: config.count }, (_, i) => {
+    const idx = String(i + 1).padStart(2, '0')
+    return {
+      poleId: `${config.prefix}${idx}`,
+      segmentId,
+      fixtureType: 'led_road_lamp',
+      lampWatt: 100,
+      atlas: `Cột đèn số ${i + 1} (${config.name})`,
+      status: i % 7 === 0 ? 'dim' : 'normal',
+    }
+  })
 }

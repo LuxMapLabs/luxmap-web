@@ -173,12 +173,20 @@ export function useAssetData() {
 
   // --- Fixture Handlers ---
   const handleAddFixture = async (data: CreateFixtureRequest) => {
+    await handleAddFixtures([data])
+  }
+
+  const handleAddFixtures = async (dataList: CreateFixtureRequest[]) => {
+    if (!dataList || dataList.length === 0) return
+
     try {
-      await assetAPI.createFixture(data)
+      for (const item of dataList) {
+        await assetAPI.createFixture(item)
+      }
       dispatch(fetchAssetsRequest())
-      showBanner(`Đã thêm bóng đèn mới gắn vào cột "${data.pole_id}"!`)
+      showBanner(`Đã thêm thành công ${dataList.length} bóng đèn mới!`)
     } catch (err: any) {
-      console.error('Failed to create fixture:', err)
+      console.error('Failed to create fixtures:', err)
       const errorMsg =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
@@ -397,6 +405,7 @@ export function useAssetData() {
     handleAddPoles,
     handleUpdatePole,
     handleAddFixture,
+    handleAddFixtures,
     handleUpdateFixture,
     handleRetireFixture,
     handleAddCabinet,
