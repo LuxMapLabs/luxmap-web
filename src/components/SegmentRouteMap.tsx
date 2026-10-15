@@ -1,14 +1,17 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER } from '../utils/gis-map/mapUtils'
+import { projectPointOnSegment, calculateDistanceMeters } from '../utils/gis-map/routeUtils'
 import {
-  fetchRoadRoute,
-  getPoleSpineWaypoints,
-  snapPointToPolyline,
-  computeLiveSnappedRoute,
-} from '../utils/gis-map/routeUtils'
-import { ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react'
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  RotateCcw,
+  Undo2,
+  PlusCircle,
+  MousePointer,
+} from 'lucide-react'
 
 export interface SegmentPoleItem {
   id: string
@@ -17,6 +20,8 @@ export interface SegmentPoleItem {
   status?: string
   atlas?: string
 }
+
+export type SegmentEditMode = 'view' | 'prepend' | 'append'
 
 export interface SegmentRouteMapProps {
   coordinates?: [number, number][]
@@ -27,10 +32,18 @@ export interface SegmentRouteMapProps {
   originalEndCoord?: [number, number]
   height?: string
   editable?: boolean
+  defaultEditMode?: SegmentEditMode
+  hideTerminalPins?: boolean
   onStartCoordChange?: (coord: [number, number]) => void
   onEndCoordChange?: (coord: [number, number]) => void
   onRouteCoordsChange?: (coords: [number, number][]) => void
   poles?: SegmentPoleItem[]
+}
+
+interface HistorySnapshot {
+  coords: [number, number][]
+  start?: [number, number]
+  end?: [number, number]
 }
 
 // Coordinate validator (checks if longitude and latitude are in valid range)
@@ -47,6 +60,22 @@ const isValidCoord = (c?: [number, number]): c is [number, number] => {
   )
 }
 
+// Round coordinate to 6 decimal places (~10cm precision)
+const roundCoord = (val: number) => Math.round(val * 1000000) / 1000000
+
+// Check if coordinate matches an existing pole within tolerance (~10m)
+const isMatchingPoleCoord = (
+  pt: [number, number],
+  poles: SegmentPoleItem[],
+  threshold = 0.0001
+): boolean => {
+  if (!poles || poles.length === 0 || !isValidCoord(pt)) return false
+  return poles.some((p) => {
+    if (!isValidCoord(p.coord)) return false
+    return Math.hypot(p.coord[0] - pt[0], p.coord[1] - pt[1]) < threshold
+  })
+}
+
 export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   coordinates = [],
   originalRouteCoords,
@@ -56,6 +85,8 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   originalEndCoord,
   height = '240px',
   editable = false,
+  defaultEditMode,
+  hideTerminalPins = false,
   onStartCoordChange,
   onEndCoordChange,
   onRouteCoordsChange,
@@ -65,14 +96,20 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null)
   const startMarkerRef = useRef<maplibregl.Marker | null>(null)
   const endMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const vertexMarkersRef = useRef<maplibregl.Marker[]>([])
   const isDraggingRef = useRef<boolean>(false)
   const currentCoordsRef = useRef<[number, number][]>([...coordinates])
-  const stableBaseRouteRef = useRef<[number, number][]>([])
-  const lastSnappedStartRef = useRef<[number, number] | null>(null)
-  const lastSnappedEndRef = useRef<[number, number] | null>(null)
-  const dragDebounceTimerRef = useRef<any>(null)
 
-  // Persistent callback refs to prevent any map re-initialization / flickering
+  // Persistent reference to original DB route to protect from accidental deletion
+  const initialDbRouteRef = useRef<[number, number][]>([])
+  const initialDbStartRef = useRef<[number, number] | null>(null)
+  const initialDbEndRef = useRef<[number, number] | null>(null)
+
+  // Undo history stack
+  const [history, setHistory] = useState<HistorySnapshot[]>([])
+  const dragStartSnapshotRef = useRef<HistorySnapshot | null>(null)
+
+  // Persistent callback refs to prevent map re-initialization
   const onStartCoordChangeRef = useRef(onStartCoordChange)
   onStartCoordChangeRef.current = onStartCoordChange
 
@@ -82,12 +119,14 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const onRouteCoordsChangeRef = useRef(onRouteCoordsChange)
   onRouteCoordsChangeRef.current = onRouteCoordsChange
 
-  const [pickMode, setPickMode] = useState<'none' | 'start' | 'end'>('none')
-  const pickModeRef = useRef<'none' | 'start' | 'end'>('none')
-  pickModeRef.current = pickMode
+  const [editMode, setEditMode] = useState<SegmentEditMode>(
+    defaultEditMode || (coordinates.length === 0 ? 'append' : 'view')
+  )
+  const editModeRef = useRef<SegmentEditMode>(editMode)
+  editModeRef.current = editMode
 
-  // Round coordinate to 6 decimal places (~10cm precision)
-  const roundCoord = (val: number) => Math.round(val * 1000000) / 1000000
+  const polesRef = useRef<SegmentPoleItem[]>(poles)
+  polesRef.current = poles
 
   // Calculate route bounding box
   const getBounds = (coords?: [number, number][]): maplibregl.LngLatBoundsLike | null => {
@@ -142,99 +181,239 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     ]
   }
 
-  // Ordered sequence of segment poles along the baseline route (Spine Waypoints)
-  const orderedPoleCoords = useMemo(() => {
-    const validPoles = (poles || []).map((p) => p.coord).filter(isValidCoord)
-    if (validPoles.length <= 1) return validPoles
+  // Create minimal Sleek Draggable Vertex Handle
+  const createVertexMarkerElement = useCallback(
+    (isStart: boolean, isEnd: boolean, isSingle: boolean, isPole: boolean) => {
+      const el = document.createElement('div')
+      el.className = 'segment-vertex-handle'
+      el.style.width = '22px'
+      el.style.height = '22px'
+      el.style.cursor = isPole ? 'not-allowed' : editable ? 'grab' : 'default'
+      el.style.display = 'flex'
+      el.style.alignItems = 'center'
+      el.style.justifyContent = 'center'
+      el.style.userSelect = 'none'
+      el.style.pointerEvents = 'auto'
+      el.style.zIndex = isPole ? '20' : '30'
+      el.title = isPole
+        ? 'Vị trí cột đèn cố định (không dời)'
+        : editable
+        ? 'Kéo để điều chỉnh vị trí mốc lộ trình'
+        : ''
 
-    // Reference baseline polyline
-    const refLine =
-      currentCoordsRef.current.length >= 2
-        ? currentCoordsRef.current
-        : coordinates.length >= 2
-        ? coordinates
-        : [validPoles[0], validPoles[validPoles.length - 1]]
+      // Nếu là cột đèn: vàng LED đặc trưng #fde047, viền đen #0f172a
+      // Nếu là mốc tự do: viền xanh #0284c7, tâm trắng #ffffff
+      const ringColor = isPole
+        ? '#0f172a'
+        : isSingle
+        ? '#10b981'
+        : isStart
+        ? '#10b981'
+        : isEnd
+        ? '#f43f5e'
+        : '#0284c7'
 
-    return [...validPoles].sort((a, b) => {
-      const snapA = snapPointToPolyline(a, refLine)
-      const snapB = snapPointToPolyline(b, refLine)
-      return snapA.accumulatedDist - snapB.accumulatedDist
-    })
-  }, [poles, coordinates])
+      const coreColor = isPole
+        ? '#fde047'
+        : isSingle
+        ? '#10b981'
+        : isStart
+        ? '#10b981'
+        : isEnd
+        ? '#f43f5e'
+        : '#ffffff'
 
-  const orderedPoleCoordsRef = useRef<[number, number][]>(orderedPoleCoords)
-  orderedPoleCoordsRef.current = orderedPoleCoords
+      const shadow = isPole
+        ? '0 1px 6px rgba(0,0,0,0.65)'
+        : '0 2px 8px rgba(2, 132, 199, 0.7)'
 
-  // Update line geometry source in MapLibre silently without re-renders
-  const updateRouteLineSource = useCallback((newCoords: [number, number][]) => {
-    currentCoordsRef.current = newCoords
-    const map = mapRef.current
-    if (!map) return
-    const src = map.getSource('route-line') as maplibregl.GeoJSONSource
-    if (src) {
-      src.setData({
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: newCoords.filter(isValidCoord),
-        },
-        properties: {},
-      })
-    }
-  }, [])
+      el.innerHTML = `
+        <div class="vertex-dot" style="
+          pointer-events: none;
+          width: 13px;
+          height: 13px;
+          border-radius: 50%;
+          background: ${coreColor};
+          border: 2.5px solid ${ringColor};
+          box-shadow: ${shadow};
+          transition: transform 0.12s ease;
+        "></div>
+      `
 
-  const abortControllerRef = useRef<AbortController | null>(null)
-
-  // Asynchronously request real road route from OSRM strictly constrained through the poles chain
-  const requestRoadRoute = useCallback(
-    async (start: [number, number], end: [number, number]) => {
-      if (!isValidCoord(start) || !isValidCoord(end)) return
-
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-      const controller = new AbortController()
-      abortControllerRef.current = controller
-
-      try {
-        // Option 1: Use ordered poles as spine waypoints to strictly bind the route to the poles' street
-        const spineWaypoints = getPoleSpineWaypoints(start, end, orderedPoleCoordsRef.current)
-        const roadCoords = await fetchRoadRoute(start, end, controller.signal, spineWaypoints)
-        if (controller.signal.aborted) return
-
-        if (roadCoords && roadCoords.length >= 2) {
-          updateRouteLineSource(roadCoords)
-          onRouteCoordsChangeRef.current?.(roadCoords)
-          stableBaseRouteRef.current = [...roadCoords]
-
-          // Crucial: Automatically snap Start & End markers onto the real road endpoints computed by OSRM!
-          const actualStart = roadCoords[0]
-          const actualEnd = roadCoords[roadCoords.length - 1]
-
-          if (!isDraggingRef.current) {
-            if (startMarkerRef.current && isValidCoord(actualStart)) {
-              startMarkerRef.current.setLngLat(actualStart)
-              lastSnappedStartRef.current = actualStart
-              onStartCoordChangeRef.current?.(actualStart)
-            }
-            if (endMarkerRef.current && isValidCoord(actualEnd)) {
-              endMarkerRef.current.setLngLat(actualEnd)
-              lastSnappedEndRef.current = actualEnd
-              onEndCoordChangeRef.current?.(actualEnd)
-            }
-          }
+      if (editable && !isPole) {
+        el.onmouseenter = () => {
+          const dot = el.querySelector('.vertex-dot') as HTMLElement | null
+          if (dot) dot.style.transform = 'scale(1.35)'
         }
-      } catch {
-        // Safe fallback
+        el.onmouseleave = () => {
+          const dot = el.querySelector('.vertex-dot') as HTMLElement | null
+          if (dot && !isDraggingRef.current) dot.style.transform = 'scale(1)'
+        }
       }
+
+      // Stop propagation on click to prevent triggering map click handlers (adding a new vertex)
+      // Note: Do NOT stop pointerdown/mousedown propagation here as MapLibre Marker requires it for dragging
+      el.addEventListener('click', (e) => e.stopPropagation())
+
+      return el
     },
-    [updateRouteLineSource]
+    [editable]
   )
 
-  const requestRoadRouteRef = useRef(requestRoadRoute)
-  requestRoadRouteRef.current = requestRoadRoute
+  // Synchronize draggable vertex markers
+  const syncVertexMarkers = useCallback(
+    (coords: [number, number][]) => {
+      const map = mapRef.current
+      if (!map) return
 
+      const valid = coords.filter(isValidCoord)
 
+      // Dọn dẹp triệt để các marker cũ để đảm bảo listener được gán chính xác theo trạng thái isPole
+      vertexMarkersRef.current.forEach((m) => m.remove())
+      vertexMarkersRef.current = []
+
+      valid.forEach((pt, idx) => {
+        const isStart = idx === 0
+        const isEnd = idx === valid.length - 1
+        const isSingle = valid.length === 1
+        const isPole = isMatchingPoleCoord(pt, polesRef.current || [])
+        const canDrag = Boolean(editable && !isPole)
+
+        const el = createVertexMarkerElement(isStart, isEnd, isSingle, isPole)
+        const marker = new maplibregl.Marker({
+          element: el,
+          draggable: canDrag,
+          anchor: 'center',
+        })
+          .setLngLat(pt)
+          .addTo(map)
+
+        ;(marker as any)._vertexIndex = idx
+
+        if (canDrag) {
+          marker.on('dragstart', () => {
+            map.dragPan.disable()
+            isDraggingRef.current = true
+            el.style.cursor = 'grabbing'
+            const curStart = currentCoordsRef.current[0]
+            const curEnd = currentCoordsRef.current[currentCoordsRef.current.length - 1]
+            dragStartSnapshotRef.current = {
+              coords: [...currentCoordsRef.current],
+              start: curStart,
+              end: curEnd,
+            }
+          })
+
+          marker.on('drag', () => {
+            const currentIdx = (marker as any)._vertexIndex
+            if (typeof currentIdx !== 'number') return
+            const pos = marker.getLngLat()
+            const movedPt: [number, number] = [roundCoord(pos.lng), roundCoord(pos.lat)]
+            const current = [...currentCoordsRef.current]
+            current[currentIdx] = movedPt
+            currentCoordsRef.current = current
+
+            if (currentIdx === 0 && startMarkerRef.current) {
+              startMarkerRef.current.setLngLat(movedPt)
+            }
+            if (currentIdx === current.length - 1 && endMarkerRef.current) {
+              endMarkerRef.current.setLngLat(movedPt)
+            }
+
+            // Fast line update during drag
+            const lineSrc = map.getSource('route-line') as maplibregl.GeoJSONSource | undefined
+            if (lineSrc) {
+              lineSrc.setData({
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: current.length >= 2 ? current : current.length === 1 ? [current[0], current[0]] : [],
+                },
+                properties: {},
+              })
+            }
+          })
+
+          marker.on('dragend', () => {
+            map.dragPan.enable()
+            el.style.cursor = 'grab'
+            const currentIdx = (marker as any)._vertexIndex
+            if (typeof currentIdx !== 'number') return
+            const pos = marker.getLngLat()
+            const movedPt: [number, number] = [roundCoord(pos.lng), roundCoord(pos.lat)]
+            const current = [...currentCoordsRef.current]
+            current[currentIdx] = movedPt
+            currentCoordsRef.current = current
+
+            if (currentIdx === 0 && startMarkerRef.current) {
+              startMarkerRef.current.setLngLat(movedPt)
+            }
+            if (currentIdx === current.length - 1 && endMarkerRef.current) {
+              endMarkerRef.current.setLngLat(movedPt)
+            }
+
+            if (dragStartSnapshotRef.current) {
+              const snap = dragStartSnapshotRef.current
+              setHistory((prev) => [...prev, snap])
+              dragStartSnapshotRef.current = null
+            }
+
+            if (currentIdx === 0) {
+              onStartCoordChangeRef.current?.(movedPt)
+            }
+            if (currentIdx === current.length - 1) {
+              onEndCoordChangeRef.current?.(movedPt)
+            }
+            onRouteCoordsChangeRef.current?.(current)
+
+            setTimeout(() => {
+              isDraggingRef.current = false
+            }, 120)
+          })
+        }
+
+        vertexMarkersRef.current.push(marker)
+      })
+    },
+    [editable, createVertexMarkerElement]
+  )
+
+  // Update line and vertices sources in MapLibre silently without re-renders
+  const updateRouteLineSource = useCallback(
+    (newCoords: [number, number][], syncMarkers = true) => {
+      currentCoordsRef.current = newCoords
+      const map = mapRef.current
+      if (!map) return
+
+      const valid = newCoords.filter(isValidCoord)
+
+      const lineSrc = map.getSource('route-line') as maplibregl.GeoJSONSource | undefined
+      if (lineSrc) {
+        lineSrc.setData({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: valid.length >= 2 ? valid : valid.length === 1 ? [valid[0], valid[0]] : [],
+          },
+          properties: {},
+        })
+      }
+
+      // Clear static circle layer as all vertices are interactive draggable DOM Markers
+      const vertSrc = map.getSource('route-vertices') as maplibregl.GeoJSONSource | undefined
+      if (vertSrc) {
+        vertSrc.setData({
+          type: 'FeatureCollection',
+          features: [],
+        })
+      }
+
+      if (syncMarkers) {
+        syncVertexMarkers(newCoords)
+      }
+    },
+    [syncVertexMarkers]
+  )
 
   // Create Start or End Pin element (minimal sleek badge with needle anchor)
   const createTerminalPinElement = useCallback(
@@ -283,7 +462,6 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
         "></div>
       `
 
-      // Apply hover animation ONLY to the inner badge child, NEVER to outer el!
       if (editable) {
         const badge = el.querySelector('.pin-badge') as HTMLElement | null
         el.onmouseenter = () => {
@@ -303,21 +481,290 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     [editable]
   )
 
-  // INITIALIZE MAP ONCE: No dependencies on changing callbacks or parent states
+  // Ensure Start Marker exists on map
+  const ensureStartMarker = useCallback(
+    (coord: [number, number]) => {
+      if (hideTerminalPins) return
+      const map = mapRef.current
+      if (!map || !isValidCoord(coord)) return
+
+      if (startMarkerRef.current) {
+        startMarkerRef.current.setLngLat(coord)
+      } else {
+        const startEl = createTerminalPinElement(true, 'ĐẦU TUYẾN')
+        const marker = new maplibregl.Marker({
+          element: startEl,
+          anchor: 'bottom',
+          draggable: editable,
+        })
+          .setLngLat(coord)
+          .addTo(map)
+
+        if (editable) {
+          let dragStartBaseCoords: [number, number][] = []
+
+          marker.on('dragstart', () => {
+            isDraggingRef.current = true
+            startEl.style.cursor = 'move'
+            const curStart = marker.getLngLat()
+            const curEnd = endMarkerRef.current?.getLngLat()
+            dragStartSnapshotRef.current = {
+              coords: [...currentCoordsRef.current],
+              start: [roundCoord(curStart.lng), roundCoord(curStart.lat)],
+              end: curEnd ? [roundCoord(curEnd.lng), roundCoord(curEnd.lat)] : undefined,
+            }
+            dragStartBaseCoords = [...currentCoordsRef.current]
+          })
+
+          const computeStartUpdate = (posLng: number, posLat: number) => {
+            const rawPt: [number, number] = [roundCoord(posLng), roundCoord(posLat)]
+            const baseCoords = dragStartBaseCoords.length > 0 ? dragStartBaseCoords : currentCoordsRef.current
+            const activePoles = (polesRef.current || []).filter((p) => isValidCoord(p.coord))
+
+            if (baseCoords.length === 0) return { pt: rawPt, updated: [rawPt] }
+            if (activePoles.length === 0) {
+              const updated: [number, number][] = [rawPt, ...baseCoords.slice(1)]
+              return { pt: rawPt, updated }
+            }
+
+            const firstPoleIdx = baseCoords.findIndex((c) => isMatchingPoleCoord(c, activePoles))
+
+            if (firstPoleIdx === -1) {
+              const updated: [number, number][] = [rawPt, ...baseCoords.slice(1)]
+              return { pt: rawPt, updated }
+            }
+
+            const poleCoord = baseCoords[firstPoleIdx]
+            const distToPole = calculateDistanceMeters(rawPt, poleCoord)
+
+            if (firstPoleIdx === 0) {
+              // Tuyến đang bắt đầu ngay tại cột điện
+              if (distToPole > 3) {
+                // Nối dài: mốc mới đứng trước cột điện (giữ nguyên cột điện ở index 1)
+                const updated: [number, number][] = [rawPt, ...baseCoords]
+                return { pt: rawPt, updated }
+              } else {
+                // Kéo sát lại gần cột (< 3m): snap về cột, giữ nguyên baseCoords
+                const snappedPt: [number, number] = [roundCoord(poleCoord[0]), roundCoord(poleCoord[1])]
+                return { pt: snappedPt, updated: [...baseCoords] }
+              }
+            } else {
+              // Tuyến đã có điểm nối dài trước cột (firstPoleIdx > 0)
+              if (distToPole < 8) {
+                // Kéo sát lại gần cột (< 8m): thu gọn lại về đúng cột điện
+                const snappedPt: [number, number] = [roundCoord(poleCoord[0]), roundCoord(poleCoord[1])]
+                const updated: [number, number][] = baseCoords.slice(firstPoleIdx)
+                return { pt: snappedPt, updated }
+              } else {
+                // Kéo điều chỉnh ra ngoài: cập nhật điểm đầu
+                const updated: [number, number][] = [rawPt, ...baseCoords.slice(1)]
+                return { pt: rawPt, updated }
+              }
+            }
+          }
+
+          marker.on('drag', () => {
+            const pos = marker.getLngLat()
+            const { pt, updated } = computeStartUpdate(pos.lng, pos.lat)
+            marker.setLngLat(pt)
+            updateRouteLineSource(updated, false)
+          })
+
+          marker.on('dragend', () => {
+            isDraggingRef.current = false
+            startEl.style.cursor = 'move'
+            const pos = marker.getLngLat()
+            const { pt, updated } = computeStartUpdate(pos.lng, pos.lat)
+            marker.setLngLat(pt)
+            updateRouteLineSource(updated)
+
+            if (dragStartSnapshotRef.current) {
+              const snap = dragStartSnapshotRef.current
+              setHistory((prev) => [...prev, snap])
+              dragStartSnapshotRef.current = null
+            }
+
+            onStartCoordChangeRef.current?.(pt)
+            onRouteCoordsChangeRef.current?.(updated)
+          })
+        }
+        startMarkerRef.current = marker
+      }
+    },
+    [hideTerminalPins, editable, createTerminalPinElement, updateRouteLineSource]
+  )
+
+  // Ensure End Marker exists on map
+  const ensureEndMarker = useCallback(
+    (coord: [number, number]) => {
+      if (hideTerminalPins) return
+      const map = mapRef.current
+      if (!map || !isValidCoord(coord)) return
+
+      if (endMarkerRef.current) {
+        endMarkerRef.current.setLngLat(coord)
+      } else {
+        const endEl = createTerminalPinElement(false, 'CUỐI TUYẾN')
+        const marker = new maplibregl.Marker({
+          element: endEl,
+          anchor: 'bottom',
+          draggable: editable,
+        })
+          .setLngLat(coord)
+          .addTo(map)
+
+        if (editable) {
+          let dragStartBaseCoords: [number, number][] = []
+
+          marker.on('dragstart', () => {
+            isDraggingRef.current = true
+            endEl.style.cursor = 'move'
+            const curEnd = marker.getLngLat()
+            const curStart = startMarkerRef.current?.getLngLat()
+            dragStartSnapshotRef.current = {
+              coords: [...currentCoordsRef.current],
+              start: curStart ? [roundCoord(curStart.lng), roundCoord(curStart.lat)] : undefined,
+              end: [roundCoord(curEnd.lng), roundCoord(curEnd.lat)],
+            }
+            dragStartBaseCoords = [...currentCoordsRef.current]
+          })
+
+          const computeEndUpdate = (posLng: number, posLat: number) => {
+            const rawPt: [number, number] = [roundCoord(posLng), roundCoord(posLat)]
+            const baseCoords = dragStartBaseCoords.length > 0 ? dragStartBaseCoords : currentCoordsRef.current
+            const activePoles = (polesRef.current || []).filter((p) => isValidCoord(p.coord))
+
+            if (baseCoords.length === 0) return { pt: rawPt, updated: [rawPt] }
+            if (activePoles.length === 0) {
+              const updated: [number, number][] = [...baseCoords.slice(0, -1), rawPt]
+              return { pt: rawPt, updated }
+            }
+
+            let lastPoleIdx = -1
+            for (let i = baseCoords.length - 1; i >= 0; i--) {
+              if (isMatchingPoleCoord(baseCoords[i], activePoles)) {
+                lastPoleIdx = i
+                break
+              }
+            }
+
+            if (lastPoleIdx === -1) {
+              const updated: [number, number][] = [...baseCoords.slice(0, -1), rawPt]
+              return { pt: rawPt, updated }
+            }
+
+            const poleCoord = baseCoords[lastPoleIdx]
+            const distToPole = calculateDistanceMeters(rawPt, poleCoord)
+
+            if (lastPoleIdx === baseCoords.length - 1) {
+              // Tuyến đang kết thúc ngay tại cột điện
+              if (distToPole > 3) {
+                // Nối dài: tuyến xanh tiếp tục chạy từ cột điện ra điểm mới
+                const updated: [number, number][] = [...baseCoords, rawPt]
+                return { pt: rawPt, updated }
+              } else {
+                // Kéo sát lại gần cột (< 3m): snap về cột, giữ nguyên baseCoords
+                const snappedPt: [number, number] = [roundCoord(poleCoord[0]), roundCoord(poleCoord[1])]
+                return { pt: snappedPt, updated: [...baseCoords] }
+              }
+            } else {
+              // Tuyến đã có điểm nối dài sau cột (lastPoleIdx < baseCoords.length - 1)
+              if (distToPole < 8) {
+                // Kéo sát lại gần cột (< 8m): thu gọn lại về đúng cột điện cuối
+                const snappedPt: [number, number] = [roundCoord(poleCoord[0]), roundCoord(poleCoord[1])]
+                const updated: [number, number][] = baseCoords.slice(0, lastPoleIdx + 1)
+                return { pt: snappedPt, updated }
+              } else {
+                // Kéo điều chỉnh ra ngoài: cập nhật điểm cuối
+                const updated: [number, number][] = [...baseCoords.slice(0, -1), rawPt]
+                return { pt: rawPt, updated }
+              }
+            }
+          }
+
+          marker.on('drag', () => {
+            const pos = marker.getLngLat()
+            const { pt, updated } = computeEndUpdate(pos.lng, pos.lat)
+            marker.setLngLat(pt)
+            updateRouteLineSource(updated, false)
+          })
+
+          marker.on('dragend', () => {
+            isDraggingRef.current = false
+            endEl.style.cursor = 'move'
+            const pos = marker.getLngLat()
+            const { pt, updated } = computeEndUpdate(pos.lng, pos.lat)
+            marker.setLngLat(pt)
+            updateRouteLineSource(updated)
+
+            if (dragStartSnapshotRef.current) {
+              const snap = dragStartSnapshotRef.current
+              setHistory((prev) => [...prev, snap])
+              dragStartSnapshotRef.current = null
+            }
+
+            onEndCoordChangeRef.current?.(pt)
+            onRouteCoordsChangeRef.current?.(updated)
+          })
+        }
+        endMarkerRef.current = marker
+      }
+    },
+    [hideTerminalPins, editable, createTerminalPinElement, updateRouteLineSource]
+  )
+
+  // INITIALIZE MAP ONCE
   useEffect(() => {
     if (!containerRef.current) return
 
-    currentCoordsRef.current = coordinates && coordinates.length > 0 ? [...coordinates] : []
+    const validPoles = (poles || []).filter((p) => isValidCoord(p.coord))
+    const validRawCoords = (coordinates || []).filter(isValidCoord)
 
-    const validStart: [number, number] = isValidCoord(startCoord)
-      ? startCoord
-      : coordinates.find(isValidCoord) || DEFAULT_MAP_CENTER
+    const hasStartCoord = isValidCoord(startCoord)
+    const hasEndCoord = isValidCoord(endCoord)
 
-    const validEnd: [number, number] = isValidCoord(endCoord)
-      ? endCoord
-      : [...coordinates].reverse().find(isValidCoord) || validStart
+    let initialCoords: [number, number][] = []
+    if (validRawCoords.length > 0) {
+      initialCoords = [...validRawCoords]
+    } else if (validPoles.length > 0) {
+      const s = hasStartCoord ? startCoord! : validPoles[0].coord
+      const e = hasEndCoord ? endCoord! : validPoles[validPoles.length - 1].coord
+      const sortedPoles = [...validPoles].sort((a, b) => {
+        return calculateDistanceMeters(s, a.coord) - calculateDistanceMeters(s, b.coord)
+      })
+      initialCoords = [s, ...sortedPoles.map((p) => p.coord), e]
+    } else if (hasStartCoord && hasEndCoord) {
+      initialCoords = [startCoord!, endCoord!]
+    }
 
-    const center: [number, number] = validStart
+    // Deduplicate consecutive identical points
+    const dedupedCoords: [number, number][] = []
+    initialCoords.forEach((pt) => {
+      if (dedupedCoords.length === 0) {
+        dedupedCoords.push(pt)
+      } else {
+        const prev = dedupedCoords[dedupedCoords.length - 1]
+        if (Math.abs(prev[0] - pt[0]) > 0.000001 || Math.abs(prev[1] - pt[1]) > 0.000001) {
+          dedupedCoords.push(pt)
+        }
+      }
+    })
+
+    currentCoordsRef.current = dedupedCoords
+
+    // Store DB original state for Reset and Safe Undo boundary
+    initialDbRouteRef.current = [...dedupedCoords]
+    initialDbStartRef.current = hasStartCoord ? startCoord! : dedupedCoords.length > 0 ? dedupedCoords[0] : null
+    initialDbEndRef.current = hasEndCoord ? endCoord! : dedupedCoords.length > 1 ? dedupedCoords[dedupedCoords.length - 1] : null
+
+    const center: [number, number] =
+      dedupedCoords.length > 0
+        ? dedupedCoords[0]
+        : hasStartCoord
+        ? startCoord!
+        : validPoles.length > 0
+        ? validPoles[0].coord
+        : DEFAULT_MAP_CENTER
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -331,20 +778,14 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     mapRef.current = map
 
     map.on('load', () => {
-      // 1. Add Road Route Line
-      const validPoints = currentCoordsRef.current.filter(isValidCoord)
-      const dataCoords =
-        validPoints.length > 1
-          ? validPoints
-          : [validStart, validEnd]
-
+      // 1. Add Road Route Line Source & Layers
       map.addSource('route-line', {
         type: 'geojson',
         data: {
           type: 'Feature',
           geometry: {
             type: 'LineString',
-            coordinates: dataCoords,
+            coordinates: dedupedCoords.length >= 2 ? dedupedCoords : [],
           },
           properties: {},
         },
@@ -377,7 +818,28 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
         },
       })
 
-      // 2. Add Visual Poles Layer (Warm LED light dots)
+      // 2. Add Route Vertices Dots Layer (empty as all vertices are managed as interactive DOM markers)
+      map.addSource('route-vertices', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [],
+        },
+      })
+
+      map.addLayer({
+        id: 'route-vertices-circle',
+        type: 'circle',
+        source: 'route-vertices',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2.5, 16, 4],
+          'circle-color': '#ffffff',
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#0284c7',
+        },
+      })
+
+      // 3. Add Visual Poles Layer (Warm LED light dots)
       if (poles && poles.length > 0) {
         const poleFeatures = poles
           .filter((p) => isValidCoord(p.coord))
@@ -409,224 +871,195 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
             type: 'circle',
             source: 'segment-poles',
             paint: {
-              'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 1.8, 16, 2.5],
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3],
               'circle-color': '#fde047',
-              'circle-stroke-width': 1,
+              'circle-stroke-width': 1.2,
               'circle-stroke-color': '#0f172a',
-              'circle-opacity': 0.85,
+              'circle-opacity': 0.9,
             },
           })
         }
       }
 
-      // 3. Add Start & End Pins with needle anchor
-      if (isValidCoord(validStart)) {
-        const startEl = createTerminalPinElement(true, 'ĐẦU TUYẾN')
-        const startMarker = new maplibregl.Marker({
-          element: startEl,
-          anchor: 'bottom',
-          draggable: editable,
-        })
-          .setLngLat(validStart)
-          .addTo(map)
+      // 4. Render markers according to mode
+      syncVertexMarkers(dedupedCoords)
 
-        startMarkerRef.current = startMarker
+      if (!hideTerminalPins) {
+        if (dedupedCoords.length > 0 && isValidCoord(dedupedCoords[0])) {
+          ensureStartMarker(dedupedCoords[0])
+        } else if (hasStartCoord) {
+          ensureStartMarker(startCoord!)
+        }
 
-        if (editable) {
-          startMarker.on('dragstart', () => {
-            isDraggingRef.current = true
-            stableBaseRouteRef.current = [...currentCoordsRef.current]
-            startEl.style.cursor = 'move'
-            const badge = startEl.querySelector('.pin-badge') as HTMLElement | null
-            if (badge) {
-              badge.style.transform = 'translateY(-4px) scale(1.08)'
-            }
-          })
-
-          startMarker.on('drag', () => {
-            const pos = startMarker.getLngLat()
-            const pt: [number, number] = [roundCoord(pos.lng), roundCoord(pos.lat)]
-            const base = stableBaseRouteRef.current
-            if (base.length === 0) return
-
-            const { routeCoords, snappedPoint } = computeLiveSnappedRoute(base, pt, false)
-            lastSnappedStartRef.current = snappedPoint
-            updateRouteLineSource(routeCoords)
-
-            if (dragDebounceTimerRef.current) {
-              clearTimeout(dragDebounceTimerRef.current)
-            }
-            dragDebounceTimerRef.current = setTimeout(() => {
-              const targetEnd: [number, number] = endMarkerRef.current
-                ? [
-                    roundCoord(endMarkerRef.current.getLngLat().lng),
-                    roundCoord(endMarkerRef.current.getLngLat().lat),
-                  ]
-                : validEnd
-              requestRoadRouteRef.current(pt, targetEnd)
-            }, 350)
-          })
-
-          startMarker.on('dragend', () => {
-            isDraggingRef.current = false
-            if (dragDebounceTimerRef.current) {
-              clearTimeout(dragDebounceTimerRef.current)
-            }
-            startEl.style.cursor = 'move'
-            const badge = startEl.querySelector('.pin-badge') as HTMLElement | null
-            if (badge) {
-              badge.style.transform = 'translateY(-2px) scale(1)'
-              badge.style.filter = 'none'
-            }
-            const pos = startMarker.getLngLat()
-            const pt: [number, number] = [roundCoord(pos.lng), roundCoord(pos.lat)]
-            const finalPt = lastSnappedStartRef.current || pt
-
-            // Snap marker itself onto the road centerline
-            startMarker.setLngLat(finalPt)
-            onStartCoordChangeRef.current?.(finalPt)
-            onRouteCoordsChangeRef.current?.(currentCoordsRef.current)
-
-            const targetEnd: [number, number] = endMarkerRef.current
-              ? [
-                  roundCoord(endMarkerRef.current.getLngLat().lng),
-                  roundCoord(endMarkerRef.current.getLngLat().lat),
-                ]
-              : validEnd
-
-            requestRoadRouteRef.current(finalPt, targetEnd)
-          })
+        if (dedupedCoords.length > 1 && isValidCoord(dedupedCoords[dedupedCoords.length - 1])) {
+          ensureEndMarker(dedupedCoords[dedupedCoords.length - 1])
+        } else if (hasEndCoord) {
+          ensureEndMarker(endCoord!)
         }
       }
 
-      if (isValidCoord(validEnd)) {
-        const endEl = createTerminalPinElement(false, 'CUỐI TUYẾN')
-        const endMarker = new maplibregl.Marker({
-          element: endEl,
-          anchor: 'bottom',
-          draggable: editable,
-        })
-          .setLngLat(validEnd)
-          .addTo(map)
-
-        endMarkerRef.current = endMarker
-
-        if (editable) {
-          endMarker.on('dragstart', () => {
-            isDraggingRef.current = true
-            stableBaseRouteRef.current = [...currentCoordsRef.current]
-            endEl.style.cursor = 'move'
-            const badge = endEl.querySelector('.pin-badge') as HTMLElement | null
-            if (badge) {
-              badge.style.transform = 'translateY(-4px) scale(1.08)'
-            }
-          })
-
-          endMarker.on('drag', () => {
-            const pos = endMarker.getLngLat()
-            const pt: [number, number] = [roundCoord(pos.lng), roundCoord(pos.lat)]
-            const base = stableBaseRouteRef.current
-            if (base.length === 0) return
-
-            const { routeCoords, snappedPoint } = computeLiveSnappedRoute(base, pt, true)
-            lastSnappedEndRef.current = snappedPoint
-            updateRouteLineSource(routeCoords)
-
-            if (dragDebounceTimerRef.current) {
-              clearTimeout(dragDebounceTimerRef.current)
-            }
-            dragDebounceTimerRef.current = setTimeout(() => {
-              const targetStart: [number, number] = startMarkerRef.current
-                ? [
-                    roundCoord(startMarkerRef.current.getLngLat().lng),
-                    roundCoord(startMarkerRef.current.getLngLat().lat),
-                  ]
-                : validStart
-              requestRoadRouteRef.current(targetStart, pt)
-            }, 350)
-          })
-
-          endMarker.on('dragend', () => {
-            isDraggingRef.current = false
-            if (dragDebounceTimerRef.current) {
-              clearTimeout(dragDebounceTimerRef.current)
-            }
-            endEl.style.cursor = 'move'
-            const badge = endEl.querySelector('.pin-badge') as HTMLElement | null
-            if (badge) {
-              badge.style.transform = 'translateY(-2px) scale(1)'
-              badge.style.filter = 'none'
-            }
-            const pos = endMarker.getLngLat()
-            const pt: [number, number] = [roundCoord(pos.lng), roundCoord(pos.lat)]
-            const finalPt = lastSnappedEndRef.current || pt
-
-            // Snap marker itself onto the road centerline
-            endMarker.setLngLat(finalPt)
-            onEndCoordChangeRef.current?.(finalPt)
-            onRouteCoordsChangeRef.current?.(currentCoordsRef.current)
-
-            const targetStart: [number, number] = startMarkerRef.current
-              ? [
-                  roundCoord(startMarkerRef.current.getLngLat().lng),
-                  roundCoord(startMarkerRef.current.getLngLat().lat),
-                ]
-              : validStart
-
-            requestRoadRouteRef.current(targetStart, finalPt)
-          })
-        }
-      }
-
-      // Map click handler for Click-to-pick mode
+      // Map click handler for interactive drawing / appending / prepending
       if (editable) {
+        const handleLineClick = (e: maplibregl.MapMouseEvent) => {
+          if (isDraggingRef.current) return
+          const current = [...currentCoordsRef.current]
+          if (current.length < 2) return
+
+          const clickPt: [number, number] = [roundCoord(e.lngLat.lng), roundCoord(e.lngLat.lat)]
+
+          // Find closest segment to insert vertex
+          let bestIdx = 0
+          let bestDist = Infinity
+          let bestPoint: [number, number] = clickPt
+
+          for (let i = 0; i < current.length - 1; i++) {
+            const segA = current[i]
+            const segB = current[i + 1]
+            const proj = projectPointOnSegment(clickPt, segA, segB)
+            if (proj.dist < bestDist) {
+              bestDist = proj.dist
+              bestIdx = i
+              bestPoint = proj.point
+            }
+          }
+
+          // Snapshot before editing
+          const curStartPt = startMarkerRef.current
+            ? ([roundCoord(startMarkerRef.current.getLngLat().lng), roundCoord(startMarkerRef.current.getLngLat().lat)] as [number, number])
+            : current[0]
+          const curEndPt = endMarkerRef.current
+            ? ([roundCoord(endMarkerRef.current.getLngLat().lng), roundCoord(endMarkerRef.current.getLngLat().lat)] as [number, number])
+            : current[current.length - 1]
+
+          setHistory((prev) => [
+            ...prev,
+            {
+              coords: [...current],
+              start: curStartPt,
+              end: curEndPt,
+            },
+          ])
+
+          const updated: [number, number][] = [
+            ...current.slice(0, bestIdx + 1),
+            bestPoint,
+            ...current.slice(bestIdx + 1),
+          ]
+
+          updateRouteLineSource(updated, true)
+          onRouteCoordsChangeRef.current?.(updated)
+        }
+
+        map.on('mouseenter', 'route-line-core', () => {
+          map.getCanvas().style.cursor = 'pointer'
+        })
+        map.on('mouseleave', 'route-line-core', () => {
+          map.getCanvas().style.cursor = ''
+        })
+        map.on('click', 'route-line-core', handleLineClick)
+        map.on('click', 'route-line-glow', handleLineClick)
         map.on('click', (e: maplibregl.MapMouseEvent) => {
-          const currentPick = pickModeRef.current
-          if (currentPick === 'none') return
+          if (isDraggingRef.current) return
+          const mode = editModeRef.current
+          if (mode === 'view') return
 
-          const newPt: [number, number] = [roundCoord(e.lngLat.lng), roundCoord(e.lngLat.lat)]
+          const clickPt: [number, number] = [roundCoord(e.lngLat.lng), roundCoord(e.lngLat.lat)]
+          const current = [...currentCoordsRef.current]
 
-          if (currentPick === 'start') {
-            const base = currentCoordsRef.current
-            const { routeCoords, snappedPoint } = computeLiveSnappedRoute(base, newPt, false)
-            startMarkerRef.current?.setLngLat(snappedPoint)
-            onStartCoordChangeRef.current?.(snappedPoint)
-            updateRouteLineSource(routeCoords)
-            onRouteCoordsChangeRef.current?.(routeCoords)
+          // Snapshot before editing
+          const curStartPt = startMarkerRef.current
+            ? ([roundCoord(startMarkerRef.current.getLngLat().lng), roundCoord(startMarkerRef.current.getLngLat().lat)] as [number, number])
+            : current[0] || clickPt
+          const curEndPt = endMarkerRef.current
+            ? ([roundCoord(endMarkerRef.current.getLngLat().lng), roundCoord(endMarkerRef.current.getLngLat().lat)] as [number, number])
+            : current[current.length - 1] || clickPt
 
-            const targetEnd: [number, number] = endMarkerRef.current
-              ? [
-                  roundCoord(endMarkerRef.current.getLngLat().lng),
-                  roundCoord(endMarkerRef.current.getLngLat().lat),
-                ]
-              : validEnd
-            requestRoadRouteRef.current(snappedPoint, targetEnd)
-            setPickMode('none')
-          } else if (currentPick === 'end') {
-            const base = currentCoordsRef.current
-            const { routeCoords, snappedPoint } = computeLiveSnappedRoute(base, newPt, true)
-            endMarkerRef.current?.setLngLat(snappedPoint)
-            onEndCoordChangeRef.current?.(snappedPoint)
-            updateRouteLineSource(routeCoords)
-            onRouteCoordsChangeRef.current?.(routeCoords)
+          setHistory((prev) => [
+            ...prev,
+            {
+              coords: [...current],
+              start: curStartPt,
+              end: curEndPt,
+            },
+          ])
 
-            const targetStart: [number, number] = startMarkerRef.current
-              ? [
-                  roundCoord(startMarkerRef.current.getLngLat().lng),
-                  roundCoord(startMarkerRef.current.getLngLat().lat),
-                ]
-              : validStart
-            requestRoadRouteRef.current(targetStart, snappedPoint)
-            setPickMode('none')
+          if (hideTerminalPins) {
+            // Compact Mode: Always append or prepend directly as vertex
+            let updated: [number, number][]
+            if (mode === 'prepend') {
+              updated = [clickPt, ...current]
+            } else {
+              updated = [...current, clickPt]
+            }
+            updateRouteLineSource(updated, true)
+            if (updated.length === 1) {
+              onStartCoordChangeRef.current?.(clickPt)
+            } else {
+              onEndCoordChangeRef.current?.(clickPt)
+            }
+            onRouteCoordsChangeRef.current?.(updated)
+            return
+          }
+
+          // Case 1: First point ever clicked (sets Start Pin)
+          if (current.length === 0) {
+            const updated = [clickPt]
+            ensureStartMarker(clickPt)
+            updateRouteLineSource(updated)
+            onStartCoordChangeRef.current?.(clickPt)
+            onRouteCoordsChangeRef.current?.(updated)
+            return
+          }
+
+          // Case 2: Second point clicked (sets End Pin, connects straight line)
+          if (current.length === 1) {
+            if (mode === 'prepend') {
+              const updated = [clickPt, current[0]]
+              ensureStartMarker(clickPt)
+              ensureEndMarker(current[0])
+              updateRouteLineSource(updated)
+              onStartCoordChangeRef.current?.(clickPt)
+              onEndCoordChangeRef.current?.(current[0])
+              onRouteCoordsChangeRef.current?.(updated)
+            } else {
+              const updated = [current[0], clickPt]
+              ensureEndMarker(clickPt)
+              updateRouteLineSource(updated)
+              onEndCoordChangeRef.current?.(clickPt)
+              onRouteCoordsChangeRef.current?.(updated)
+            }
+            return
+          }
+
+          // Case 3: Third+ points clicked
+          if (mode === 'prepend') {
+            const updated = [clickPt, ...current]
+            ensureStartMarker(clickPt)
+            updateRouteLineSource(updated)
+            onStartCoordChangeRef.current?.(clickPt)
+            onRouteCoordsChangeRef.current?.(updated)
+          } else {
+            // append
+            const updated = [...current, clickPt]
+            ensureEndMarker(clickPt)
+            updateRouteLineSource(updated)
+            onEndCoordChangeRef.current?.(clickPt)
+            onRouteCoordsChangeRef.current?.(updated)
           }
         })
       }
 
-      // Fit bounds nicely
+      // Fit bounds nicely if coords exist
       const b = getBounds()
       if (b) {
         map.fitBounds(b, { padding: 40, duration: 400, maxZoom: 17 })
       }
+
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.resize()
+        }
+      }, 200)
     })
 
     // Resize handling for modal transition
@@ -646,67 +1079,88 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     return () => {
       clearTimeout(resizeTimer)
       resizeObserver.disconnect()
-      if (dragDebounceTimerRef.current) {
-        clearTimeout(dragDebounceTimerRef.current)
-      }
-      abortControllerRef.current?.abort()
       startMarkerRef.current?.remove()
       endMarkerRef.current?.remove()
       startMarkerRef.current = null
       endMarkerRef.current = null
+      vertexMarkersRef.current.forEach((m) => m.remove())
+      vertexMarkersRef.current = []
       map.remove()
       mapRef.current = null
     }
-  }, [editable, createTerminalPinElement, updateRouteLineSource])
+  }, [
+    editable,
+    hideTerminalPins,
+    createTerminalPinElement,
+    updateRouteLineSource,
+    ensureStartMarker,
+    ensureEndMarker,
+    syncVertexMarkers,
+  ])
 
-  // Sync cursor when pickMode changes
+  // Sync cursor when editMode changes
   useEffect(() => {
     if (!mapRef.current) return
     const canvas = mapRef.current.getCanvas()
-    if (pickMode === 'start' || pickMode === 'end') {
+    if (editMode === 'append' || editMode === 'prepend') {
       canvas.style.cursor = 'crosshair'
     } else {
       canvas.style.cursor = ''
     }
-  }, [pickMode])
+  }, [editMode])
 
-  // Sync external startCoord changes (e.g. typing in input fields)
+  // Sync external startCoord changes
   useEffect(() => {
+    if (hideTerminalPins) return
     if (isDraggingRef.current || !startCoord || !isValidCoord(startCoord)) return
-    if (!mapRef.current || !startMarkerRef.current) return
+    if (!mapRef.current) return
 
-    const currentPos = startMarkerRef.current.getLngLat()
-    const diffLng = Math.abs(currentPos.lng - startCoord[0])
-    const diffLat = Math.abs(currentPos.lat - startCoord[1])
-
-    if (diffLng > 0.00001 || diffLat > 0.00001) {
-      startMarkerRef.current.setLngLat(startCoord)
+    if (startMarkerRef.current) {
+      const currentPos = startMarkerRef.current.getLngLat()
+      const diffLng = Math.abs(currentPos.lng - startCoord[0])
+      const diffLat = Math.abs(currentPos.lat - startCoord[1])
+      if (diffLng > 0.00001 || diffLat > 0.00001) {
+        startMarkerRef.current.setLngLat(startCoord)
+      }
+    } else {
+      ensureStartMarker(startCoord)
     }
-  }, [startCoord])
+  }, [startCoord, hideTerminalPins, ensureStartMarker])
 
-  // Sync external endCoord changes (e.g. typing in input fields)
+  // Sync external endCoord changes
   useEffect(() => {
+    if (hideTerminalPins) return
     if (isDraggingRef.current || !endCoord || !isValidCoord(endCoord)) return
-    if (!mapRef.current || !endMarkerRef.current) return
+    if (!mapRef.current) return
 
-    const currentPos = endMarkerRef.current.getLngLat()
-    const diffLng = Math.abs(currentPos.lng - endCoord[0])
-    const diffLat = Math.abs(currentPos.lat - endCoord[1])
-
-    if (diffLng > 0.00001 || diffLat > 0.00001) {
-      endMarkerRef.current.setLngLat(endCoord)
+    if (endMarkerRef.current) {
+      const currentPos = endMarkerRef.current.getLngLat()
+      const diffLng = Math.abs(currentPos.lng - endCoord[0])
+      const diffLat = Math.abs(currentPos.lat - endCoord[1])
+      if (diffLng > 0.00001 || diffLat > 0.00001) {
+        endMarkerRef.current.setLngLat(endCoord)
+      }
+    } else {
+      ensureEndMarker(endCoord)
     }
-  }, [endCoord])
+  }, [endCoord, hideTerminalPins, ensureEndMarker])
 
-  // Sync external coordinates changes (e.g. when reset or updated from outside)
+  // Sync external coordinates changes
   useEffect(() => {
     if (isDraggingRef.current) return
-    if (!coordinates || coordinates.length === 0) return
+    if (!coordinates) return
     if (coordinates === currentCoordsRef.current) return
 
-    updateRouteLineSource(coordinates)
-    stableBaseRouteRef.current = [...coordinates]
-  }, [coordinates, updateRouteLineSource])
+    updateRouteLineSource(coordinates, true)
+    if (!hideTerminalPins) {
+      if (coordinates.length > 0 && isValidCoord(coordinates[0])) {
+        ensureStartMarker(coordinates[0])
+      }
+      if (coordinates.length > 1 && isValidCoord(coordinates[coordinates.length - 1])) {
+        ensureEndMarker(coordinates[coordinates.length - 1])
+      }
+    }
+  }, [coordinates, hideTerminalPins, updateRouteLineSource, ensureStartMarker, ensureEndMarker])
 
   // Controls Handlers
   const handleZoomIn = () => mapRef.current?.zoomIn({ duration: 250 })
@@ -718,40 +1172,96 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     }
   }
 
-  // Reset to original coordinates and route
+  // Safe Undo Handler - Only undo user-added modifications in this session, never eating into DB original points
+  const handleUndo = () => {
+    if (history.length === 0) return
+
+    const previousSnapshot = history[history.length - 1]
+    setHistory((prev) => prev.slice(0, -1))
+
+    updateRouteLineSource(previousSnapshot.coords, true)
+
+    if (hideTerminalPins) {
+      onRouteCoordsChangeRef.current?.(previousSnapshot.coords)
+      return
+    }
+
+    if (previousSnapshot.coords.length === 0) {
+      startMarkerRef.current?.remove()
+      startMarkerRef.current = null
+      endMarkerRef.current?.remove()
+      endMarkerRef.current = null
+      onRouteCoordsChangeRef.current?.([])
+      return
+    }
+
+    if (previousSnapshot.coords.length === 1) {
+      ensureStartMarker(previousSnapshot.coords[0])
+      endMarkerRef.current?.remove()
+      endMarkerRef.current = null
+      onStartCoordChangeRef.current?.(previousSnapshot.coords[0])
+      onRouteCoordsChangeRef.current?.(previousSnapshot.coords)
+      return
+    }
+
+    if (previousSnapshot.start && isValidCoord(previousSnapshot.start)) {
+      ensureStartMarker(previousSnapshot.start)
+      onStartCoordChangeRef.current?.(previousSnapshot.start)
+    }
+    if (previousSnapshot.end && isValidCoord(previousSnapshot.end)) {
+      ensureEndMarker(previousSnapshot.end)
+      onEndCoordChangeRef.current?.(previousSnapshot.end)
+    }
+
+    onRouteCoordsChangeRef.current?.(previousSnapshot.coords)
+  }
+
+  // Reset to original DB baseline or clear completely for new segments
   const handleReset = () => {
-    if (!originalStartCoord || !originalEndCoord) return
-
-    // Cancel any pending live-routing debounce or active fetch
-    if (dragDebounceTimerRef.current) {
-      clearTimeout(dragDebounceTimerRef.current)
+    // If it's a new segment without pre-existing DB route
+    if (initialDbRouteRef.current.length === 0) {
+      startMarkerRef.current?.remove()
+      startMarkerRef.current = null
+      endMarkerRef.current?.remove()
+      endMarkerRef.current = null
+      vertexMarkersRef.current.forEach((m) => m.remove())
+      vertexMarkersRef.current = []
+      updateRouteLineSource([], false)
+      setHistory([])
+      onRouteCoordsChangeRef.current?.([])
+      setEditMode(defaultEditMode || 'append')
+      return
     }
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
-
-    if (startMarkerRef.current && isValidCoord(originalStartCoord)) {
-      startMarkerRef.current.setLngLat(originalStartCoord)
-    }
-    if (endMarkerRef.current && isValidCoord(originalEndCoord)) {
-      endMarkerRef.current.setLngLat(originalEndCoord)
-    }
-
-    lastSnappedStartRef.current = originalStartCoord
-    lastSnappedEndRef.current = originalEndCoord
 
     const targetRoute =
-      originalRouteCoords && originalRouteCoords.length > 0
+      initialDbRouteRef.current.length > 0
+        ? initialDbRouteRef.current
+        : originalRouteCoords && originalRouteCoords.length > 0
         ? originalRouteCoords
-        : [originalStartCoord, originalEndCoord]
+        : originalStartCoord && originalEndCoord
+        ? [originalStartCoord, originalEndCoord]
+        : []
 
-    stableBaseRouteRef.current = [...targetRoute]
-    updateRouteLineSource(targetRoute)
+    const targetStart =
+      initialDbStartRef.current || (originalStartCoord && isValidCoord(originalStartCoord) ? originalStartCoord : targetRoute[0])
+    const targetEnd =
+      initialDbEndRef.current || (originalEndCoord && isValidCoord(originalEndCoord) ? originalEndCoord : targetRoute[targetRoute.length - 1])
+
+    if (!hideTerminalPins) {
+      if (targetStart && isValidCoord(targetStart)) {
+        ensureStartMarker(targetStart)
+        onStartCoordChangeRef.current?.(targetStart)
+      }
+      if (targetEnd && isValidCoord(targetEnd)) {
+        ensureEndMarker(targetEnd)
+        onEndCoordChangeRef.current?.(targetEnd)
+      }
+    }
+
+    updateRouteLineSource(targetRoute, true)
     onRouteCoordsChangeRef.current?.(targetRoute)
-
-    onStartCoordChangeRef.current?.(originalStartCoord)
-    onEndCoordChangeRef.current?.(originalEndCoord)
-    setPickMode('none')
+    setHistory([])
+    setEditMode('view')
 
     const bounds = getBounds(targetRoute)
     if (mapRef.current && bounds) {
@@ -759,47 +1269,110 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     }
   }
 
+  const isAddMode = hideTerminalPins || initialDbRouteRef.current.length === 0
+
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner group">
+    <div className="relative w-full h-full min-h-[480px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner group">
       <div
         ref={containerRef}
         style={{ height, width: '100%' }}
-        className="w-full bg-slate-900"
+        className="w-full h-full min-h-[480px] bg-slate-900"
       />
 
-      {/* Editable Pick Mode Selector (Top Left) */}
+      {/* Segment Geometry Editing Toolbar (Top Left) */}
       {editable && (
-        <div className="absolute top-2 left-2 z-10 flex items-center gap-1 bg-slate-900/80 backdrop-blur-md p-1 rounded-lg border border-slate-700/60 shadow-xs">
+        <div className="absolute top-2 left-2 z-10 flex flex-wrap items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/70 shadow-lg">
+          {/* Mode: Move / View (Kéo mốc) */}
           <button
             type="button"
-            onClick={() => setPickMode(pickMode === 'start' ? 'none' : 'start')}
-            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 transition cursor-pointer ${
-              pickMode === 'start'
-                ? 'bg-emerald-500 text-white shadow-xs'
-                : 'text-emerald-400 hover:bg-slate-800'
+            onClick={() => setEditMode('view')}
+            className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer ${
+              editMode === 'view'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-300 hover:bg-slate-800'
             }`}
-            title="Click vào bản đồ để chọn lại vị trí Điểm đầu"
+            title="Chế độ kéo mốc điểm đầu và điểm cuối hoặc các đỉnh"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span>{pickMode === 'start' ? 'Click Đặt Điểm Đầu...' : 'Chấm Điểm Đầu'}</span>
+            <MousePointer className="w-3 h-3" />
+            <span>Kéo mốc</span>
           </button>
+
+          {isAddMode ? (
+            /* Chế độ Thêm Mới: Ẩn Nối đầu, chỉ hiển thị Vẽ tuyến */
+            <button
+              type="button"
+              onClick={() => setEditMode(editMode === 'append' ? 'view' : 'append')}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                editMode === 'append'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-300 hover:bg-slate-800'
+              }`}
+              title="Click trên bản đồ để vẽ nối tiếp các điểm lộ trình"
+            >
+              <PlusCircle className="w-3 h-3" />
+              <span>{editMode === 'append' ? 'Đang vẽ tuyến...' : 'Vẽ tuyến'}</span>
+            </button>
+          ) : (
+            /* Chế độ Sửa Tuyến: Giữ nguyên Nối đầu & Nối cuối */
+            <>
+              {/* Mode: Prepend Points (🟢 Nối Đầu) */}
+              <button
+                type="button"
+                onClick={() => setEditMode(editMode === 'prepend' ? 'view' : 'prepend')}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                  editMode === 'prepend'
+                    ? 'bg-emerald-600 text-white shadow-xs animate-pulse'
+                    : 'text-emerald-400 hover:bg-slate-800'
+                }`}
+                title="Click vào bản đồ để nối thêm mốc vào ĐẦU TUYẾN"
+              >
+                <PlusCircle className="w-3 h-3" />
+                <span>{editMode === 'prepend' ? 'Đang nối đầu...' : 'Nối đầu'}</span>
+              </button>
+
+              {/* Mode: Append Points (🔴 Nối Cuối) */}
+              <button
+                type="button"
+                onClick={() => setEditMode(editMode === 'append' ? 'view' : 'append')}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                  editMode === 'append'
+                    ? 'bg-rose-600 text-white shadow-xs animate-pulse'
+                    : 'text-rose-400 hover:bg-slate-800'
+                }`}
+                title="Click vào bản đồ để nối thêm mốc vào CUỐI TUYẾN"
+              >
+                <PlusCircle className="w-3 h-3" />
+                <span>{editMode === 'append' ? 'Đang vẽ/nối...' : 'Vẽ/Nối cuối'}</span>
+              </button>
+            </>
+          )}
+
+          {/* Safe Undo Button */}
           <button
             type="button"
-            onClick={() => setPickMode(pickMode === 'end' ? 'none' : 'end')}
-            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 transition cursor-pointer ${
-              pickMode === 'end'
-                ? 'bg-rose-500 text-white shadow-xs'
-                : 'text-rose-400 hover:bg-slate-800'
-            }`}
-            title="Click vào bản đồ để chọn lại vị trí Điểm cuối"
+            onClick={handleUndo}
+            disabled={history.length === 0}
+            className="px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 text-slate-300 hover:bg-slate-800 disabled:opacity-35 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Hoàn tác điểm vừa thêm hoặc kéo chỉnh sửa trong phiên (an toàn, không xóa lẹm vào DB gốc)"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-            <span>{pickMode === 'end' ? 'Click Đặt Điểm Cuối...' : 'Chấm Điểm Cuối'}</span>
+            <Undo2 className="w-3 h-3" />
+            <span>Hoàn tác{history.length > 0 ? ` (${history.length})` : ''}</span>
+          </button>
+
+          {/* Reset / Clear Button */}
+          <button
+            type="button"
+            onClick={handleReset}
+            className="px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 text-slate-300 hover:text-amber-400 hover:bg-slate-800 transition cursor-pointer"
+            title={isAddMode ? 'Xóa toàn bộ các điểm vừa vẽ để chấm lại từ đầu' : 'Khôi phục lại đúng lộ trình gốc ban đầu từ DB'}
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>{isAddMode ? 'Xóa vẽ lại' : 'Gốc'}</span>
           </button>
         </div>
       )}
 
-      {/* Floating Control Buttons (Top Right) */}
+      {/* Floating Zoom & Fit Bounds Controls (Top Right) */}
       <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
         <button
           type="button"
@@ -825,18 +1398,9 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
-        {editable && originalStartCoord && originalEndCoord && (
-          <button
-            type="button"
-            onClick={handleReset}
-            title="Khôi phục lại tuyến đường ban đầu"
-            className="w-7 h-7 bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-amber-600 dark:text-amber-400 backdrop-blur-md rounded-lg shadow-md border border-slate-200/80 dark:border-slate-600/80 flex items-center justify-center transition cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
-        )}
       </div>
     </div>
   )
 }
+
 export default SegmentRouteMap
