@@ -7,13 +7,13 @@ import {
   Info,
   Radio,
   Wrench,
-  Clock,
   Maximize2,
-  History,
   ChevronDown,
   ChevronUp,
   Power,
   MapPin,
+  ShieldCheck,
+  CameraOff,
 } from 'lucide-react'
 
 import type { SegmentInfo, PoleFeature } from '../GisMapPage'
@@ -22,6 +22,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../../../redux/store'
 import { fetchPoleDetailRequest, clearPoleDetail } from '../../../feature/map/mapSlice'
 import { StatusBadge } from '../../../components/StatusBadge'
+import type { FaultType, Severity, FaultStatus } from '../../../types/common/enums'
+import type { PoleMapOpenFault } from '../../../types/map/poles'
 
 export interface GisDrawerPanelProps {
   selectedPole: PoleFeature | null
@@ -36,16 +38,40 @@ export interface GisDrawerPanelProps {
   effectivePoles?: PoleFeature[]
 }
 
-interface IncidentRecord {
-  id: string
-  title: string
-  time: string
-  status: 'repairing' | 'resolved'
-  technician: string
-  workOrderId: string
-  description: string
-  beforePhoto: { url: string; label: string }
-  afterPhoto?: { url: string; label: string }
+const FAULT_TYPE_LABELS: Record<FaultType, string> = {
+  lamp_out: 'Đèn tắt hoàn toàn',
+  lamp_dim: 'Đèn mờ / Sụt quang thông',
+  segment_outage: 'Mất điện toàn tuyến',
+  node_offline: 'Cảm biến IoT mất tín hiệu',
+  runtime_decline: 'Suy giảm thời gian chiếu sáng',
+}
+
+const SEVERITY_BADGES: Record<Severity, { label: string; className: string }> = {
+  critical: {
+    label: 'Khẩn cấp',
+    className: 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+  },
+  high: {
+    label: 'Cao',
+    className: 'bg-orange-100 text-orange-800 dark:bg-orange-950/80 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+  },
+  medium: {
+    label: 'Trung bình',
+    className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  },
+  low: {
+    label: 'Thấp',
+    className: 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+  },
+}
+
+const FAULT_STATUS_LABELS: Record<FaultStatus, string> = {
+  detected: 'Mới phát hiện',
+  confirmed: 'Đã xác nhận',
+  in_progress: 'Đang sửa chữa',
+  resolved: 'Đã khắc phục',
+  verified: 'Đã nghiệm thu',
+  rejected: 'Đã từ chối',
 }
 
 export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
@@ -79,7 +105,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
   const isUnderRepair =
     effectiveFixtureStatus === 'dim' ||
-    poleId === 'POLE-0083' ||
     (openFaultCount > 0 && effectiveFixtureStatus !== 'out')
   const isFaulted = effectiveFixtureStatus === 'out'
   const isUnknown = effectiveFixtureStatus === 'unknown'
@@ -115,10 +140,14 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     return null
   }, [poleDetail])
 
+  // Real open faults from poleDetail
+  const openFaults = poleDetail?.open_faults || []
+
   // Accordion state: auto-open if pole has issue, otherwise collapsed
   const hasIssue =
     selectedPole?.properties?.fixture_status === 'out' ||
     selectedPole?.properties?.fixture_status === 'dim' ||
+    openFaults.length > 0 ||
     (selectedPole?.properties?.open_fault_count || 0) > 0
 
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(hasIssue)
@@ -128,54 +157,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     setIsHistoryOpen(hasIssue)
   }, [selectedPole?.properties?.pole_id, hasIssue])
 
-  // Load More state (default showing 2 recent incidents)
-  const [visibleCount, setVisibleCount] = useState<number>(2)
-
-  // Incident history list with multiple records to demonstrate load more
-  const incidentHistory: IncidentRecord[] = [
-    {
-      id: `INC-2026-${poleId ? poleId.replace('POLE-', '') : '0083'}-01`,
-      title: isUnderRepair ? 'Cháy chấn lưu LED 60W & chập nguồn nhánh' : 'Đứt bóng LED 60W sau mưa dông',
-      time: '24/08/2026 19:45',
-      status: isUnderRepair ? 'repairing' : 'resolved',
-      technician: 'Nguyễn Văn Hùng (Tổ 2 Củ Chi)',
-      workOrderId: 'WO-2026-0824',
-      description: isUnderRepair
-        ? 'Đang thay thế cụm module LED 60W và kiểm tra aptomat nhánh.'
-        : 'Đã thay mới module LED Philips 60W, đo sáng đạt chuẩn.',
-      beforePhoto: {
-        url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=900&auto=format&fit=crop&q=80',
-        label: 'Trước sửa chữa (Lúc hỏng)',
-      },
-      afterPhoto: isUnderRepair
-        ? undefined
-        : {
-            url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=900&auto=format&fit=crop&q=80',
-            label: 'Nghiệm thu sau sửa chữa',
-          },
-    },
-    {
-      id: `INC-2025-${poleId ? poleId.replace('POLE-', '') : '0083'}-02`,
-      title: 'Đèn mờ sụt quang thông (Dimming < 80% Baseline)',
-      time: '12/10/2025 18:30',
-      status: 'resolved',
-      technician: 'Lê Quốc Bảo (Tổ 1)',
-      workOrderId: 'WO-2025-1012',
-      description: 'Quang thông suy giảm do bụi bám dày chao quang học. Đã vệ sinh và thay tụ nguồn.',
-      beforePhoto: {
-        url: 'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=900&auto=format&fit=crop&q=80',
-        label: 'Chao quang học bị bám bụi',
-      },
-      afterPhoto: {
-        url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=900&auto=format&fit=crop&q=80',
-        label: 'Nghiệm thu sau vệ sinh',
-      },
-    },
-  ]
-
-  const polePhotoUrl =
-    poleDetail?.recent_frames?.[0]?.thumbnail_url ||
-    'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=900&auto=format&fit=crop&q=80'
+  const polePhotoUrl = poleDetail?.recent_frames?.[0]?.thumbnail_url || null
 
   // Dàn đèn do tủ phụ trách được xác định qua topology edges từ Redux Store
   const { cabinetTopologyEdges } = useSelector((state: RootState) => state.map)
@@ -339,29 +321,36 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               )}
 
               {/* 1. Actual Pole Photo */}
-                  <div
-                    onClick={() =>
-                      setLightboxImage({
-                        url: polePhotoUrl,
-                        title: `Ảnh hiện trường: ${selectedPole.properties.pole_id}`,
-                      })
-                    }
-                    className="relative h-44 rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs"
-                  >
-                    <img
-                      src={polePhotoUrl}
-                      alt={selectedPole.properties.pole_id}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                    />
-                    <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent flex items-end justify-between p-2.5 text-white">
-                      <span className="text-[11px] font-medium drop-shadow-sm font-mono">
-                        {selectedPole.properties.pole_id}
-                      </span>
-                      <div className="p-1 rounded bg-black/40 group-hover:bg-blue-600 text-white transition">
-                        <Maximize2 className="w-3.5 h-3.5" />
-                      </div>
+              {polePhotoUrl ? (
+                <div
+                  onClick={() =>
+                    setLightboxImage({
+                      url: polePhotoUrl,
+                      title: `Ảnh hiện trường: ${selectedPole.properties.pole_id}`,
+                    })
+                  }
+                  className="relative h-44 rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs"
+                >
+                  <img
+                    src={polePhotoUrl}
+                    alt={selectedPole.properties.pole_id}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent flex items-end justify-between p-2.5 text-white">
+                    <span className="text-[11px] font-medium drop-shadow-sm font-mono">
+                      {selectedPole.properties.pole_id}
+                    </span>
+                    <div className="p-1 rounded bg-black/40 group-hover:bg-blue-600 text-white transition">
+                      <Maximize2 className="w-3.5 h-3.5" />
                     </div>
                   </div>
+                </div>
+              ) : (
+                <div className="h-28 rounded-xl border border-dashed border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/40 flex flex-col items-center justify-center p-3 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  <CameraOff className="w-6 h-6 mb-1 text-slate-300 dark:text-slate-600" />
+                  <span>Chưa có ảnh khảo sát thực địa</span>
+                </div>
+              )}
 
                   {/* 2. Technical Specs Card (Core Asset Identity) */}
                   <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
@@ -477,7 +466,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/50">
                           <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Thời gian phát sáng</span>
                           <strong className="text-slate-900 dark:text-white font-mono text-xs">
-                            {selectedPole.properties.pole_id === 'POLE-0047' ? '6.65 h/đêm' : '10.5 h/đêm'}
+                            {poleDetail?.runtime_history?.[0]?.runtime_hours !== undefined
+                              ? `${poleDetail.runtime_history[0].runtime_hours} h/đêm`
+                              : '—'}
                           </strong>
                         </div>
                       </div>
@@ -495,35 +486,38 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     </div>
 
                     <div className="space-y-1 pt-0.5">
-                      {(poleDetail?.luminance_history && poleDetail.luminance_history.length > 0
-                        ? poleDetail.luminance_history.slice(0, 3)
-                        : [
-                            { observed_at: new Date().toISOString(), baseline_ratio: 0.98, classified_as: 'normal' },
-                            { observed_at: new Date(Date.now() - 86400000).toISOString(), baseline_ratio: 0.95, classified_as: 'normal' },
-                            { observed_at: new Date(Date.now() - 172800000).toISOString(), baseline_ratio: 0.92, classified_as: 'normal' },
-                          ]
-                      ).map((item: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800 text-[11px]"
-                        >
-                          <span className="font-mono text-slate-600 dark:text-slate-400">{item.observed_at ? item.observed_at.split('T')[0] : 'Gần đây'}</span>
-                          <span className="font-bold text-slate-900 dark:text-white">{Math.round((item.baseline_ratio || 1) * 100)}%</span>
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
-                              item.classified_as === 'normal'
-                                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                                : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                            }`}
+                      {poleDetail?.luminance_history && poleDetail.luminance_history.length > 0 ? (
+                        poleDetail.luminance_history.slice(0, 3).map((item: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800 text-[11px]"
                           >
-                            {item.classified_as === 'normal' ? 'Sáng' : 'Mờ'}
-                          </span>
+                            <span className="font-mono text-slate-600 dark:text-slate-400">
+                              {item.observed_at ? item.observed_at.split('T')[0] : 'Gần đây'}
+                            </span>
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {Math.round((item.baseline_ratio || 1) * 100)}%
+                            </span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
+                                item.classified_as === 'normal'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                                  : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                              }`}
+                            >
+                              {item.classified_as === 'normal' ? 'Sáng' : 'Mờ'}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-2.5 text-center text-slate-400 dark:text-slate-500 text-[11px]">
+                          Chưa có dữ liệu đo quang thông từ các đợt quét gần nhất
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
 
-                  {/* 4. Collapsible Maintenance & Incident History (Accordion at the bottom) */}
+                  {/* 4. Collapsible Active Faults & Issues (Accordion at the bottom) */}
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden bg-white dark:bg-slate-800/50 shadow-2xs">
                     <button
                       type="button"
@@ -531,8 +525,21 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200 select-none"
                     >
                       <span className="flex items-center gap-1.5">
-                        <History className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                        <span>Lịch sử sự cố & bảo trì</span>
+                        {openFaults.length > 0 ? (
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                        ) : (
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        )}
+                        <span>Sự cố đang ghi nhận</span>
+                        {openFaults.length > 0 ? (
+                          <span className="ml-1.5 px-2 py-0.2 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
+                            {openFaults.length} sự cố
+                          </span>
+                        ) : (
+                          <span className="ml-1.5 px-2 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
+                            Bình thường
+                          </span>
+                        )}
                       </span>
                       {isHistoryOpen ? (
                         <ChevronUp className="w-4 h-4 text-slate-400 dark:text-slate-400" />
@@ -542,113 +549,65 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     </button>
 
                     {isHistoryOpen && (
-                      <div className="p-3 pt-2 space-y-3 border-t border-slate-100 dark:border-slate-700/60 bg-white dark:bg-slate-900/40">
-                        {incidentHistory.slice(0, visibleCount).map((inc) => (
-                          <div
-                            key={inc.id}
-                            className={`p-2.5 rounded-lg border space-y-2 ${
-                              inc.status === 'repairing'
-                                ? 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/50'
-                                : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700/60'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200">{inc.id}</span>
-                              <span
-                                className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
-                                  inc.status === 'repairing'
-                                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                                    : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                                }`}
-                              >
-                                {inc.status === 'repairing' ? 'Đang sửa' : 'Đã sửa'}
-                              </span>
-                            </div>
+                      <div className="p-3 pt-2 space-y-2.5 border-t border-slate-100 dark:border-slate-700/60 bg-white dark:bg-slate-900/40">
+                        {openFaults.length > 0 ? (
+                          openFaults.map((fault: PoleMapOpenFault, idx: number) => {
+                            const faultType = fault.fault_type
+                            const severity = fault.severity
+                            const faultStatus = fault.fault_status
+                            const sevConfig = severity ? SEVERITY_BADGES[severity] : null
 
-                            <div className="space-y-0.5 text-[11px] text-slate-700 dark:text-slate-300">
-                              <div className="flex justify-between">
-                                <span className="text-slate-500 dark:text-slate-400">Lỗi:</span>
-                                <strong className="text-slate-800 dark:text-slate-200 text-right">{inc.title}</strong>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-500 dark:text-slate-400">Thời gian:</span>
-                                <span className="font-mono text-slate-600 dark:text-slate-400 text-[10.5px]">{inc.time}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-500 dark:text-slate-400">Kỹ thuật:</span>
-                                <span className="text-slate-800 dark:text-slate-200 font-medium">{inc.technician}</span>
-                              </div>
-                            </div>
-
-                            {/* Before / After Photos */}
-                            <div className="grid grid-cols-2 gap-2 pt-0.5">
+                            return (
                               <div
-                                onClick={() =>
-                                  setLightboxImage({
-                                    url: inc.beforePhoto.url,
-                                    title: `${inc.id} - ${inc.beforePhoto.label}`,
-                                  })
-                                }
-                                className="relative h-20 rounded-lg overflow-hidden cursor-pointer group border border-slate-300 dark:border-slate-700 bg-slate-900"
+                                key={fault.fault_id || idx}
+                                className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-700/60 bg-slate-50/80 dark:bg-slate-800/60 space-y-1.5"
                               >
-                                <img
-                                  src={inc.beforePhoto.url}
-                                  alt="Lúc hỏng"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                />
-                                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-1 text-white">
-                                  <span className="text-[9px] font-semibold text-amber-200">Lúc hỏng</span>
-                                  <Maximize2 className="w-3 h-3 text-white/80" />
-                                </div>
-                              </div>
-
-                              {inc.afterPhoto ? (
-                                <div
-                                  onClick={() =>
-                                    setLightboxImage({
-                                      url: inc.afterPhoto!.url,
-                                      title: `${inc.id} - ${inc.afterPhoto!.label}`,
-                                    })
-                                  }
-                                  className="relative h-20 rounded-lg overflow-hidden cursor-pointer group border border-slate-300 dark:border-slate-700 bg-slate-900"
-                                >
-                                  <img
-                                    src={inc.afterPhoto.url}
-                                    alt="Nghiệm thu"
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                  />
-                                  <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-1 text-white">
-                                    <span className="text-[9px] font-semibold text-emerald-200">Nghiệm thu</span>
-                                    <Maximize2 className="w-3 h-3 text-white/80" />
+                                <div className="flex items-center justify-between">
+                                  <span className="font-mono text-[11px] font-bold text-blue-900 dark:text-blue-300">
+                                    {fault.fault_id || `FAULT-#${idx + 1}`}
+                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    {sevConfig && (
+                                      <span
+                                        className={`text-[9.5px] px-1.5 py-0.2 rounded border font-semibold ${sevConfig.className}`}
+                                      >
+                                        {sevConfig.label}
+                                      </span>
+                                    )}
+                                    {faultStatus && (
+                                      <span className="text-[9.5px] px-1.5 py-0.2 rounded font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                                        {FAULT_STATUS_LABELS[faultStatus] || faultStatus}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
-                              ) : (
-                                <div className="h-20 rounded-lg border border-dashed border-amber-300 dark:border-amber-700 bg-amber-100/40 dark:bg-amber-950/40 flex flex-col items-center justify-center p-1 text-center text-amber-800 dark:text-amber-300 text-[10px]">
-                                  <Clock className="w-3.5 h-3.5 mb-0.5 text-amber-600 dark:text-amber-400" />
-                                  <span>Đang sửa chữa...</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
 
-                        {visibleCount < incidentHistory.length ? (
-                          <button
-                            type="button"
-                            onClick={() => setVisibleCount((prev) => prev + 2)}
-                            className="w-full py-2 text-center text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50/50 dark:bg-blue-950/40 hover:bg-blue-100/60 dark:hover:bg-blue-900/50 rounded-lg transition cursor-pointer border border-blue-200/60 dark:border-blue-800/50"
-                          >
-                            Xem thêm sự cố cũ hơn ↓
-                          </button>
-                        ) : incidentHistory.length > 2 ? (
-                          <button
-                            type="button"
-                            onClick={() => setVisibleCount(2)}
-                            className="w-full py-1.5 text-center text-[10.5px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                          >
-                            Thu gọn ↑
-                          </button>
-                        ) : null}
+                                <div className="text-[11.5px] text-slate-800 dark:text-slate-200 font-semibold flex items-center justify-between">
+                                  <span>
+                                    {faultType ? FAULT_TYPE_LABELS[faultType] || faultType : 'Sự cố chiếu sáng'}
+                                  </span>
+                                  {typeof fault.priority_score === 'number' && (
+                                    <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                                      Ưu tiên: {fault.priority_score}đ
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <div className="py-4 px-3 flex flex-col items-center justify-center text-center space-y-1.5 text-slate-500 dark:text-slate-400">
+                            <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                              <ShieldCheck className="w-4.5 h-4.5" />
+                            </div>
+                            <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                              Không có sự cố nào đang ghi nhận
+                            </span>
+                            <p className="text-[10.5px] text-slate-400 dark:text-slate-500 max-w-60 leading-relaxed">
+                              Cột đèn hoạt động bình thường, không có cảnh báo bất thường từ các đợt khảo sát và vận hành.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -704,7 +663,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <div className="flex justify-between">
                     <span>Tổng số đèn quản lý:</span>
                     <strong className="text-slate-900 dark:text-white font-mono">
-                      {cabinetConnectedPoles.length || selectedCabinet.total_poles_managed || 23} cột đèn
+                      {cabinetConnectedPoles.length || selectedCabinet.total_poles_managed || 0} cột đèn
                     </strong>
                   </div>
                   <div className="flex justify-between">

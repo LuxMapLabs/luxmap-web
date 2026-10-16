@@ -2,7 +2,6 @@
  * Utility functions for route geometry projection, magnetic road snapping, and trimming.
  * Guarantees that routes and endpoints ALWAYS strictly lie on the road centerline.
  */
-import mockSegmentsGeoJson from '../../data/mock-segments.geo.json'
 
 // Haversine distance between two coordinates in meters
 export const calculateDistanceMeters = (
@@ -246,171 +245,213 @@ export const getPoleSpineWaypoints = (
   return sampled
 }
 
-// In-memory cache for road routing queries
-const routeCache = new Map<string, [number, number][]>()
+/**
+ * Trích xuất mảng tọa độ [lng, lat] từ chuỗi WKT LINESTRING
+ */
+export function parseLineStringWkt(wkt?: string | null): [number, number][] {
+  if (!wkt) return []
+  const match = wkt.match(/LINESTRING\s*\(([^)]+)\)/i)
+  if (!match) return []
+  const parts = match[1].split(',')
+  const coords: [number, number][] = []
+  for (const part of parts) {
+    const tokens = part.trim().split(/\s+/)
+    if (tokens.length >= 2) {
+      const lng = parseFloat(tokens[0])
+      const lat = parseFloat(tokens[1])
+      if (Number.isFinite(lng) && Number.isFinite(lat)) {
+        coords.push([lng, lat])
+      }
+    }
+  }
+  return coords
+}
 
 /**
- * Fetch realistic road route between start and end coordinates from OSRM.
- * Supports intermediate viaPoints (anchor chain) to guarantee visiting key assets.
- * Guarantees that returned coordinates strictly lie on the road network.
- * Handles timeouts, network failures, bidirectional checks, and caches results.
+ * Trích xuất tọa độ điểm đầu, điểm cuối và toàn bộ lộ trình thực tế của tuyến đường
+ * Thứ tự ưu tiên: geom_wkt -> Cột đèn thực tế thuộc tuyến -> Tọa độ mặc định Củ Chi
  */
-export const fetchRoadRoute = async (
-  start: [number, number],
-  end: [number, number],
-  signal?: AbortSignal,
-  viaPoints?: [number, number][]
-): Promise<[number, number][] | null> => {
-  if (!start || !end) return null
-  if (
-    Math.abs(start[0] - end[0]) < 0.00001 &&
-    Math.abs(start[1] - end[1]) < 0.00001
-  ) {
-    return [start, end]
+export function extractSegmentCoordinates(
+  segment: Record<string, any> | null | undefined,
+  poles?: { coord: [number, number] }[]
+): {
+  initialStart: [number, number]
+  initialEnd: [number, number]
+  initialCoords: [number, number][]
+} {
+  if (!segment) {
+    const fallbackStart: [number, number] = [106.4896, 10.9701]
+    const fallbackEnd: [number, number] = [106.4950, 10.9750]
+    return {
+      initialStart: fallbackStart,
+      initialEnd: fallbackEnd,
+      initialCoords: [fallbackStart, fallbackEnd],
+    }
   }
 
-  const validVia = (viaPoints || []).filter(
-    (p) =>
-      Array.isArray(p) &&
-      p.length === 2 &&
-      Number.isFinite(p[0]) &&
-      Number.isFinite(p[1]) &&
-      (Math.abs(p[0] - start[0]) > 0.00005 || Math.abs(p[1] - start[1]) > 0.00005) &&
-      (Math.abs(p[0] - end[0]) > 0.00005 || Math.abs(p[1] - end[1]) > 0.00005)
+  // 1. Ưu tiên trích xuất từ geom_wkt của segment
+  const geomWkt = (segment as any).geom_wkt
+  if (typeof geomWkt === 'string') {
+    const parsed = parseLineStringWkt(geomWkt)
+    if (parsed.length >= 2) {
+      return {
+        initialStart: parsed[0],
+        initialEnd: parsed[parsed.length - 1],
+        initialCoords: parsed,
+      }
+    }
+  }
+
+  // 2. Ưu tiên trích xuất từ geometry GeoJSON nếu có
+  const geojsonCoords = (segment as any).geometry?.coordinates
+  if (Array.isArray(geojsonCoords) && geojsonCoords.length >= 2) {
+    const valid = geojsonCoords.filter(
+      (c: any) => Array.isArray(c) && c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])
+    ) as [number, number][]
+    if (valid.length >= 2) {
+      return {
+        initialStart: valid[0],
+        initialEnd: valid[valid.length - 1],
+        initialCoords: valid,
+      }
+    }
+  }
+
+  // 3. Trích xuất từ danh sách cột đèn thực tế thuộc tuyến
+  if (poles && poles.length >= 2) {
+    const poleCoords = poles.map((p) => p.coord)
+    return {
+      initialStart: poleCoords[0],
+      initialEnd: poleCoords[poleCoords.length - 1],
+      initialCoords: poleCoords,
+    }
+  }
+
+  if (poles && poles.length === 1) {
+    const singleCoord = poles[0].coord
+    return {
+      initialStart: singleCoord,
+      initialEnd: singleCoord,
+      initialCoords: [singleCoord, singleCoord],
+    }
+  }
+
+  // 4. Fallback mặc định khu vực trung tâm Củ Chi khi tuyến chưa có hình học & chưa có cột
+  const fallbackStart: [number, number] = [106.4896, 10.9701]
+  const fallbackEnd: [number, number] = [106.4950, 10.9750]
+  return {
+    initialStart: fallbackStart,
+    initialEnd: fallbackEnd,
+    initialCoords: [fallbackStart, fallbackEnd],
+  }
+}
+
+/**
+ * Interpolate coordinates along polyline given target distance in meters from the start.
+ */
+export const getPointAtDistanceAlongPolyline = (
+  coords: [number, number][],
+  distMeters: number
+): [number, number] => {
+  if (!coords || coords.length === 0) return [0, 0]
+  if (coords.length === 1 || distMeters <= 0) return coords[0]
+
+  let accum = 0
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i]
+    const p2 = coords[i + 1]
+    const segLen = calculateDistanceMeters(p1, p2)
+    if (accum + segLen >= distMeters) {
+      const remain = distMeters - accum
+      const t = segLen === 0 ? 0 : remain / segLen
+      return [
+        Math.round((p1[0] + t * (p2[0] - p1[0])) * 1000000) / 1000000,
+        Math.round((p1[1] + t * (p2[1] - p1[1])) * 1000000) / 1000000,
+      ]
+    }
+    accum += segLen
+  }
+  return coords[coords.length - 1]
+}
+
+/**
+ * Magnetically snap coordinate onto polyline and leapfrog over obstacle points (e.g. existing poles)
+ * to avoid spatial collision within `minClearance` meters.
+ */
+export const resolveNonOverlappingRoutePoint = (
+  rawLng: number,
+  rawLat: number,
+  coords: [number, number][],
+  obstaclePoints: [number, number][],
+  minClearance: number = 15
+): [number, number] => {
+  if (!coords || coords.length < 2) return [rawLng, rawLat]
+
+  const snap = snapPointToPolyline([rawLng, rawLat], coords)
+  const mouseDist = snap.accumulatedDist
+  let targetDist = mouseDist
+
+  const validObstacles = obstaclePoints.filter(
+    (pt) => Array.isArray(pt) && pt.length === 2 && Number.isFinite(pt[0]) && Number.isFinite(pt[1])
   )
 
-  const allPoints: [number, number][] = [start, ...validVia, end]
-
-  // Key with 5 decimal places (~1m precision) for cache hits
-  const key = allPoints.map((p) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`).join(';')
-
-  if (routeCache.has(key)) {
-    return routeCache.get(key)!
+  if (validObstacles.length === 0) {
+    return snap.snappedPoint
   }
 
-  try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 9000)
+  // Convert obstacles to distance along polyline
+  const obstacleDists = validObstacles
+    .map((pt) => snapPointToPolyline(pt, coords).accumulatedDist)
+    .sort((a, b) => a - b)
 
-    if (signal) {
-      signal.addEventListener('abort', () => controller.abort(), { once: true })
-    }
+  // Build & merge overlapping forbidden intervals [d - minClearance, d + minClearance]
+  const rawIntervals = obstacleDists.map((d) => [
+    Math.max(0, d - minClearance),
+    d + minClearance,
+  ] as [number, number])
 
-    const coordsParam = allPoints.map((p) => `${p[0]},${p[1]}`).join(';')
-    const url = `https://router.project-osrm.org/route/v1/driving/${coordsParam}?overview=full&geometries=geojson`
-    const res = await fetch(url, { signal: controller.signal })
-    clearTimeout(timeoutId)
-
-    if (!res.ok) return allPoints
-
-    const data = await res.json()
-    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-      const coords = data.routes[0].geometry?.coordinates as [number, number][]
-      if (Array.isArray(coords) && coords.length >= 2) {
-        // Cache result (limit cache size to 100 entries)
-        if (routeCache.size > 100) {
-          const firstKey = routeCache.keys().next().value
-          if (firstKey) routeCache.delete(firstKey)
-        }
-        routeCache.set(key, coords)
-        return coords
-      }
-    }
-    return allPoints
-  } catch {
-    return allPoints
-  }
-}
-
-export interface LiveSnapResult {
-  routeCoords: [number, number][]
-  snappedPoint: [number, number]
-  isOnRoad: boolean
-}
-
-/**
- * Real-time 60fps road snapping while dragging marker.
- * Snaps the dragged point onto the current road or connected road network
- * and stitches a continuous road polyline with 0ms latency.
- */
-export const computeLiveSnappedRoute = (
-  baseRoute: [number, number][],
-  dragPoint: [number, number],
-  isEnd: boolean
-): LiveSnapResult => {
-  if (!baseRoute || baseRoute.length < 2) {
-    return { routeCoords: [dragPoint, dragPoint], snappedPoint: dragPoint, isOnRoad: false }
-  }
-
-  const snapBase = snapPointToPolyline(dragPoint, baseRoute)
-  const terminalPoint = isEnd ? baseRoute[baseRoute.length - 1] : baseRoute[0]
-
-  // Check known roads in the network (e.g. from mock-segments.geo.json)
-  const knownRoads: [number, number][][] =
-    ((mockSegmentsGeoJson as any).features || [])
-      .map((f: any) => f.geometry?.coordinates)
-      .filter((c: any) => Array.isArray(c) && c.length >= 2)
-
-  let bestOtherRoad: [number, number][] | null = null
-  let bestOtherSnap: SnappedPointResult | null = null
-  let minOtherDist = Infinity
-
-  for (const road of knownRoads) {
-    // Skip if road is practically the baseRoute itself
-    const startMatch = calculateDistanceMeters(road[0], baseRoute[0]) < 10
-    const endMatch = calculateDistanceMeters(road[road.length - 1], baseRoute[baseRoute.length - 1]) < 10
-    if (startMatch && endMatch) continue
-
-    const snap = snapPointToPolyline(dragPoint, road)
-    if (snap.distMeters < minOtherDist) {
-      minOtherDist = snap.distMeters
-      bestOtherSnap = snap
-      bestOtherRoad = road
-    }
-  }
-
-  // If cursor is strictly on another connected road (within 18m of its centerline, e.g. Tỉnh Lộ 8):
-  if (bestOtherRoad && bestOtherSnap && minOtherDist <= 18 && minOtherDist < snapBase.distMeters) {
-    const snapIntersection = snapPointToPolyline(terminalPoint, bestOtherRoad)
-    if (snapIntersection.distMeters <= 50) {
-      const otherSlice = sliceRoadBetweenPoints(
-        bestOtherRoad,
-        snapIntersection.snappedPoint,
-        bestOtherSnap.snappedPoint
-      ).slicedCoords
-
-      const combined = isEnd
-        ? [...baseRoute, ...otherSlice.slice(1)]
-        : [...otherSlice.slice(0, -1), ...baseRoute]
-
-      return {
-        routeCoords: combined,
-        snappedPoint: bestOtherSnap.snappedPoint,
-        isOnRoad: true,
+  const mergedIntervals: [number, number][] = []
+  for (const cur of rawIntervals) {
+    if (mergedIntervals.length === 0) {
+      mergedIntervals.push([...cur])
+    } else {
+      const prev = mergedIntervals[mergedIntervals.length - 1]
+      if (cur[0] <= prev[1]) {
+        prev[1] = Math.max(prev[1], cur[1])
+      } else {
+        mergedIntervals.push([...cur])
       }
     }
   }
 
-  // If cursor is along baseRoute (within 40m)
-  if (snapBase.distMeters <= 40) {
-    const sliced = isEnd
-      ? sliceRoadBetweenPoints(baseRoute, baseRoute[0], snapBase.snappedPoint).slicedCoords
-      : sliceRoadBetweenPoints(baseRoute, snapBase.snappedPoint, baseRoute[baseRoute.length - 1]).slicedCoords
+  const totalLen = calculateRouteLengthMeters(coords)
 
-    return {
-      routeCoords: sliced.length >= 2 ? sliced : baseRoute,
-      snappedPoint: snapBase.snappedPoint,
-      isOnRoad: true,
+  // Push targetDist outside forbidden intervals
+  let iterations = 0
+  while (iterations < 10) {
+    iterations++
+    const inside = mergedIntervals.find(
+      ([start, end]) => targetDist >= start - 0.0001 && targetDist <= end + 0.0001
+    )
+    if (!inside) break
+
+    const [start, end] = inside
+    const mid = (start + end) / 2
+
+    if (start <= 0.1 && end >= totalLen - 0.1) {
+      break
+    }
+
+    if (start <= 0.1) {
+      targetDist = end + 0.05
+    } else if (end >= totalLen - 0.1) {
+      targetDist = Math.max(0, start - 0.05)
+    } else if (mouseDist >= mid) {
+      targetDist = end + 0.05
+    } else {
+      targetDist = Math.max(0, start - 0.05)
     }
   }
 
-  // Fallback when off-road: strictly keep entire base route, extend to cursor
-  const fallback = isEnd ? [...baseRoute, dragPoint] : [dragPoint, ...baseRoute]
-  return {
-    routeCoords: fallback,
-    snappedPoint: dragPoint,
-    isOnRoad: false,
-  }
+  return getPointAtDistanceAlongPolyline(coords, targetDist)
 }
-
-

@@ -245,6 +245,9 @@ export const PolesTab: React.FC<PolesTabProps> = ({
       <EditPoleModal
         isOpen={!!editPole}
         pole={editPole}
+        segments={segments}
+        cabinets={cabinets}
+        allPoles={poles}
         onClose={() => setEditPole(null)}
         onSave={handleSavePole}
       />

@@ -17,7 +17,7 @@ import { useAssetData } from '../../hooks/assets/useAssetData'
 export type AssetCategory = 'poles' | 'fixtures' | 'cabinets' | 'segments' | 'poles_and_fixtures'
 
 export const AssetManagementPage: React.FC = () => {
-  const [activeCategory, setActiveCategory] = useState<AssetCategory>('poles')
+  const [activeCategory, setActiveCategory] = useState<AssetCategory>('segments')
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [selectedFixtureCode, setSelectedFixtureCode] = useState<string>('')
   const [selectedPoleCode, setSelectedPoleCode] = useState<string>('')
@@ -49,6 +49,7 @@ export const AssetManagementPage: React.FC = () => {
     handleAddPoles,
     handleUpdatePole,
     handleAddFixture,
+    handleAddFixtures,
     handleUpdateFixture,
     handleAddCabinet,
     handleAddCabinets,
@@ -83,109 +84,18 @@ export const AssetManagementPage: React.FC = () => {
             style={{
               width: 'calc((100% - 12px) / 4)',
               transform: `translateX(calc(${
-                activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
+                activeCategory === 'segments'
                   ? 0
-                  : activeCategory === 'fixtures'
-                  ? 100
                   : activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'
+                  ? 100
+                  : activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
                   ? 200
                   : 300
               }%))`,
             }}
           />
 
-          {/* Tab 1: Cột điện */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedCabinetCode('')
-              setActiveCategory('poles')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Boxes
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
-                  ? 'text-blue-600 dark:text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(37,99,235,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Cột điện</span>
-            <TabCountBadge
-              count={poles.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'}
-              colorScheme="blue"
-            />
-          </button>
-
-          {/* Tab 2: Bóng đèn */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedPoleCode('')
-              setSelectedCabinetCode('')
-              setActiveCategory('fixtures')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'fixtures'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Lightbulb
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'fixtures'
-                  ? 'text-amber-500 dark:text-amber-400 scale-110 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Bóng đèn</span>
-            <TabCountBadge
-              count={fixtures.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'fixtures'}
-              colorScheme="amber"
-            />
-          </button>
-
-          {/* Tab 3: Tủ điện */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedPoleCode('')
-              setActiveCategory('cabinets')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Zap
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'
-                  ? 'text-amber-500 dark:text-amber-400 scale-110 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Tủ điện</span>
-            <TabCountBadge
-              count={cabinets.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'}
-              colorScheme="purple"
-            />
-          </button>
-
-          {/* Tab 4: Tuyến đường chiếu sáng */}
+          {/* Tab 1: Tuyến đường chiếu sáng */}
           <button
             type="button"
             onClick={() => {
@@ -215,9 +125,126 @@ export const AssetManagementPage: React.FC = () => {
               colorScheme="indigo"
             />
           </button>
+
+          {/* Tab 2: Tủ điện */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedFixtureCode('')
+              setSelectedPoleCode('')
+              setActiveCategory('cabinets')
+            }}
+            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
+              activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'
+                ? 'text-slate-900 dark:text-white font-bold'
+                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+            }`}
+          >
+            <Zap
+              className={`w-4 h-4 transition-all duration-300 ${
+                activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'
+                  ? 'text-amber-500 dark:text-amber-400 scale-110 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)]'
+                  : 'text-slate-400'
+              }`}
+            />
+            <span>Tủ điện</span>
+            <TabCountBadge
+              count={cabinets.length}
+              isLoading={isLoadingAssets}
+              isActive={activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'}
+              colorScheme="purple"
+            />
+          </button>
+
+          {/* Tab 3: Cột điện */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedFixtureCode('')
+              setSelectedCabinetCode('')
+              setActiveCategory('poles')
+            }}
+            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
+              activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
+                ? 'text-slate-900 dark:text-white font-bold'
+                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+            }`}
+          >
+            <Boxes
+              className={`w-4 h-4 transition-all duration-300 ${
+                activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
+                  ? 'text-blue-600 dark:text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(37,99,235,0.3)]'
+                  : 'text-slate-400'
+              }`}
+            />
+            <span>Cột điện</span>
+            <TabCountBadge
+              count={poles.length}
+              isLoading={isLoadingAssets}
+              isActive={activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'}
+              colorScheme="blue"
+            />
+          </button>
+
+          {/* Tab 4: Bóng đèn */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedFixtureCode('')
+              setSelectedPoleCode('')
+              setSelectedCabinetCode('')
+              setActiveCategory('fixtures')
+            }}
+            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
+              activeCategory === 'fixtures'
+                ? 'text-slate-900 dark:text-white font-bold'
+                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+            }`}
+          >
+            <Lightbulb
+              className={`w-4 h-4 transition-all duration-300 ${
+                activeCategory === 'fixtures'
+                  ? 'text-amber-500 dark:text-amber-400 scale-110 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)]'
+                  : 'text-slate-400'
+              }`}
+            />
+            <span>Bóng đèn</span>
+            <TabCountBadge
+              count={fixtures.length}
+              isLoading={isLoadingAssets}
+              isActive={activeCategory === 'fixtures'}
+              colorScheme="amber"
+            />
+          </button>
         </div>
 
-        {/* Tab 1 Content: Cột điện */}
+        {/* Tab 1 Content: Tuyến đường chiếu sáng */}
+        {activeCategory === 'segments' && (
+          <SegmentsTab
+            segments={segments}
+            isLoading={isLoadingAssets}
+            onAddSegment={handleAddSegment}
+            onUpdateSegment={handleUpdateSegment}
+            onOpenImport={() => setIsImportModalOpen(true)}
+          />
+        )}
+
+        {/* Tab 2 Content: Tủ điện & Mạch nguồn (Feeder) */}
+        {(activeCategory === 'cabinets' || (activeCategory as string) === 'feeders') && (
+          <CabinetsTab
+            cabinets={cabinets}
+            segments={segments}
+            isLoading={isLoadingAssets}
+            activeCabinetCode={selectedCabinetCode}
+            onClearActiveCabinet={() => setSelectedCabinetCode('')}
+            onAddCabinet={handleAddCabinet}
+            onAddCabinets={handleAddCabinets}
+            onUpdateCabinet={handleUpdateCabinet}
+            onOpenImport={() => setIsImportModalOpen(true)}
+          />
+        )}
+
+        {/* Tab 3 Content: Cột điện */}
         {(activeCategory === 'poles' || activeCategory === 'poles_and_fixtures') && (
           <PolesTab
             poles={poles}
@@ -238,43 +265,19 @@ export const AssetManagementPage: React.FC = () => {
           />
         )}
 
-        {/* Tab 2 Content: Bóng đèn */}
+        {/* Tab 4 Content: Bóng đèn */}
         {activeCategory === 'fixtures' && (
           <FixturesTab
             fixtures={fixtures}
             poles={poles}
+            segments={segments}
             activeFixtureCode={selectedFixtureCode}
             isLoading={isLoadingAssets}
             onClearActiveFixture={() => setSelectedFixtureCode('')}
             onSelectPole={handleSelectPole}
             onAddFixture={handleAddFixture}
+            onAddFixtures={handleAddFixtures}
             onUpdateFixture={handleUpdateFixture}
-            onOpenImport={() => setIsImportModalOpen(true)}
-          />
-        )}
-
-        {/* Tab 3 Content: Tủ điện & Mạch nguồn (Feeder) */}
-        {(activeCategory === 'cabinets' || (activeCategory as string) === 'feeders') && (
-          <CabinetsTab
-            cabinets={cabinets}
-            segments={segments}
-            isLoading={isLoadingAssets}
-            activeCabinetCode={selectedCabinetCode}
-            onClearActiveCabinet={() => setSelectedCabinetCode('')}
-            onAddCabinet={handleAddCabinet}
-            onAddCabinets={handleAddCabinets}
-            onUpdateCabinet={handleUpdateCabinet}
-            onOpenImport={() => setIsImportModalOpen(true)}
-          />
-        )}
-
-        {/* Tab 4 Content: Tuyến đường chiếu sáng */}
-        {activeCategory === 'segments' && (
-          <SegmentsTab
-            segments={segments}
-            isLoading={isLoadingAssets}
-            onAddSegment={handleAddSegment}
-            onUpdateSegment={handleUpdateSegment}
             onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}

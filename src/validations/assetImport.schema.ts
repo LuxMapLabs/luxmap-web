@@ -204,6 +204,42 @@ function extractLineFirstPointCoords(wkt: string | null | undefined, defaultLat 
   return { lat: defaultLat, lng: defaultLng }
 }
 
+/**
+ * Phân tích chuỗi LINESTRING WKT thành chuỗi tóm tắt trực quan:
+ * "Lộ trình (26 điểm) [106.489, 10.970] ➔ [106.502, 10.977]"
+ */
+export function summarizeLineWkt(wkt?: string | null): string {
+  if (!wkt || typeof wkt !== 'string' || !wkt.trim()) {
+    return 'Chưa có hình học'
+  }
+  const match = wkt.match(/LINESTRING\s*\((.*)\)/i)
+  if (!match) return 'Hình học không hợp lệ'
+
+  const rawCoords = match[1]
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  if (rawCoords.length === 0) return '0 điểm'
+
+  const parseLngLat = (str: string): [number, number] | null => {
+    const parts = str.split(/\s+/).map(Number)
+    if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+      return [Math.round(parts[0] * 1000) / 1000, Math.round(parts[1] * 1000) / 1000]
+    }
+    return null
+  }
+
+  const firstPt = parseLngLat(rawCoords[0])
+  const lastPt = parseLngLat(rawCoords[rawCoords.length - 1])
+
+  if (!firstPt || !lastPt) {
+    return `Lộ trình (${rawCoords.length} điểm)`
+  }
+
+  return `Lộ trình (${rawCoords.length} điểm) [${firstPt[0]}, ${firstPt[1]}] ➔ [${lastPt[0]}, ${lastPt[1]}]`
+}
+
 // ==========================================
 // 3. MASTER VALIDATOR & CONSTRAINT CHECKER
 // ==========================================
@@ -370,6 +406,26 @@ export function validateImportRow(
           newVal: formatCommuneDisplayName(data.commune_id),
         })
       }
+      if (data.geom_wkt) {
+        const existingGeomWkt = (existing as any).geom_wkt as string | null | undefined
+        if (!existingGeomWkt) {
+          diffs.push({
+            label: 'Hình học GIS',
+            oldVal: 'Chưa có hình học',
+            newVal: summarizeLineWkt(data.geom_wkt),
+          })
+        } else {
+          const normExisting = existingGeomWkt.replace(/\s+/g, ' ').trim().toLowerCase()
+          const normNew = data.geom_wkt.replace(/\s+/g, ' ').trim().toLowerCase()
+          if (normExisting !== normNew) {
+            diffs.push({
+              label: 'Hình học GIS',
+              oldVal: summarizeLineWkt(existingGeomWkt),
+              newVal: summarizeLineWkt(data.geom_wkt),
+            })
+          }
+        }
+      }
 
       actionType = diffs.length > 0 ? 'updated' : 'unchanged'
     }
@@ -460,6 +516,16 @@ export function validateImportRow(
           oldVal: 'Chưa định vị',
           newVal: `Định vị tọa độ (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
         })
+      } else if (existing.location && data.geom_wkt) {
+        const latDiff = Math.abs(existing.location.lat - lat)
+        const lngDiff = Math.abs(existing.location.lng - lng)
+        if (latDiff > 0.00001 || lngDiff > 0.00001) {
+          diffs.push({
+            label: 'Tọa độ GIS',
+            oldVal: `${existing.location.lat.toFixed(5)}, ${existing.location.lng.toFixed(5)}`,
+            newVal: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+          })
+        }
       }
 
       actionType = diffs.length > 0 ? 'updated' : 'unchanged'

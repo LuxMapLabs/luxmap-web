@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { StatusBadge } from '../../../../../components/StatusBadge'
 import { PoleTable } from '../../../../../pages/assets/components/poles/PoleTable'
 import { PoleDetailModal } from '../../../../../pages/assets/components/poles/PoleDetailModal'
@@ -261,23 +261,39 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       expect(screen.getByText(/Hạn: —/i)).toBeInTheDocument()
     })
 
-    it('AddFixtureModal khởi tạo ngày hết hạn rỗng "" (không tự động cộng 3 năm hardcode)', () => {
+    it('AddFixtureModal khởi tạo form bóng đèn và các trường ngày tháng', () => {
       const onAddFixtureMock = vi.fn()
       render(
         <AddFixtureModal
           isOpen={true}
           onClose={vi.fn()}
           poles={[mockPoleWithActiveWarranty]}
+          segments={[mockSegment]}
           onAddFixture={onAddFixtureMock}
         />
       )
 
-      // Tìm trường nhập hạn bảo hành qua container của label "Hạn Bảo Hành"
-      const label = screen.getByText('Hạn Bảo Hành')
-      const container = label.parentElement
-      const expiryInput = container?.querySelector('input[type="date"]') as HTMLInputElement
-      expect(expiryInput).toBeInTheDocument()
-      expect(expiryInput.value).toBe('') // Đảm bảo rỗng mặc định
+      // Kiểm tra header cột 'Hạn bảo hành' có mặt trong thead
+      const thLabel = screen.getByText(/Hạn bảo hành/i)
+      expect(thLabel).toBeInTheDocument()
+
+      // Chọn tuyến đường và cột điện để xuất hiện hàng bóng đèn
+      const selects = document.querySelectorAll('select')
+      const segmentSelect = selects[0]
+      fireEvent.change(segmentSelect, { target: { value: mockSegment.segment_id } })
+
+      const poleSelect = selects[1]
+      fireEvent.change(poleSelect, { target: { value: mockPoleWithActiveWarranty.pole_id } })
+
+      // Bấm '+ Thêm Bóng Mới'
+      const addRowBtn = screen.getAllByText(/Thêm Bóng Mới/i)[0]
+      fireEvent.click(addRowBtn)
+
+      // Kiểm tra ô input date hạn bảo hành có mặt
+      const dateInputs = document.querySelectorAll('input[type="date"]')
+      expect(dateInputs.length).toBeGreaterThanOrEqual(2) // Ngày lắp và Hạn bảo hành
+      const warrantyInput = dateInputs[1] as HTMLInputElement
+      expect(warrantyInput).toBeInTheDocument()
     })
   })
 

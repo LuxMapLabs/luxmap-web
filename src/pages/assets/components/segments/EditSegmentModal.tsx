@@ -1,11 +1,13 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useSelector } from 'react-redux'
 import { Route, X, CheckCircle2, MapPin, RotateCcw } from 'lucide-react'
-import { SegmentRouteMap } from '../../../../components/SegmentRouteMap'
-import { calculateRouteLengthMeters } from '../../../../utils/gis-map/routeUtils'
+import { SegmentRouteMap, SegmentPoleItem } from '../../../../components/SegmentRouteMap'
+import { calculateRouteLengthMeters, extractSegmentCoordinates } from '../../../../utils/gis-map/routeUtils'
+import { CU_CHI_COMMUNES_MAP } from '../../../../constants/communes'
 import type { RoadClass } from '../../../../types/common/enums'
 import type { SegmentListItem } from '../../../../types/assets/segments'
-import mockPolesGeoJson from '../../../../data/mock-poles.geo.json'
+import type { RootState } from '../../../../redux/rootReducer'
 
 export interface EditSegmentModalProps {
   isOpen: boolean
@@ -25,19 +27,45 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   onClose,
   onSave,
 }) => {
-  const initialStart: [number, number] = [106.485, 10.972]
-  const initialEnd: [number, number] = [106.495, 10.978]
-  const initialCoords: [number, number][] = [initialStart, initialEnd]
+  // Lấy danh sách cột thực tế từ Redux Store
+  const allPoles = useSelector((state: RootState) => state.assets.poles)
+
+  // Lọc danh sách cột đèn thực tế thuộc tuyến đường này
+  const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
+    if (!segment.segment_id) return []
+    return allPoles
+      .filter(
+        (p) =>
+          p.segment_id === segment.segment_id &&
+          p.location &&
+          Number.isFinite(p.location.lat) &&
+          Number.isFinite(p.location.lng)
+      )
+      .sort((a, b) =>
+        (a.external_ref || '').localeCompare(b.external_ref || '', undefined, { numeric: true })
+      )
+      .map((p) => ({
+        id: p.pole_id || p.external_ref || 'unknown',
+        code: p.external_ref || p.pole_id || undefined,
+        coord: [p.location.lng, p.location.lat] as [number, number],
+        status: p.active_fixture ? 'normal' : 'unknown',
+        atlas: p.active_fixture?.fixture_type,
+      }))
+  }, [allPoles, segment.segment_id])
+
+  // Trích xuất tọa độ điểm đầu, điểm cuối và lộ trình thực tế từ hình học hoặc cột đèn
+  const { initialStart, initialEnd, initialCoords } = useMemo(() => {
+    return extractSegmentCoordinates(segment, segmentPoles)
+  }, [segment, segmentPoles])
 
   const [segmentName, setSegmentName] = useState(segment.segment_name || '')
   const [roadClass, setRoadClass] = useState<RoadClass>(
     (segment.road_class as RoadClass) || 'inter_commune'
   )
   const [lengthM, setLengthM] = useState<number>(segment.length_m || 1000)
-  const [communeName, setCommuneName] = useState(segment.commune_id || 'Xã Tân An Hội')
-  const [hasActiveFault, setHasActiveFault] = useState<boolean>(false)
+  const [communeId, setCommuneId] = useState(segment.commune_id || 'COM-001')
 
-  // Coordinate States initialized with valid values immediately
+  // Coordinate States initialized with extracted coordinates
   const [startLat, setStartLat] = useState<number>(initialStart[1])
   const [startLng, setStartLng] = useState<number>(initialStart[0])
   const [endLat, setEndLat] = useState<number>(initialEnd[1])
@@ -47,21 +75,6 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   const originalStartRef = useRef<[number, number]>(initialStart)
   const originalEndRef = useRef<[number, number]>(initialEnd)
   const originalRouteCoordsRef = useRef<[number, number][]>([...initialCoords])
-
-  // Filter existing poles that belong to this segment
-  const segmentPoles = useMemo(() => {
-    const features = (mockPolesGeoJson as any).features || []
-    return features
-      .filter((f: any) => f.properties?.segment_id === segment.segment_id)
-      .map((f: any) => ({
-        id: f.properties?.pole_id,
-        code: f.properties?.pole_id,
-        coord: f.geometry?.coordinates as [number, number],
-        status: f.properties?.fixture_status,
-        atlas: f.properties?.atlas,
-      }))
-      .filter((p: any) => p.coord && p.coord.length === 2)
-  }, [segment.segment_id])
 
   // Start coordinate handlers
   const handleStartCoordChange = useCallback((coord: [number, number]) => {
@@ -121,14 +134,20 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const geomWkt =
+      routeCoords.length >= 2
+        ? `LINESTRING(${routeCoords.map((c) => `${c[0]} ${c[1]}`).join(', ')})`
+        : (segment as any).geom_wkt || null
+
     onSave({
       ...segment,
       segment_name: segmentName.trim() || segment.segment_id,
       road_class: roadClass,
       length_m: lengthM,
-      commune_id: communeName.trim() || segment.commune_id || 'cuchi_01',
+      commune_id: communeId,
+      geom_wkt: geomWkt,
       updated_at: new Date().toISOString(),
-    })
+    } as SegmentListItem)
     onClose()
   }
 
@@ -154,9 +173,12 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
         </button>
       </div>
 
-      {/* Form Body */}
-      <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 max-h-[75vh] overflow-y-auto">
-        {/* Tên tuyến đường */}
+      {/* Form Body - 2 Columns Layout */}
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
+          {/* CỘT TRÁI (40% width trên md) */}
+          <div className="md:col-span-5 p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
+            {/* Tên tuyến đường */}
         <div className="space-y-1">
           <label className="font-bold text-slate-700 dark:text-slate-300">Tên tuyến đường:</label>
           <input
@@ -191,29 +213,24 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
           </div>
         </div>
 
-        {/* Địa bàn Xã & Trạng thái */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="font-bold text-slate-700 dark:text-slate-300">Địa bàn quản lý (Xã/Thị trấn):</label>
-            <input
-              type="text"
-              value={communeName}
-              onChange={(e) => setCommuneName(e.target.value)}
-              placeholder="VD: Xã Phước Hậu"
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="font-bold text-slate-700 dark:text-slate-300">Trạng thái vận hành lưới:</label>
-            <select
-              value={hasActiveFault ? 'fault' : 'normal'}
-              onChange={(e) => setHasActiveFault(e.target.value === 'fault')}
-              className="w-full p-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
-            >
-              <option value="normal">🟢 Vận hành tốt</option>
-              <option value="fault">🔴 Có sự cố phân đoạn</option>
-            </select>
-          </div>
+        {/* Địa bàn Xã/Thị trấn */}
+        <div className="space-y-1">
+          <label className="font-bold text-slate-700 dark:text-slate-300">
+            Địa bàn quản lý (Xã/Thị trấn Củ Chi):
+          </label>
+          <select
+            value={communeId}
+            onChange={(e) => setCommuneId(e.target.value)}
+            className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+          >
+            {Object.entries(CU_CHI_COMMUNES_MAP)
+              .filter(([code]) => code.startsWith('COM-'))
+              .map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name} ({code})
+                </option>
+              ))}
+          </select>
         </div>
 
         {/* Tọa độ Điểm đầu & Điểm cuối GPS */}
@@ -312,41 +329,45 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
               </div>
             </div>
           </div>
+          </div>
         </div>
 
-        {/* Bản đồ Tuyến đường Thực địa (Segment Route Map) */}
-        <div className="space-y-1.5 pt-1">
-          <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between text-xs">
-            <span>Lộ trình Tim đường Thực địa Tuyến:</span>
-          </label>
-          <SegmentRouteMap
-            coordinates={routeCoords}
-            originalRouteCoords={originalRouteCoordsRef.current}
-            startCoord={[startLng, startLat]}
-            endCoord={[endLng, endLat]}
-            originalStartCoord={originalStartRef.current}
-            originalEndCoord={originalEndRef.current}
-            editable={true}
-            onStartCoordChange={handleStartCoordChange}
-            onEndCoordChange={handleEndCoordChange}
-            onRouteCoordsChange={handleRouteCoordsChange}
-            poles={segmentPoles}
-            height="240px"
-          />
+          {/* CỘT PHẢI: BẢN ĐỒ TUYẾN ĐƯỜNG THỰC ĐỊA (60% width trên md) */}
+          <div className="md:col-span-7 p-4 bg-slate-950 flex flex-col justify-between min-h-[480px] relative">
+            <div className="min-h-[480px] h-[480px] rounded-2xl overflow-hidden border border-slate-700/80 shadow-inner relative">
+              <SegmentRouteMap
+                coordinates={routeCoords}
+                originalRouteCoords={originalRouteCoordsRef.current}
+                startCoord={[startLng, startLat]}
+                endCoord={[endLng, endLat]}
+                originalStartCoord={originalStartRef.current}
+                originalEndCoord={originalEndRef.current}
+                editable={true}
+                onStartCoordChange={handleStartCoordChange}
+                onEndCoordChange={handleEndCoordChange}
+                onRouteCoordsChange={handleRouteCoordsChange}
+                poles={segmentPoles}
+                height="480px"
+              />
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2 italic text-center shrink-0">
+              💡 Mẹo: Bấm và kéo ghim xanh (Điểm đầu) / ghim đỏ (Điểm cuối) hoặc nhấp vào line để chỉnh lộ trình.
+            </p>
+          </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 -mx-5 -mb-5 mt-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end gap-2">
+        <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end gap-2 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer shadow-2xs"
           >
             Hủy bỏ
           </button>
           <button
             type="submit"
-            className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Lưu Thay Đổi</span>
@@ -374,7 +395,7 @@ export const EditSegmentModal: React.FC<EditSegmentModalProps> = ({
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95">
+      <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95">
         <EditSegmentModalContent
           key={segment.segment_id}
           segment={segment}

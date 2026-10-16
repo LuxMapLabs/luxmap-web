@@ -233,6 +233,52 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       })
     })
 
+    it('hàm validateImportRow phát hiện thay đổi tọa độ GIS của tủ điện và trả về actionType updated', () => {
+      const rowObj = {
+        external_ref: 'CAB-TL01',
+        cabinet_name: 'Tủ điện Tỉnh Lộ 8 - Trạm 1',
+        commune_id: 'commune_tl8',
+        geom_wkt: 'POINT(106.4950 10.9750)',
+        data_source: 'field',
+      }
+
+      const context: ValidationContext = {
+        poles: [],
+        fixtures: [],
+        cabinets: defaultCabinetsList,
+        segments: defaultSegmentsList,
+      }
+
+      const review = validateImportRow('cabinets', rowObj, context, 0)
+      expect(review.category).toBe('cabinets')
+      expect(review.externalRef).toBe('CAB-TL01')
+      expect(review.actionType).toBe('updated')
+      expect(review.diffs.some((d) => d.label === 'Tọa độ GIS')).toBe(true)
+    })
+
+    it('hàm validateImportRow giữ nguyên actionType unchanged khi tọa độ tủ điện không đổi', () => {
+      const rowObj = {
+        external_ref: 'CAB-TL01',
+        cabinet_name: 'Tủ điện Tỉnh Lộ 8 - Trạm 1',
+        commune_id: 'commune_tl8',
+        geom_wkt: 'POINT(106.4896 10.9701)',
+        data_source: 'field',
+      }
+
+      const context: ValidationContext = {
+        poles: [],
+        fixtures: [],
+        cabinets: defaultCabinetsList,
+        segments: defaultSegmentsList,
+      }
+
+      const review = validateImportRow('cabinets', rowObj, context, 0)
+      expect(review.category).toBe('cabinets')
+      expect(review.externalRef).toBe('CAB-TL01')
+      expect(review.actionType).toBe('unchanged')
+      expect(review.diffs).toHaveLength(0)
+    })
+
     it('xử lý Redux state fetchAssetsSuccess cập nhật danh sách cabinets thành công', () => {
       const initialState = assetReducer(undefined, { type: '@@INIT' })
       const nextState = assetReducer(
