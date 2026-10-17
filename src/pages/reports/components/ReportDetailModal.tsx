@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { Printer, Download, X, ShieldCheck, Loader2 } from 'lucide-react'
 import type { SuperiorReportItem } from '../../../types/reports/report'
-import { exportReportToPdf } from '../../../utils/reportPdfGenerator'
+import { exportReportToPdf } from '../../../utils/reports/reportPdfGenerator'
 
 interface ReportDetailModalProps {
   isOpen: boolean

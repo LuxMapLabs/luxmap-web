@@ -8,14 +8,14 @@ import {
   openCaseDetail,
   closeCaseDetail,
   setViewingPhaseIndex,
-  fetchWorkOrdersThunk,
-  fetchAssigneesThunk,
-  createWorkOrderBackendThunk,
-  patchWorkOrderBackendThunk,
-  followUpWorkOrderBackendThunk,
-  verifyWorkOrderBackendThunk,
-  cancelWorkOrderBackendThunk,
-  returnWorkOrderBackendThunk,
+  fetchWorkOrdersRequest,
+  fetchAssigneesRequest,
+  createWorkOrderRequest,
+  patchWorkOrderRequest,
+  followUpWorkOrderRequest,
+  verifyWorkOrderRequest,
+  cancelWorkOrderRequest,
+  returnWorkOrderRequest,
 } from '../../feature/work-schedule/workScheduleSlice'
 import { ScheduleFilterBar } from './components/ScheduleFilterBar'
 import { CalendarGrid } from './components/CalendarGrid'
@@ -39,25 +39,21 @@ export const WorkSchedulePage: React.FC = () => {
 
   // Tự động tải danh sách lịch làm việc và danh sách kỹ sư từ máy chủ theo tháng được chọn
   useEffect(() => {
-    try {
-      const startOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
-      const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate()
-      const endOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(
-        lastDay
-      ).padStart(2, '0')}`
+    const startOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate()
+    const endOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(
+      lastDay
+    ).padStart(2, '0')}`
 
-      dispatch(
-        fetchWorkOrdersThunk({
-          scheduled_from: startOfMonth,
-          scheduled_to: endOfMonth,
-        }) as any
-      )
+    dispatch(
+      fetchWorkOrdersRequest({
+        scheduled_from: startOfMonth,
+        scheduled_to: endOfMonth,
+      })
+    )
 
-      // Tải danh sách kỹ sư hiện trường theo địa bàn xã của người dùng
-      dispatch(fetchAssigneesThunk(activeCommuneId) as any)
-    } catch (e) {
-      console.warn('Lỗi khi tải lịch làm việc từ máy chủ:', e)
-    }
+    // Tải danh sách kỹ sư hiện trường theo địa bàn xã của người dùng
+    dispatch(fetchAssigneesRequest(activeCommuneId))
   }, [dispatch, currentMonth, currentYear, activeCommuneId])
 
   const getTodayStr = () => {
@@ -87,7 +83,7 @@ export const WorkSchedulePage: React.FC = () => {
     setIsCreateManualOpen(true)
   }
 
-  const handleCreateNewCaseSubmit = async (payload: any) => {
+  const handleCreateNewCaseSubmit = (payload: any) => {
     // 1. Trích xuất mã tuyến đường từ chuỗi segment (ví dụ: 'SEG-001')
     const segmentIdMatch = payload.segment?.match(/SEG-\d+/i)
     const segmentId = segmentIdMatch ? segmentIdMatch[0].toUpperCase() : 'SEG-001'
@@ -114,13 +110,8 @@ export const WorkSchedulePage: React.FC = () => {
       backendPayload.fault_ids = payload.poleIds || []
     }
 
-    try {
-      await (dispatch(createWorkOrderBackendThunk(backendPayload) as any) as any).unwrap()
-      setIsCreateManualOpen(false)
-      toast.success(`Đã tạo thành công lệnh công tác mới trên máy chủ!`)
-    } catch (err: any) {
-      toast.error(typeof err === 'string' ? err : 'Không thể tạo lệnh công tác trên máy chủ')
-    }
+    dispatch(createWorkOrderRequest(backendPayload))
+    setIsCreateManualOpen(false)
   }
 
   // Xử lý mở giai đoạn tiếp theo (gọi API /follow-up trên máy chủ)
@@ -129,7 +120,7 @@ export const WorkSchedulePage: React.FC = () => {
     setIsNextPhaseModalOpen(true)
   }
 
-  const handleNextPhaseSubmit = async (payload: any) => {
+  const handleNextPhaseSubmit = (payload: any) => {
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
     const parentWorkOrderId = currentPhase?.workOrderId
 
@@ -138,33 +129,24 @@ export const WorkSchedulePage: React.FC = () => {
       return
     }
 
-    try {
-      await (dispatch(
-        followUpWorkOrderBackendThunk({
-          parentWorkOrderId,
-          payload: {
-            task_kind: payload.nextPhaseType,
-            scheduled_date: payload.date,
-            assigned_to: payload.assigneeId,
-            note: payload.notes,
-            materials_note: payload.materialsNote,
-          },
-        }) as any
-      ) as any).unwrap()
-
-      setIsNextPhaseModalOpen(false)
-      dispatch(closeCaseDetail())
-      toast.success(
-        `✓ Đã mở tiếp ${payload.nextPhaseType === 'repair' ? 'Sửa chữa' : 'Kiểm tra'
-        } cho mã lệnh công tác trên máy chủ!`
-      )
-    } catch (err: any) {
-      toast.error(typeof err === 'string' ? err : 'Không thể mở giai đoạn tiếp theo trên máy chủ')
-    }
+    dispatch(
+      followUpWorkOrderRequest({
+        parentWorkOrderId,
+        payload: {
+          task_kind: payload.nextPhaseType,
+          scheduled_date: payload.date,
+          assigned_to: payload.assigneeId,
+          note: payload.notes,
+          materials_note: payload.materialsNote,
+        },
+        nextPhaseLabel: payload.nextPhaseType === 'repair' ? 'Sửa chữa' : 'Kiểm tra',
+      })
+    )
+    setIsNextPhaseModalOpen(false)
   }
 
   // Xử lý Quản lý Yêu cầu làm lại (POST /api/v1/work-orders/{id}/return)
-  const handleReturnPhase = async (_code: string, note: string) => {
+  const handleReturnPhase = (_code: string, note: string) => {
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
     const workOrderId = currentPhase?.workOrderId
 
@@ -173,23 +155,16 @@ export const WorkSchedulePage: React.FC = () => {
       return
     }
 
-    try {
-      await (dispatch(
-        returnWorkOrderBackendThunk({
-          workOrderId,
-          note,
-        }) as any
-      ) as any).unwrap()
-
-      dispatch(closeCaseDetail())
-      toast.success(`✓ Đã gửi yêu cầu làm lại cho Kỹ sư hiện trường trên máy chủ!`)
-    } catch (err: any) {
-      toast.error(typeof err === 'string' ? err : 'Không thể gửi yêu cầu làm lại trên máy chủ')
-    }
+    dispatch(
+      returnWorkOrderRequest({
+        workOrderId,
+        note,
+      })
+    )
   }
 
   // Xử lý đóng thông thường (Khi kiểm tra/khảo sát không phát hiện lỗi - POST /api/v1/work-orders/{id}/cancel)
-  const handleEndNormally = async (_code: string, reason: string) => {
+  const handleEndNormally = (_code: string, reason: string) => {
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
     const workOrderId = currentPhase?.workOrderId
 
@@ -198,23 +173,17 @@ export const WorkSchedulePage: React.FC = () => {
       return
     }
 
-    try {
-      await (dispatch(
-        cancelWorkOrderBackendThunk({
-          workOrderId,
-          note: reason,
-        }) as any
-      ) as any).unwrap()
-
-      dispatch(closeCaseDetail())
-      toast.info(`Đã đóng sự vụ thành công trên máy chủ.`)
-    } catch (err: any) {
-      toast.error(typeof err === 'string' ? err : 'Không thể hủy sự vụ trên máy chủ')
-    }
+    dispatch(
+      cancelWorkOrderRequest({
+        workOrderId,
+        note: reason,
+        successMessage: 'Đã đóng sự vụ thành công trên máy chủ.',
+      })
+    )
   }
 
   // Xử lý Quản lý duyệt sửa chữa & gửi Superior (POST /api/v1/work-orders/{id}/verify)
-  const handleSubmitSuperior = async (_code: string, editedMaterialsNote: string) => {
+  const handleSubmitSuperior = (_code: string, editedMaterialsNote: string) => {
     const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
     const workOrderId = currentPhase?.workOrderId
 
@@ -223,30 +192,23 @@ export const WorkSchedulePage: React.FC = () => {
       return
     }
 
-    try {
-      await (dispatch(
-        verifyWorkOrderBackendThunk({
-          workOrderId,
-          note: 'Quản lý đã nghiệm thu đạt tiêu chuẩn và chuyển hồ sơ lên Superior.',
-          materialsNote: editedMaterialsNote,
-        }) as any
-      ) as any).unwrap()
-
-      dispatch(closeCaseDetail())
-      toast.success(`🎉 Đã duyệt nghiệm thu và gửi báo cáo lên Superior thành công!`)
-    } catch (err: any) {
-      toast.error(typeof err === 'string' ? err : 'Không thể duyệt nghiệm thu trên máy chủ')
-    }
+    dispatch(
+      verifyWorkOrderRequest({
+        workOrderId,
+        note: 'Quản lý đã nghiệm thu đạt tiêu chuẩn và chuyển hồ sơ lên Superior.',
+        materials_note: editedMaterialsNote,
+      })
+    )
   }
 
   // Xử lý Quản lý chỉnh sửa lịch (PATCH /api/v1/work-orders/{id} và PUT /assignee nếu đổi kỹ sư)
-  const handleEditSchedule = async (payload: {
+  const handleEditSchedule = (payload: {
     title: string
     scheduledDate: string
     dueDate: string
     newAssigneeId: string
     materialsNote?: string
-  }) => {
+  }): Promise<void> => {
     const currentPhase =
       selectedCase?.phases[viewingPhaseIndex] ||
       selectedCase?.phases[selectedCase.currentPhaseIndex]
@@ -254,33 +216,26 @@ export const WorkSchedulePage: React.FC = () => {
 
     if (!workOrderId) {
       toast.error('Không tìm thấy mã lệnh công tác để cập nhật trên máy chủ.')
-      return
+      return Promise.resolve()
     }
 
-    try {
-      await (dispatch(
-        patchWorkOrderBackendThunk({
-          workOrderId,
-          payload: {
-            title: payload.title,
-            scheduled_date: payload.scheduledDate,
-            due_date: payload.dueDate,
-            materials_note: payload.materialsNote,
-          },
-          newAssigneeId: payload.newAssigneeId,
-          currentAssigneeId: currentPhase.assigneeId,
-        }) as any
-      ) as any).unwrap()
-
-      toast.success('Đã cập nhật lịch làm việc thành công trên máy chủ!')
-    } catch (err: any) {
-      toast.error(typeof err === 'string' ? err : 'Không thể cập nhật lịch làm việc trên máy chủ')
-      throw err
-    }
+    dispatch(
+      patchWorkOrderRequest({
+        workOrderId,
+        payload: {
+          title: payload.title,
+          scheduled_date: payload.scheduledDate,
+          due_date: payload.dueDate,
+          materials_note: payload.materialsNote,
+        },
+        newAssigneeId: payload.newAssigneeId,
+      })
+    )
+    return Promise.resolve()
   }
 
   // Xử lý Quản lý hủy lịch (POST /api/v1/work-orders/{id}/cancel)
-  const handleCancelSchedule = async (reason: string) => {
+  const handleCancelSchedule = (reason: string): Promise<void> => {
     const currentPhase =
       selectedCase?.phases[viewingPhaseIndex] ||
       selectedCase?.phases[selectedCase.currentPhaseIndex]
@@ -288,23 +243,16 @@ export const WorkSchedulePage: React.FC = () => {
 
     if (!workOrderId) {
       toast.error('Không tìm thấy mã lệnh công tác để hủy.')
-      return
+      return Promise.resolve()
     }
 
-    try {
-      await (dispatch(
-        cancelWorkOrderBackendThunk({
-          workOrderId,
-          note: reason,
-        }) as any
-      ) as any).unwrap()
-
-      dispatch(closeCaseDetail())
-      toast.success(`Đã hủy lịch công tác [${workOrderId}] thành công!`)
-    } catch (err: any) {
-      toast.error(typeof err === 'string' ? err : 'Không thể hủy lịch trên máy chủ')
-      throw err
-    }
+    dispatch(
+      cancelWorkOrderRequest({
+        workOrderId,
+        note: reason,
+      })
+    )
+    return Promise.resolve()
   }
 
   return (

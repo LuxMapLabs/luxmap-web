@@ -1,6 +1,6 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import type { SuperiorReportItem } from '../types/reports/report'
+import type { SuperiorReportItem } from '../../types/reports/report'
 
 /**
  * Xuất trực tiếp một thẻ DOM (biên bản A4) thành file PDF chất lượng cao,

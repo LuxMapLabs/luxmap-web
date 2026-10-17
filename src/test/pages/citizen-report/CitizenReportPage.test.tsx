@@ -24,7 +24,7 @@ import type {
 import { VIETNAM_PHONE_REGEX } from '../../../validations/common.schema'
 
 // Mock indexedDbDraft module
-vi.mock('../../../utils/indexedDbDraft', () => ({
+vi.mock('../../../utils/citizen-report/indexedDbDraft', () => ({
   getCitizenDraft: vi.fn().mockResolvedValue(null),
   saveCitizenDraft: vi.fn().mockResolvedValue(undefined),
   deleteCitizenDraft: vi.fn().mockResolvedValue(undefined),

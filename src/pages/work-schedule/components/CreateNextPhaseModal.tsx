@@ -3,7 +3,7 @@ import { X, CheckCircle, Wrench, Search, Calendar, User, FileText } from 'lucide
 import { toast } from 'sonner'
 import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
 import { PoleSelector } from './PoleSelector'
-import { getPolesBySegment } from '../../../feature/work-schedule/poleUtils'
+import { getPolesBySegment } from '../../../utils/work-schedule/poleUtils'
 
 interface CreateNextPhaseModalProps {
   isOpen: boolean

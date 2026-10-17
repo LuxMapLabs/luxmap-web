@@ -14,7 +14,7 @@ import {
   getCitizenDraft,
   saveCitizenDraft,
   deleteCitizenDraft,
-} from '../../utils/indexedDbDraft'
+} from '../../utils/citizen-report/indexedDbDraft'
 import { convertToJpeg } from '../../utils/imageUtils'
 import type { CitizenReportKind } from '../../types/common/enums'
 import {

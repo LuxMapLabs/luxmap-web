@@ -9,7 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
-import { getPolesBySegment, PoleItem } from '../../../feature/work-schedule/poleUtils'
+import { getPolesBySegment, PoleItem } from '../../../utils/work-schedule/poleUtils'
 
 interface PoleSelectorProps {
   segmentStr: string
