@@ -77,58 +77,28 @@ function App() {
 
             {/* Tuyến bản đồ GIS: Dành cho Cán bộ Quản lý (Manager) & Cấp trên Giám sát (Superior) */}
             <Route
-              path="/gis-map"
               element={
-                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]}>
-                  <GisMapPage />
-                </ProtectedRoute>
+                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]} />
               }
-            />
+            >
+              <Route path="/gis-map" element={<GisMapPage />} />
+            </Route>
 
-            {/* Tuyến Quản lý Lịch làm việc: Dành cho Cán bộ Quản lý (Manager) */}
-            <Route
-              path="/work-schedule"
-              element={
-                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]}>
-                  <WorkSchedulePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/work%20schedule" element={<Navigate to="/work-schedule" replace />} />
-            <Route path="/work schedule" element={<Navigate to="/work-schedule" replace />} />
-            <Route path="/work_schedule" element={<Navigate to="/work-schedule" replace />} />
-            <Route path="/schedule" element={<Navigate to="/work-schedule" replace />} />
-
-            {/* Tuyến Quản lý tài sản: Dành cho Cán bộ Quản lý (Manager) */}
-            <Route
-              path="/assets"
-              element={
-                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]}>
-                  <AssetManagementPage />
-                </ProtectedRoute>
-              }
-            />
+            {/* Tuyến dành riêng cho Cán bộ Quản lý (Manager): Lịch làm việc & Quản lý tài sản */}
+            <Route element={<ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]} />}>
+              <Route path="/work-schedule" element={<WorkSchedulePage />} />
+              <Route path="/assets" element={<AssetManagementPage />} />
+            </Route>
 
             {/* Tuyến Báo cáo & Nghiệm thu: CHỈ DÀNH RIÊNG CHO Cấp trên Giám sát (Superior) */}
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute allowedRoles={[UserRole.ManagementAgency]}>
-                  <SuperiorReportsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/superior-reports" element={<Navigate to="/reports" replace />} />
+            <Route element={<ProtectedRoute allowedRoles={[UserRole.ManagementAgency]} />}>
+              <Route path="/reports" element={<SuperiorReportsPage />} />
+            </Route>
 
             {/* Tuyến đường Quản trị: CHỈ CHO PHÉP Quản trị viên (Admin) */}
-            <Route
-              path="/admin/system"
-              element={
-                <ProtectedRoute allowedRoles={[UserRole.Admin]}>
-                  <AdminManagementPage />
-                </ProtectedRoute>
-              }
-            />
+            <Route element={<ProtectedRoute allowedRoles={[UserRole.Admin]} />}>
+              <Route path="/admin/system" element={<AdminManagementPage />} />
+            </Route>
           </Route>
 
           {/* 404 Not Found Page */}

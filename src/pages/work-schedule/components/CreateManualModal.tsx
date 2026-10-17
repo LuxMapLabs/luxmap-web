@@ -3,7 +3,7 @@ import { X, Calendar, MapPin, User, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
 import { PoleSelector } from './PoleSelector'
-import { getPolesBySegment } from '../../../feature/work-schedule/poleUtils'
+import { getPolesBySegment } from '../../../utils/work-schedule/poleUtils'
 
 interface CreateManualModalProps {
   isOpen: boolean

@@ -1,4 +1,4 @@
-import type { FaultType, Severity } from '../types/common/enums'
+import type { FaultType, Severity } from '../../types/common/enums'
 
 const DB_NAME = 'LuxMapCitizenDB'
 const DB_VERSION = 1

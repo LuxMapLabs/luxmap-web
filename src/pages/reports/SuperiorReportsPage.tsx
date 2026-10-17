@@ -6,7 +6,7 @@ import type { SuperiorReportItem } from '../../types/reports/report'
 import { ReportFilterBar } from './components/ReportFilterBar'
 import { ReportTable } from './components/ReportTable'
 import { ReportDetailModal } from './components/ReportDetailModal'
-import { exportReportToPdf } from '../../utils/reportPdfGenerator'
+import { exportReportToPdf } from '../../utils/reports/reportPdfGenerator'
 
 export const SuperiorReportsPage: React.FC = () => {
   // Trạng thái ngày/tháng được chọn (mặc định tháng hiện tại: Tháng 10 năm 2026)

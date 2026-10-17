@@ -1,5 +1,5 @@
-import type { PoleListItem } from '../types/assets/poles'
-import type { SegmentListItem } from '../types/assets/segments'
+import type { PoleListItem } from '../../types/assets/poles'
+import type { SegmentListItem } from '../../types/assets/segments'
 
 /**
  * DTO thông tin cột đèn giải mã từ mã QR (Local UI Entity)
