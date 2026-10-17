@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { Loader2 } from 'lucide-react'
 import { RootState } from '../redux/rootReducer'
@@ -7,7 +7,7 @@ import { UserRole } from '../types/auth/web'
 import { hasAnyRole } from '../utils/roleUtils'
 
 export interface ProtectedRouteProps {
-  children: ReactNode
+  children?: ReactNode
   allowedRoles?: (UserRole | string | number)[]
 }
 
@@ -16,6 +16,7 @@ export interface ProtectedRouteProps {
  * - Kiểm tra trạng thái xác thực phiên làm việc (Silent Refresh)
  * - Chuyển hướng người dùng chưa đăng nhập về /login
  * - Chặn và chuyển hướng tài khoản không đủ quyền hạn về /forbidden
+ * - Hỗ trợ bọc component con (children) hoặc làm Layout Route Guard (<Outlet />)
  */
 export const ProtectedRoute: FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
   const location = useLocation()
@@ -46,7 +47,7 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = ({ children, allowedRoles
     }
   }
 
-  return <>{children}</>
+  return <>{children ?? <Outlet />}</>
 }
 
 export default ProtectedRoute
