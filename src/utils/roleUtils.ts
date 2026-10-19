@@ -274,7 +274,7 @@ export const isFieldCrew = (role?: UserRole | string | number): boolean => {
  * - các vai trò khác: Tạm thời chưa có tab
  */
 export const canAccessTab = (
-  tabId: 'gis-map' | 'work-schedule' | 'assets' | 'admin-system' | 'reports' | 'citizen-reports',
+  tabId: 'dashboard' | 'gis-map' | 'work-schedule' | 'assets' | 'admin-system' | 'reports' | 'citizen-reports',
   role?: UserRole | string | number
 ): boolean => {
   if (isSystemAdmin(role)) {
@@ -285,6 +285,7 @@ export const canAccessTab = (
   }
   if (isManager(role)) {
     return (
+      tabId === 'dashboard' ||
       tabId === 'gis-map' ||
       tabId === 'work-schedule' ||
       tabId === 'assets' ||

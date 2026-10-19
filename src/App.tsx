@@ -5,7 +5,7 @@ import { Toaster } from 'sonner'
 import { checkAuth } from './feature/auth/authSlice'
 import { UserRole } from './types/auth/web'
 import type { RootState } from './redux/rootReducer'
-import { isSystemAdmin, isManagementAgency } from './utils/roleUtils'
+import { isSystemAdmin, isManagementAgency, isManager } from './utils/roleUtils'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { DefaultLayout } from './layout/DefaultLayout'
 
@@ -14,6 +14,7 @@ import { LoginPage } from './pages/login/LoginPage'
 import { CitizenReportPage } from './pages/citizen-report/CitizenReportPage'
 import { ForbiddenPage } from './pages/forbidden/ForbiddenPage'
 import { GisMapPage } from './pages/gis-map/GisMapPage'
+import { ManagerDashboardPage } from './pages/dashboard/ManagerDashboardPage'
 import { WorkSchedulePage } from './pages/work-schedule/WorkSchedulePage'
 import { AssetManagementPage } from './pages/assets/AssetManagementPage'
 import { AdminManagementPage } from './pages/admin/AdminManagementPage'
@@ -24,7 +25,8 @@ import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
  * - Admin: chuyển sang /admin/system
- * - Manager: chuyển sang /gis-map
+ * - Superior: chuyển sang /reports
+ * - Manager: chuyển sang /dashboard
  */
 const RootRedirect: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
@@ -33,6 +35,9 @@ const RootRedirect: React.FC = () => {
   }
   if (isManagementAgency(user?.role)) {
     return <Navigate to="/reports" replace />
+  }
+  if (isManager(user?.role)) {
+    return <Navigate to="/dashboard" replace />
   }
   return <Navigate to="/gis-map" replace />
 }
@@ -85,8 +90,9 @@ function App() {
               <Route path="/gis-map" element={<GisMapPage />} />
             </Route>
 
-            {/* Tuyến dành riêng cho Cán bộ Quản lý (Manager): Lịch làm việc, Quản lý tài sản & Phản ánh người dân */}
+            {/* Tuyến dành riêng cho Cán bộ Quản lý (Manager): Bảng điều khiển (Dashboard), Lịch làm việc, Quản lý tài sản & Phản ánh người dân */}
             <Route element={<ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]} />}>
+              <Route path="/dashboard" element={<ManagerDashboardPage />} />
               <Route path="/work-schedule" element={<WorkSchedulePage />} />
               <Route path="/assets" element={<AssetManagementPage />} />
               <Route path="/citizen-reports" element={<CitizenReviewPage />} />
