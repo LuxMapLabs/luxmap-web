@@ -52,6 +52,16 @@ export interface PoleListItemPagedResult {
     items?: PoleListItem[]
 }
 
+export interface PoleLocationResponse {
+    pole_id?: string | null
+    lat?: number
+    lng?: number
+    moved_m?: number
+    updated_at?: string | null
+    updated_by?: string | null
+    updated_by_name?: string | null
+}
+
 export interface PoleNoteResponse {
     pole_id?: string | null
     note?: string | null
@@ -63,6 +73,11 @@ export interface PoleNoteResponse {
 export interface SetPoleFeederRequest {
     feeder_id?: string | null
     feeder_source?: string | null
+}
+
+export interface SetPoleLocationRequest {
+    lat?: number
+    lng?: number
 }
 
 export interface SetPoleNoteRequest {

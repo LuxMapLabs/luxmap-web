@@ -11,13 +11,6 @@ type WorkOrderRawItem = WorkOrderItem & Partial<WorkOrderDetail> & {
   ai_detections?: any
 }
 
-const DEFAULT_ASSIGNEE_NAMES: Record<string, string> = {
-  'USR-004': 'Khang Lê',
-  'USR-005': 'Nguyễn Văn Hoàng',
-  'USR-006': 'Trần Minh Tuấn',
-  'USR-khang': 'Khang Lê',
-}
-
 /**
  * Tiện ích chuyển đổi danh sách lệnh công tác (WorkOrderItem[]) từ Backend API
  * thành danh sách hồ sơ sự vụ (ScheduleCase[]) gom nhóm theo chuỗi tiến trình Stepper cho giao diện Calendar.
@@ -29,7 +22,7 @@ export function mapWorkOrdersToScheduleCases(
   if (!rawItems || rawItems.length === 0) return []
 
   // Xây dựng lookup map cho tên kỹ sư từ danh sách assignees thực tế
-  const assigneeNameMap: Record<string, string> = { ...DEFAULT_ASSIGNEE_NAMES }
+  const assigneeNameMap: Record<string, string> = {}
   if (assignees && assignees.length > 0) {
     assignees.forEach((a) => {
       if (a.user_id && a.full_name) {
@@ -65,9 +58,7 @@ export function mapWorkOrdersToScheduleCases(
     const assignedTo = raw.assigned_to || ''
     const assigneeName =
       raw.assignee_name ||
-      assigneeNameMap[assignedTo] ||
-      assignedTo ||
-      'Kỹ sư hiện trường'
+      (assignedTo ? assigneeNameMap[assignedTo] || assignedTo : 'Chưa phân công')
     const scheduledDate = raw.scheduled_date || raw.created_at || '2026-10-01'
     const phaseDate = scheduledDate.substring(0, 10)
     const endReason = raw.end_reason || undefined
@@ -106,7 +97,7 @@ export function mapWorkOrdersToScheduleCases(
       dueDate: raw.due_date || undefined,
       createdAt: raw.created_at || undefined,
       rawStatus: woStatus,
-      assigneeId: assignedTo || 'USR-004',
+      assigneeId: assignedTo || '',
       assigneeName,
       status,
       notes: raw.note || title,
@@ -115,14 +106,14 @@ export function mapWorkOrdersToScheduleCases(
       report:
         raw.report_note || woStatus === 'done' || woStatus === 'verified'
           ? {
-              submittedAt: raw.created_at || `${phaseDate} 17:00`,
-              summary: raw.report_note || 'Báo cáo kỹ thuật hiện trường',
-              usedMaterialsNote: raw.materials_used || undefined,
-              suggestedMaterialsNote: raw.materials_note || undefined,
-              luxMeasured: raw.lux_measured || undefined,
-              videoUrl: raw.video_url || undefined,
-              aiDetections: raw.ai_detections || undefined,
-            }
+            submittedAt: raw.created_at || `${phaseDate} 17:00`,
+            summary: raw.report_note || 'Báo cáo kỹ thuật hiện trường',
+            usedMaterialsNote: raw.materials_used || undefined,
+            suggestedMaterialsNote: raw.materials_note || undefined,
+            luxMeasured: raw.lux_measured || undefined,
+            videoUrl: raw.video_url || undefined,
+            aiDetections: raw.ai_detections || undefined,
+          }
           : undefined,
     }
 

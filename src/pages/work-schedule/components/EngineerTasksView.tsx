@@ -10,7 +10,7 @@ interface EngineerTasksViewProps {
 
 export const EngineerTasksView: React.FC<EngineerTasksViewProps> = ({
   cases,
-  currentEngineerId = 'USR-004',
+  currentEngineerId = '',
   onOpenReportModal,
 }) => {
   // Lọc các vụ việc mà phase đang active được giao cho kỹ sư này
