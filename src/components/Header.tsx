@@ -10,6 +10,8 @@ import {
   RefreshCw,
   ChevronDown,
   CalendarDays,
+  MessageSquareWarning,
+  ClipboardCheck,
 } from 'lucide-react'
 import { User, UserRole } from '../types/auth/web'
 import { getRoleName } from '../utils/roleUtils'
@@ -45,6 +47,8 @@ export const Header: React.FC<HeaderProps> = ({
   const location = useLocation()
   const isWorkSchedule = location.pathname.startsWith('/work-schedule')
   const isAssets = location.pathname.startsWith('/assets')
+  const isCitizenReports = location.pathname.startsWith('/citizen-reports')
+  const isReports = location.pathname.startsWith('/reports')
   const isAdminPath = location.pathname.startsWith('/admin')
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
@@ -125,6 +129,10 @@ export const Header: React.FC<HeaderProps> = ({
               <CalendarDays className="w-4.5 h-4.5" />
             ) : isAssets ? (
               <Boxes className="w-4.5 h-4.5" />
+            ) : isCitizenReports ? (
+              <MessageSquareWarning className="w-4.5 h-4.5" />
+            ) : isReports ? (
+              <ClipboardCheck className="w-4.5 h-4.5" />
             ) : isAdminPath ? (
               <ShieldCheck className="w-4.5 h-4.5" />
             ) : (
@@ -137,6 +145,10 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Lịch làm việc'
                 : isAssets
                 ? 'Quản lý tài sản'
+                : isCitizenReports
+                ? 'Phản ánh người dân'
+                : isReports
+                ? 'Báo cáo & Nghiệm thu'
                 : isAdminPath
                 ? 'Quản trị hệ thống'
                 : 'Bản đồ chiếu sáng'}
@@ -146,6 +158,10 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Lập lịch khảo sát, kiểm tra & điều phối sửa chữa'
                 : isAssets
                 ? 'Danh mục Cột đèn, Tủ điện & Tuyến đường'
+                : isCitizenReports
+                ? 'Thẩm định và xử lý báo cáo sự cố chiếu sáng từ mã QR'
+                : isReports
+                ? 'Tổng hợp số liệu vận hành & chất lượng chiếu sáng'
                 : isAdminPath
                 ? 'Cấu hình và phân quyền người dùng'
                 : 'Giám sát lưới điện & hiện trạng tài sản theo thời gian thực'}

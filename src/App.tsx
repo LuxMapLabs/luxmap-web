@@ -19,6 +19,7 @@ import { AssetManagementPage } from './pages/assets/AssetManagementPage'
 import { AdminManagementPage } from './pages/admin/AdminManagementPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
+import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
@@ -84,10 +85,11 @@ function App() {
               <Route path="/gis-map" element={<GisMapPage />} />
             </Route>
 
-            {/* Tuyến dành riêng cho Cán bộ Quản lý (Manager): Lịch làm việc & Quản lý tài sản */}
+            {/* Tuyến dành riêng cho Cán bộ Quản lý (Manager): Lịch làm việc, Quản lý tài sản & Phản ánh người dân */}
             <Route element={<ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]} />}>
               <Route path="/work-schedule" element={<WorkSchedulePage />} />
               <Route path="/assets" element={<AssetManagementPage />} />
+              <Route path="/citizen-reports" element={<CitizenReviewPage />} />
             </Route>
 
             {/* Tuyến Báo cáo & Nghiệm thu: CHỈ DÀNH RIÊNG CHO Cấp trên Giám sát (Superior) */}

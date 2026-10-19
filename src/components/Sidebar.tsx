@@ -1,5 +1,6 @@
 import React from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import {
   Lightbulb,
   Map,
@@ -9,9 +10,11 @@ import {
   ChevronRight,
   CalendarDays,
   FileCheck2,
+  MessageSquareWarning,
 } from 'lucide-react'
 import { User } from '../types/auth/web'
 import { canAccessTab } from '../utils/roleUtils'
+import type { RootState } from '../redux/rootReducer'
 
 export interface SidebarProps {
   brandTitle?: string
@@ -37,7 +40,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isWorkSchedule = location.pathname.startsWith('/work-schedule')
   const isAssets = location.pathname.startsWith('/assets')
   const isReports = location.pathname.startsWith('/reports')
+  const isCitizenReports = location.pathname.startsWith('/citizen-reports')
   const isAdminPath = location.pathname.startsWith('/admin')
+
+  // Lấy pendingCount từ store để gắn badge
+  const pendingCount = useSelector(
+    (state: RootState) => state.citizenReports?.pendingCount || 0
+  )
 
   // Phân quyền hiển thị từng tab theo vai trò người dùng (RBAC)
   const userRole = user?.role
@@ -45,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const showWorkSchedule = canAccessTab('work-schedule', userRole)
   const showAssets = canAccessTab('assets', userRole)
   const showReports = canAccessTab('reports', userRole)
+  const showCitizenReports = canAccessTab('citizen-reports', userRole)
   const showAdmin = isAdminUser !== undefined ? isAdminUser : canAccessTab('admin-system', userRole)
 
   return (
@@ -181,6 +191,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="flex-1 tracking-tight whitespace-nowrap">Báo cáo & Nghiệm thu</span>
             )}
             {!isCollapsed && isReports && (
+              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
+            )}
+          </NavLink>
+        )}
+
+        {/* Tab Phản ánh người dân (Dành cho Manager và Superior) */}
+        {showCitizenReports && (
+          <NavLink
+            to="/citizen-reports"
+            title="Phản ánh người dân"
+            className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] relative ${
+              isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
+            } ${
+              isCitizenReports
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+            }`}
+          >
+            <MessageSquareWarning
+              className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
+                isCitizenReports ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+              }`}
+            />
+            {!isCollapsed && (
+              <span className="flex-1 tracking-tight whitespace-nowrap">Phản ánh người dân</span>
+            )}
+            {pendingCount > 0 && (
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  isCitizenReports
+                    ? 'bg-white text-blue-700'
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                } ${isCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'}`}
+              >
+                {pendingCount}
+              </span>
+            )}
+            {!isCollapsed && isCitizenReports && pendingCount === 0 && (
               <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
             )}
           </NavLink>
