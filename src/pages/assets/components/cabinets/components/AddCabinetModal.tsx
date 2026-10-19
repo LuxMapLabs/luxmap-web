@@ -10,9 +10,9 @@ import {
   PlusCircle,
   Cpu,
 } from 'lucide-react'
-import { DatePicker } from '../../../../components/DatePicker'
-import type { CabinetListItem } from '../../../../types/assets/cabinets'
-import type { SegmentListItem } from '../../../../types/assets/segments'
+import { DatePicker } from '../../../../../components/DatePicker'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
 
 interface CabinetRowDraft {
   rowId: string
@@ -32,22 +32,15 @@ interface AddCabinetModalProps {
   availableCabinets?: CabinetListItem[]
 }
 
-const DEFAULT_SEGMENTS: SegmentListItem[] = [
-  { segment_id: 'SEG-001', external_ref: 'SEG-001', segment_name: 'Tuyến A - Tỉnh Lộ 8', road_class: 'inter_commune', length_m: 1200, commune_id: 'COM-001', data_source: 'field', pole_count: 46, updated_at: null },
-  { segment_id: 'SEG-002', external_ref: 'SEG-002', segment_name: 'Tuyến B - Nguyễn Văn Ni', road_class: 'inter_commune', length_m: 850, commune_id: 'COM-001', data_source: 'field', pole_count: 31, updated_at: null },
-  { segment_id: 'SEG-003', external_ref: 'SEG-003', segment_name: 'Tuyến C - Huỳnh Văn Cọ', road_class: 'inter_village', length_m: 720, commune_id: 'COM-001', data_source: 'field', pole_count: 26, updated_at: null },
-]
-
 export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
   isOpen,
   onClose,
   onAddCabinet,
   onAddCabinets,
-  existingCount: _existingCount,
   availableSegments,
   availableCabinets = [],
 }) => {
-  const segmentList = availableSegments && availableSegments.length > 0 ? availableSegments : DEFAULT_SEGMENTS
+  const segmentList = availableSegments || []
 
   // Top Section: Segment, Date
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
@@ -157,7 +150,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
     setRows((prev) => prev.filter((r) => r.rowId !== rowId))
   }
 
-  const handleUpdateRow = (rowId: string, field: keyof CabinetRowDraft, value: any) => {
+  const handleUpdateRow = <K extends keyof CabinetRowDraft>(rowId: string, field: K, value: CabinetRowDraft[K]) => {
     setRows((prev) =>
       prev.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r))
     )

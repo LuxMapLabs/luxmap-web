@@ -1,7 +1,7 @@
 import React from 'react'
 import { Edit2, Archive, CheckCircle2, AlertCircle, Boxes } from 'lucide-react'
-import type { ManagedFixture } from '../../../../hooks/assets/useAssetData'
-import type { PoleListItem } from '../../../../types/assets/poles'
+import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
+import type { PoleListItem } from '../../../../../types/assets/poles'
 import { FixtureTableSkeleton } from './FixtureTableSkeleton'
 
 interface FixtureTableProps {

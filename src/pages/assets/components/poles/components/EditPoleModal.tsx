@@ -8,12 +8,13 @@ import {
   MapPin,
   Zap,
 } from 'lucide-react'
-import type { RootState } from '../../../../redux/rootReducer'
-import type { PoleListItem } from '../../../../types/assets/poles'
-import type { SegmentListItem } from '../../../../types/assets/segments'
-import type { CabinetListItem } from '../../../../types/assets/cabinets'
-import { parseLineStringWkt } from '../../../../utils/gis-map/routeUtils'
-import { EditPoleMap } from './components/EditPoleMap'
+import type { FeatureCollection, Feature } from 'geojson'
+import type { RootState } from '../../../../../redux/rootReducer'
+import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
+import { EditPoleMap } from './EditPoleMap'
 
 export interface EditPoleModalProps {
   isOpen: boolean
@@ -65,7 +66,7 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
 
     // 1. ƯU TIÊN SỐ 1: Lấy LineString chuẩn từ PostGIS Backend (state.map.segments)
     const mapSeg = mapSegments.find(
-      (s) => s.properties?.segment_id === segmentId || (s as any).id === segmentId
+      (s) => s.properties?.segment_id === segmentId
     )
     if (
       mapSeg &&
@@ -82,8 +83,8 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
     const found = segments.find(
       (s) => s.segment_id === segmentId || s.external_ref === segmentId
     )
-    if (found && (found as any).geom_wkt) {
-      const parsed = parseLineStringWkt((found as any).geom_wkt)
+    if (found && 'geom_wkt' in found && typeof found.geom_wkt === 'string') {
+      const parsed = parseLineStringWkt(found.geom_wkt)
       if (parsed.length >= 2) return parsed
     }
 
@@ -112,11 +113,11 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
   }, [segmentId, mapSegments, segments, allPoles])
 
   // Trích xuất các cột khác trên cùng tuyến đường (GeoJSON FeatureCollection)
-  const otherPolesGeoJSON = useMemo<GeoJSON.FeatureCollection>(() => {
+  const otherPolesGeoJSON = useMemo<FeatureCollection>(() => {
     if (!segmentId) {
       return { type: 'FeatureCollection', features: [] }
     }
-    const features: GeoJSON.Feature[] = allPoles
+    const features: Feature[] = allPoles
       .filter(
         (p) =>
           p.segment_id === segmentId &&

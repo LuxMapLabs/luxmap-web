@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, AlertTriangle, Archive, RotateCcw } from 'lucide-react'
-import type { RetireFixtureRequest } from '../../../../types/assets/fixtures'
-import type { ManagedFixture } from '../../../../hooks/assets/useAssetData'
+import type { RetireFixtureRequest } from '../../../../../types/assets/fixtures'
+import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 
 interface RetireFixtureModalProps {
   isOpen: boolean

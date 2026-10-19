@@ -4,9 +4,9 @@ import type { CreateFixtureRequest } from '../../../../types/assets/fixtures'
 import type { ManagedFixture } from '../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../types/assets/segments'
-import { FixtureTable } from './FixtureTable'
-import { AddFixtureModal } from './AddFixtureModal'
-import { EditFixtureModal } from './EditFixtureModal'
+import { FixtureTable } from './components/FixtureTable'
+import { AddFixtureModal } from './components/AddFixtureModal'
+import { EditFixtureModal } from './components/EditFixtureModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface FixturesTabProps {
@@ -108,7 +108,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
 
       return () => clearTimeout(timer)
     }
-  }, [activeFixtureCode, filteredFixtures, pageSize])
+  }, [activeFixtureCode, filteredFixtures, pageSize, onClearActiveFixture])
 
   // Paginated List
   const paginatedFixtures = useMemo(() => {
@@ -163,7 +163,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => {
-                setStatusFilter(e.target.value as any)
+                setStatusFilter(e.target.value as 'all' | 'active' | 'retired')
                 setCurrentPage(1)
               }}
               className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"

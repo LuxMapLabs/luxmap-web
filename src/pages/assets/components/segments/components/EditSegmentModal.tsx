@@ -2,12 +2,12 @@ import React, { useState, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
 import { Route, X, CheckCircle2, MapPin, RotateCcw } from 'lucide-react'
-import { SegmentRouteMap, SegmentPoleItem } from '../../../../components/SegmentRouteMap'
-import { calculateRouteLengthMeters, extractSegmentCoordinates } from '../../../../utils/gis-map/routeUtils'
-import { CU_CHI_COMMUNES_MAP } from '../../../../constants/communes'
-import type { RoadClass } from '../../../../types/common/enums'
-import type { SegmentListItem } from '../../../../types/assets/segments'
-import type { RootState } from '../../../../redux/rootReducer'
+import { SegmentRouteMap, SegmentPoleItem } from '../../../../../components/SegmentRouteMap'
+import { calculateRouteLengthMeters, extractSegmentCoordinates } from '../../../../../utils/gis-map/routeUtils'
+import { CU_CHI_COMMUNES_MAP } from '../../../../../constants/communes'
+import type { RoadClass } from '../../../../../types/common/enums'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
+import type { RootState } from '../../../../../redux/rootReducer'
 
 export interface EditSegmentModalProps {
   isOpen: boolean
@@ -137,7 +137,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
     const geomWkt =
       routeCoords.length >= 2
         ? `LINESTRING(${routeCoords.map((c) => `${c[0]} ${c[1]}`).join(', ')})`
-        : (segment as any).geom_wkt || null
+        : (segment as SegmentListItem & { geom_wkt?: string | null }).geom_wkt || null
 
     onSave({
       ...segment,

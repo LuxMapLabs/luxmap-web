@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react'
 import { Search, Plus, Upload, Filter } from 'lucide-react'
 import type { SegmentListItem } from '../../../../types/assets/segments'
-import { SegmentTable } from './SegmentTable'
-import { AddSegmentModal } from './AddSegmentModal'
-import { EditSegmentModal } from './EditSegmentModal'
-import { SegmentDetailModal } from './SegmentDetailModal'
+import { SegmentTable } from './components/SegmentTable'
+import { AddSegmentModal } from './components/AddSegmentModal'
+import { EditSegmentModal } from './components/EditSegmentModal'
+import { SegmentDetailModal } from './components/SegmentDetailModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface SegmentsTabProps {

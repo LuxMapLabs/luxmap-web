@@ -2,12 +2,12 @@ import React, { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
 import { X, Route, MapPin, CheckCircle2 } from 'lucide-react'
-import { SegmentRouteMap, SegmentPoleItem } from '../../../../components/SegmentRouteMap'
-import { extractSegmentCoordinates } from '../../../../utils/gis-map/routeUtils'
-import type { SegmentListItem } from '../../../../types/assets/segments'
-import type { RootState } from '../../../../redux/rootReducer'
-import { getDataSourceDisplayName } from '../../../../constants/enums'
-import { formatCommuneDisplayName } from '../../../../constants/communes'
+import { SegmentRouteMap, SegmentPoleItem } from '../../../../../components/SegmentRouteMap'
+import { extractSegmentCoordinates } from '../../../../../utils/gis-map/routeUtils'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
+import type { RootState } from '../../../../../redux/rootReducer'
+import { getDataSourceDisplayName } from '../../../../../constants/enums'
+import { formatCommuneDisplayName } from '../../../../../constants/communes'
 
 interface SegmentDetailModalProps {
   segment: SegmentListItem | null

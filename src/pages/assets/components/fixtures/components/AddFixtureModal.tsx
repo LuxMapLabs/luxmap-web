@@ -9,10 +9,10 @@ import {
   Route,
   AlertCircle,
 } from 'lucide-react'
-import type { CreateFixtureRequest } from '../../../../types/assets/fixtures'
-import type { FixtureType, PowerSource, DataSource } from '../../../../types/common/enums'
-import type { PoleListItem } from '../../../../types/assets/poles'
-import type { SegmentListItem } from '../../../../types/assets/segments'
+import type { CreateFixtureRequest } from '../../../../../types/assets/fixtures'
+import type { FixtureType, PowerSource, DataSource } from '../../../../../types/common/enums'
+import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
 
 export interface AddFixtureModalProps {
   isOpen: boolean

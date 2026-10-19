@@ -1,9 +1,9 @@
 import React from 'react'
 import { Eye, Edit2, Database } from 'lucide-react'
-import type { SegmentListItem } from '../../../../types/assets/segments'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
 import { SegmentTableSkeleton } from './SegmentTableSkeleton'
-import { getCommuneName } from '../../../../constants/communes'
-import { getDataSourceDisplayName } from '../../../../constants/enums'
+import { getCommuneName } from '../../../../../constants/communes'
+import { getDataSourceDisplayName } from '../../../../../constants/enums'
 
 export interface SegmentTableProps {
   segments: SegmentListItem[]

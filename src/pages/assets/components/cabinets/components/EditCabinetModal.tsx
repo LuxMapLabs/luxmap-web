@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Zap, X, CheckCircle2 } from 'lucide-react'
-import type { CabinetListItem } from '../../../../types/assets/cabinets'
-import type { SegmentListItem } from '../../../../types/assets/segments'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
 
 export interface EditCabinetModalProps {
   isOpen: boolean

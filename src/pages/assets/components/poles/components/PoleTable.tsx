@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react'
 import { Eye, Edit2, Zap, Bookmark, Lightbulb, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
-import { StatusBadge } from '../../../../components/StatusBadge'
-import type { PoleListItem } from '../../../../types/assets/poles'
-import type { CabinetListItem } from '../../../../types/assets/cabinets'
-import type { SegmentListItem } from '../../../../types/assets/segments'
+import { StatusBadge } from '../../../../../components/StatusBadge'
+import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
 import { PoleTableSkeleton } from './PoleTableSkeleton'
 
 export interface PoleTableProps {

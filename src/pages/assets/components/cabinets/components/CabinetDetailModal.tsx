@@ -1,7 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { X, Zap, MapPin } from 'lucide-react'
-import type { CabinetListItem } from '../../../../types/assets/cabinets'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 
 interface CabinetDetailModalProps {
   cabinet: CabinetListItem | null
