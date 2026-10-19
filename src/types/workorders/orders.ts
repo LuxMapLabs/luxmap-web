@@ -2,7 +2,7 @@
  * Auto-generated Types for: workorders/orders
  * Sinh tự động từ endpoint Backend
  */
-import type { AgendaFlag, EvidenceKind, FaultStatus, FaultType, FixtureStatus, FixtureType, InspectionOutcome, Severity, TaskKind, WorkOrderStatus } from '../common/enums'
+import type { AgendaFlag, DataSource, EvidenceKind, FaultStatus, FaultType, FixtureStatus, FixtureType, InspectionOutcome, Severity, TaskKind, WorkOrderStatus } from '../common/enums'
 
 export interface AgendaWorkOrder {
     work_order_id: string | null
@@ -93,6 +93,44 @@ export interface PatchWorkOrderRequest {
     due_date?: string | null
     scheduled_date?: string | null
     materials_note?: any
+}
+
+export interface PolePhotoDecisionRequest {
+    decision: 'confirm' | 'reject'
+    note?: string | null
+}
+
+export interface PolePhotoItem {
+    photo_id?: string | null
+    work_order_id?: string | null
+    pole_id?: string | null
+    data_source?: DataSource
+    captured_at?: string | null
+    lat?: number
+    lng?: number
+    uploaded_by?: string | null
+    uploaded_at?: string | null
+    ai_status?: 'available' | 'unavailable'
+    cv_state?: 'on' | 'off' | 'inconclusive'
+    confidence?: number
+    model_version?: string | null
+    artifact_version?: string | null
+    analyzed_at?: string | null
+    decision?: 'confirm' | 'reject'
+    decided_by?: string | null
+    decided_at?: string | null
+    decision_note?: string | null
+    status_applied?: boolean
+    status_reason?: 'applied' | 'classification_preserved' | 'not_newer' | 'rejected'
+    thumbnail_url?: string | null
+    original_url?: string | null
+}
+
+export interface PolePhotoItemPagedResult {
+    page?: number
+    page_size?: number
+    total?: number
+    items?: PolePhotoItem[]
 }
 
 export interface ReviewWorkOrderRequest {

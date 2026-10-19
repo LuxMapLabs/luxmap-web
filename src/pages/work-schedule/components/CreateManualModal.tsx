@@ -3,7 +3,6 @@ import { X, Calendar, MapPin, User, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
 import { PoleSelector } from './PoleSelector'
-import { getPolesBySegment } from '../../../utils/work-schedule/poleUtils'
 
 interface CreateManualModalProps {
   isOpen: boolean
@@ -20,6 +19,7 @@ interface CreateManualModalProps {
     date: string
     notes?: string
     poleIds?: string[]
+    faultIds?: string[]
   }) => void
 }
 
@@ -45,9 +45,17 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   const [title, setTitle] = useState('')
   const [segment, setSegment] = useState(SEGMENTS[0])
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>([])
-  const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || 'USR-004')
+  const [selectedFaultIds, setSelectedFaultIds] = useState<string[]>([])
+  const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || '')
   const [date, setDate] = useState(defaultDate || getTodayStr())
   const [notes, setNotes] = useState('')
+
+  // Đồng bộ kỹ sư khi danh sách assignees tải xong từ API
+  useEffect(() => {
+    if (!assigneeId && assignees && assignees.length > 0) {
+      setAssigneeId(assignees[0].user_id || '')
+    }
+  }, [assignees, assigneeId])
 
   // Đồng bộ ngày khi mở modal từ ô lịch hoặc nút tạo mới
   useEffect(() => {
@@ -58,16 +66,10 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
     }
   }, [defaultDate, isOpen])
 
-  // Cập nhật danh sách cột khi thay đổi tuyến đường hoặc giai đoạn
+  // Reset khi đổi tuyến đường hoặc giai đoạn
   useEffect(() => {
-    if (initPhase === 'survey') {
-      setSelectedPoleIds([])
-    } else {
-      const poles = getPolesBySegment(segment)
-      if (poles.length > 0) {
-        setSelectedPoleIds([poles[0].poleId])
-      }
-    }
+    setSelectedPoleIds([])
+    setSelectedFaultIds([])
   }, [segment, initPhase])
 
   if (!isOpen) return null
@@ -83,25 +85,51 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       return
     }
 
-    if (initPhase !== 'survey' && selectedPoleIds.length === 0) {
-      toast.warning(
-        `Vui lòng chọn ít nhất 01 cột đèn cần ${initPhase === 'inspection' ? 'kiểm tra' : 'sửa chữa'}!`
-      )
+    if (initPhase === 'repair' && selectedFaultIds.length === 0) {
+      toast.warning('Vui lòng chọn ít nhất 01 sự cố cần sửa chữa trên tuyến này!')
       return
     }
 
     const selectedAssignee = assignees.find((a) => a.user_id === assigneeId)
-    const assigneeName = selectedAssignee?.full_name ? selectedAssignee.full_name.split(' (')[0] : 'Khang Lê'
+    const assigneeName = selectedAssignee?.full_name ? selectedAssignee.full_name.split(' (')[0] : 'Kỹ sư hiện trường'
+
+    // Xây dựng tiêu đề và ghi chú thông minh
+    let effectiveTitle = title.trim()
+    let effectiveNotes = notes.trim()
+    const segmentShortName = segment.split(' (')[0]
+
+    if (initPhase === 'inspection') {
+      if (selectedPoleIds.length > 0) {
+        if (!effectiveTitle) {
+          effectiveTitle = `Kiểm tra cột ${selectedPoleIds.join(', ')} - ${segmentShortName}`
+        }
+        const poleNote = `[Chỉ định kiểm tra trọng tâm]: ${selectedPoleIds.join(', ')}`
+        effectiveNotes = effectiveNotes ? `${effectiveNotes}\n${poleNote}` : poleNote
+      } else {
+        if (!effectiveTitle) {
+          effectiveTitle = `Kiểm tra toàn tuyến ${segmentShortName}`
+        }
+      }
+    } else if (initPhase === 'repair') {
+      if (!effectiveTitle) {
+        effectiveTitle = `Sửa chữa cột ${selectedPoleIds.join(', ')} - ${segmentShortName}`
+      }
+    } else {
+      if (!effectiveTitle) {
+        effectiveTitle = `Khảo sát đêm tuyến ${segmentShortName}`
+      }
+    }
 
     onSubmit({
-      title: title.trim() || 'Sự cố chiếu sáng mới',
+      title: effectiveTitle,
       segment,
       initPhase,
       assigneeId,
       assigneeName,
       date,
-      notes: notes.trim(),
-      poleIds: initPhase === 'survey' ? undefined : selectedPoleIds,
+      notes: effectiveNotes,
+      poleIds: selectedPoleIds,
+      faultIds: selectedFaultIds,
     })
   }
 
@@ -180,13 +208,39 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               </select>
             </div>
 
-            {/* Chọn cột đèn theo tuyến đường: Tự động hiển thị khi loại việc là Kiểm tra hoặc Sửa chữa */}
-            {initPhase !== 'survey' && (
+            {/* 1. Với Khảo sát: Áp dụng toàn tuyến */}
+            {initPhase === 'survey' && (
+              <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-2xl text-xs text-blue-900 flex items-center gap-2">
+                <span className="font-extrabold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">Khảo sát đêm:</span>
+                <span>Thu thập dữ liệu đo lux và video trên toàn bộ tuyến đường đã chọn.</span>
+              </div>
+            )}
+
+            {/* 2. Với Kiểm tra: Chọn cột đèn có sự cố trên tuyến */}
+            {initPhase === 'inspection' && (
               <PoleSelector
                 segmentStr={segment}
                 selectedPoleIds={selectedPoleIds}
-                onChange={setSelectedPoleIds}
-                taskKindName={initPhase === 'inspection' ? 'Kiểm tra' : 'Sửa chữa'}
+                onChange={(poleIds, faultIds) => {
+                  setSelectedPoleIds(poleIds)
+                  if (faultIds) setSelectedFaultIds(faultIds)
+                }}
+                taskKindName="Kiểm tra"
+                allowEmpty={false}
+              />
+            )}
+
+            {/* 3. Với Sửa chữa: Chọn cột đèn có sự cố trên tuyến */}
+            {initPhase === 'repair' && (
+              <PoleSelector
+                segmentStr={segment}
+                selectedPoleIds={selectedPoleIds}
+                onChange={(poleIds, faultIds) => {
+                  setSelectedPoleIds(poleIds)
+                  if (faultIds) setSelectedFaultIds(faultIds)
+                }}
+                taskKindName="Sửa chữa"
+                allowEmpty={false}
               />
             )}
 
@@ -201,11 +255,15 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 onChange={(e) => setAssigneeId(e.target.value)}
                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {assignees.map((a) => (
-                  <option key={a.user_id || ''} value={a.user_id || ''}>
-                    {a.full_name || a.user_id || ''}
-                  </option>
-                ))}
+                {assignees.length === 0 ? (
+                  <option value="">Chưa có kỹ sư thuộc địa bàn này</option>
+                ) : (
+                  assignees.map((a) => (
+                    <option key={a.user_id || ''} value={a.user_id || ''}>
+                      {a.full_name || a.user_id || ''}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 

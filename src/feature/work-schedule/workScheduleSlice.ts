@@ -51,11 +51,7 @@ const initialState: WorkScheduleState = {
   totalWorkOrders: 0,
   selectedWorkOrderId: null,
   workOrderDetail: null,
-  assignees: [
-    { user_id: 'USR-004', full_name: 'Khang Lê (Field Crew 1)' },
-    { user_id: 'USR-005', full_name: 'Nguyễn Văn Hoàng (Field Crew 2)' },
-    { user_id: 'USR-006', full_name: 'Trần Minh Tuấn (Field Crew 3)' },
-  ],
+  assignees: [],
 
   isLoadingWorkOrders: false,
   workOrdersError: null,
@@ -152,14 +148,7 @@ export const workScheduleSlice = createSlice({
     fetchAssigneesSuccess(state, action: PayloadAction<WorkOrderAssignee[]>) {
       state.isLoadingAssignees = false
       state.assigneesError = null
-      if (action.payload && action.payload.length > 0) {
-        const hasSpecificEngineers = action.payload.some(
-          (a) => a.full_name && a.full_name !== 'Kỹ sư hiện trường'
-        )
-        if (hasSpecificEngineers) {
-          state.assignees = action.payload
-        }
-      }
+      state.assignees = action.payload || []
       if (state.workOrders.length > 0) {
         state.cases = mapWorkOrdersToScheduleCases(state.workOrders, state.assignees)
       }

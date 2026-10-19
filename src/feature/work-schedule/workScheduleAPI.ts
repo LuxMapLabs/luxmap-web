@@ -1,4 +1,4 @@
-import { apiClient } from '../../config/apiClient'
+import apiClient from '../../config/apiClient'
 import type { TaskKind, WorkOrderStatus } from '../../types/common/enums'
 import type {
   WorkOrderDetail,

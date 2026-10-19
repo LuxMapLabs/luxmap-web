@@ -110,7 +110,15 @@ function* handleFetchWorkOrderDetail(action: PayloadAction<string>) {
  */
 function* handleFetchAssignees(action: PayloadAction<string | undefined>) {
   try {
-    const communeId = action.payload || 'COM-001'
+    let communeId = action.payload
+    if (!communeId) {
+      const state: RootState = yield select()
+      communeId = state.auth.user?.administrativeUnitId || state.auth.user?.communeIds?.[0]
+    }
+    if (!communeId) {
+      yield put(fetchAssigneesSuccess([]))
+      return
+    }
     const result: WorkOrderAssigneePagedResult = yield call(workScheduleAPI.getAssignees, communeId)
     yield put(fetchAssigneesSuccess(result.items || []))
   } catch (error: any) {

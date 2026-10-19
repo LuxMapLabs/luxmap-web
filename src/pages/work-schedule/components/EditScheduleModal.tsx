@@ -39,7 +39,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
       const initialDate = currentPhase.date || new Date().toISOString().substring(0, 10)
       setScheduledDate(initialDate)
       setDueDate(currentPhase.dueDate || initialDate)
-      setAssigneeId(currentPhase.assigneeId || assignees[0]?.user_id || 'USR-004')
+      setAssigneeId(currentPhase.assigneeId || assignees[0]?.user_id || '')
       setMaterialsNote(currentPhase.materialsNote || '')
     }
   }, [isOpen, currentPhase, caseItem, assignees])
@@ -201,11 +201,15 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               onChange={(e) => setAssigneeId(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition cursor-pointer"
             >
-              {assignees.map((a) => (
-                <option key={a.user_id || ''} value={a.user_id || ''}>
-                  {a.full_name || a.user_id || ''}
-                </option>
-              ))}
+              {assignees.length === 0 ? (
+                <option value="">Chưa có kỹ sư thuộc địa bàn này</option>
+              ) : (
+                assignees.map((a) => (
+                  <option key={a.user_id || ''} value={a.user_id || ''}>
+                    {a.full_name || a.user_id || ''}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

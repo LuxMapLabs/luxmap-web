@@ -103,11 +103,15 @@ export const WorkSchedulePage: React.FC = () => {
       backendPayload.commune_id = activeCommuneId
       backendPayload.segment_ids = [segmentId]
     } else if (payload.initPhase === 'inspection') {
-      // Backend Inspection: Yêu cầu segment_id
-      backendPayload.segment_id = segmentId
+      // Backend Inspection: Nếu có fault_ids từ các cột đã chọn thì gửi fault_ids, nếu không có thì gửi segment_id
+      if (payload.faultIds && payload.faultIds.length > 0) {
+        backendPayload.fault_ids = payload.faultIds
+      } else {
+        backendPayload.segment_id = segmentId
+      }
     } else if (payload.initPhase === 'repair') {
-      // Backend Repair: Yêu cầu fault_ids[]
-      backendPayload.fault_ids = payload.poleIds || []
+      // Backend Repair: Yêu cầu fault_ids[] của các sự cố đã xác nhận
+      backendPayload.fault_ids = payload.faultIds || []
     }
 
     dispatch(createWorkOrderRequest(backendPayload))
@@ -129,16 +133,22 @@ export const WorkSchedulePage: React.FC = () => {
       return
     }
 
+    const followUpPayload: any = {
+      task_kind: payload.nextPhaseType,
+      scheduled_date: payload.date,
+      assigned_to: payload.assigneeId,
+      note: payload.notes,
+      materials_note: payload.materialsNote,
+    }
+
+    if (payload.faultIds && payload.faultIds.length > 0) {
+      followUpPayload.fault_ids = payload.faultIds
+    }
+
     dispatch(
       followUpWorkOrderRequest({
         parentWorkOrderId,
-        payload: {
-          task_kind: payload.nextPhaseType,
-          scheduled_date: payload.date,
-          assigned_to: payload.assigneeId,
-          note: payload.notes,
-          materials_note: payload.materialsNote,
-        },
+        payload: followUpPayload,
         nextPhaseLabel: payload.nextPhaseType === 'repair' ? 'Sửa chữa' : 'Kiểm tra',
       })
     )
@@ -163,23 +173,36 @@ export const WorkSchedulePage: React.FC = () => {
     )
   }
 
-  // Xử lý đóng thông thường (Khi kiểm tra/khảo sát không phát hiện lỗi - POST /api/v1/work-orders/{id}/cancel)
+  // Xử lý hoàn tất / đóng sự vụ thông thường (Dùng verify nếu kỹ sư đã nộp báo cáo done, cancel nếu lệnh chưa chạy)
   const handleEndNormally = (_code: string, reason: string) => {
-    const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const currentPhase =
+      selectedCase?.phases[viewingPhaseIndex] ||
+      selectedCase?.phases[selectedCase.currentPhaseIndex]
     const workOrderId = currentPhase?.workOrderId
 
     if (!workOrderId) {
-      toast.error('Không tìm thấy mã lệnh công tác để hủy.')
+      toast.error('Không tìm thấy mã lệnh công tác để hoàn tất.')
       return
     }
 
-    dispatch(
-      cancelWorkOrderRequest({
-        workOrderId,
-        note: reason,
-        successMessage: 'Đã đóng sự vụ thành công trên máy chủ.',
-      })
-    )
+    // Nếu lệnh đang ở trạng thái 'done' (kỹ sư đã nộp báo cáo), duyệt nghiệm thu bằng verify
+    if (currentPhase?.rawStatus === 'done' || currentPhase?.status === 'reported') {
+      dispatch(
+        verifyWorkOrderRequest({
+          workOrderId,
+          note: reason || 'Quản lý đã duyệt báo cáo và hoàn tất sự vụ.',
+        })
+      )
+    } else {
+      // Nếu lệnh chưa thực hiện (open, assigned, in_progress), hủy bằng cancel
+      dispatch(
+        cancelWorkOrderRequest({
+          workOrderId,
+          note: reason,
+          successMessage: 'Đã đóng sự vụ thành công trên máy chủ.',
+        })
+      )
+    }
   }
 
   // Xử lý Quản lý duyệt sửa chữa & gửi Superior (POST /api/v1/work-orders/{id}/verify)
@@ -311,7 +334,11 @@ export const WorkSchedulePage: React.FC = () => {
         isOpen={isNextPhaseModalOpen}
         caseCode={selectedCaseCode || ''}
         segment={selectedCase?.segment}
-        defaultPoleIds={selectedCase?.poleIds || selectedCase?.phases[selectedCase.currentPhaseIndex]?.poleIds}
+        defaultPoleIds={
+          selectedCase?.poleIds ||
+          selectedCase?.phases[selectedCase.currentPhaseIndex]?.poleIds ||
+          selectedCase?.phases[viewingPhaseIndex]?.poleIds
+        }
         targetNextPhaseType={targetNextPhaseType}
         assignees={assignees}
         onClose={() => setIsNextPhaseModalOpen(false)}

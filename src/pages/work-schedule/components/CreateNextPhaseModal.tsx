@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, CheckCircle, Wrench, Search, Calendar, User, FileText } from 'lucide-react'
-import { toast } from 'sonner'
 import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
 import { PoleSelector } from './PoleSelector'
-import { getPolesBySegment } from '../../../utils/work-schedule/poleUtils'
 
 interface CreateNextPhaseModalProps {
   isOpen: boolean
@@ -22,6 +20,7 @@ interface CreateNextPhaseModalProps {
     materialsNote?: string
     notes?: string
     poleIds?: string[]
+    faultIds?: string[]
   }) => void
 }
 
@@ -40,28 +39,34 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || 'USR-004')
+  const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || '')
   const [date, setDate] = useState(getTodayStr())
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(defaultPoleIds)
+  const [selectedFaultIds, setSelectedFaultIds] = useState<string[]>([])
   const [materialsNote, setMaterialsNote] = useState(
     '02 bóng LED 100W Rạng Đông, 01 aptomat 16A, 01 cuộn cáp mạ kẽm'
   )
   const [notes, setNotes] = useState('Thực hiện đúng quy chuẩn an toàn lao động và đo kiểm ban đêm.')
 
+  // Đồng bộ kỹ sư khi danh sách assignees tải xong từ API
+  useEffect(() => {
+    if (!assigneeId && assignees && assignees.length > 0) {
+      setAssigneeId(assignees[0].user_id || '')
+    }
+  }, [assignees, assigneeId])
+
+  // Khởi tạo lựa chọn chỉ một lần khi mở modal
   useEffect(() => {
     if (isOpen) {
       setDate(getTodayStr())
       if (defaultPoleIds && defaultPoleIds.length > 0) {
-        setSelectedPoleIds(defaultPoleIds)
+        setSelectedPoleIds([...defaultPoleIds])
       } else {
-        const poles = getPolesBySegment(segment)
-        if (poles.length > 0) {
-          // Gợi ý chọn sẵn cột đầu tiên
-          setSelectedPoleIds([poles[0].poleId])
-        }
+        setSelectedPoleIds([])
       }
+      setSelectedFaultIds([])
     }
-  }, [isOpen, segment, defaultPoleIds])
+  }, [isOpen, caseCode])
 
   if (!isOpen) return null
 
@@ -70,15 +75,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (selectedPoleIds.length === 0) {
-      toast.warning(
-        `Vui lòng chọn ít nhất 01 cột đèn cần ${isRepair ? 'sửa chữa' : 'kiểm tra'}!`
-      )
-      return
-    }
-
     const selectedAssignee = assignees.find((a) => a.user_id === assigneeId)
-    const assigneeName = selectedAssignee?.full_name ? selectedAssignee.full_name.split(' (')[0] : 'Khang Lê'
+    const assigneeName = selectedAssignee?.full_name ? selectedAssignee.full_name.split(' (')[0] : 'Kỹ sư hiện trường'
 
     onSubmit({
       code: caseCode,
@@ -88,7 +86,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
       assigneeName,
       materialsNote: isRepair ? materialsNote : undefined,
       notes,
-      poleIds: selectedPoleIds,
+      poleIds: !isRepair ? selectedPoleIds : undefined,
+      faultIds: isRepair ? selectedFaultIds : undefined,
     })
   }
 
@@ -139,13 +138,45 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
               </div>
             </div>
 
-            {/* Chọn cột đèn cần tác nghiệp */}
-            <PoleSelector
-              segmentStr={segment}
-              selectedPoleIds={selectedPoleIds}
-              onChange={setSelectedPoleIds}
-              taskKindName={isRepair ? 'Sửa chữa' : 'Kiểm tra'}
-            />
+            {/* Đối tượng thực hiện: Cột đèn có sự cố cho Kiểm tra, Kế thừa tự động cho Sửa chữa */}
+            {isRepair ? (
+              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/90 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
+                  <Wrench className="w-4 h-4 text-emerald-600" />
+                  <span>Cột đèn cần Sửa chữa (Tự động kế thừa từ giai đoạn Kiểm tra):</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                  {selectedPoleIds.length > 0 ? (
+                    selectedPoleIds.map((pid) => (
+                      <span
+                        key={pid}
+                        className="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-950 rounded-xl text-xs font-mono font-black shadow-2xs"
+                      >
+                        {pid}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-slate-500 italic">
+                      Toàn bộ các cột đèn ghi nhận sự cố đã xác nhận từ giai đoạn kiểm tra.
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-emerald-700 italic">
+                  Hệ thống tự động kế thừa hồ sơ sự cố từ giai đoạn kiểm tra. Quản lý không cần chọn lại cột.
+                </p>
+              </div>
+            ) : (
+              <PoleSelector
+                segmentStr={segment}
+                selectedPoleIds={selectedPoleIds}
+                onChange={(poleIds, faultIds) => {
+                  setSelectedPoleIds(poleIds)
+                  if (faultIds) setSelectedFaultIds(faultIds)
+                }}
+                taskKindName="Kiểm tra"
+                allowEmpty={false}
+              />
+            )}
 
             {/* Chọn Kỹ sư */}
             <div className="flex flex-col gap-1.5">
@@ -158,11 +189,15 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
                 onChange={(e) => setAssigneeId(e.target.value)}
                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {assignees.map((a) => (
-                  <option key={a.user_id || ''} value={a.user_id || ''}>
-                    {a.full_name || a.user_id || ''}
-                  </option>
-                ))}
+                {assignees.length === 0 ? (
+                  <option value="">Chưa có kỹ sư thuộc địa bàn này</option>
+                ) : (
+                  assignees.map((a) => (
+                    <option key={a.user_id || ''} value={a.user_id || ''}>
+                      {a.full_name || a.user_id || ''}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
