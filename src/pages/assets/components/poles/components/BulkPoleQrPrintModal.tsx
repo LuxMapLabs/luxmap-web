@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom'
 import { X, Loader2, AlertCircle, FileCheck, MapPin, FileDown } from 'lucide-react'
 import QRCode from 'qrcode'
 import { jsPDF } from 'jspdf'
-import { renderDecalToCanvas } from '../../../../utils/assets/decalCanvas'
-import { qrCodeAPI } from '../../../../feature/qr-code/qrCodeAPI'
+import { renderDecalToCanvas } from '../../../../../utils/assets/decalCanvas'
+import { qrCodeAPI } from '../../../../../feature/qr-code/qrCodeAPI'
 import { toast } from 'sonner'
-import type { PoleListItem } from '../../../../types/assets/poles'
-import type { SegmentListItem } from '../../../../types/assets/segments'
+import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
 
 interface BulkPoleQrPrintModalProps {
   isOpen: boolean

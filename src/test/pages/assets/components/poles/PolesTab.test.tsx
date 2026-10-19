@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { StatusBadge } from '../../../../../components/StatusBadge'
-import { PoleTable } from '../../../../../pages/assets/components/poles/PoleTable'
-import { PoleDetailModal } from '../../../../../pages/assets/components/poles/PoleDetailModal'
-import { AddFixtureModal } from '../../../../../pages/assets/components/fixtures/AddFixtureModal'
+import { PoleTable } from '../../../../../pages/assets/components/poles/components/PoleTable'
+import { PoleDetailModal } from '../../../../../pages/assets/components/poles/components/PoleDetailModal'
+import { AddFixtureModal } from '../../../../../pages/assets/components/fixtures/components/AddFixtureModal'
 import assetReducer, {
   fetchAssetsRequest,
   fetchAssetsFailure,

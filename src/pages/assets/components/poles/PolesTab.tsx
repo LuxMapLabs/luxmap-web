@@ -3,13 +3,13 @@ import { Search, Plus, Upload, Filter, Printer } from 'lucide-react'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../types/assets/segments'
-import { PoleTable } from './PoleTable'
-import { AddPoleModal } from './AddPoleModal'
-import { EditPoleModal } from './EditPoleModal'
-import { PoleDetailModal } from './PoleDetailModal'
-import { PoleQrModal } from './PoleQrModal'
-import { BulkPoleQrPrintModal } from './BulkPoleQrPrintModal'
-import { CabinetDetailModal } from '../cabinets/CabinetDetailModal'
+import { PoleTable } from './components/PoleTable'
+import { AddPoleModal } from './components/AddPoleModal'
+import { EditPoleModal } from './components/EditPoleModal'
+import { PoleDetailModal } from './components/PoleDetailModal'
+import { PoleQrModal } from './components/PoleQrModal'
+import { BulkPoleQrPrintModal } from './components/BulkPoleQrPrintModal'
+import { CabinetDetailModal } from '../cabinets/components/CabinetDetailModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface PolesTabProps {
@@ -120,7 +120,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
 
       return () => clearTimeout(timer)
     }
-  }, [activePoleCode, filteredPoles, pageSize])
+  }, [activePoleCode, filteredPoles, pageSize, onClearActivePole])
 
   const handleSavePole = (updated: PoleListItem) => {
     onUpdatePole(updated)

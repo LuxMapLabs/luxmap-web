@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { CabinetsTab, CabinetsTabProps } from '../../../../../pages/assets/components/cabinets/CabinetsTab'
-import { CabinetTable } from '../../../../../pages/assets/components/cabinets/CabinetTable'
-import { CabinetDetailModal } from '../../../../../pages/assets/components/cabinets/CabinetDetailModal'
+import { CabinetTable } from '../../../../../pages/assets/components/cabinets/components/CabinetTable'
+import { CabinetDetailModal } from '../../../../../pages/assets/components/cabinets/components/CabinetDetailModal'
 import assetReducer, {
   fetchAssetsRequest,
   fetchAssetsSuccess,

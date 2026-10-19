@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers } from 'lucide-react'
+import type { FeatureCollection } from 'geojson'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import {
   GOOGLE_HYBRID_STYLE,
@@ -16,7 +17,7 @@ export interface EditPoleMapProps {
   lat: number
   lng: number
   segmentCoords: [number, number][]
-  otherPolesGeoJSON: GeoJSON.FeatureCollection
+  otherPolesGeoJSON: FeatureCollection
   currentCabinet?: CabinetListItem | null
   onChangeCoords: (coords: { lat: number; lng: number }) => void
 }
@@ -44,14 +45,18 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   const onChangeCoordsRef = useRef(onChangeCoords)
   onChangeCoordsRef.current = onChangeCoords
 
+  const initialCoordsRef = useRef<[number, number]>([lng, lat])
+
   // Helper trích xuất các điểm cột khác làm chướng ngại vật
   const getObstaclePoints = (): [number, number][] => {
     const features = otherPolesGeoJSONRef.current?.features || []
     const points: [number, number][] = []
     features.forEach((feat) => {
-      const coord = feat.geometry && 'coordinates' in feat.geometry ? (feat.geometry as any).coordinates : null
-      if (Array.isArray(coord) && coord.length === 2 && Number.isFinite(coord[0]) && Number.isFinite(coord[1])) {
-        points.push([coord[0], coord[1]])
+      if (feat.geometry && feat.geometry.type === 'Point' && Array.isArray(feat.geometry.coordinates)) {
+        const coord = feat.geometry.coordinates
+        if (coord.length >= 2 && Number.isFinite(coord[0]) && Number.isFinite(coord[1])) {
+          points.push([coord[0], coord[1]])
+        }
       }
     })
     return points
@@ -65,15 +70,19 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     return resolveNonOverlappingRoutePoint(rawLng, rawLat, coords, obstacles, 15)
   }
 
+  const getSnappedSafeCoordRef = useRef(getSnappedSafeCoord)
+  getSnappedSafeCoordRef.current = getSnappedSafeCoord
+
   // Khởi tạo MapLibre
   useEffect(() => {
     if (!mapContainerRef.current) return
 
     let isMounted = true
 
+    const [initLng, initLat] = initialCoordsRef.current
     const initialCenter: [number, number] =
-      Number.isFinite(lng) && Number.isFinite(lat)
-        ? [lng, lat]
+      Number.isFinite(initLng) && Number.isFinite(initLat)
+        ? [initLng, initLat]
         : DEFAULT_MAP_CENTER
 
     const map = new maplibregl.Map({
@@ -117,7 +126,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     const handleMarkerDrag = () => {
       const pos = marker.getLngLat()
       if (segmentCoordsRef.current.length >= 2) {
-        const snappedPoint = getSnappedSafeCoord(pos.lng, pos.lat)
+        const snappedPoint = getSnappedSafeCoordRef.current(pos.lng, pos.lat)
         marker.setLngLat(snappedPoint)
         onChangeCoordsRef.current({
           lng: Number(snappedPoint[0].toFixed(6)),
@@ -137,7 +146,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     // Click bản đồ để dời vị trí ghim (bám tim đường & tránh đè cột)
     map.on('click', (e: maplibregl.MapMouseEvent) => {
       if (segmentCoordsRef.current.length >= 2) {
-        const snappedPoint = getSnappedSafeCoord(e.lngLat.lng, e.lngLat.lat)
+        const snappedPoint = getSnappedSafeCoordRef.current(e.lngLat.lng, e.lngLat.lat)
         marker.setLngLat(snappedPoint)
         onChangeCoordsRef.current({
           lng: Number(snappedPoint[0].toFixed(6)),
@@ -155,6 +164,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
     map.on('load', () => {
       if (!isMounted) return
+
+      setTimeout(() => {
+        map.resize()
+      }, 150)
 
       // 1. Source & layer vẽ tuyến đường
       if (!map.getSource('edit-segment-route')) {
@@ -217,10 +230,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
           map.getCanvas().style.cursor = 'pointer'
           if (!e.features || !e.features[0]) return
           const feat = e.features[0]
-          const coords =
-            feat.geometry && 'coordinates' in feat.geometry
-              ? ((feat.geometry as any).coordinates as [number, number])
-              : [e.lngLat.lng, e.lngLat.lat]
+          let coords: [number, number] = [e.lngLat.lng, e.lngLat.lat]
+          if (feat.geometry && feat.geometry.type === 'Point' && Array.isArray(feat.geometry.coordinates)) {
+            coords = [feat.geometry.coordinates[0], feat.geometry.coordinates[1]]
+          }
           const code = feat.properties?.code || feat.properties?.id || 'Cột'
 
           if (!existingPolePopupRef.current) {
@@ -232,7 +245,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
           }
 
           existingPolePopupRef.current
-            .setLngLat(coords as [number, number])
+            .setLngLat(coords)
             .setHTML(
               `<div style="font-size: 11px; font-weight: 700; color: #0f172a; padding: 2px 4px; white-space: nowrap;">` +
                 `💡 Cột khác: <span style="color: #2563eb;">${code}</span>` +
@@ -355,7 +368,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     } else {
       map.once('load', updateLayers)
     }
-  }, [segmentCoords, otherPolesGeoJSON])
+  }, [segmentCoords, otherPolesGeoJSON, lat, lng])
 
   // Render Marker tủ điện quản lý khi có currentCabinet
   useEffect(() => {

@@ -14,18 +14,18 @@ import {
 } from 'lucide-react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER } from '../../../../utils/gis-map/mapUtils'
+import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER } from '../../../../../utils/gis-map/mapUtils'
 import {
   snapPointToPolyline,
   parseLineStringWkt,
   calculateDistanceMeters,
   calculateRouteLengthMeters,
-} from '../../../../utils/gis-map/routeUtils'
-import { fetchMapLayersRequest } from '../../../../feature/map/mapSlice'
-import type { RootState } from '../../../../redux/rootReducer'
-import type { PoleListItem } from '../../../../types/assets/poles'
-import type { SegmentListItem } from '../../../../types/assets/segments'
-import type { CabinetListItem } from '../../../../types/assets/cabinets'
+} from '../../../../../utils/gis-map/routeUtils'
+import { fetchMapLayersRequest } from '../../../../../feature/map/mapSlice'
+import type { RootState } from '../../../../../redux/rootReducer'
+import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 
 interface AddPoleModalProps {
   isOpen: boolean
@@ -46,42 +46,6 @@ interface PoleRowDraft {
   near_sensitive_poi: boolean
 }
 
-const DEFAULT_SEGMENTS: SegmentListItem[] = [
-  {
-    segment_id: 'SEG-001',
-    external_ref: 'SEG-001',
-    segment_name: 'Tuyến A - Tỉnh Lộ 8',
-    road_class: 'inter_commune',
-    length_m: 1200,
-    commune_id: 'COM-001',
-    data_source: 'field',
-    pole_count: 46,
-    updated_at: null,
-  },
-  {
-    segment_id: 'SEG-002',
-    external_ref: 'SEG-002',
-    segment_name: 'Tuyến B - Nguyễn Văn Ni',
-    road_class: 'inter_commune',
-    length_m: 850,
-    commune_id: 'COM-001',
-    data_source: 'field',
-    pole_count: 31,
-    updated_at: null,
-  },
-  {
-    segment_id: 'SEG-003',
-    external_ref: 'SEG-003',
-    segment_name: 'Tuyến C - Huỳnh Văn Cọ',
-    road_class: 'inter_village',
-    length_m: 720,
-    commune_id: 'COM-001',
-    data_source: 'field',
-    pole_count: 26,
-    updated_at: null,
-  },
-]
-
 export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   isOpen,
   onClose,
@@ -91,7 +55,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   availableSegments,
   availableCabinets,
 }) => {
-  const segmentList = availableSegments && availableSegments.length > 0 ? availableSegments : DEFAULT_SEGMENTS
+  const segmentList = availableSegments || []
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -249,7 +213,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
     // 1. Ưu tiên lấy LineString thật từ mapSegments (dữ liệu PostGIS Backend)
     const mapSeg = mapSegments.find(
-      (s) => s.properties?.segment_id === selectedSegmentId || (s as any).id === selectedSegmentId
+      (s) => s.properties?.segment_id === selectedSegmentId
     )
     if (mapSeg && mapSeg.geometry?.type === 'LineString' && Array.isArray(mapSeg.geometry.coordinates)) {
       const valid = mapSeg.geometry.coordinates.filter(
@@ -259,8 +223,8 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     }
 
     // 2. Nếu currentSegment có geom_wkt
-    if (currentSegment && (currentSegment as any).geom_wkt) {
-      const parsed = parseLineStringWkt((currentSegment as any).geom_wkt)
+    if (currentSegment && 'geom_wkt' in currentSegment && typeof currentSegment.geom_wkt === 'string') {
+      const parsed = parseLineStringWkt(currentSegment.geom_wkt)
       if (parsed.length >= 2) return parsed
     }
 
@@ -514,7 +478,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   }
 
   // Handler: Update specific field in row
-  const handleUpdateRow = (rowId: string, field: keyof PoleRowDraft, value: any) => {
+  const handleUpdateRow = <K extends keyof PoleRowDraft>(rowId: string, field: K, value: PoleRowDraft[K]) => {
     setRows((prev) =>
       prev.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r))
     )
@@ -616,10 +580,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
           if (!e.features || !e.features[0]) return
 
           const feat = e.features[0]
-          const coords =
-            feat.geometry && 'coordinates' in feat.geometry
-              ? ((feat.geometry as any).coordinates as [number, number])
-              : [e.lngLat.lng, e.lngLat.lat]
+          let coords: [number, number] = [e.lngLat.lng, e.lngLat.lat]
+          if (feat.geometry && feat.geometry.type === 'Point' && Array.isArray(feat.geometry.coordinates)) {
+            coords = [feat.geometry.coordinates[0], feat.geometry.coordinates[1]]
+          }
           const code = feat.properties?.code || feat.properties?.id || 'Cột'
 
           if (!existingPolePopupRef.current) {
@@ -632,7 +596,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
           }
 
           existingPolePopupRef.current
-            .setLngLat(coords as [number, number])
+            .setLngLat(coords)
             .setHTML(
               `<div style="font-family: inherit; font-size: 11px; font-weight: 700; color: #0f172a; padding: 2px 4px; white-space: nowrap;">` +
                 `💡 Cột hiện hữu: <span style="color: #2563eb;">${code}</span>` +
@@ -663,13 +627,15 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       addPoleAtPoint(e.lngLat.lng, e.lngLat.lat)
     })
 
+    const markersMap = markersMapRef.current
+
     return () => {
       if (existingPolePopupRef.current) {
         existingPolePopupRef.current.remove()
         existingPolePopupRef.current = null
       }
-      markersMapRef.current.forEach((marker) => marker.remove())
-      markersMapRef.current.clear()
+      markersMap.forEach((marker) => marker.remove())
+      markersMap.clear()
       if (cabinetMarkerRef.current) {
         cabinetMarkerRef.current.remove()
         cabinetMarkerRef.current = null

@@ -16,16 +16,16 @@ import {
 import QRCode from 'qrcode'
 import { jsPDF } from 'jspdf'
 import { useDispatch, useSelector } from 'react-redux'
-import { renderDecalToCanvas } from '../../../../utils/assets/decalCanvas'
+import { renderDecalToCanvas } from '../../../../../utils/assets/decalCanvas'
 import { toast } from 'sonner'
-import type { PoleListItem } from '../../../../types/assets/poles'
-import type { RootState, AppDispatch } from '../../../../redux/store'
+import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { RootState, AppDispatch } from '../../../../../redux/store'
 import {
   fetchPoleQrRequest,
   issueQrCodeRequest,
   revokeQrCodeRequest,
   clearCurrentPoleQr,
-} from '../../../../feature/qr-code/qrCodeSlice'
+} from '../../../../../feature/qr-code/qrCodeSlice'
 
 interface PoleQrModalProps {
   isOpen: boolean

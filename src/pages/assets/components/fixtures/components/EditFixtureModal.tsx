@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Edit3, Check } from 'lucide-react'
-import type { FixtureType, PowerSource, DataSource } from '../../../../types/common/enums'
-import type { PoleListItem } from '../../../../types/assets/poles'
-import type { ManagedFixture } from '../../../../hooks/assets/useAssetData'
+import type { FixtureType, PowerSource, DataSource } from '../../../../../types/common/enums'
+import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 
 interface EditFixtureModalProps {
   isOpen: boolean

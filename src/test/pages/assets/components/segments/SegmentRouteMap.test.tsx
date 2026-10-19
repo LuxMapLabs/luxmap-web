@@ -7,8 +7,8 @@ import {
   projectPointOnSegment,
 } from '../../../../../utils/gis-map/routeUtils'
 import { summarizeLineWkt, validateImportRow, type ValidationContext } from '../../../../../validations/assetImport.schema'
-import { EditSegmentModal } from '../../../../../pages/assets/components/segments/EditSegmentModal'
-import { EditPoleModal } from '../../../../../pages/assets/components/poles/EditPoleModal'
+import { EditSegmentModal } from '../../../../../pages/assets/components/segments/components/EditSegmentModal'
+import { EditPoleModal } from '../../../../../pages/assets/components/poles/components/EditPoleModal'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'

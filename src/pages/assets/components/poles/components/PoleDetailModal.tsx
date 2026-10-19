@@ -1,10 +1,10 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { X, MapPin, Zap, Lightbulb, AlertTriangle, Bookmark, QrCode, ShieldCheck } from 'lucide-react'
-import { StatusBadge } from '../../../../components/StatusBadge'
-import type { PoleListItem } from '../../../../types/assets/poles'
-import type { SegmentListItem } from '../../../../types/assets/segments'
-import type { CabinetListItem } from '../../../../types/assets/cabinets'
+import { StatusBadge } from '../../../../../components/StatusBadge'
+import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 
 interface PoleDetailModalProps {
   isOpen: boolean
