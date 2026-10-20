@@ -295,12 +295,6 @@ export const ManagerDashboardPage: React.FC = () => {
       {/* NỘI DUNG TRANG */}
       <div className="px-7 py-6 space-y-5">
         
-        {/* 1. Page Header */}
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Bảng Điều Hành Chiếu Sáng
-          </h2>
-        </div>
 
         {/* 2. Thanh công cụ Lọc Tuyến Đường */}
         <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 px-4.5 flex flex-wrap items-center justify-between gap-4 shadow-xs">
@@ -317,10 +311,10 @@ export const ManagerDashboardPage: React.FC = () => {
                 }}
                 className="bg-transparent font-bold text-slate-800 outline-hidden cursor-pointer max-w-sm truncate"
               >
-                <option value="all">Toàn bộ 3 tuyến (103 cột đèn)</option>
+                <option value="all">Tất cả các tuyến</option>
                 {PRIMARY_SEGMENTS.map((seg) => (
                   <option key={seg.id} value={seg.id}>
-                    {seg.name} ({seg.poleCount} cột)
+                    {seg.name}
                   </option>
                 ))}
               </select>
@@ -444,7 +438,7 @@ export const ManagerDashboardPage: React.FC = () => {
           
           {/* Biểu đồ 1: Stacked Bar Chart theo tuyến */}
           <div className="lg:col-span-2 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col">
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
                   {selectedSegment === 'all'
@@ -457,9 +451,6 @@ export const ManagerDashboardPage: React.FC = () => {
                     : `Thống kê tình trạng hoạt động trên ${segmentNameMap[selectedSegment] || selectedSegment}`}
                 </p>
               </div>
-              <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg">
-                Đồng bộ GIS & AI
-              </span>
             </div>
 
             <div className="h-64 w-full">
