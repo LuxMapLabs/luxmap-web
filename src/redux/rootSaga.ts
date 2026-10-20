@@ -7,6 +7,7 @@ import citizenReportSaga from '../feature/citizen-report/citizenReportSaga'
 import { citizenReportsSaga } from '../feature/citizen-reports/citizenReportsSaga'
 import qrCodeSaga from '../feature/qr-code/qrCodeSaga'
 import workScheduleSaga from '../feature/work-schedule/workScheduleSaga'
+import dashboardSaga from '../feature/dashboard/dashboardSaga'
 
 export default function* rootSaga() {
     yield all([
@@ -18,5 +19,6 @@ export default function* rootSaga() {
         fork(citizenReportsSaga),
         fork(qrCodeSaga),
         fork(workScheduleSaga),
+        fork(dashboardSaga),
     ])
 }

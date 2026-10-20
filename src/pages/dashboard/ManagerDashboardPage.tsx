@@ -1,13 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { toast } from 'sonner'
-import {
-  fetchWarrantyStatistics,
-  fetchFaultsList,
-  fetchSegmentsList,
-} from '../../feature/dashboard/dashboardAPI'
-import type { WarrantyList } from '../../types/statistics/warranty'
+import { useDispatch, useSelector } from 'react-redux'
+import type { RootState, AppDispatch } from '../../redux/store'
+import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
 import type { FaultItem } from '../../types/faults/faults'
-import type { SegmentListItem } from '../../types/assets/segments'
 
 import { DashboardToolbar } from './components/DashboardToolbar'
 import { DashboardKpiCards } from './components/DashboardKpiCards'
@@ -17,85 +12,25 @@ import { FaultsTableCard } from './components/FaultsTableCard'
 import { FaultDetailModal } from './components/FaultDetailModal'
 
 export const ManagerDashboardPage: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>()
+
+  // Redux Global State (được quản lý và nạp bởi Redux-Saga)
+  const { segmentsList, warrantyList, faultsList, loading } = useSelector(
+    (state: RootState) => state.dashboard
+  )
+
   // State Filters
   const [selectedSegment, setSelectedSegment] = useState<string>('all')
-  const [faultTab, setFaultTab] = useState<'all' | 'blackout' | 'dim'>('all')
+  const [faultTab, setFaultTab] = useState<'all' | 'blackout' | 'dim' | 'offline'>('all')
   const [warrantyTab, setWarrantyTab] = useState<'all' | 'expired' | 'expiring'>('all')
-
-  // Data State từ Backend API
-  const [loading, setLoading] = useState<boolean>(true)
-  const [segmentsList, setSegmentsList] = useState<SegmentListItem[]>([])
-  const [warrantyList, setWarrantyList] = useState<WarrantyList>({
-    today: new Date().toISOString().split('T')[0],
-    expiring_within_days: 30,
-    page: 1,
-    page_size: 100,
-    total: 0,
-    items: [],
-  })
-  const [faultsList, setFaultsList] = useState<FaultItem[]>([])
 
   // Modal State
   const [selectedFault, setSelectedFault] = useState<FaultItem | null>(null)
 
-  // Tải dữ liệu toàn diện từ Backend API
-  const loadDashboardData = async () => {
-    setLoading(true)
-    try {
-      const [segments, wStats, fList] = await Promise.all([
-        // API Tuyến đường: Lấy danh sách tuyến đường động từ Backend
-        fetchSegmentsList('COM-070'),
-        // API Bảo hành: Chỉ lấy bóng hết hạn hoặc sắp hết trong vòng 1 tháng (<= 30 ngày)
-        fetchWarrantyStatistics({
-          within_days: 30,
-          status: 'expired,expiring',
-          page_size: 100,
-        }),
-        // API Sự cố: Tải danh sách sự cố trên các tuyến đường
-        fetchFaultsList({
-          sort: '-detected_at',
-          page_size: 100,
-        }),
-      ])
-
-      // Lưu danh sách tuyến đường động
-      setSegmentsList(segments)
-
-      // Lấy danh sách ID các tuyến tác nghiệp
-      const targetSegmentIds = segments
-        .map((s) => s.segment_id)
-        .filter((id): id is string => Boolean(id))
-
-      // Lọc các bóng đèn thuộc phạm vi các tuyến tác nghiệp và có ngày hạn rõ ràng
-      const filteredWarrantyItems = (wStats.items || []).filter(
-        (i) =>
-          i.days_remaining != null &&
-          i.days_remaining <= 30 &&
-          (targetSegmentIds.length === 0 || (i.segment_id ? targetSegmentIds.includes(i.segment_id) : true))
-      )
-
-      setWarrantyList({
-        ...wStats,
-        total: filteredWarrantyItems.length,
-        items: filteredWarrantyItems,
-      })
-
-      // Lọc sự cố trên các tuyến tác nghiệp
-      const filteredFaultItems = (fList || []).filter((f) =>
-        targetSegmentIds.length === 0 || (f.segment_id ? targetSegmentIds.includes(f.segment_id) : true)
-      )
-      setFaultsList(filteredFaultItems)
-    } catch (err) {
-      console.error('[ManagerDashboard] Load data error:', err)
-      toast.error('Không thể đồng bộ dữ liệu mới nhất từ máy chủ')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Tải dữ liệu toàn diện qua Redux-Saga khi vào trang Dashboard
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    dispatch(fetchDashboardDataRequest())
+  }, [dispatch])
 
   // Map tên tuyến đường
   const segmentNameMap: Record<string, string> = useMemo(() => {
@@ -118,12 +53,20 @@ export const ManagerDashboardPage: React.FC = () => {
       const segFaults = faultsList.filter((f) => f.segment_id === segId)
       const out = segFaults.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
-        return type.includes('out') || type.includes('blackout') || type.includes('segment_outage')
+        return (
+          !type.includes('offline') &&
+          !type.includes('node') &&
+          (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
+        )
       }).length
 
       const dim = segFaults.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
-        return type.includes('dim') || type.includes('runtime_decline')
+        return (
+          !type.includes('offline') &&
+          !type.includes('node') &&
+          (type.includes('dim') || type.includes('runtime_decline'))
+        )
       }).length
 
       const normal = Math.max(0, poleCount - out - dim)
@@ -202,7 +145,7 @@ export const ManagerDashboardPage: React.FC = () => {
       }
     }
 
-    // Khi chọn "Toàn bộ": Hiển thị 3 tuyến tác nghiệp chính
+    // Khi chọn "Toàn bộ": Hiển thị các tuyến trong danh sách lọc
     return dynamicSegments.map((s) => ({
       name: s.name,
       fullName: s.name,
@@ -238,17 +181,32 @@ export const ManagerDashboardPage: React.FC = () => {
     return faultsList.filter((f) => f.segment_id === selectedSegment)
   }, [faultsList, selectedSegment])
 
+  const offlineFaultsCount = useMemo(() => {
+    return segmentFaults.filter((f) => {
+      const type = String(f.fault_type).toLowerCase()
+      return type.includes('offline') || type.includes('node')
+    }).length
+  }, [segmentFaults])
+
   const blackoutFaultsCount = useMemo(() => {
     return segmentFaults.filter((f) => {
       const type = String(f.fault_type).toLowerCase()
-      return type.includes('out') || type.includes('blackout') || type.includes('segment_outage')
+      return (
+        !type.includes('offline') &&
+        !type.includes('node') &&
+        (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
+      )
     }).length
   }, [segmentFaults])
 
   const dimFaultsCount = useMemo(() => {
     return segmentFaults.filter((f) => {
       const type = String(f.fault_type).toLowerCase()
-      return type.includes('dim') || type.includes('runtime_decline')
+      return (
+        !type.includes('offline') &&
+        !type.includes('node') &&
+        (type.includes('dim') || type.includes('runtime_decline'))
+      )
     }).length
   }, [segmentFaults])
 
@@ -257,12 +215,25 @@ export const ManagerDashboardPage: React.FC = () => {
     if (faultTab === 'blackout') {
       list = list.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
-        return type.includes('out') || type.includes('blackout') || type.includes('segment_outage')
+        return (
+          !type.includes('offline') &&
+          !type.includes('node') &&
+          (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
+        )
       })
     } else if (faultTab === 'dim') {
       list = list.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
-        return type.includes('dim') || type.includes('runtime_decline')
+        return (
+          !type.includes('offline') &&
+          !type.includes('node') &&
+          (type.includes('dim') || type.includes('runtime_decline'))
+        )
+      })
+    } else if (faultTab === 'offline') {
+      list = list.filter((f) => {
+        const type = String(f.fault_type).toLowerCase()
+        return type.includes('offline') || type.includes('node')
       })
     }
     return list
@@ -323,6 +294,7 @@ export const ManagerDashboardPage: React.FC = () => {
             totalCount={segmentFaults.length}
             blackoutCount={blackoutFaultsCount}
             dimCount={dimFaultsCount}
+            offlineCount={offlineFaultsCount}
           />
         </div>
       </div>
