@@ -1,12 +1,12 @@
 import React from 'react'
 import { Route, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { OperationSegment } from '../constants'
+import type { SegmentListItem } from '../../../types/assets/segments'
 
 interface DashboardToolbarProps {
   selectedSegment: string
   onSegmentChange: (segmentId: string) => void
-  segments: OperationSegment[]
+  segments: SegmentListItem[]
   loading: boolean
 }
 
@@ -19,7 +19,7 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
   return (
     <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 px-4.5 flex flex-wrap items-center justify-between gap-4 shadow-xs">
       <div className="flex items-center gap-3 flex-wrap">
-        {/* Lọc Tuyến đường (Đồng bộ 3 tuyến như GIS và Lịch làm việc) */}
+        {/* Lọc Tuyến đường (Đồng bộ trực tiếp từ Database qua API) */}
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
           <Route className="w-4 h-4 text-slate-500" />
           <label className="font-semibold text-slate-500 whitespace-nowrap">Tuyến đường:</label>
@@ -33,8 +33,8 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
           >
             <option value="all">Tất cả các tuyến</option>
             {segments.map((seg) => (
-              <option key={seg.id} value={seg.id}>
-                {seg.name}
+              <option key={seg.segment_id || ''} value={seg.segment_id || ''}>
+                {seg.segment_name || seg.segment_id}
               </option>
             ))}
           </select>

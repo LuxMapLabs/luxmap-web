@@ -3,11 +3,12 @@ import { toast } from 'sonner'
 import {
   fetchWarrantyStatistics,
   fetchFaultsList,
+  fetchSegmentsList,
 } from '../../feature/dashboard/dashboardAPI'
 import type { WarrantyList } from '../../types/statistics/warranty'
 import type { FaultItem } from '../../types/faults/faults'
+import type { SegmentListItem } from '../../types/assets/segments'
 
-import { PRIMARY_SEGMENTS } from './constants'
 import { DashboardToolbar } from './components/DashboardToolbar'
 import { DashboardKpiCards } from './components/DashboardKpiCards'
 import { DashboardCharts } from './components/DashboardCharts'
@@ -23,6 +24,7 @@ export const ManagerDashboardPage: React.FC = () => {
 
   // Data State từ Backend API
   const [loading, setLoading] = useState<boolean>(true)
+  const [segmentsList, setSegmentsList] = useState<SegmentListItem[]>([])
   const [warrantyList, setWarrantyList] = useState<WarrantyList>({
     today: new Date().toISOString().split('T')[0],
     expiring_within_days: 30,
@@ -40,7 +42,9 @@ export const ManagerDashboardPage: React.FC = () => {
   const loadDashboardData = async () => {
     setLoading(true)
     try {
-      const [wStats, fList] = await Promise.all([
+      const [segments, wStats, fList] = await Promise.all([
+        // API Tuyến đường: Lấy danh sách tuyến đường động từ Backend
+        fetchSegmentsList('COM-070'),
         // API Bảo hành: Chỉ lấy bóng hết hạn hoặc sắp hết trong vòng 1 tháng (<= 30 ngày)
         fetchWarrantyStatistics({
           within_days: 30,
@@ -54,13 +58,20 @@ export const ManagerDashboardPage: React.FC = () => {
         }),
       ])
 
-      // Lọc các bóng đèn thuộc phạm vi 3 tuyến tác nghiệp chính và có ngày hạn rõ ràng
-      const targetSegmentIds = ['SEG-001', 'SEG-002', 'SEG-003']
+      // Lưu danh sách tuyến đường động
+      setSegmentsList(segments)
+
+      // Lấy danh sách ID các tuyến tác nghiệp
+      const targetSegmentIds = segments
+        .map((s) => s.segment_id)
+        .filter((id): id is string => Boolean(id))
+
+      // Lọc các bóng đèn thuộc phạm vi các tuyến tác nghiệp và có ngày hạn rõ ràng
       const filteredWarrantyItems = (wStats.items || []).filter(
         (i) =>
           i.days_remaining != null &&
           i.days_remaining <= 30 &&
-          (i.segment_id ? targetSegmentIds.includes(i.segment_id) : true)
+          (targetSegmentIds.length === 0 || (i.segment_id ? targetSegmentIds.includes(i.segment_id) : true))
       )
 
       setWarrantyList({
@@ -69,9 +80,9 @@ export const ManagerDashboardPage: React.FC = () => {
         items: filteredWarrantyItems,
       })
 
-      // Lọc sự cố trên 3 tuyến tác nghiệp
+      // Lọc sự cố trên các tuyến tác nghiệp
       const filteredFaultItems = (fList || []).filter((f) =>
-        f.segment_id ? targetSegmentIds.includes(f.segment_id) : true
+        targetSegmentIds.length === 0 || (f.segment_id ? targetSegmentIds.includes(f.segment_id) : true)
       )
       setFaultsList(filteredFaultItems)
     } catch (err) {
@@ -89,18 +100,22 @@ export const ManagerDashboardPage: React.FC = () => {
   // Map tên tuyến đường
   const segmentNameMap: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {}
-    PRIMARY_SEGMENTS.forEach((s) => {
-      map[s.id] = s.name
+    segmentsList.forEach((s) => {
+      if (s.segment_id) {
+        map[s.segment_id] = s.segment_name || s.segment_id
+      }
     })
     return map
-  }, [])
+  }, [segmentsList])
 
   // --- TÍNH TOÁN DỮ LIỆU KPI & BIỂU ĐỒ (ĐỒNG BỘ 100% VỚI DATABASE) ---
 
   // 1. Phân bố trạng thái từng tuyến đường tính toán động trực tiếp từ cơ sở dữ liệu sự cố
   const dynamicSegments = useMemo(() => {
-    return PRIMARY_SEGMENTS.map((seg) => {
-      const segFaults = faultsList.filter((f) => f.segment_id === seg.id)
+    return segmentsList.map((seg) => {
+      const segId = seg.segment_id || ''
+      const poleCount = seg.pole_count || 0
+      const segFaults = faultsList.filter((f) => f.segment_id === segId)
       const out = segFaults.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
         return type.includes('out') || type.includes('blackout') || type.includes('segment_outage')
@@ -111,16 +126,18 @@ export const ManagerDashboardPage: React.FC = () => {
         return type.includes('dim') || type.includes('runtime_decline')
       }).length
 
-      const normal = Math.max(0, seg.poleCount - out - dim)
+      const normal = Math.max(0, poleCount - out - dim)
 
       return {
-        ...seg,
+        id: segId,
+        name: seg.segment_name || segId,
+        poleCount,
         normal,
         dim,
         out,
       }
     })
-  }, [faultsList])
+  }, [segmentsList, faultsList])
 
   // 2. KPI Tình trạng đèn
   const fixtureKpis = useMemo(() => {
@@ -259,7 +276,7 @@ export const ManagerDashboardPage: React.FC = () => {
         <DashboardToolbar
           selectedSegment={selectedSegment}
           onSegmentChange={setSelectedSegment}
-          segments={PRIMARY_SEGMENTS}
+          segments={segmentsList}
           loading={loading}
         />
 
