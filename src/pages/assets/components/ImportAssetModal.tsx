@@ -141,6 +141,8 @@ const REQUIRED_HEADERS_BY_CATEGORY: Record<string, string[]> = {
   poles_and_fixtures: ['external_ref', 'segment_external_ref', 'commune_id', 'geom_wkt', 'data_source'],
   fixtures: ['pole_external_ref', 'fixture_type', 'power_source', 'lamp_watt', 'install_date', 'data_source'],
   cabinets: ['external_ref', 'cabinet_name', 'commune_id', 'geom_wkt', 'data_source'],
+
+  feeders: ['external_ref', 'feeder_name', 'commune_id', 'cabinet_external_ref'],
   segments: ['external_ref', 'segment_name', 'road_class', 'length_m', 'geom_wkt', 'commune_id', 'data_source'],
 }
 
@@ -171,6 +173,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
     poles = [],
     cabinets = [],
     segments = [],
+    feeders = [],
   } = useSelector((state: RootState) => state.assets)
 
   // Lifecycle hiệu ứng import theo giai đoạn
@@ -291,7 +294,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
         const reviewedItem = validateImportRow(
           category,
           rowObj,
-          { poles, fixtures, cabinets, segments },
+          { poles, fixtures, cabinets, segments, feeders },
           index
         )
         parsed.push(reviewedItem)
@@ -746,21 +749,55 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                   )
                                 }
 
+                                if (item.category === 'feeders') {
+                                  const cab = cabinets.find(
+                                    (c) =>
+                                      (item.data.cabinet_id && c.cabinet_id === item.data.cabinet_id) ||
+                                      (c.external_ref && c.external_ref === item.data.cabinet_id)
+                                  )
+                                  return (
+                                    <>
+                                      <div className="font-semibold text-slate-800 dark:text-slate-100">
+                                        ⚡ {cab?.cabinet_name || cab?.cabinet_id || 'Tủ điện'}
+                                      </div>
+                                      <div className="text-[10px] text-slate-500 font-mono">
+                                        Lộ: {item.data.feeder_name || item.externalRef}
+                                      </div>
+                                    </>
+                                  )
+                                }
+
                                 // Poles
                                 const seg = segments.find(
                                   (s) =>
                                     (item.data.segment_id && s.segment_id === item.data.segment_id) ||
                                     (item.data.segment_id && s.external_ref?.toLowerCase() === item.data.segment_id.toLowerCase())
                                 )
+                                const fdr = feeders.find(
+                                  (f) =>
+                                    (item.data.feeder_id && f.feeder_id === item.data.feeder_id) ||
+                                    (item.data.feeder_id && f.external_ref?.toLowerCase() === item.data.feeder_id.toLowerCase())
+                                )
+                                const cab = fdr?.cabinet?.cabinet_name || cabinets.find(
+                                  (c) =>
+                                    (item.data.feeder_id && (c.cabinet_id === item.data.feeder_id || c.external_ref === item.data.feeder_id))
+                                )?.cabinet_name
                                 return (
                                   <>
                                     <div className="font-medium text-slate-800 truncate max-w-[170px]" title={seg?.segment_name || ''}>
                                       {seg?.segment_name || (item.data.segment_id ? `Tuyến ${item.data.segment_id}` : 'Chưa gán tuyến')}
                                     </div>
-                                    {item.data.feeder_id && (
-                                      <div className="text-[10px] text-slate-500 font-mono">
-                                        Tủ: {item.data.feeder_id}
+                                    {fdr ? (
+                                      <div className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5" title={fdr.feeder_name || fdr.external_ref || ''}>
+                                        <Zap className="w-3 h-3 text-emerald-600 shrink-0" />
+                                        <span className="truncate max-w-[150px]">{fdr.feeder_name || fdr.external_ref}</span>
                                       </div>
+                                    ) : item.data.feeder_id ? (
+                                      <div className="text-[10px] text-slate-500 font-mono">
+                                        Lộ/Tủ: {cab || item.data.feeder_id}
+                                      </div>
+                                    ) : (
+                                      <div className="text-[9.5px] text-slate-400 italic">Chưa gán mạch</div>
                                     )}
                                     {item.data.note && (
                                       <div className="text-[10px] text-amber-700 font-medium truncate max-w-[170px] flex items-center gap-1 mt-0.5" title={item.data.note}>
@@ -837,8 +874,11 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                     if (item.category === 'cabinets') {
                                       return `Tủ: ${item.data.cabinet_name || item.externalRef} • ${formatCommuneDisplayName(item.data.commune_id)}`
                                     }
+                                    if (item.category === 'feeders') {
+                                      return `Mạch: ${item.data.feeder_name || item.externalRef} • Khu vực: ${formatCommuneDisplayName(item.data.commune_id || '')}`
+                                    }
                                     // Poles
-                                    return `Tạo mới (${item.fixtureData?.lamp_watt ?? 100}W, ${item.externalRef})${item.data.note ? ` • Ghi chú: ${item.data.note}` : ''}`
+                                    return `Tạo mới (${item.externalRef})${item.data.note ? ` • Ghi chú: ${item.data.note}` : ''}`
                                   })()}
                                 </div>
                               ) : (
