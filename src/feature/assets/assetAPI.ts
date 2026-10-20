@@ -12,6 +12,12 @@ import type {
   CabinetDetail,
 } from '../../types/assets/cabinets'
 import type {
+  FeederListItemPagedResult,
+  CreateFeederRequest,
+  UpdateFeederRequest,
+  FeederDetail,
+} from '../../types/assets/feeders'
+import type {
   PoleListItemPagedResult,
   CreatePoleRequest,
   UpdatePoleRequest,
@@ -21,7 +27,7 @@ import type {
   RetireFixtureRequest,
 } from '../../types/assets/fixtures'
 
-export type ImportAssetCategory = 'segments' | 'cabinets' | 'poles' | 'fixtures' | 'poles_and_fixtures'
+export type ImportAssetCategory = 'segments' | 'cabinets' | 'feeders' | 'poles' | 'fixtures' | 'poles_and_fixtures'
 
 export interface AssetQueryParams {
   page?: number
@@ -58,6 +64,48 @@ export const assetAPI = {
   },
 
   /**
+   * Lấy danh sách Mạch điện (Feeders)
+   * GET /api/v1/assets/feeders
+   */
+  getFeeders: async (params?: AssetQueryParams): Promise<FeederListItemPagedResult> => {
+    const response = await apiClient.get<FeederListItemPagedResult>('/assets/feeders', { params })
+    return response.data
+  },
+
+  /**
+   * Lấy chi tiết Mạch điện
+   * GET /api/v1/assets/feeders/{feederId}
+   */
+  getFeederDetail: async (feederId: string): Promise<FeederDetail> => {
+    const response = await apiClient.get<FeederDetail>(`/assets/feeders/${encodeURIComponent(feederId)}`)
+    return response.data
+  },
+
+  /**
+   * Thêm mới Mạch điện
+   * POST /api/v1/assets/feeders
+   */
+  createFeeder: async (data: CreateFeederRequest): Promise<void> => {
+    await apiClient.post('/assets/feeders', data)
+  },
+
+  /**
+   * Cập nhật Mạch điện
+   * PUT /api/v1/assets/feeders/{feederId}
+   */
+  updateFeeder: async (feederId: string, data: UpdateFeederRequest): Promise<void> => {
+    await apiClient.put(`/assets/feeders/${encodeURIComponent(feederId)}`, data)
+  },
+
+  /**
+   * Xóa Mạch điện
+   * DELETE /api/v1/assets/feeders/{feederId}
+   */
+  deleteFeeder: async (feederId: string): Promise<void> => {
+    await apiClient.delete(`/assets/feeders/${encodeURIComponent(feederId)}`)
+  },
+
+  /**
    * Lấy danh sách Cột điện chiếu sáng
    * GET /api/v1/assets/poles
    */
@@ -86,8 +134,14 @@ export const assetAPI = {
    * Thêm mới Tủ điện
    * POST /api/v1/assets/cabinets
    */
-  createCabinet: async (data: CreateCabinetRequest): Promise<void> => {
-    await apiClient.post('/assets/cabinets', data)
+  createCabinet: async (data: CreateCabinetRequest): Promise<string | null> => {
+    const response = await apiClient.post('/assets/cabinets', data)
+    const loc = (response.headers?.location || response.headers?.Location) as string | undefined
+    if (loc) {
+      const parts = loc.split('/')
+      return parts[parts.length - 1] || null
+    }
+    return null
   },
 
   /**
@@ -151,6 +205,19 @@ export const assetAPI = {
     const formData = new FormData()
     formData.append('file', file)
     const response = await apiClient.post<ImportResult>('/assets/import/cabinets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+
+  /**
+   * Nạp danh mục Mạch điện qua CSV
+   * POST /api/v1/assets/import/feeders
+   */
+  importFeeders: async (file: File): Promise<ImportResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post<ImportResult>('/assets/import/feeders', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return response.data
