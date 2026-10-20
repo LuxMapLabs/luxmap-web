@@ -78,6 +78,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   // Top Section States
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
   const [selectedCabinetId, setSelectedCabinetId] = useState('')
+  const [selectedFeederId, setSelectedFeederId] = useState('')
+
+  // Danh sách mạch điện từ Redux store
+  const allFeeders = useSelector((state: RootState) => state.assets.feeders)
 
   // Bottom Section: Pole Rows State
   const [rows, setRows] = useState<PoleRowDraft[]>([])
@@ -206,6 +210,32 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const currentCabinet = availableCabinetsOnSegment.find(
     (c) => c.cabinet_id === selectedCabinetId || c.external_ref === selectedCabinetId
   )
+
+  // Danh sách mạch điện khả dụng của Tủ điện đang chọn
+  const availableFeedersOnCabinet = useMemo(() => {
+    if (!selectedCabinetId || !allFeeders) return []
+    const cabId = currentCabinet?.cabinet_id || selectedCabinetId
+    const cabExt = currentCabinet?.external_ref
+    return allFeeders.filter((f) => {
+      if (f.cabinet?.cabinet_id && (f.cabinet.cabinet_id === cabId || f.cabinet.cabinet_id === cabExt)) return true
+      if (currentCabinet?.feeder_ids?.includes(f.feeder_id || '')) return true
+      if (cabExt && f.external_ref && f.external_ref.toLowerCase().includes(cabExt.toLowerCase())) return true
+      return false
+    })
+  }, [allFeeders, selectedCabinetId, currentCabinet])
+
+  // Tự động gán mạch nếu tủ chỉ có 1 mạch hoặc mạch đầu tiên nếu có nhiều mạch
+  useEffect(() => {
+    if (availableFeedersOnCabinet.length === 1) {
+      setSelectedFeederId(availableFeedersOnCabinet[0].feeder_id || '')
+    } else if (availableFeedersOnCabinet.length > 1) {
+      if (!selectedFeederId || !availableFeedersOnCabinet.some((f) => f.feeder_id === selectedFeederId)) {
+        setSelectedFeederId(availableFeedersOnCabinet[0].feeder_id || '')
+      }
+    } else {
+      setSelectedFeederId('')
+    }
+  }, [availableFeedersOnCabinet, selectedFeederId])
 
   // Extract real coordinates of current route
   const segmentCoords = useMemo<[number, number][]>(() => {
@@ -719,14 +749,22 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       Number.isFinite(currentCabinet.location.lng)
     ) {
       const el = document.createElement('div')
-      el.className = 'cabinet-marker cursor-pointer'
-      el.title = `Tủ điện: ${currentCabinet.cabinet_name || currentCabinet.cabinet_id}`
+      el.className = 'cabinet-marker select-none pointer-events-none'
+      el.style.width = '0px'
+      el.style.height = '0px'
+      el.style.position = 'relative'
       el.innerHTML = `
-        <div style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fbbf24; width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(124,58,237,0.5); border: 2px solid #ffffff; font-weight: bold; font-size: 14px;">
+        <div style="position: absolute; top: -14px; left: -14px; width: 28px; height: 28px; background: linear-gradient(135deg, #7c3aed, #4f46e5); border: 2.5px solid #ffffff; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #fbbf24; font-size: 13px; font-weight: 800; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.6), 0 2px 6px rgba(0,0,0,0.4); z-index: 2;">
           ⚡
         </div>
+        <div style="position: absolute; top: 17px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.92); color: #ffffff; padding: 1.5px 6px; border-radius: 5px; font-size: 9.5px; font-weight: 700; white-space: nowrap; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 1;">
+          ${currentCabinet.cabinet_name || currentCabinet.external_ref || 'Tủ'}
+        </div>
       `
-      const marker = new maplibregl.Marker({ element: el })
+      const marker = new maplibregl.Marker({
+        element: el,
+        anchor: 'center',
+      })
         .setLngLat([currentCabinet.location.lng, currentCabinet.location.lat])
         .addTo(map)
 
@@ -896,11 +934,19 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
         return
       }
 
+      const effectiveFeederId =
+        selectedFeederId ||
+        availableFeedersOnCabinet[0]?.feeder_id ||
+        (currentCabinet?.feeder_ids?.[0]?.startsWith('FDR-') ? currentCabinet.feeder_ids[0] : null) ||
+        null
+
       validatedDataList.push({
         pole_id: poleId,
         external_ref: trimmedExternalRef || null,
         segment_id: selectedSegmentId,
-        feeder_id: selectedCabinetId,
+        feeder_id: effectiveFeederId,
+        cabinet_id: selectedCabinetId || null,
+        cabinet_name: currentCabinet?.cabinet_name || null,
         commune_id: currentSegment?.commune_id || 'COM-001',
         data_source: 'field',
         near_sensitive_poi: !!row.near_sensitive_poi,
@@ -1036,6 +1082,50 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                         </option>
                       ))}
                     </select>
+
+                    {/* 3. Select Feeder */}
+                    <div className="space-y-1 pt-1">
+                      <label className="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Mạch điện (Lộ xuất tuyến):</span>
+                        </span>
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">(1 Cột - 1 Mạch)</span>
+                      </label>
+                      <select
+                        value={selectedFeederId}
+                        onChange={(e) => setSelectedFeederId(e.target.value)}
+                        disabled={!selectedCabinetId}
+                        className={`w-full p-2 bg-white dark:bg-slate-900 border rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800 ${
+                          !selectedFeederId
+                            ? 'text-slate-400 border-slate-300 dark:border-slate-700'
+                            : 'text-slate-900 dark:text-slate-100 border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500'
+                        }`}
+                      >
+                        <option value="" disabled className="text-slate-400 font-normal">
+                          {!selectedCabinetId
+                            ? '-- Vui lòng chọn Tủ trước --'
+                            : availableFeedersOnCabinet.length > 0
+                            ? '-- Chọn mạch điện cấp nguồn --'
+                            : '-- Tủ này chưa có mạch điện --'}
+                        </option>
+                        {availableFeedersOnCabinet.map((f) => (
+                          <option key={f.feeder_id || f.external_ref} value={f.feeder_id || ''} className="text-slate-900 dark:text-slate-100">
+                            ⚡️ {f.feeder_name || f.external_ref || f.feeder_id} ({f.external_ref || f.feeder_id})
+                          </option>
+                        ))}
+                      </select>
+                      {selectedCabinetId && availableFeedersOnCabinet.length === 1 && (
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 italic">
+                          ✓ Đã tự động chọn mạch duy nhất của tủ này
+                        </p>
+                      )}
+                      {selectedCabinetId && availableFeedersOnCabinet.length === 0 && (
+                        <p className="text-[10px] text-rose-500 dark:text-rose-400 italic">
+                          ⚠ Tủ này chưa có mạch điện nào. Vui lòng thêm mạch tại Tab Mạch điện.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

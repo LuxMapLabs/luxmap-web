@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import { configureStore } from '@reduxjs/toolkit'
+import rootReducer from '../../../../../redux/rootReducer'
 import { CabinetsTab, CabinetsTabProps } from '../../../../../pages/assets/components/cabinets/CabinetsTab'
 import { CabinetTable } from '../../../../../pages/assets/components/cabinets/components/CabinetTable'
 import { CabinetDetailModal } from '../../../../../pages/assets/components/cabinets/components/CabinetDetailModal'
@@ -22,6 +25,74 @@ import type {
 } from '../../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { ImportResult } from '../../../../../types/assets/import'
+
+
+// Mock maplibre-gl for jsdom headless testing
+vi.mock('maplibre-gl', () => {
+  class MockMarker {
+    element: HTMLElement = document.createElement('div');
+    draggable: boolean = false;
+    lngLat: { lng: number; lat: number } = { lng: 106.4896, lat: 10.9701 };
+    listeners: Record<string, Function[]> = {};
+    constructor(options?: any) {
+      if (options?.element) this.element = options.element;
+      if (options?.draggable) this.draggable = options.draggable;
+    }
+    setLngLat(coord: any) {
+      if (Array.isArray(coord)) this.lngLat = { lng: coord[0], lat: coord[1] };
+      else this.lngLat = { ...coord };
+      return this;
+    }
+    getLngLat() { return this.lngLat; }
+    addTo() { return this; }
+    remove() { return this; }
+    on(e: string, cb: Function) {
+      if (!this.listeners[e]) this.listeners[e] = [];
+      this.listeners[e].push(cb);
+      return this;
+    }
+  }
+
+  class MockMap {
+    listeners: Record<string, Function[]> = {};
+    sources: Record<string, any> = {};
+    layers: Record<string, any> = {};
+    constructor(_options?: any) {
+      setTimeout(() => {
+        if (this.listeners['load']) this.listeners['load'].forEach((cb: Function) => cb());
+      }, 0);
+    }
+    on(e: string, cb: Function) {
+      if (!this.listeners[e]) this.listeners[e] = [];
+      this.listeners[e].push(cb);
+      return this;
+    }
+    once(e: string, cb: Function) { this.on(e, cb); return this; }
+    off() { return this; }
+    remove() { return this; }
+    resize() { return this; }
+    flyTo() { return this; }
+    fitBounds() { return this; }
+    getSource(id: string) { return this.sources[id]; }
+    addSource(id: string, s: any) { this.sources[id] = { ...s, setData: vi.fn() }; return this; }
+    getLayer(id: string) { return this.layers[id]; }
+    addLayer(l: any) { this.layers[l.id] = l; return this; }
+    addControl() { return this; }
+  }
+
+  return {
+    default: {
+      Map: MockMap,
+      Marker: MockMarker,
+      NavigationControl: class {},
+      LngLatBounds: class { extend() { return this; } isEmpty() { return false; } }
+    },
+    Map: MockMap,
+    Marker: MockMarker,
+    NavigationControl: class {},
+    LngLatBounds: class { extend() { return this; } isEmpty() { return false; } }
+  };
+});
 
 describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
   // Mock Data chuẩn DTO 100% từ src/types/
@@ -80,7 +151,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
 
   describe('1. Happy Path - Component Rendering & User Interactions', () => {
     it('render đầy đủ thanh tìm kiếm, bộ lọc trạng thái GIS và các nút thao tác', () => {
-      render(<CabinetsTab {...defaultProps} />)
+      render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
       expect(
         screen.getByPlaceholderText('Tìm theo mã tủ (CAB-TL8), tên tủ, mốc thực địa...')
@@ -91,7 +162,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     })
 
     it('hiển thị danh sách tủ điện với đầy đủ thông tin chuẩn DTO CabinetListItem trên bảng', () => {
-      render(<CabinetsTab {...defaultProps} />)
+      render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
       // Kiểm tra hiển thị mã tủ điện (external_ref)
       expect(screen.getByText('CAB-TL01')).toBeInTheDocument()
@@ -111,7 +182,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     })
 
     it('tìm kiếm theo mã tủ điện và cập nhật danh sách hiển thị', () => {
-      render(<CabinetsTab {...defaultProps} />)
+      render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
       const searchInput = screen.getByPlaceholderText(
         'Tìm theo mã tủ (CAB-TL8), tên tủ, mốc thực địa...'
@@ -123,7 +194,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     })
 
     it('lọc theo trạng thái định vị GIS (Đã định vị vs Chưa định vị)', () => {
-      render(<CabinetsTab {...defaultProps} />)
+      render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
       const filterSelect = screen.getByDisplayValue('Tất cả trạng thái định vị')
       
@@ -139,7 +210,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     })
 
     it('kích hoạt onOpenImport khi người dùng click nút "Import Dữ Liệu"', () => {
-      render(<CabinetsTab {...defaultProps} />)
+      render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
       const importBtn = screen.getByRole('button', { name: /Import Dữ Liệu/i })
       fireEvent.click(importBtn)
@@ -148,7 +219,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     })
 
     it('mở modal xem chi tiết và xác nhận KHÔNG CÓ nút Chỉnh Sửa ở footer', () => {
-      render(<CabinetsTab {...defaultProps} />)
+      render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
       // Click nút xem chi tiết của hàng đầu tiên
       const viewButtons = screen.getAllByRole('button', { name: /Chi tiết/i })
@@ -165,7 +236,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     })
 
     it('mở modal sửa tủ điện và cập nhật thông tin thành công', () => {
-      render(<CabinetsTab {...defaultProps} />)
+      render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
       const editButtons = screen.getAllByRole('button', { name: /^Sửa$/i })
       expect(editButtons.length).toBeGreaterThan(0)

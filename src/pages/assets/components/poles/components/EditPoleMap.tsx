@@ -307,10 +307,19 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     }
   }, [lng, lat])
 
-  // Cập nhật Route Line & Other Poles layer khi tuyến đường thay đổi
+  const prevSegmentCoordsKeyRef = useRef<string>('')
+
+  // 1. Cập nhật Route Line & Fit bounds CHỈ KHI tuyến đường (segmentCoords) thực sự thay đổi
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
+
+    const coordsKey = segmentCoords.length > 0
+      ? `${segmentCoords[0][0]},${segmentCoords[0][1]}-${segmentCoords.length}`
+      : ''
+    const isSegmentChanged = coordsKey !== prevSegmentCoordsKeyRef.current
+    if (!isSegmentChanged) return
+    prevSegmentCoordsKeyRef.current = coordsKey
 
     // Tự động snap cột về tuyến mới nếu nằm ngoài hoặc cách xa tuyến (> 50m)
     if (segmentCoords.length >= 2 && Number.isFinite(lng) && Number.isFinite(lat)) {
@@ -324,18 +333,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         if (currentPoleMarkerRef.current) {
           currentPoleMarkerRef.current.setLngLat(targetPoint)
         }
-      } else if (snapped.distMeters > 0.05) {
-        onChangeCoordsRef.current({
-          lng: Number(snapped.snappedPoint[0].toFixed(6)),
-          lat: Number(snapped.snappedPoint[1].toFixed(6)),
-        })
-        if (currentPoleMarkerRef.current) {
-          currentPoleMarkerRef.current.setLngLat(snapped.snappedPoint)
-        }
       }
     }
 
-    const updateLayers = () => {
+    const updateRouteLayer = () => {
       const routeSource = map.getSource('edit-segment-route') as maplibregl.GeoJSONSource | undefined
       if (routeSource) {
         routeSource.setData({
@@ -348,27 +349,38 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         })
       }
 
-      const polesSource = map.getSource('other-segment-poles') as maplibregl.GeoJSONSource | undefined
-      if (polesSource) {
-        polesSource.setData(otherPolesGeoJSON)
-      }
-
       if (segmentCoords.length >= 2) {
         const bounds = new maplibregl.LngLatBounds()
         segmentCoords.forEach((coord) => bounds.extend(coord))
-        if (Number.isFinite(lng) && Number.isFinite(lat)) {
-          bounds.extend([lng, lat])
-        }
         map.fitBounds(bounds, { padding: 40, maxZoom: 18, duration: 600 })
       }
     }
 
     if (map.isStyleLoaded()) {
-      updateLayers()
+      updateRouteLayer()
     } else {
-      map.once('load', updateLayers)
+      map.once('load', updateRouteLayer)
     }
-  }, [segmentCoords, otherPolesGeoJSON, lat, lng])
+  }, [segmentCoords, lat, lng])
+
+  // 2. Cập nhật Other Poles layer khi danh sách cột khác thay đổi (tuyệt đối KHÔNG gọi fitBounds)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const updatePolesLayer = () => {
+      const polesSource = map.getSource('other-segment-poles') as maplibregl.GeoJSONSource | undefined
+      if (polesSource) {
+        polesSource.setData(otherPolesGeoJSON)
+      }
+    }
+
+    if (map.isStyleLoaded()) {
+      updatePolesLayer()
+    } else {
+      map.once('load', updatePolesLayer)
+    }
+  }, [otherPolesGeoJSON])
 
   // Render Marker tủ điện quản lý khi có currentCabinet
   useEffect(() => {
@@ -387,20 +399,21 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       Number.isFinite(currentCabinet.location.lat)
     ) {
       const cabEl = document.createElement('div')
-      cabEl.className = 'cabinet-marker select-none'
+      cabEl.className = 'cabinet-marker select-none pointer-events-none'
+      cabEl.style.width = '0px'
+      cabEl.style.height = '0px'
+      cabEl.style.position = 'relative'
       cabEl.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; transform: translate(0, -6px); pointer-events: none;">
-          <div style="width: 24px; height: 24px; background: #6366f1; border: 2px solid #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 11px; font-weight: 800; box-shadow: 0 3px 8px rgba(0,0,0,0.4);">
-            ⚡
-          </div>
-          <div style="background: rgba(30, 27, 75, 0.85); color: #ffffff; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; margin-top: 2px; white-space: nowrap; border: 1px solid rgba(255,255,255,0.2);">
-            ${currentCabinet.cabinet_name || currentCabinet.external_ref || 'Tủ'}
-          </div>
+        <div style="position: absolute; top: -14px; left: -14px; width: 28px; height: 28px; background: linear-gradient(135deg, #7c3aed, #4f46e5); border: 2.5px solid #ffffff; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #fbbf24; font-size: 13px; font-weight: 800; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.6), 0 2px 6px rgba(0,0,0,0.4); z-index: 2;">
+          ⚡
+        </div>
+        <div style="position: absolute; top: 17px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.92); color: #ffffff; padding: 1.5px 6px; border-radius: 5px; font-size: 9.5px; font-weight: 700; white-space: nowrap; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 1;">
+          ${currentCabinet.cabinet_name || currentCabinet.external_ref || 'Tủ'}
         </div>
       `
       const cabMarker = new maplibregl.Marker({
         element: cabEl,
-        anchor: 'bottom',
+        anchor: 'center',
       })
         .setLngLat([currentCabinet.location.lng, currentCabinet.location.lat])
         .addTo(map)
