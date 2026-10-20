@@ -23,7 +23,7 @@
       <p>Sửa nền trắng ở ô tài khoản và mật khẩu khi trình duyệt tự điền; làm rõ gợi ý tài khoản.</p>
       <label for="task-progress">Tiến độ bản sửa mã nguồn: 100%</label>
       <progress id="task-progress" value="100" max="100">100%</progress>
-      <p>Đã push commit <code>6b7a826</code> lên <code>dev</code> ngày 20/10/2026. Vercel báo deploy Preview thành công.</p>
+      <p>Hoàn tất ngày 20/10/2026: bản sửa <code>6b7a826</code> đã lên Production tại <a href="https://luxmap.com.vn">luxmap.com.vn</a> qua VPS. Vercel chỉ là bản Preview.</p>
     </section>
     <section>
       <h2>Đã hoàn thành</h2>
@@ -35,18 +35,20 @@
         <dt>Commit</dt>
         <dd><code>fix(auth): preserve dark login autofill and clarify account placeholder</code></dd>
         <dt>Kiểm chứng</dt>
-        <dd>Chrome headless tái hiện lỗi trước sửa bằng trạng thái :autofill, kiểm tra sau sửa ở desktop và mobile, focus và hiện/ẩn mật khẩu. Build production, lint file LoginPage và 120 tests đều đạt. GitHub CodeQL và Vercel deploy thành công.</dd>
+        <dd>Chrome headless tái hiện lỗi trước sửa bằng trạng thái :autofill và kiểm tra trực tiếp Production sau sửa: nền tối, chữ trắng, placeholder mới, focus và hiện/ẩn mật khẩu, ảnh desktop 1440×1000 và mobile 390×844. Build production, lint file LoginPage và 120 tests đều đạt. Trang chủ và /map trả đúng bản build mới; /api/v1/auth/me trả 401 khi chưa đăng nhập.</dd>
         <dt>Bản triển khai</dt>
-        <dd><a href="https://luxmap-2rtn0tlxm-ntngoc204s-projects.vercel.app">Preview của commit 6b7a826</a> — yêu cầu đăng nhập Vercel.</dd>
+        <dd>Build từ <code>7b545d9</code> với <code>VITE_API_URL=/api/v1</code>, rsync hai lượt lên VPS theo mục B của tài liệu backend <code>docs/deploy/update.md</code>. Đã giữ cấu hình bản đồ đang dùng; không thay backend hay database.</dd>
+        <dt>Sao lưu trước triển khai</dt>
+        <dd><code>/home/ubuntu/luxmap-web-before-login-fix-20261020T162140Z.tar.gz</code> trên VPS; đã kiểm tra đọc được archive.</dd>
       </dl>
     </section>
     <section>
       <h2>Còn lại</h2>
-      <p>Kiểm tra trực tiếp giao diện bằng phiên có quyền truy cập Preview; xác nhận URL người dùng đang sử dụng nếu cần phát hành Production.</p>
+      <p>Không còn việc chặn bản sửa login. Người đang mở bản cũ tải lại trang bằng Ctrl/Cmd-Shift-R.</p>
     </section>
     <section>
       <h2>Vấn đề đã biết</h2>
-      <p>Preview bị bảo vệ bằng đăng nhập Vercel, nên chưa kiểm chứng trực tiếp form LuxMap trên bản deploy. Chưa kiểm tra Safari/Firefox và chưa xác nhận bản Production được cập nhật.</p>
+      <p>Chưa kiểm tra Safari/Firefox hoặc đăng nhập bằng tài khoản thật; kiểm tra Production chỉ thao tác giao diện với dữ liệu thử, không gửi yêu cầu đăng nhập.</p>
     </section>
   </body>
 </html>
