@@ -23,7 +23,7 @@
       <p>Sửa nền trắng ở ô tài khoản và mật khẩu khi trình duyệt tự điền; làm rõ gợi ý tài khoản.</p>
       <label for="task-progress">Tiến độ bản sửa mã nguồn: 100%</label>
       <progress id="task-progress" value="100" max="100">100%</progress>
-      <p>Chờ phát hành bản deploy mới.</p>
+      <p>Đã push commit <code>6b7a826</code> lên <code>dev</code> ngày 20/10/2026. Vercel báo deploy Preview thành công.</p>
     </section>
     <section>
       <h2>Đã hoàn thành</h2>
@@ -35,16 +35,18 @@
         <dt>Commit</dt>
         <dd><code>fix(auth): preserve dark login autofill and clarify account placeholder</code></dd>
         <dt>Kiểm chứng</dt>
-        <dd>Chrome headless tái hiện lỗi trước sửa bằng trạng thái :autofill, kiểm tra sau sửa ở desktop và mobile, focus và hiện/ẩn mật khẩu. Build production và lint file LoginPage.</dd>
+        <dd>Chrome headless tái hiện lỗi trước sửa bằng trạng thái :autofill, kiểm tra sau sửa ở desktop và mobile, focus và hiện/ẩn mật khẩu. Build production, lint file LoginPage và 120 tests đều đạt. GitHub CodeQL và Vercel deploy thành công.</dd>
+        <dt>Bản triển khai</dt>
+        <dd><a href="https://luxmap-2rtn0tlxm-ntngoc204s-projects.vercel.app">Preview của commit 6b7a826</a> — yêu cầu đăng nhập Vercel.</dd>
       </dl>
     </section>
     <section>
       <h2>Còn lại</h2>
-      <p>Push sau khi được xác nhận, deploy bản sửa và kiểm tra lại trên URL triển khai.</p>
+      <p>Kiểm tra trực tiếp giao diện bằng phiên có quyền truy cập Preview; xác nhận URL người dùng đang sử dụng nếu cần phát hành Production.</p>
     </section>
     <section>
       <h2>Vấn đề đã biết</h2>
-      <p>Chưa kiểm chứng trực tiếp trên bản deploy và trên Safari/Firefox. Thay đổi mã nguồn cục bộ chưa cập nhật website đang chạy.</p>
+      <p>Preview bị bảo vệ bằng đăng nhập Vercel, nên chưa kiểm chứng trực tiếp form LuxMap trên bản deploy. Chưa kiểm tra Safari/Firefox và chưa xác nhận bản Production được cập nhật.</p>
     </section>
   </body>
 </html>
