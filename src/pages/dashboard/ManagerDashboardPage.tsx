@@ -1,13 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { toast } from 'sonner'
-import {
-  fetchWarrantyStatistics,
-  fetchFaultsList,
-  fetchSegmentsList,
-} from '../../feature/dashboard/dashboardAPI'
-import type { WarrantyList } from '../../types/statistics/warranty'
+import { useDispatch, useSelector } from 'react-redux'
+import type { RootState, AppDispatch } from '../../redux/store'
+import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
 import type { FaultItem } from '../../types/faults/faults'
-import type { SegmentListItem } from '../../types/assets/segments'
 
 import { DashboardToolbar } from './components/DashboardToolbar'
 import { DashboardKpiCards } from './components/DashboardKpiCards'
@@ -17,73 +12,25 @@ import { FaultsTableCard } from './components/FaultsTableCard'
 import { FaultDetailModal } from './components/FaultDetailModal'
 
 export const ManagerDashboardPage: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>()
+
+  // Redux Global State (được quản lý và nạp bởi Redux-Saga)
+  const { segmentsList, warrantyList, faultsList, loading } = useSelector(
+    (state: RootState) => state.dashboard
+  )
+
   // State Filters
   const [selectedSegment, setSelectedSegment] = useState<string>('all')
   const [faultTab, setFaultTab] = useState<'all' | 'blackout' | 'dim' | 'offline'>('all')
   const [warrantyTab, setWarrantyTab] = useState<'all' | 'expired' | 'expiring'>('all')
 
-  // Data State từ Backend API
-  const [loading, setLoading] = useState<boolean>(true)
-  const [segmentsList, setSegmentsList] = useState<SegmentListItem[]>([])
-  const [warrantyList, setWarrantyList] = useState<WarrantyList>({
-    today: new Date().toISOString().split('T')[0],
-    expiring_within_days: 30,
-    page: 1,
-    page_size: 100,
-    total: 0,
-    items: [],
-  })
-  const [faultsList, setFaultsList] = useState<FaultItem[]>([])
-
   // Modal State
   const [selectedFault, setSelectedFault] = useState<FaultItem | null>(null)
 
-  // Tải dữ liệu toàn diện từ Backend API (Lấy FULL toàn bộ tuyến đường theo quyền tài khoản)
-  const loadDashboardData = async () => {
-    setLoading(true)
-    try {
-      const [segments, wStats, fList] = await Promise.all([
-        // API Tuyến đường: Lấy FULL toàn bộ tuyến đường động từ Backend
-        fetchSegmentsList(),
-        // API Bảo hành: Chỉ lấy bóng hết hạn hoặc sắp hết trong vòng 1 tháng (<= 30 ngày)
-        fetchWarrantyStatistics({
-          within_days: 30,
-          status: 'expired,expiring',
-          page_size: 100,
-        }),
-        // API Sự cố: Tải danh sách sự cố trên các tuyến đường
-        fetchFaultsList({
-          sort: '-detected_at',
-          page_size: 100,
-        }),
-      ])
-
-      // Lưu danh sách toàn bộ tuyến đường động
-      setSegmentsList(segments)
-
-      // Lọc các bóng đèn có ngày hạn rõ ràng (<= 30 ngày)
-      const filteredWarrantyItems = (wStats.items || []).filter(
-        (i) => i.days_remaining != null && i.days_remaining <= 30
-      )
-
-      setWarrantyList({
-        ...wStats,
-        total: filteredWarrantyItems.length,
-        items: filteredWarrantyItems,
-      })
-
-      setFaultsList(fList || [])
-    } catch (err) {
-      console.error('[ManagerDashboard] Load data error:', err)
-      toast.error('Không thể đồng bộ dữ liệu mới nhất từ máy chủ')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Tải dữ liệu toàn diện qua Redux-Saga khi vào trang Dashboard
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    dispatch(fetchDashboardDataRequest())
+  }, [dispatch])
 
   // Map tên tuyến đường
   const segmentNameMap: Record<string, string> = useMemo(() => {
