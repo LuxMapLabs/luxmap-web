@@ -304,6 +304,17 @@ button:focus-visible {
   }
 }
 
+.login-form {
+  --login-input-background: #0f172a;
+  color-scheme: dark;
+}
+
+.login-input:is(:autofill, :-webkit-autofill) {
+  box-shadow: 0 0 0 1000px var(--login-input-background) inset;
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+}
+
 .animate-login-card {
   animation: loginCardEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: opacity, transform;
