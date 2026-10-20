@@ -36,10 +36,12 @@ export const DashboardKpiCards: React.FC<DashboardKpiCardsProps> = ({
         </div>
         <div className="flex items-baseline gap-2.5 my-3">
           <span className="text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
-            {fixtureKpis.normalPct}%
+            {fixtureKpis.totalPoles > 0 ? `${fixtureKpis.normalPct}%` : '---'}
           </span>
           <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
-            {fixtureKpis.totalNormal} / {fixtureKpis.totalPoles} cột
+            {fixtureKpis.totalPoles > 0
+              ? `${fixtureKpis.totalNormal} / ${fixtureKpis.totalPoles} cột`
+              : 'Chưa có cột đèn'}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">

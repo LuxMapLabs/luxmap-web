@@ -17,9 +17,9 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
   loading,
 }) => {
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 px-4.5 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+    <div className="bg-white border border-slate-200/90 rounded-2xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
       <div className="flex items-center gap-3 flex-wrap">
-        {/* Lọc Tuyến đường (Đồng bộ trực tiếp từ Database qua API) */}
+        {/* Lọc Tuyến đường Dropdown */}
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
           <Route className="w-4 h-4 text-slate-500" />
           <label className="font-semibold text-slate-500 whitespace-nowrap">Tuyến đường:</label>
@@ -31,10 +31,10 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
             }}
             className="bg-transparent font-bold text-slate-800 outline-hidden cursor-pointer max-w-sm truncate"
           >
-            <option value="all">Tất cả các tuyến</option>
+            <option value="all">Tất cả các tuyến ({segments.length})</option>
             {segments.map((seg) => (
               <option key={seg.segment_id || ''} value={seg.segment_id || ''}>
-                {seg.segment_name || seg.segment_id}
+                {seg.segment_name || seg.segment_id} {seg.pole_count != null ? `(${seg.pole_count} cột)` : ''}
               </option>
             ))}
           </select>

@@ -4,13 +4,14 @@ import type { FaultItem } from '../../../types/faults/faults'
 
 interface FaultsTableCardProps {
   faults: FaultItem[]
-  activeTab: 'all' | 'blackout' | 'dim'
-  onTabChange: (tab: 'all' | 'blackout' | 'dim') => void
+  activeTab: 'all' | 'blackout' | 'dim' | 'offline'
+  onTabChange: (tab: 'all' | 'blackout' | 'dim' | 'offline') => void
   segmentNameMap: Record<string, string>
   onSelectFault: (fault: FaultItem) => void
   totalCount: number
   blackoutCount: number
   dimCount: number
+  offlineCount: number
 }
 
 export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
@@ -22,6 +23,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
   totalCount,
   blackoutCount,
   dimCount,
+  offlineCount,
 }) => {
   return (
     <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
@@ -33,7 +35,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">Giám Sát Sự Cố Bóng Đèn</h3>
-              <p className="text-[11px] text-slate-500">Tổng hợp đa nguồn (Xe quét AI, Khảo sát, Cảm biến IoT)</p>
+              <p className="text-[11px] text-slate-500">Tổng hợp đa nguồn (Xe quét AI, Khảo sát, Cảm biến IoT, Dân quét QR)</p>
             </div>
           </div>
           <span className="text-[11px] font-bold px-2.5 py-1 bg-rose-50 text-rose-700 rounded-full border border-rose-200/60">
@@ -41,8 +43,8 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
           </span>
         </div>
 
-        {/* 3 Tab Lọc Sự Cố */}
-        <div className="flex gap-1.5 border-b border-slate-100 pb-2.5 mb-3 text-xs">
+        {/* 4 Tab Lọc Sự Cố (Khớp số học 100%: 19 + 11 + 3 = 33) */}
+        <div className="flex gap-1.5 border-b border-slate-100 pb-2.5 mb-3 text-xs flex-wrap">
           <button
             onClick={() => onTabChange('all')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
@@ -75,6 +77,17 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
             Sáng yếu / Suy giảm ({dimCount})
           </button>
+          <button
+            onClick={() => onTabChange('offline')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'offline'
+                ? 'bg-purple-600 text-white'
+                : 'text-slate-500 hover:text-purple-600 hover:bg-purple-50'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+            Mất kết nối IoT ({offlineCount})
+          </button>
         </div>
 
         <div className="overflow-x-auto max-h-[360px] overflow-y-auto custom-scrollbar">
@@ -90,21 +103,31 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
             <tbody className="divide-y divide-slate-100">
               {faults.length > 0 ? (
                 faults.map((fault, idx) => {
-                  const faultTypeStr = String(fault.fault_type).toLowerCase()
+                  const faultTypeStr = String(fault.fault_type || '').toLowerCase()
+                  const isOffline = faultTypeStr.includes('offline') || faultTypeStr.includes('node')
                   const isBlackout =
-                    faultTypeStr.includes('out') ||
-                    faultTypeStr.includes('blackout') ||
-                    faultTypeStr.includes('segment_outage')
+                    !isOffline &&
+                    (faultTypeStr.includes('out') ||
+                      faultTypeStr.includes('blackout') ||
+                      faultTypeStr.includes('segment_outage'))
 
-                  const sourceChannel = String(fault.source_channel).toLowerCase()
-                  const sourceText =
-                    sourceChannel.includes('citizen') || sourceChannel.includes('qr')
-                      ? '📱 Dân quét QR'
-                      : sourceChannel.includes('iot')
-                      ? '⚡ Cảm biến IoT'
-                      : sourceChannel.includes('field')
-                      ? '📋 Khảo sát hiện trường'
-                      : '🤖 Xe quét AI'
+                  // Nhận diện nguồn phát hiện chuẩn xác từ Backend (kể cả báo cáo công dân qua review_note)
+                  const sourceChannel = String(fault.source_channel || '').toLowerCase()
+                  const noteStr = `${fault.note || ''} ${fault.review_note || ''}`.toLowerCase()
+                  const isCitizen =
+                    sourceChannel.includes('citizen') ||
+                    sourceChannel.includes('qr') ||
+                    noteStr.includes('citizen_report') ||
+                    noteStr.includes('crp-') ||
+                    noteStr.includes('dân')
+
+                  const sourceText = isCitizen
+                    ? '📱 Dân quét QR'
+                    : sourceChannel.includes('iot')
+                    ? '⚡ Cảm biến IoT'
+                    : sourceChannel.includes('field')
+                    ? '📋 Khảo sát hiện trường'
+                    : '🤖 Xe quét AI'
 
                   const segmentName =
                     segmentNameMap[fault.segment_id || ''] || fault.segment_id || 'Chưa rõ tuyến'
@@ -124,7 +147,11 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                         </div>
                       </td>
                       <td className="py-3 px-3">
-                        {isBlackout ? (
+                        {isOffline ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60">
+                            Mất kết nối IoT
+                          </span>
+                        ) : isBlackout ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200/60">
                             Mất sáng hoàn toàn
                           </span>
@@ -137,7 +164,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                           className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[200px]"
                           title={fault.note || ''}
                         >
-                          {fault.note || 'Cần kiểm tra điện áp & bóng'}
+                          {fault.note || (isOffline ? 'Bộ điều khiển ngắt kết nối với máy chủ' : 'Cần kiểm tra điện áp & bóng')}
                         </div>
                       </td>
                       <td className="py-3 px-3">

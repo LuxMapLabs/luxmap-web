@@ -19,7 +19,7 @@ import { FaultDetailModal } from './components/FaultDetailModal'
 export const ManagerDashboardPage: React.FC = () => {
   // State Filters
   const [selectedSegment, setSelectedSegment] = useState<string>('all')
-  const [faultTab, setFaultTab] = useState<'all' | 'blackout' | 'dim'>('all')
+  const [faultTab, setFaultTab] = useState<'all' | 'blackout' | 'dim' | 'offline'>('all')
   const [warrantyTab, setWarrantyTab] = useState<'all' | 'expired' | 'expiring'>('all')
 
   // Data State từ Backend API
@@ -38,13 +38,13 @@ export const ManagerDashboardPage: React.FC = () => {
   // Modal State
   const [selectedFault, setSelectedFault] = useState<FaultItem | null>(null)
 
-  // Tải dữ liệu toàn diện từ Backend API
+  // Tải dữ liệu toàn diện từ Backend API (Lấy FULL toàn bộ tuyến đường theo quyền tài khoản)
   const loadDashboardData = async () => {
     setLoading(true)
     try {
       const [segments, wStats, fList] = await Promise.all([
-        // API Tuyến đường: Lấy danh sách tuyến đường động từ Backend
-        fetchSegmentsList('COM-070'),
+        // API Tuyến đường: Lấy FULL toàn bộ tuyến đường động từ Backend
+        fetchSegmentsList(),
         // API Bảo hành: Chỉ lấy bóng hết hạn hoặc sắp hết trong vòng 1 tháng (<= 30 ngày)
         fetchWarrantyStatistics({
           within_days: 30,
@@ -58,20 +58,12 @@ export const ManagerDashboardPage: React.FC = () => {
         }),
       ])
 
-      // Lưu danh sách tuyến đường động
+      // Lưu danh sách toàn bộ tuyến đường động
       setSegmentsList(segments)
 
-      // Lấy danh sách ID các tuyến tác nghiệp
-      const targetSegmentIds = segments
-        .map((s) => s.segment_id)
-        .filter((id): id is string => Boolean(id))
-
-      // Lọc các bóng đèn thuộc phạm vi các tuyến tác nghiệp và có ngày hạn rõ ràng
+      // Lọc các bóng đèn có ngày hạn rõ ràng (<= 30 ngày)
       const filteredWarrantyItems = (wStats.items || []).filter(
-        (i) =>
-          i.days_remaining != null &&
-          i.days_remaining <= 30 &&
-          (targetSegmentIds.length === 0 || (i.segment_id ? targetSegmentIds.includes(i.segment_id) : true))
+        (i) => i.days_remaining != null && i.days_remaining <= 30
       )
 
       setWarrantyList({
@@ -80,11 +72,7 @@ export const ManagerDashboardPage: React.FC = () => {
         items: filteredWarrantyItems,
       })
 
-      // Lọc sự cố trên các tuyến tác nghiệp
-      const filteredFaultItems = (fList || []).filter((f) =>
-        targetSegmentIds.length === 0 || (f.segment_id ? targetSegmentIds.includes(f.segment_id) : true)
-      )
-      setFaultsList(filteredFaultItems)
+      setFaultsList(fList || [])
     } catch (err) {
       console.error('[ManagerDashboard] Load data error:', err)
       toast.error('Không thể đồng bộ dữ liệu mới nhất từ máy chủ')
@@ -118,12 +106,20 @@ export const ManagerDashboardPage: React.FC = () => {
       const segFaults = faultsList.filter((f) => f.segment_id === segId)
       const out = segFaults.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
-        return type.includes('out') || type.includes('blackout') || type.includes('segment_outage')
+        return (
+          !type.includes('offline') &&
+          !type.includes('node') &&
+          (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
+        )
       }).length
 
       const dim = segFaults.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
-        return type.includes('dim') || type.includes('runtime_decline')
+        return (
+          !type.includes('offline') &&
+          !type.includes('node') &&
+          (type.includes('dim') || type.includes('runtime_decline'))
+        )
       }).length
 
       const normal = Math.max(0, poleCount - out - dim)
@@ -202,7 +198,7 @@ export const ManagerDashboardPage: React.FC = () => {
       }
     }
 
-    // Khi chọn "Toàn bộ": Hiển thị 3 tuyến tác nghiệp chính
+    // Khi chọn "Toàn bộ": Hiển thị các tuyến trong danh sách lọc
     return dynamicSegments.map((s) => ({
       name: s.name,
       fullName: s.name,
@@ -238,17 +234,32 @@ export const ManagerDashboardPage: React.FC = () => {
     return faultsList.filter((f) => f.segment_id === selectedSegment)
   }, [faultsList, selectedSegment])
 
+  const offlineFaultsCount = useMemo(() => {
+    return segmentFaults.filter((f) => {
+      const type = String(f.fault_type).toLowerCase()
+      return type.includes('offline') || type.includes('node')
+    }).length
+  }, [segmentFaults])
+
   const blackoutFaultsCount = useMemo(() => {
     return segmentFaults.filter((f) => {
       const type = String(f.fault_type).toLowerCase()
-      return type.includes('out') || type.includes('blackout') || type.includes('segment_outage')
+      return (
+        !type.includes('offline') &&
+        !type.includes('node') &&
+        (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
+      )
     }).length
   }, [segmentFaults])
 
   const dimFaultsCount = useMemo(() => {
     return segmentFaults.filter((f) => {
       const type = String(f.fault_type).toLowerCase()
-      return type.includes('dim') || type.includes('runtime_decline')
+      return (
+        !type.includes('offline') &&
+        !type.includes('node') &&
+        (type.includes('dim') || type.includes('runtime_decline'))
+      )
     }).length
   }, [segmentFaults])
 
@@ -257,12 +268,25 @@ export const ManagerDashboardPage: React.FC = () => {
     if (faultTab === 'blackout') {
       list = list.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
-        return type.includes('out') || type.includes('blackout') || type.includes('segment_outage')
+        return (
+          !type.includes('offline') &&
+          !type.includes('node') &&
+          (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
+        )
       })
     } else if (faultTab === 'dim') {
       list = list.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
-        return type.includes('dim') || type.includes('runtime_decline')
+        return (
+          !type.includes('offline') &&
+          !type.includes('node') &&
+          (type.includes('dim') || type.includes('runtime_decline'))
+        )
+      })
+    } else if (faultTab === 'offline') {
+      list = list.filter((f) => {
+        const type = String(f.fault_type).toLowerCase()
+        return type.includes('offline') || type.includes('node')
       })
     }
     return list
@@ -323,6 +347,7 @@ export const ManagerDashboardPage: React.FC = () => {
             totalCount={segmentFaults.length}
             blackoutCount={blackoutFaultsCount}
             dimCount={dimFaultsCount}
+            offlineCount={offlineFaultsCount}
           />
         </div>
       </div>
