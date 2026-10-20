@@ -233,9 +233,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
                 <span>
                   {selectedPole
-                    ? selectedPole.properties?.pole_id
+                    ? (selectedPole.properties?.external_ref || selectedPole.properties?.pole_id)
                     : selectedCabinet
-                    ? selectedCabinet.cabinet_name
+                    ? (selectedCabinet.external_ref || selectedCabinet.cabinet_name)
                     : activeSegmentDetail.name}
                 </span>
 
@@ -326,19 +326,19 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   onClick={() =>
                     setLightboxImage({
                       url: polePhotoUrl,
-                      title: `Ảnh hiện trường: ${selectedPole.properties.pole_id}`,
+                      title: `Ảnh hiện trường: ${selectedPole.properties.external_ref || selectedPole.properties.pole_id}`,
                     })
                   }
                   className="relative h-44 rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs"
                 >
                   <img
                     src={polePhotoUrl}
-                    alt={selectedPole.properties.pole_id}
+                    alt={selectedPole.properties.external_ref || selectedPole.properties.pole_id}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                   />
                   <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent flex items-end justify-between p-2.5 text-white">
                     <span className="text-[11px] font-medium drop-shadow-sm font-mono">
-                      {selectedPole.properties.pole_id}
+                      {selectedPole.properties.external_ref || selectedPole.properties.pole_id}
                     </span>
                     <div className="p-1 rounded bg-black/40 group-hover:bg-blue-600 text-white transition">
                       <Maximize2 className="w-3.5 h-3.5" />
@@ -639,7 +639,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                   <div className="flex justify-between">
                     <span>Mã hiệu quản lý:</span>
-                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.cabinet_code || selectedCabinet.cabinet_id}</strong>
+                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.external_ref || selectedCabinet.cabinet_code || selectedCabinet.cabinet_id}</strong>
                   </div>
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1 font-medium">
@@ -657,7 +657,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <div className="flex justify-between">
                     <span>Tuyến điện (Lộ cấp nguồn):</span>
                     <strong className="text-purple-700 dark:text-purple-400 font-bold font-mono">
-                      {selectedCabinet.feeder_id || `FDR-${selectedCabinet.cabinet_id}`}
+                      {selectedCabinet.feeder_external_ref || selectedCabinet.feeder_id || `FDR-${selectedCabinet.external_ref || selectedCabinet.cabinet_id}`}
                     </strong>
                   </div>
                   <div className="flex justify-between">
@@ -744,7 +744,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                      {`Dàn đèn tủ phụ trách (${selectedCabinet.cabinet_code || selectedCabinet.cabinet_id})`}
+                      {`Dàn đèn tủ phụ trách (${selectedCabinet.external_ref || selectedCabinet.cabinet_code || selectedCabinet.cabinet_id})`}
                     </p>
                     <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded ${selectedCabinet.status === 'fault' ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}`}>
                       {selectedCabinet.status === 'fault' ? 'Mất điện' : `${cabinetConnectedPoles.length} đèn đang sáng`}
@@ -762,7 +762,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           >
                             <div className="flex items-center gap-2">
                               <span className="font-bold font-mono text-slate-800 dark:text-slate-200 text-xs group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
-                                {f.properties.pole_id}
+                                {f.properties.external_ref || f.properties.pole_id}
                               </span>
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                                 {lampLabel}
@@ -852,7 +852,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       >
                         <div className="flex items-center gap-2">
                           <span className="font-bold font-mono text-slate-800 dark:text-slate-200 text-xs group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
-                            {f.properties.pole_id}
+                            {f.properties.external_ref || f.properties.pole_id}
                           </span>
                           {f.properties.near_sensitive_poi && (
                             <span
