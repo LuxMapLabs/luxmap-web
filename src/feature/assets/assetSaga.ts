@@ -14,6 +14,11 @@ import type {
 import type { FeederListItemPagedResult, CreateFeederRequest } from '../../types/assets/feeders'
 import type { PoleListItemPagedResult } from '../../types/assets/poles'
 import type { CreateFixtureRequest } from '../../types/assets/fixtures'
+import type {
+  IotNodeItemPagedResult,
+  CreateIotNodeRequest,
+  IotNodeCredential,
+} from '../../types/assets/iot-nodes'
 import {
   fetchAssetsRequest,
   fetchAssetsSuccess,
@@ -36,6 +41,11 @@ import {
   createFixtureRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
+  createIotNodeRequest,
+  updateIotNodeRequest,
+  deleteIotNodeRequest,
+  setIotNodeRelayRequest,
+  issueIotNodeCredentialRequest,
   mutationSuccess,
   mutationFailure,
   type ImportAssetPayload,
@@ -45,6 +55,9 @@ import {
   type UpdateFeederPayload,
   type UpdateSegmentPayload,
   type RetireFixturePayload,
+  type UpdateIotNodePayload,
+  type SetIotNodeRelayPayload,
+  type IssueIotNodeCredentialPayload,
 } from './assetSlice'
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -57,16 +70,18 @@ function getErrorMessage(error: unknown, fallback: string): string {
  */
 function* handleFetchAssets() {
   try {
-    const [segmentsRes, cabinetsRes, feedersRes, polesRes]: [
+    const [segmentsRes, cabinetsRes, feedersRes, polesRes, iotNodesRes]: [
       SegmentListItemPagedResult,
       CabinetListItemPagedResult,
       FeederListItemPagedResult,
-      PoleListItemPagedResult
+      PoleListItemPagedResult,
+      IotNodeItemPagedResult
     ] = yield all([
       call(assetAPI.getSegments, { page_size: 1000 }),
       call(assetAPI.getCabinets, { page_size: 1000 }),
       call(assetAPI.getFeeders, { page_size: 1000 }),
       call(assetAPI.getPoles, { page_size: 1000 }),
+      call(assetAPI.getIotNodes, { page_size: 1000 }),
     ])
 
     yield put(
@@ -75,6 +90,7 @@ function* handleFetchAssets() {
         cabinets: cabinetsRes.items ?? [],
         feeders: feedersRes.items ?? [],
         poles: polesRes.items ?? [],
+        iotNodes: iotNodesRes.items ?? [],
       })
     )
   } catch (error: unknown) {
@@ -407,6 +423,85 @@ function* handleRetireFixture(action: PayloadAction<RetireFixturePayload>) {
   }
 }
 
+function* handleCreateIotNode(action: PayloadAction<CreateIotNodeRequest>) {
+  try {
+    yield call(assetAPI.createIotNode, action.payload)
+    yield put(mutationSuccess())
+    toast.success('Đã đăng ký thiết bị IoT mới thành công!')
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể đăng ký thiết bị IoT')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi đăng ký thiết bị IoT: ${errorMsg}`)
+  }
+}
+
+function* handleUpdateIotNode(action: PayloadAction<UpdateIotNodePayload>) {
+  try {
+    const { nodeId, data } = action.payload
+    yield call(assetAPI.updateIotNode, nodeId, data)
+    yield put(mutationSuccess())
+    toast.success(`Đã cập nhật thiết bị IoT "${nodeId}" thành công!`)
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể cập nhật thiết bị IoT')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi cập nhật thiết bị IoT: ${errorMsg}`)
+  }
+}
+
+function* handleDeleteIotNode(action: PayloadAction<string>) {
+  try {
+    const nodeId = action.payload
+    yield call(assetAPI.deleteIotNode, nodeId)
+    yield put(mutationSuccess())
+    toast.success(`Đã xóa thiết bị IoT "${nodeId}" thành công!`)
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể xóa thiết bị IoT')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi xóa thiết bị IoT: ${errorMsg}`)
+  }
+}
+
+function* handleSetIotNodeRelay(action: PayloadAction<SetIotNodeRelayPayload>) {
+  try {
+    const { nodeId, relayNo, data } = action.payload
+    yield call(assetAPI.setIotNodeRelay, nodeId, relayNo, data)
+    yield put(mutationSuccess())
+    toast.success(
+      data.feeder_id
+        ? `Đã đấu nối rơ-le số ${relayNo} vào mạch "${data.feeder_id}"!`
+        : `Đã ngắt kết nối rơ-le số ${relayNo}!`
+    )
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể cấu hình rơ-le thiết bị IoT')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi cấu hình rơ-le: ${errorMsg}`)
+  }
+}
+
+function* handleIssueIotNodeCredential(action: PayloadAction<IssueIotNodeCredentialPayload>) {
+  try {
+    const { nodeId, onSuccess } = action.payload
+    const credential: IotNodeCredential = (yield call(
+      assetAPI.issueIotNodeCredential,
+      nodeId
+    )) as IotNodeCredential
+    yield put(mutationSuccess())
+    toast.success(`Đã cấp secret xác thực mới cho thiết bị IoT "${nodeId}"!`)
+    if (onSuccess) {
+      onSuccess(credential)
+    }
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể cấp secret thiết bị IoT')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi cấp secret: ${errorMsg}`)
+  }
+}
+
 export default function* assetSaga() {
   yield takeLatest(fetchAssetsRequest.type, handleFetchAssets)
   yield takeLatest(importAssetRequest.type, handleImportAsset)
@@ -425,4 +520,9 @@ export default function* assetSaga() {
   yield takeLatest(createFixtureRequest.type, handleCreateFixture)
   yield takeLatest(createFixturesBulkRequest.type, handleCreateFixturesBulk)
   yield takeLatest(retireFixtureRequest.type, handleRetireFixture)
+  yield takeLatest(createIotNodeRequest.type, handleCreateIotNode)
+  yield takeLatest(updateIotNodeRequest.type, handleUpdateIotNode)
+  yield takeLatest(deleteIotNodeRequest.type, handleDeleteIotNode)
+  yield takeLatest(setIotNodeRelayRequest.type, handleSetIotNodeRelay)
+  yield takeLatest(issueIotNodeCredentialRequest.type, handleIssueIotNodeCredential)
 }

@@ -16,12 +16,23 @@ import {
   updateSegmentRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
+  createIotNodeRequest,
+  updateIotNodeRequest,
+  deleteIotNodeRequest,
+  setIotNodeRelayRequest,
+  issueIotNodeCredentialRequest,
 } from '../../feature/assets/assetSlice'
 import type { PoleListItem, CreatePoleRequest, UpdatePoleRequest } from '../../types/assets/poles'
 import type { CabinetListItem, CreateCabinetRequest, UpdateCabinetRequest } from '../../types/assets/cabinets'
 import type { SegmentListItem, CreateSegmentRequest, UpdateSegmentRequest } from '../../types/assets/segments'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../types/assets/feeders'
 import type { ActiveFixture, CreateFixtureRequest, RetireFixtureRequest } from '../../types/assets/fixtures'
+import type {
+  IotNodeItem,
+  CreateIotNodeRequest,
+  UpdateIotNodeRequest,
+  IotNodeCredential,
+} from '../../types/assets/iot-nodes'
 
 // ManagedFixture represents an active or historical fixture displayed in the fixtures table
 export type ManagedFixture = ActiveFixture & {
@@ -37,6 +48,7 @@ export function useAssetData() {
     cabinets: backendCabinets,
     segments: backendSegments,
     feeders: backendFeeders,
+    iotNodes: backendIotNodes,
     isLoadingAssets,
     loadAssetsError,
     isMutating,
@@ -47,6 +59,7 @@ export function useAssetData() {
   const [cabinets, setCabinets] = useState<CabinetListItem[]>([])
   const [segments, setSegments] = useState<SegmentListItem[]>([])
   const [feeders, setFeeders] = useState<FeederListItem[]>([])
+  const [iotNodes, setIotNodes] = useState<IotNodeItem[]>([])
   const [successBanner, setSuccessBanner] = useState<string | null>(null)
 
   // Fetch real assets from Backend API on mount
@@ -79,6 +92,12 @@ export function useAssetData() {
     }
   }, [backendFeeders])
 
+  useEffect(() => {
+    if (backendIotNodes) {
+      setIotNodes(backendIotNodes)
+    }
+  }, [backendIotNodes])
+
   // Fixtures are derived dynamically from poles carrying an active lamp
   const fixtures: ManagedFixture[] = useMemo(() => {
     return poles
@@ -90,6 +109,7 @@ export function useAssetData() {
         return {
           ...(p.active_fixture as ActiveFixture),
           fixture_id: fixtureId,
+          pole_id: p.pole_id,
           pole_external_ref: p.external_ref,
           removed_date: null,
         }
@@ -129,6 +149,7 @@ export function useAssetData() {
           fixture_type: item.active_fixture.fixture_type || 'led_road_lamp',
           power_source: item.active_fixture.power_source || 'grid',
           lamp_watt: Number(item.active_fixture.lamp_watt) || 100,
+          lamp_count: Number(item.active_fixture.lamp_count) || 1,
           install_date: item.active_fixture.install_date || new Date().toISOString().split('T')[0],
           warranty_expiry: item.active_fixture.warranty_expiry || null,
           data_source: item.active_fixture.data_source || 'field',
@@ -185,7 +206,7 @@ export function useAssetData() {
         return p
       })
     )
-    showBanner(`Đã cập nhật thông số bóng đèn "${updated.fixture_id}"!`)
+    showBanner(`Đã cập nhật thông số bộ đèn "${updated.fixture_id}"!`)
   }
 
   const handleRetireFixture = async (fixtureId: string, req: RetireFixtureRequest) => {
@@ -285,6 +306,36 @@ export function useAssetData() {
     dispatch(updateSegmentRequest({ segmentId: updated.segment_id, data: updateReq }))
   }
 
+  // --- IoT Node Handlers (Redux-Saga First) ---
+  const handleAddIotNode = async (data: CreateIotNodeRequest) => {
+    dispatch(createIotNodeRequest(data))
+  }
+
+  const handleUpdateIotNode = async (nodeId: string, data: UpdateIotNodeRequest) => {
+    dispatch(updateIotNodeRequest({ nodeId, data }))
+  }
+
+  const handleDeleteIotNode = async (nodeId: string) => {
+    dispatch(deleteIotNodeRequest(nodeId))
+  }
+
+  const handleSetRelay = async (nodeId: string, relayNo: number, feederId: string | null) => {
+    dispatch(
+      setIotNodeRelayRequest({
+        nodeId,
+        relayNo,
+        data: { feeder_id: feederId },
+      })
+    )
+  }
+
+  const handleIssueCredential = (
+    nodeId: string,
+    onSuccess: (cred: IotNodeCredential) => void
+  ) => {
+    dispatch(issueIotNodeCredentialRequest({ nodeId, onSuccess }))
+  }
+
   // --- Import Handler ---
   const handleImportSuccess = useCallback(
     (count: number) => {
@@ -299,6 +350,7 @@ export function useAssetData() {
     cabinets,
     segments,
     feeders,
+    iotNodes,
     isLoadingAssets,
     loadAssetsError,
     isMutating,
@@ -320,6 +372,11 @@ export function useAssetData() {
     handleDeleteFeeder,
     handleAddSegment,
     handleUpdateSegment,
+    handleAddIotNode,
+    handleUpdateIotNode,
+    handleDeleteIotNode,
+    handleSetRelay,
+    handleIssueCredential,
     handleImportSuccess,
   }
 }

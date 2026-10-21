@@ -26,6 +26,14 @@ import type {
   CreateFixtureRequest,
   RetireFixtureRequest,
 } from '../../types/assets/fixtures'
+import type {
+  IotNodeItemPagedResult,
+  IotNodeItem,
+  CreateIotNodeRequest,
+  UpdateIotNodeRequest,
+  SetRelayRequest,
+  IotNodeCredential,
+} from '../../types/assets/iot-nodes'
 
 export type ImportAssetCategory = 'segments' | 'cabinets' | 'feeders' | 'poles' | 'fixtures' | 'poles_and_fixtures'
 
@@ -246,6 +254,71 @@ export const assetAPI = {
     const response = await apiClient.post<ImportResult>('/assets/import/fixtures', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
+    return response.data
+  },
+
+  /**
+   * Lấy danh sách Thiết bị IoT
+   * GET /api/v1/assets/iot-nodes
+   */
+  getIotNodes: async (params?: AssetQueryParams): Promise<IotNodeItemPagedResult> => {
+    const response = await apiClient.get<IotNodeItemPagedResult>('/assets/iot-nodes', { params })
+    return response.data
+  },
+
+  /**
+   * Lấy chi tiết Thiết bị IoT
+   * GET /api/v1/assets/iot-nodes/{nodeId}
+   */
+  getIotNodeDetail: async (nodeId: string): Promise<IotNodeItem> => {
+    const response = await apiClient.get<IotNodeItem>(`/assets/iot-nodes/${encodeURIComponent(nodeId)}`)
+    return response.data
+  },
+
+  /**
+   * Đăng ký Thiết bị IoT mới
+   * POST /api/v1/assets/iot-nodes
+   */
+  createIotNode: async (data: CreateIotNodeRequest): Promise<string | null> => {
+    const response = await apiClient.post('/assets/iot-nodes', data)
+    const loc = (response.headers?.location || response.headers?.Location) as string | undefined
+    if (loc) {
+      const parts = loc.split('/')
+      return parts[parts.length - 1] || null
+    }
+    return null
+  },
+
+  /**
+   * Cập nhật Thiết bị IoT
+   * PUT /api/v1/assets/iot-nodes/{nodeId}
+   */
+  updateIotNode: async (nodeId: string, data: UpdateIotNodeRequest): Promise<void> => {
+    await apiClient.put(`/assets/iot-nodes/${encodeURIComponent(nodeId)}`, data)
+  },
+
+  /**
+   * Xóa Thiết bị IoT
+   * DELETE /api/v1/assets/iot-nodes/{nodeId}
+   */
+  deleteIotNode: async (nodeId: string): Promise<void> => {
+    await apiClient.delete(`/assets/iot-nodes/${encodeURIComponent(nodeId)}`)
+  },
+
+  /**
+   * Đấu nối hoặc hủy nối Rơ-le của Thiết bị IoT
+   * PUT /api/v1/assets/iot-nodes/{nodeId}/relays/{relayNo}
+   */
+  setIotNodeRelay: async (nodeId: string, relayNo: number, data: SetRelayRequest): Promise<void> => {
+    await apiClient.put(`/assets/iot-nodes/${encodeURIComponent(nodeId)}/relays/${relayNo}`, data)
+  },
+
+  /**
+   * Cấp phát Secret xác thực mới cho Thiết bị IoT
+   * POST /api/v1/assets/iot-nodes/{nodeId}/credential
+   */
+  issueIotNodeCredential: async (nodeId: string): Promise<IotNodeCredential> => {
+    const response = await apiClient.post<IotNodeCredential>(`/assets/iot-nodes/${encodeURIComponent(nodeId)}/credential`)
     return response.data
   },
 }
