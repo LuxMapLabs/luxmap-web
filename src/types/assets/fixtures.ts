@@ -9,7 +9,7 @@ export interface ActiveFixture {
     fixture_type: FixtureType
     power_source: PowerSource
     lamp_watt: number
-    lamp_count?: number
+    lamp_count: number
     install_date: string | null
     warranty_expiry?: string | null
     warranty_status?: WarrantyStatus

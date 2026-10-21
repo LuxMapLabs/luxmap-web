@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import type { SuperiorReportItem } from '../../types/reports/report'
+import { workScheduleAPI } from '../../feature/work-schedule/workScheduleAPI'
 
 /**
  * Xuất trực tiếp một thẻ DOM (biên bản A4) thành file PDF chất lượng cao,
@@ -241,6 +242,24 @@ export async function exportReportToPdf(
   }
 
   // Trường hợp 2: Bấm xuất nhanh từ danh sách ngoài bảng (chưa mở modal)
+  const preparedReport = { ...report }
+  if (preparedReport.evidencePhotos && preparedReport.evidencePhotos.length > 0) {
+    const updatedPhotos = await Promise.all(
+      preparedReport.evidencePhotos.map(async (p) => {
+        if (p.id) {
+          try {
+            const b64 = await workScheduleAPI.fetchEvidenceBase64(p.id, false)
+            return { ...p, url: b64 }
+          } catch {
+            return p
+          }
+        }
+        return p
+      })
+    )
+    preparedReport.evidencePhotos = updatedPhotos
+  }
+
   const container = document.createElement('div')
   container.style.position = 'fixed'
   container.style.left = '-9999px'
@@ -248,13 +267,13 @@ export async function exportReportToPdf(
   container.style.width = '780px'
   container.style.background = '#ffffff'
   container.style.zIndex = '-9999'
-  container.innerHTML = buildReportHtmlString(report)
+  container.innerHTML = buildReportHtmlString(preparedReport)
 
   document.body.appendChild(container)
 
   try {
-    // Chờ 150ms để DOM phân giải và render hình ảnh / font
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    // Chờ 250ms để DOM phân giải và render hình ảnh / font
+    await new Promise((resolve) => setTimeout(resolve, 250))
     await exportReportElementToPdf(container, filename)
   } finally {
     if (document.body.contains(container)) {
@@ -262,6 +281,7 @@ export async function exportReportToPdf(
     }
   }
 }
+
 
 /**
  * Mở hộp thoại in ấn chuẩn của trình duyệt (hỗ trợ in ra PDF sắc nét với font tiếng Việt đầy đủ)

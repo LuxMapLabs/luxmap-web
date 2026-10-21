@@ -164,4 +164,39 @@ export const workScheduleAPI = {
   getEvidenceImageUrl(evidenceId: string, type: 'thumbnail' | 'original' = 'thumbnail'): string {
     return `/api/v1/evidence/${evidenceId}/${type}`
   },
+
+  /**
+   * Tải ảnh bằng chứng nghiệm thu an toàn qua Blob kèm Access Token Authorization Header
+   * Khắc phục triệt để lỗi ảnh bị chặn bởi chính sách [Authorize(Policy = ReadWorkOrders)]
+   *
+   * @param evidenceId Mã bằng chứng ảnh (ví dụ: EVD-0005)
+   * @param original Tải ảnh gốc chất lượng cao (true) hoặc ảnh thu nhỏ thumbnail (false)
+   * @returns Chuỗi Object URL (blob:...) sẵn sàng gán vào thẻ <img>
+   */
+  async fetchEvidenceBlob(evidenceId: string, original = false): Promise<string> {
+    const variant = original ? 'original' : 'thumbnail'
+    const endpoint = `/evidence/${encodeURIComponent(evidenceId)}/${variant}`
+    const response = await apiClient.get<Blob>(endpoint, {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(response.data)
+  },
+
+  /**
+   * Tải ảnh bằng chứng và chuyển đổi thành Base64 Data URL (phục vụ nhúng trực tiếp vào PDF hoặc canvas)
+   */
+  async fetchEvidenceBase64(evidenceId: string, original = false): Promise<string> {
+    const variant = original ? 'original' : 'thumbnail'
+    const endpoint = `/evidence/${encodeURIComponent(evidenceId)}/${variant}`
+    const response = await apiClient.get<Blob>(endpoint, {
+      responseType: 'blob',
+    })
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(response.data)
+    })
+  },
 }
+

@@ -1,8 +1,12 @@
 /**
  * Quy tắc nghiệp vụ kiểm tra quyền Chỉnh sửa hoặc Hủy lịch làm việc.
  * Quy định:
- * - Lịch diễn ra trong ngày hôm nay (hoặc quá khứ): Quản lý không được xóa/sửa vì đã đến ngày kỹ sư thực hiện.
- * - Lịch diễn ra sau ngày hôm nay (từ ngày mai trở đi): Quản lý được phép xóa hoặc chỉnh sửa.
+ * - Đồng bộ với Backend C# (WorkOrderRules.cs):
+ *   Quản lý được phép Chỉnh sửa và Hủy lịch khi lệnh ở các trạng thái chưa hoàn tất (Open, Assigned, InProgress).
+ * - Không cho phép Chỉnh sửa hoặc Hủy khi:
+ *   1. Kỹ sư đã nộp báo cáo nghiệm thu (reported / Done) -> Quản lý phải duyệt hoặc yêu cầu làm lại.
+ *   2. Giai đoạn hoặc toàn bộ sự vụ đã kết thúc/nghiệm thu (ended / Verified).
+ *   3. Lệnh đã bị hủy trước đó (cancelled).
  */
 
 export interface ScheduleModificationCheck {
@@ -14,16 +18,20 @@ export interface ScheduleModificationCheck {
 export function checkScheduleModificationAllowed(
   scheduledDateStr?: string,
   phaseStatus?: string,
-  isTerminated?: boolean
+  isTerminated?: boolean,
+  rawStatus?: string
 ): ScheduleModificationCheck {
-  if (isTerminated || phaseStatus === 'ended') {
+  const normRaw = String(rawStatus || '').toLowerCase()
+  const normPhase = String(phaseStatus || '').toLowerCase()
+
+  if (isTerminated || normPhase === 'ended' || normRaw === 'verified' || normRaw === 'cancelled') {
     return {
       canModify: false,
-      reason: 'Sự vụ hoặc giai đoạn này đã kết thúc, không thể chỉnh sửa hoặc hủy.',
+      reason: 'Sự vụ hoặc lệnh công tác này đã kết thúc hoặc đã hủy, không thể chỉnh sửa hoặc hủy.',
     }
   }
 
-  if (phaseStatus === 'reported') {
+  if (normPhase === 'reported' || normRaw === 'done') {
     return {
       canModify: false,
       reason:
@@ -31,40 +39,17 @@ export function checkScheduleModificationAllowed(
     }
   }
 
-  if (!scheduledDateStr) {
-    return { canModify: true }
-  }
-
   // Chuẩn hóa chuỗi ngày YYYY-MM-DD
-  const datePart = scheduledDateStr.substring(0, 10)
-  const parts = datePart.split('-')
-  const scheduledDateFormatted =
-    parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : scheduledDateStr
-
-  const now = new Date()
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
-    now.getDate()
-  ).padStart(2, '0')}`
-
-  // Nếu ngày thực hiện là hôm nay
-  if (datePart === todayStr) {
-    return {
-      canModify: false,
-      reason: `Lịch công tác được lên lịch thực hiện trong ngày hôm nay (${scheduledDateFormatted}). Theo quy chế dự án, Quản lý không được chỉnh sửa hoặc hủy lịch trong ngày thực hiện.`,
-      scheduledDateFormatted,
+  let scheduledDateFormatted = scheduledDateStr
+  if (scheduledDateStr) {
+    const datePart = scheduledDateStr.substring(0, 10)
+    const parts = datePart.split('-')
+    if (parts.length === 3) {
+      scheduledDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`
     }
   }
 
-  // Nếu ngày thực hiện là trong quá khứ
-  if (datePart < todayStr) {
-    return {
-      canModify: false,
-      reason: `Lịch công tác thuộc về ngày trong quá khứ (${scheduledDateFormatted}), không thể chỉnh sửa hoặc hủy.`,
-      scheduledDateFormatted,
-    }
-  }
-
-  // Nếu ngày thực hiện là sau ngày hôm nay (ngày mai trở đi)
+  // Cho phép Quản lý chỉnh sửa và hủy lịch
   return {
     canModify: true,
     scheduledDateFormatted,

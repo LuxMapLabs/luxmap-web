@@ -15,6 +15,33 @@ export const SEGMENT_NAME_MAP: Record<string, string> = {
   'SEG-001': 'Tuyến A - Tỉnh Lộ 8 (SEG-001)',
   'SEG-002': 'Tuyến B - Nguyễn Văn Ni (SEG-002)',
   'SEG-003': 'Tuyến C - Huỳnh Văn Cọ (SEG-003)',
+  'SEG-004': 'Phước Thiện (SEG-004)',
+  'SEG-005': 'Hẻm 190 Nguyễn Xiển (SEG-005)',
+  'SEG-006': 'Đường không tên 898251247 (SEG-006)',
+  'SEG-007': 'Phước Thiện (SEG-007)',
+  'SEG-008': 'Cầu Vồng (SEG-008)',
+  'SEG-009': 'Hẻm 275/30 Đường Phước Thiện (SEG-009)',
+  'SEG-010': 'Đường không tên 608514662 (SEG-010)',
+  'SEG-011': 'Nguyễn Xiển (SEG-011)',
+  'SEG-012': 'Phước Thiện (SEG-012)',
+  'SEG-013': 'Nguyễn Xiển (SEG-013)',
+  'SEG-014': 'Cầu Gò Công (SEG-014)',
+  'SEG-015': 'Nguyễn Xiển (SEG-015)',
+  'SEG-016': 'Đường không tên 607194281 (SEG-016)',
+  'SEG-017': 'Cầu Vồng (SEG-017)',
+  'SEG-018': 'Hẻm 230 (SEG-018)',
+  'SEG-019': 'Đường số 1 (SEG-019)',
+  'SEG-020': 'Hẻm 275 (SEG-020)',
+  'SEG-021': 'Long Phước – đoạn 2 (SEG-021)',
+  'SEG-022': 'Đường không tên 838404715 (SEG-022)',
+  'SEG-023': 'Long Phước – đoạn 4 (SEG-023)',
+  'SEG-024': 'Long Phước – đoạn 3 (SEG-024)',
+  'SEG-025': 'Long Phước – đoạn 1 (SEG-025)',
+  'SEG-026': 'Đường không tên 848726664 (SEG-026)',
+  'SEG-027': 'Phước Thiện (SEG-027)',
+  'SEG-028': 'Đường Hoa Giấy (SEG-028)',
+  'SEG-029': 'Đường N2 (SEG-029)',
+  'SEG-030': 'Long Phước – đoạn 5 (SEG-030)',
 }
 
 /**
@@ -32,7 +59,7 @@ export function formatSegmentDisplay(
         return SEGMENT_NAME_MAP[id] || `${id} - Tuyến đường phụ trách`
       }
     }
-    return 'Tuyến A - Tỉnh Lộ 8 (SEG-001)'
+    return 'Tuyến đường phụ trách'
   }
 
   const segMatch = segIdOrName.match(/SEG-\d+/i)
@@ -45,6 +72,7 @@ export function formatSegmentDisplay(
 
   return segIdOrName
 }
+
 
 /**
  * Tiện ích chuyển đổi danh sách lệnh công tác (WorkOrderItem[]) từ Backend API
