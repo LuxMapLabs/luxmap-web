@@ -120,11 +120,12 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const isActivePhase = viewingPhaseIndex === caseItem.currentPhaseIndex
   const hasReport = currentPhase?.status === 'reported'
 
-  // Kiểm tra quy chế: nếu lịch thực hiện trong ngày hôm nay thì không được sửa/hủy, lịch sau ngày hôm nay thì được sửa/hủy
+  // Kiểm tra quy chế: cho phép sửa/hủy khi chưa hoàn tất (đồng bộ với Backend C#)
   const modificationCheck = checkScheduleModificationAllowed(
     currentPhase?.date || currentPhase?.dueDate,
     currentPhase?.status,
-    caseItem.isTerminated
+    caseItem.isTerminated,
+    currentPhase?.rawStatus
   )
   const canModify = modificationCheck.canModify
 
@@ -629,8 +630,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               Đóng
             </button>
 
-            {/* Nút Chỉnh sửa & Hủy lịch theo quy chế 1 ngày */}
-            {!caseItem.isTerminated && currentPhase && currentPhase.status !== 'ended' && (
+            {/* Nút Chỉnh sửa & Hủy lịch (Đồng bộ với Backend C#) */}
+            {!caseItem.isTerminated && currentPhase && currentPhase.status !== 'ended' && currentPhase.rawStatus !== 'cancelled' && currentPhase.rawStatus !== 'verified' && (
               <>
                 <button
                   type="button"

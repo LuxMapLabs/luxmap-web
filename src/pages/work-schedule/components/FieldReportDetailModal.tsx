@@ -15,6 +15,7 @@ import {
 import { ScheduleCase, SchedulePhase } from '../../../types/workSchedule'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import { EvidenceItem } from '../../../types/workorders/orders'
+import { EvidenceImage } from './EvidenceImage'
 import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
 import fieldBrokenFixtureImg from '../../../assets/images/field-broken-fixture.jpg'
 import fieldLuxmeterImg from '../../../assets/images/field-luxmeter-4lux.jpg'
@@ -26,6 +27,11 @@ interface FieldReportDetailModalProps {
   onClose: () => void
 }
 
+interface ZoomImageTarget {
+  evidenceId?: string | null
+  src?: string
+}
+
 export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   isOpen,
   caseItem,
@@ -34,14 +40,17 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'video' | 'photos' | 'ai'>('video')
   const [isPlaying, setIsPlaying] = useState(false)
-  const [zoomImage, setZoomImage] = useState<string | null>(null)
+  const [zoomImage, setZoomImage] = useState<ZoomImageTarget | null>(null)
   const [backendEvidence, setBackendEvidence] = useState<EvidenceItem[]>([])
+
+  // Xác định mã lệnh công tác (hỗ trợ fallback caseItem.code nếu phase.workOrderId trống)
+  const targetWorkOrderId = phase?.workOrderId || caseItem?.code
 
   // Tải ảnh bằng chứng nghiệm thu từ Backend nếu có mã lệnh công tác
   useEffect(() => {
-    if (isOpen && phase?.workOrderId) {
+    if (isOpen && targetWorkOrderId) {
       workScheduleAPI
-        .getWorkOrderEvidence(phase.workOrderId)
+        .getWorkOrderEvidence(targetWorkOrderId)
         .then((res) => {
           if (res.items && res.items.length > 0) {
             setBackendEvidence(res.items)
@@ -49,7 +58,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
         })
         .catch(() => {})
     }
-  }, [isOpen, phase?.workOrderId])
+  }, [isOpen, targetWorkOrderId])
 
   if (!isOpen || !caseItem || !phase || !phase.report) return null
 
@@ -59,6 +68,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const displayPhotos =
     backendEvidence.length > 0
       ? backendEvidence.map((ev, idx) => ({
+          evidenceId: ev.evidence_id,
           src:
             ev.original_url ||
             ev.thumbnail_url ||
@@ -70,23 +80,26 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
               ? 'Sau sửa chữa'
               : 'Hiện trường'
           }`,
-          desc: `Thời điểm ghi nhận: ${ev.captured_at || ev.uploaded_at || 'Đã ghi nhận'}`,
+          desc: `Thời điểm ghi nhận: ${ev.captured_at ? new Date(ev.captured_at).toLocaleString('vi-VN') : ev.uploaded_at || 'Đã ghi nhận'}`,
           tag: ev.kind === 'before' ? 'Trước sửa' : ev.kind === 'after' ? 'Sau sửa' : 'Hiện trường',
         }))
       : [
           {
+            evidenceId: null,
             src: fieldSurveyNightImg,
             title: 'Ảnh 1: Cột đèn thực địa ban đêm (POLE-0041)',
             desc: 'Chiếu sáng chập chờn, quang thông suy giảm nghiêm trọng khi xe tải đi qua.',
             tag: 'Hiện trường đêm',
           },
           {
+            evidenceId: null,
             src: fieldBrokenFixtureImg,
             title: 'Ảnh 2: Chao đèn & Đui đèn bị cháy hỏng',
             desc: 'Cận cảnh đui đèn bị nứt vỡ cách điện, tiếp xúc lỏng gây phóng điện hồ quang.',
             tag: 'Chi tiết hỏng hóc',
           },
           {
+            evidenceId: null,
             src: fieldLuxmeterImg,
             title: 'Ảnh 3: Kết quả đo máy Luxmeter tại mặt đường',
             desc: 'Độ rọi đo được chỉ 4.2 Lux (Tiêu chuẩn kỹ thuật chiếu sáng nông thôn: ≥ 15 Lux).',
@@ -242,7 +255,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() => setZoomImage(fieldSurveyNightImg)}
+                      onClick={() => setZoomImage({ src: fieldSurveyNightImg })}
                       className="flex items-center gap-1 hover:text-blue-400 cursor-pointer"
                     >
                       <Maximize2 className="w-3.5 h-3.5" />
@@ -274,12 +287,13 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                 {displayPhotos.map((photo, idx) => (
                   <div
                     key={idx}
-                    onClick={() => setZoomImage(photo.src)}
+                    onClick={() => setZoomImage({ evidenceId: photo.evidenceId, src: photo.src })}
                     className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer group flex flex-col"
                   >
                     <div className="relative aspect-4/3 overflow-hidden bg-slate-950">
-                      <img
-                        src={photo.src}
+                      <EvidenceImage
+                        evidenceId={photo.evidenceId}
+                        fallbackSrc={photo.src}
                         alt={photo.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -401,9 +415,11 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           onClick={() => setZoomImage(null)}
           className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out animate-in fade-in duration-150"
         >
-          <div className="relative max-w-5xl max-h-[90vh]">
-            <img
-              src={zoomImage}
+          <div className="relative max-w-5xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <EvidenceImage
+              evidenceId={zoomImage.evidenceId}
+              fallbackSrc={zoomImage.src}
+              preferOriginal={true}
               alt="Zoomed Evidence"
               className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain border border-white/20"
             />

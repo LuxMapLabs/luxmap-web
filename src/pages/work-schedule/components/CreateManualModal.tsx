@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
 import { PoleSelector } from './PoleSelector'
 import { FaultSelector } from './FaultSelector'
+import { assetAPI } from '../../../feature/assets/assetAPI'
 
 interface CreateManualModalProps {
   isOpen: boolean
@@ -24,7 +25,7 @@ interface CreateManualModalProps {
   }) => void
 }
 
-const SEGMENTS = [
+const FALLBACK_SEGMENTS = [
   'Tuyến A - Trục chính liên xã Phước Hậu (SEG-001)',
   'Tuyến B - Đường liên thôn Mỹ Hạnh Bắc (SEG-002)',
   'Tuyến C - Tuyến đường ra cầu (SEG-003)',
@@ -44,12 +45,35 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
 }) => {
   const [initPhase, setInitPhase] = useState<TaskKind>('survey')
   const [title, setTitle] = useState('')
-  const [segment, setSegment] = useState(SEGMENTS[0])
+  const [segmentsList, setSegmentsList] = useState<string[]>(FALLBACK_SEGMENTS)
+  const [segment, setSegment] = useState(FALLBACK_SEGMENTS[0])
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>([])
   const [selectedFaultIds, setSelectedFaultIds] = useState<string[]>([])
   const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || '')
   const [date, setDate] = useState(defaultDate || getTodayStr())
   const [notes, setNotes] = useState('')
+
+  // Tải danh sách toàn bộ tuyến đường thực tế từ Backend API
+  useEffect(() => {
+    let isMounted = true
+    assetAPI
+      .getSegments({ page_size: 100 })
+      .then((res) => {
+        if (isMounted && res.items && res.items.length > 0) {
+          const list = res.items.map(
+            (s) => `${s.segment_name || s.segment_id} (${s.segment_id})`
+          )
+          setSegmentsList(list)
+          setSegment((prev) => (list.includes(prev) ? prev : list[0]))
+        }
+      })
+      .catch((err) => {
+        console.warn('Không thể nạp danh sách tuyến đường:', err)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Đồng bộ kỹ sư khi danh sách assignees tải xong từ API
   useEffect(() => {
@@ -73,6 +97,14 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
     setSelectedFaultIds([])
   }, [segment, initPhase])
 
+  // Điều kiện vô hiệu hóa nút "+ Tạo sự vụ":
+  // - Sửa chữa: Bắt buộc phải chọn ít nhất 01 sự cố
+  // - Kiểm tra: Bắt buộc phải chọn ít nhất 01 cột có sự cố
+  // - Khảo sát: Cho phép tạo bình thường vì đi rà quét tìm lỗi mới trên toàn tuyến
+  const isSubmitDisabled =
+    (initPhase === 'repair' && selectedFaultIds.length === 0) ||
+    (initPhase === 'inspection' && selectedPoleIds.length === 0)
+
   if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -91,6 +123,11 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       return
     }
 
+    if (initPhase === 'inspection' && selectedPoleIds.length === 0) {
+      toast.warning('Vui lòng chọn ít nhất 01 cột có sự cố cần kiểm tra trên tuyến này!')
+      return
+    }
+
     const selectedAssignee = assignees.find((a) => a.user_id === assigneeId)
     const assigneeName = selectedAssignee?.full_name ? selectedAssignee.full_name.split(' (')[0] : 'Kỹ sư hiện trường'
 
@@ -100,20 +137,14 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
     const segmentShortName = segment.split(' (')[0]
 
     if (initPhase === 'inspection') {
-      if (selectedPoleIds.length > 0) {
-        if (!effectiveTitle) {
-          effectiveTitle = `Kiểm tra cột ${selectedPoleIds.join(', ')} - ${segmentShortName}`
-        }
-        const poleNote = `[Chỉ định kiểm tra trọng tâm]: ${selectedPoleIds.join(', ')}`
-        effectiveNotes = effectiveNotes ? `${effectiveNotes}\n${poleNote}` : poleNote
-      } else {
-        if (!effectiveTitle) {
-          effectiveTitle = `Kiểm tra toàn tuyến ${segmentShortName}`
-        }
+      if (!effectiveTitle) {
+        effectiveTitle = `Kiểm tra cột ${selectedPoleIds.join(', ')} - ${segmentShortName}`
       }
+      const poleNote = `[Chỉ định kiểm tra trọng tâm]: ${selectedPoleIds.join(', ')}`
+      effectiveNotes = effectiveNotes ? `${effectiveNotes}\n${poleNote}` : poleNote
     } else if (initPhase === 'repair') {
       if (!effectiveTitle) {
-        effectiveTitle = `Sửa chữa cột ${selectedPoleIds.join(', ')} - ${segmentShortName}`
+        effectiveTitle = `Sửa chữa sự cố trên ${segmentShortName}`
       }
     } else {
       if (!effectiveTitle) {
@@ -201,7 +232,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 onChange={(e) => setSegment(e.target.value)}
                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {SEGMENTS.map((s) => (
+                {segmentsList.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -300,7 +331,12 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer active:scale-98"
+              disabled={isSubmitDisabled}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
+                isSubmitDisabled
+                  ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed shadow-none'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer active:scale-98'
+              }`}
             >
               + Tạo sự vụ
             </button>
