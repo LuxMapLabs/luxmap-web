@@ -1,7 +1,7 @@
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../../redux/store'
-import { toLngLatBounds } from '../../utils/gis-map/mapUtils'
+import { toLngLatBounds, toBboxParam } from '../../utils/gis-map/mapUtils'
 import * as maplibregl from 'maplibre-gl'
 
 import type { FixtureType, PowerSource, RoadClass, DataSource } from '../../types/common/enums'
@@ -96,14 +96,49 @@ export const GisMapPage: React.FC = () => {
   // 1. Khởi tạo MapLibre instance và các điều khiển bản đồ
   const { mapContainerRef, mapRef, popupRef, isMapLoaded } = useGisMapInstance()
 
-  // Open on the account's communes (GET /auth/me map_bounds) — once, so a user who has panned is never pulled back.
+  // Open on the account's commune center (GET /auth/me map_bounds.center) taken 100% directly from backend.
+  // Restrict zoom-out (minZoom) to the entire commune panorama bbox (map_bounds.bbox) and restrict panning (maxBounds).
   const mapBounds = useSelector((state: RootState) => state.auth.user?.mapBounds)
-  const framedRef = useRef(false)
+  const lastFramedBboxRef = useRef<string | null>(null)
   useEffect(() => {
     const bounds = toLngLatBounds(mapBounds?.bbox)
-    if (!isMapLoaded || !mapRef.current || !bounds || framedRef.current) return
-    mapRef.current.fitBounds(bounds, { padding: 40, duration: 0 })
-    framedRef.current = true
+    const bboxKey = toBboxParam(mapBounds?.bbox)
+    const centerLng = mapBounds?.center?.lng
+    const centerLat = mapBounds?.center?.lat
+
+    if (
+      !isMapLoaded ||
+      !mapRef.current ||
+      !bounds ||
+      !bboxKey ||
+      typeof centerLng !== 'number' ||
+      !Number.isFinite(centerLng) ||
+      typeof centerLat !== 'number' ||
+      !Number.isFinite(centerLat) ||
+      lastFramedBboxRef.current === bboxKey
+    ) {
+      return
+    }
+
+    // 1. Tính mức zoom toàn cảnh vừa khít cái Bbox của xã từ Backend
+    const camera = mapRef.current.cameraForBounds(bounds, { padding: 40 })
+    const panoramaZoom = camera?.zoom
+    if (typeof panoramaZoom === 'number' && Number.isFinite(panoramaZoom)) {
+      mapRef.current.setMinZoom(panoramaZoom)
+    }
+    mapRef.current.setMaxBounds(bounds)
+
+    // 2. Mở bản đồ cận cảnh tại Tâm (Center) lấy 100% trực tiếp từ Backend
+    const detailedZoom = typeof panoramaZoom === 'number' && Number.isFinite(panoramaZoom)
+      ? Math.max(15.5, panoramaZoom + 1.5)
+      : 15.5
+
+    mapRef.current.jumpTo({
+      center: [centerLng, centerLat],
+      zoom: detailedZoom,
+    })
+
+    lastFramedBboxRef.current = bboxKey
   }, [isMapLoaded, mapBounds, mapRef])
 
   // 2. Trạng thái bộ lọc & thanh tìm kiếm
@@ -288,7 +323,6 @@ export const GisMapPage: React.FC = () => {
   const handleSelectSearchResult = useCallback(
     (item: SearchResultItem) => {
       setIsSearchFocused(false)
-
       if (item.category === 'segment') {
         setSearchInput(item.title)
         setAppliedSearchQuery('')

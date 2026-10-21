@@ -1,9 +1,8 @@
 import type { CommuneBbox } from '../../types/admin/communes'
 
 /** Fallback only — the map opens on the account's `map_bounds` (GET /auth/me). Centre of the surveyed communes. */
-export const DEFAULT_MAP_CENTER: [number, number] = [106.845, 10.826]
+export const DEFAULT_MAP_CENTER: [number, number] = [106.4975, 10.9715]
 /** Fallback `bbox` for map layers when the account has no `map_bounds` (no commune frame set yet). */
-export const FALLBACK_MAP_BBOX = '106.80,10.78,106.89,10.88'
 
 /** A complete commune frame as MapLibre bounds, or null when any edge is missing. */
 export function toLngLatBounds(bbox?: CommuneBbox | null): [[number, number], [number, number]] | null {
