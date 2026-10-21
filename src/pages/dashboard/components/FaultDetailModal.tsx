@@ -1,5 +1,6 @@
 import { X, Calendar, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react'
 import type { FaultItem } from '../../../types/faults/faults'
+import { getFaultProgressInfo } from './FaultsTableCard'
 
 interface FaultDetailModalProps {
   fault: FaultItem | null
@@ -110,16 +111,18 @@ export const FaultDetailModal: React.FC<FaultDetailModalProps> = ({
             </div>
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
               <span className="text-slate-400 font-medium">Tiến độ xử lý:</span>
-              <div className="mt-0.5">
-                {fault.work_order_id ? (
-                  <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                    Đã tạo lệnh: {fault.work_order_id}
-                  </span>
-                ) : (
-                  <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                    Chưa phân lịch bảo trì
-                  </span>
-                )}
+              <div className="mt-1">
+                {(() => {
+                  const progress = getFaultProgressInfo(fault)
+                  return (
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${progress.bgClass} ${progress.textClass} border ${progress.borderClass}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${progress.dotClass}`} />
+                      {progress.label}
+                    </span>
+                  )
+                })()}
               </div>
             </div>
           </div>

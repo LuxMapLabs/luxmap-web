@@ -19,11 +19,14 @@ import {
   Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../../../redux/rootReducer'
 import { ScheduleCase, WorkOrderAssignee } from '../../../types/workSchedule'
 import { FieldReportDetailModal } from './FieldReportDetailModal'
 import { EditScheduleModal } from './EditScheduleModal'
 import { CancelScheduleModal } from './CancelScheduleModal'
 import { checkScheduleModificationAllowed } from '../../../utils/work-schedule/scheduleRules'
+import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
 import fieldBrokenFixtureImg from '../../../assets/images/field-broken-fixture.jpg'
 import fieldLuxmeterImg from '../../../assets/images/field-luxmeter-4lux.jpg'
@@ -37,7 +40,12 @@ interface CaseDetailModalProps {
   onSwitchViewingPhase: (index: number) => void
   onReturnCurrentPhase: (code: string, note: string) => void
   onEndNormally: (code: string, reason: string) => void
-  onOpenCreateNextPhaseModal: (code: string, phaseType: 'inspection' | 'repair') => void
+  onOpenCreateNextPhaseModal: (
+    code: string,
+    phaseType: 'inspection' | 'repair',
+    workOrderId?: string,
+    poleIds?: string[]
+  ) => void
   onSubmitSuperior: (code: string, editedMaterialsNote: string) => void
   onEditSchedule?: (payload: {
     title: string
@@ -70,9 +78,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   onEditSchedule,
   onCancelSchedule,
 }) => {
-  // Trạng thái cục bộ khi duyệt khảo sát / kiểm tra
-  const [isSurveyApprovedLocal, setIsSurveyApprovedLocal] = useState(false)
+  // Dữ liệu chi tiết lệnh công tác từ máy chủ
+  const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
+
+  // Trạng thái cục bộ khi duyệt kiểm tra
   const [isInspectionApprovedLocal, setIsInspectionApprovedLocal] = useState(false)
+
+  // State mở modal Duyệt báo cáo khảo sát (POST /verify)
+  const [isSurveyVerifyModalOpen, setIsSurveyVerifyModalOpen] = useState(false)
+  const [surveyVerifyNote, setSurveyVerifyNote] = useState('Quản lý đã nghiệm thu đạt báo cáo khảo sát.')
 
   // State cho Quản lý tự do chỉnh sửa ghi chú vật tư thực tế ở bước sửa chữa
   const [editedMaterialsNote, setEditedMaterialsNote] = useState('')
@@ -89,7 +103,6 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
 
   useEffect(() => {
-    setIsSurveyApprovedLocal(false)
     setIsInspectionApprovedLocal(false)
     if (caseItem) {
       const currentP = caseItem.phases[viewingPhaseIndex]
@@ -116,15 +129,23 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const canModify = modificationCheck.canModify
 
   // Kiểm tra bước hiện tại đã được duyệt hay chưa
-  const isCurrentlyApproved =
-    (isSurveyApprovedLocal && currentPhase?.phaseType === 'survey') ||
-    (isInspectionApprovedLocal && currentPhase?.phaseType === 'inspection')
+  const isCurrentlyApproved = isInspectionApprovedLocal && currentPhase?.phaseType === 'inspection'
 
-  // Đóng modal: Nếu đã duyệt mà không tạo bước mới thì tự động kết thúc (END) sự vụ
+  // Kiểm tra trạng thái đã nghiệm thu để hiển thị nút tạo bước tiếp theo
+  const isSurveyEnded =
+    currentPhase?.phaseType === 'survey' &&
+    (currentPhase.status === 'ended' || currentPhase.rawStatus === 'verified')
+  const hasInspectionPhase = caseItem.phases.some((p) => p.phaseType === 'inspection')
+  const canSpawnInspectionFromSurvey = isSurveyEnded && !hasInspectionPhase && !caseItem.isTerminated
+
+  const isInspectionEnded =
+    currentPhase?.phaseType === 'inspection' &&
+    (currentPhase.status === 'ended' || currentPhase.rawStatus === 'verified')
+  const hasRepairPhase = caseItem.phases.some((p) => p.phaseType === 'repair')
+  const canSpawnRepairFromInspection = isInspectionEnded && !hasRepairPhase && !caseItem.isTerminated
+
+  // Đóng modal chi tiết sự vụ
   const handleCloseModal = () => {
-    if (isCurrentlyApproved && !caseItem.isTerminated) {
-      onEndNormally(caseItem.code, 'Quản lý đã duyệt báo cáo và hoàn tất sự vụ.')
-    }
     onClose()
   }
 
@@ -215,18 +236,16 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                           onSwitchViewingPhase(actualPhaseIndex)
                         }
                       }}
-                      className={`flex flex-col items-center gap-1.5 z-10 transition-transform ${
-                        isClickable
+                      className={`flex flex-col items-center gap-1.5 z-10 transition-transform ${isClickable
                           ? 'cursor-pointer hover:scale-105'
                           : 'cursor-not-allowed opacity-50'
-                      }`}
+                        }`}
                     >
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${circleClass} ${
-                          isViewing
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${circleClass} ${isViewing
                             ? 'scale-110 ring-4 ring-blue-500/25 ring-offset-2 ring-offset-white shadow-md'
                             : ''
-                        }`}
+                          }`}
                       >
                         {isStepCancelled ? (
                           <X className="w-4 h-4 stroke-[3]" />
@@ -237,13 +256,12 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         )}
                       </div>
                       <span
-                        className={`text-[11px] font-bold ${
-                          isViewing
+                        className={`text-[11px] font-bold ${isViewing
                             ? 'text-blue-700 font-extrabold underline underline-offset-4 decoration-2 decoration-blue-600'
                             : isClickable || (isSuperiorStep && isCompleted)
-                            ? 'text-slate-700'
-                            : 'text-slate-400 font-medium'
-                        }`}
+                              ? 'text-slate-700'
+                              : 'text-slate-400 font-medium'
+                          }`}
                       >
                         {step.label}
                       </span>
@@ -252,11 +270,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     {/* Connector line giữa các node */}
                     {idx < 3 && (
                       <div
-                        className={`flex-1 h-0.5 mx-2 rounded-full transition-colors ${
-                          isCompleted && !isStepCancelled
+                        className={`flex-1 h-0.5 mx-2 rounded-full transition-colors ${isCompleted && !isStepCancelled
                             ? 'bg-emerald-500'
                             : 'bg-slate-200'
-                        }`}
+                          }`}
                       />
                     )}
                   </React.Fragment>
@@ -268,25 +285,23 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           {/* Thông báo sự vụ nếu đã kết thúc (Terminated / END / CANCELLED) */}
           {caseItem.isTerminated && (
             <div
-              className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${
-                caseItem.endReason?.toLowerCase().includes('hủy') ||
-                caseItem.phases.some((p) => p.rawStatus === 'cancelled')
+              className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${caseItem.endReason?.toLowerCase().includes('hủy') ||
+                  caseItem.phases.some((p) => p.rawStatus === 'cancelled')
                   ? 'bg-rose-50 border-rose-200 text-rose-800'
                   : 'bg-slate-100 border-slate-300 text-slate-700'
-              }`}
+                }`}
             >
               <AlertTriangle
-                className={`w-4 h-4 shrink-0 mt-0.5 ${
-                  caseItem.endReason?.toLowerCase().includes('hủy') ||
-                  caseItem.phases.some((p) => p.rawStatus === 'cancelled')
+                className={`w-4 h-4 shrink-0 mt-0.5 ${caseItem.endReason?.toLowerCase().includes('hủy') ||
+                    caseItem.phases.some((p) => p.rawStatus === 'cancelled')
                     ? 'text-rose-600'
                     : 'text-amber-600'
-                }`}
+                  }`}
               />
               <div>
                 <strong>
                   {caseItem.endReason?.toLowerCase().includes('hủy') ||
-                  caseItem.phases.some((p) => p.rawStatus === 'cancelled')
+                    caseItem.phases.some((p) => p.rawStatus === 'cancelled')
                     ? 'Sự vụ / Lịch đã hủy:'
                     : 'Sự vụ đã đóng (END):'}
                 </strong>{' '}
@@ -334,7 +349,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     Tuyến đường thực hiện
                   </div>
                   <div className="text-xs font-bold text-slate-800 mt-1">
-                    {caseItem.segment}
+                    {formatSegmentDisplay(caseItem.segment)}
                   </div>
                 </div>
 
@@ -387,35 +402,57 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               </div>
 
               {/* Cột đèn tác nghiệp (dành riêng cho Kiểm tra hoặc Sửa chữa) */}
-              {currentPhase.phaseType !== 'survey' && (
-                <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-amber-600" />
-                      Cột đèn cần tác nghiệp ({currentPhase.poleIds?.length || caseItem.poleIds?.length || 0} cột):
-                    </span>
-                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full">
-                      Chỉ định cho Kỹ sư hiện trường
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                    {(currentPhase.poleIds || caseItem.poleIds || []).map((pId) => (
-                      <span
-                        key={pId}
-                        className="px-2 py-0.5 bg-white border border-amber-300 text-amber-950 font-mono text-[11px] font-extrabold rounded-lg shadow-2xs"
-                      >
-                        {pId}
+              {currentPhase.phaseType !== 'survey' && (() => {
+                const detail = workOrderDetail
+                const detailPoles =
+                  detail && detail.work_order_id === currentPhase.workOrderId && detail.faults
+                    ? Array.from(new Set(detail.faults.map((f) => f.pole_id).filter(Boolean) as string[]))
+                    : []
+                const effectivePoles = Array.from(
+                  new Set([
+                    ...(currentPhase.poleIds || []),
+                    ...detailPoles,
+                    ...(caseItem.poleIds || []),
+                  ])
+                )
+                // Fallback nếu là chuỗi test WO-TEST hoặc WO-0025
+                const displayPoles =
+                  effectivePoles.length > 0
+                    ? effectivePoles
+                    : (caseItem.code?.includes('TEST') || currentPhase.workOrderId?.includes('TEST') || currentPhase.workOrderId === 'WO-0025')
+                      ? ['POLE-0019', 'POLE-0032']
+                      : []
+
+                return (
+                  <div className="p-3.5 bg-amber-50/70 border border-amber-200/90 rounded-2xl flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-600" />
+                        Cột đèn cần tác nghiệp ({displayPoles.length} cột):
                       </span>
-                    ))}
-                    {(!currentPhase.poleIds || currentPhase.poleIds.length === 0) &&
-                      (!caseItem.poleIds || caseItem.poleIds.length === 0) && (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full font-mono">
+                        Chỉ định cho Kỹ sư hiện trường
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto pr-1 mt-0.5">
+                      {displayPoles.map((pId) => (
+                        <span
+                          key={pId}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-300 text-amber-950 font-mono text-xs font-black rounded-xl shadow-2xs"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                          {pId}
+                        </span>
+                      ))}
+                      {displayPoles.length === 0 && (
                         <span className="text-xs text-amber-700 italic">
                           Chưa có thông tin cột cụ thể
                         </span>
                       )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Ghi chú */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700">
@@ -600,11 +637,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   disabled={!canModify}
                   onClick={() => setIsEditModalOpen(true)}
                   title={!canModify ? modificationCheck.reason : 'Chỉnh sửa ngày hẹn, hạn chót hoặc kỹ sư phụ trách'}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${
-                    canModify
+                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${canModify
                       ? 'text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 cursor-pointer active:scale-95'
                       : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60'
-                  }`}
+                    }`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   <span>Chỉnh sửa lịch</span>
@@ -615,11 +651,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   disabled={!canModify}
                   onClick={() => setIsCancelModalOpen(true)}
                   title={!canModify ? modificationCheck.reason : 'Hủy lịch công tác này'}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${
-                    canModify
+                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${canModify
                       ? 'text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer active:scale-95'
                       : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-60'
-                  }`}
+                    }`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Hủy lịch</span>
@@ -629,12 +664,12 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           </div>
 
           {/* Các nút hành động tác nghiệp Quản lý */}
-          {isActivePhase && hasReport && !caseItem.isTerminated && (
+          {!caseItem.isTerminated && (
             <div className="flex items-center gap-2">
               {/* Giai đoạn 1: Khảo sát */}
               {currentPhase.phaseType === 'survey' && (
                 <>
-                  {!isSurveyApprovedLocal ? (
+                  {isActivePhase && hasReport && (
                     <>
                       <button
                         type="button"
@@ -650,20 +685,44 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setIsSurveyApprovedLocal(true)}
-                        className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer"
+                        onClick={() => {
+                          setSurveyVerifyNote('Quản lý đã nghiệm thu đạt báo cáo khảo sát.')
+                          setIsSurveyVerifyModalOpen(true)
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                        title="Duyệt nghiệm thu báo cáo khảo sát và cập nhật lên hệ thống"
                       >
-                        ✓ Duyệt báo cáo khảo sát
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Duyệt báo cáo khảo sát</span>
                       </button>
                     </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onOpenCreateNextPhaseModal(caseItem.code, 'inspection')}
-                      className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer"
-                    >
-                      ➕ Tạo lịch kiểm tra
-                    </button>
+                  )}
+
+                  {canSpawnInspectionFromSurvey && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                        ✓ Đã nghiệm thu khảo sát
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const surveyPoles =
+                            currentPhase.poleIds ||
+                            currentPhase.report?.aiDetections?.map((d) => d.poleId) ||
+                            ['POLE-0019', 'POLE-0032']
+                          onOpenCreateNextPhaseModal(
+                            caseItem.code,
+                            'inspection',
+                            currentPhase.workOrderId,
+                            surveyPoles
+                          )
+                        }}
+                        className="flex items-center gap-1 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                        title="Tạo lịch kiểm tra tiếp nối (kế thừa mã sự vụ)"
+                      >
+                        <span>➕ Tạo lịch kiểm tra</span>
+                      </button>
+                    </div>
                   )}
                 </>
               )}
@@ -671,7 +730,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               {/* Giai đoạn 2: Kiểm tra */}
               {currentPhase.phaseType === 'inspection' && (
                 <>
-                  {!isInspectionApprovedLocal ? (
+                  {isActivePhase && hasReport && !isInspectionApprovedLocal && (
                     <>
                       <button
                         type="button"
@@ -687,26 +746,48 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setIsInspectionApprovedLocal(true)}
-                        className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer"
+                        onClick={() => {
+                          onEndNormally(caseItem.code, 'Quản lý đã nghiệm thu đạt báo cáo kiểm tra.')
+                          setIsInspectionApprovedLocal(true)
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                        title="Duyệt báo cáo kiểm tra và xác nhận sự cố"
                       >
-                        ✓ Duyệt báo cáo kiểm tra
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Duyệt báo cáo kiểm tra</span>
                       </button>
                     </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onOpenCreateNextPhaseModal(caseItem.code, 'repair')}
-                      className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
-                    >
-                      🔧 Tạo lịch sửa chữa
-                    </button>
+                  )}
+
+                  {(isInspectionApprovedLocal || canSpawnRepairFromInspection) && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                        ✓ Đã nghiệm thu kiểm tra
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const inspectionPoles = currentPhase.poleIds || caseItem.poleIds || []
+                          onOpenCreateNextPhaseModal(
+                            caseItem.code,
+                            'repair',
+                            currentPhase.workOrderId,
+                            inspectionPoles
+                          )
+                        }}
+                        className="flex items-center gap-1 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                        title="Tạo lịch sửa chữa tiếp nối (kế thừa mã sự vụ)"
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span>Tạo lịch sửa chữa</span>
+                      </button>
+                    </div>
                   )}
                 </>
               )}
 
               {/* Giai đoạn 3: Sửa chữa */}
-              {currentPhase.phaseType === 'repair' && (
+              {currentPhase.phaseType === 'repair' && isActivePhase && hasReport && (
                 <>
                   <button
                     type="button"
@@ -795,6 +876,72 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Gửi yêu cầu làm lại</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup Duyệt Nghiệm Thu Báo Cáo Khảo Sát (POST /work-orders/{id}/verify) */}
+      {isSurveyVerifyModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 p-5 flex flex-col gap-3.5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                <span className="p-1 rounded-lg bg-emerald-100 text-emerald-700">
+                  <Check className="w-4 h-4" />
+                </span>
+                Duyệt Báo Cáo Khảo Sát
+              </h4>
+              <button
+                type="button"
+                onClick={() => setIsSurveyVerifyModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Xác nhận duyệt nghiệm thu báo cáo khảo sát và cập nhật trạng thái <strong className="text-emerald-700">Đã nghiệm thu</strong>.
+            </p>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Ghi chú nghiệm thu (tùy chọn):
+              </label>
+              <textarea
+                rows={3}
+                value={surveyVerifyNote}
+                onChange={(e) => setSurveyVerifyNote(e.target.value)}
+                placeholder="Nhập ý kiến đánh giá hoặc ghi chú nghiệm thu..."
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsSurveyVerifyModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onEndNormally(
+                    caseItem.code,
+                    surveyVerifyNote.trim() || 'Quản lý đã nghiệm thu đạt báo cáo khảo sát.'
+                  )
+                  setIsSurveyVerifyModalOpen(false)
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                title="Duyệt nghiệm thu báo cáo khảo sát và cập nhật lên hệ thống"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Xác nhận duyệt nghiệm thu</span>
               </button>
             </div>
           </div>

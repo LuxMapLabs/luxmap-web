@@ -207,8 +207,12 @@ function* handleVerifyWorkOrder(
   try {
     yield call(workScheduleAPI.verifyWorkOrder, workOrderId, { note, materials_note })
     yield put(verifyWorkOrderSuccess())
-    yield put(closeCaseDetail())
-    toast.success('🎉 Đã duyệt nghiệm thu và gửi báo cáo lên Superior thành công!')
+    if (materials_note) {
+      yield put(closeCaseDetail())
+      toast.success('🎉 Đã duyệt nghiệm thu sửa chữa và gửi báo cáo lên Cấp trên thành công!')
+    } else {
+      toast.success('🎉 Đã duyệt nghiệm thu báo cáo công tác thành công!')
+    }
     yield put(fetchWorkOrdersRequest(undefined))
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể duyệt nghiệm thu trên máy chủ')

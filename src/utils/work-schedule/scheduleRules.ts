@@ -23,6 +23,14 @@ export function checkScheduleModificationAllowed(
     }
   }
 
+  if (phaseStatus === 'reported') {
+    return {
+      canModify: false,
+      reason:
+        'Kỹ sư hiện trường đã nộp báo cáo nghiệm thu. Vui lòng Duyệt báo cáo hoặc Yêu cầu làm lại trước khi chỉnh sửa hoặc hủy lịch.',
+    }
+  }
+
   if (!scheduledDateStr) {
     return { canModify: true }
   }

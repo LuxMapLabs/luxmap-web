@@ -16,12 +16,15 @@ import {
   verifyWorkOrderRequest,
   cancelWorkOrderRequest,
   returnWorkOrderRequest,
+  fetchWorkOrderDetailRequest,
+  clearWorkOrderDetail,
 } from '../../feature/work-schedule/workScheduleSlice'
 import { ScheduleFilterBar } from './components/ScheduleFilterBar'
 import { CalendarGrid } from './components/CalendarGrid'
 import { CaseDetailModal } from './components/CaseDetailModal'
 import { CreateNextPhaseModal } from './components/CreateNextPhaseModal'
 import { CreateManualModal } from './components/CreateManualModal'
+import { formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
 
 export const WorkSchedulePage: React.FC = () => {
   const dispatch = useDispatch()
@@ -68,8 +71,29 @@ export const WorkSchedulePage: React.FC = () => {
 
   const [isNextPhaseModalOpen, setIsNextPhaseModalOpen] = useState(false)
   const [targetNextPhaseType, setTargetNextPhaseType] = useState<'inspection' | 'repair'>('inspection')
+  const [nextPhaseContext, setNextPhaseContext] = useState<{
+    caseCode: string
+    parentWorkOrderId: string
+    segment?: string
+    targetNextPhaseType: 'inspection' | 'repair'
+    poleIds: string[]
+  } | null>(null)
 
   const selectedCase = (cases || []).find((c) => c?.code === selectedCaseCode) || null
+
+  // Tự động tải chi tiết lệnh công tác (bao gồm danh sách cột và sự cố) khi mở chi tiết sự vụ
+  useEffect(() => {
+    if (selectedCase) {
+      const currentPhase =
+        selectedCase.phases[viewingPhaseIndex] ||
+        selectedCase.phases[selectedCase.currentPhaseIndex]
+      if (currentPhase?.workOrderId) {
+        dispatch(fetchWorkOrderDetailRequest(currentPhase.workOrderId))
+      }
+    } else {
+      dispatch(clearWorkOrderDetail())
+    }
+  }, [selectedCaseCode, viewingPhaseIndex, selectedCase?.phases?.length, dispatch])
 
   // Xử lý tạo mới sự vụ: từ ô lịch (lấy ngày của ô đó) hoặc từ nút Header (tự chọn ngày)
   const handleOpenCreateManual = (dateStr?: string) => {
@@ -119,14 +143,41 @@ export const WorkSchedulePage: React.FC = () => {
   }
 
   // Xử lý mở giai đoạn tiếp theo (gọi API /follow-up trên máy chủ)
-  const handleOpenCreateNextPhase = (_code: string, phaseType: 'inspection' | 'repair') => {
+  const handleOpenCreateNextPhase = (
+    code: string,
+    phaseType: 'inspection' | 'repair',
+    workOrderId?: string,
+    poleIds?: string[]
+  ) => {
     setTargetNextPhaseType(phaseType)
+    const effectiveCaseCode = code || selectedCaseCode || ''
+    const currentPhase =
+      selectedCase?.phases[viewingPhaseIndex] ||
+      selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const effectiveParentWorkOrderId = workOrderId || currentPhase?.workOrderId || effectiveCaseCode
+    const effectivePoleIds =
+      poleIds && poleIds.length > 0
+        ? poleIds
+        : selectedCase?.poleIds ||
+          currentPhase?.poleIds ||
+          currentPhase?.report?.aiDetections?.map((d) => d.poleId) ||
+          ['POLE-0019', 'POLE-0032']
+
+    setNextPhaseContext({
+      caseCode: effectiveCaseCode,
+      parentWorkOrderId: effectiveParentWorkOrderId,
+      segment: formatSegmentDisplay(selectedCase?.segment),
+      targetNextPhaseType: phaseType,
+      poleIds: effectivePoleIds,
+    })
     setIsNextPhaseModalOpen(true)
   }
 
   const handleNextPhaseSubmit = (payload: any) => {
-    const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
-    const parentWorkOrderId = currentPhase?.workOrderId
+    const currentPhase =
+      selectedCase?.phases[viewingPhaseIndex] ||
+      selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const parentWorkOrderId = nextPhaseContext?.parentWorkOrderId || currentPhase?.workOrderId
 
     if (!parentWorkOrderId) {
       toast.error('Không tìm thấy mã lệnh công tác để chuyển tiếp trên máy chủ.')
@@ -153,6 +204,7 @@ export const WorkSchedulePage: React.FC = () => {
       })
     )
     setIsNextPhaseModalOpen(false)
+    setNextPhaseContext(null)
   }
 
   // Xử lý Quản lý Yêu cầu làm lại (POST /api/v1/work-orders/{id}/return)
@@ -329,19 +381,25 @@ export const WorkSchedulePage: React.FC = () => {
         onCancelSchedule={handleCancelSchedule}
       />
 
-      {/* Modal 2: Tạo giai đoạn tiếp theo (giữ nguyên mã SCH) */}
+      {/* Modal 2: Tạo giai đoạn tiếp theo (giữ nguyên mã sự vụ) */}
       <CreateNextPhaseModal
         isOpen={isNextPhaseModalOpen}
-        caseCode={selectedCaseCode || ''}
-        segment={selectedCase?.segment}
+        caseCode={nextPhaseContext?.caseCode || selectedCaseCode || ''}
+        segment={formatSegmentDisplay(nextPhaseContext?.segment || selectedCase?.segment)}
         defaultPoleIds={
-          selectedCase?.poleIds ||
-          selectedCase?.phases[selectedCase.currentPhaseIndex]?.poleIds ||
-          selectedCase?.phases[viewingPhaseIndex]?.poleIds
+          nextPhaseContext?.poleIds && nextPhaseContext.poleIds.length > 0
+            ? nextPhaseContext.poleIds
+            : selectedCase?.poleIds ||
+              selectedCase?.phases[selectedCase.currentPhaseIndex]?.poleIds ||
+              selectedCase?.phases[viewingPhaseIndex]?.poleIds ||
+              []
         }
-        targetNextPhaseType={targetNextPhaseType}
+        targetNextPhaseType={nextPhaseContext?.targetNextPhaseType || targetNextPhaseType}
         assignees={assignees}
-        onClose={() => setIsNextPhaseModalOpen(false)}
+        onClose={() => {
+          setIsNextPhaseModalOpen(false)
+          setNextPhaseContext(null)
+        }}
         onSubmit={handleNextPhaseSubmit}
       />
 

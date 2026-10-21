@@ -48,7 +48,9 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
           page_size: 100,
         })
         if (!isCancelled) {
-          setFaults(res.items || [])
+          // Chỉ lấy các sự cố chưa nằm trong bất kỳ lệnh công tác nào (!f.work_order_id)
+          const availableFaults = (res.items || []).filter((f) => !f.work_order_id)
+          setFaults(availableFaults)
         }
       } catch (err) {
         console.warn('Không thể tải sự cố cho cột đèn:', err)
@@ -162,7 +164,9 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
             {allowEmpty ? `Cột đèn trọng tâm cần ${taskKindName} (Tùy chọn):` : `Chỉ định cột đèn cần ${taskKindName} (*):`}
           </label>
           <span className="text-[11px] font-bold text-blue-700 bg-blue-100/90 px-2 py-0.5 rounded-full ml-1">
-            {allowEmpty && selectedPoleIds.length === 0
+            {poles.length === 0
+              ? 'Không có sự cố tồn đọng'
+              : allowEmpty && selectedPoleIds.length === 0
               ? 'Kiểm tra toàn tuyến'
               : `Đã chọn ${selectedPoleIds.length} / ${poles.length} cột có sự cố`}
           </span>
@@ -200,12 +204,16 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
         </div>
       )}
 
-      {/* Tuyến đường không có cột nào bị lỗi */}
+      {/* Tuyến đường không có sự cố nào tồn đọng chưa giao việc */}
       {!isLoading && poles.length === 0 && (
-        <div className="py-4 px-3 text-center rounded-xl bg-white border border-slate-200 text-xs text-slate-600 flex flex-col items-center gap-1">
-          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-          <span className="font-bold text-slate-800">Tất cả cột đèn trên tuyến hoạt động bình thường</span>
-          <span className="text-[11px] text-slate-400">Không ghi nhận sự cố nào cần kiểm tra trên tuyến này.</span>
+        <div className="py-4 px-3 text-center rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-800 flex flex-col items-center gap-1.5 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          <span className="font-extrabold text-emerald-950 text-xs">
+            Toàn bộ sự cố trên tuyến này đều đã được lên lịch xử lý.
+          </span>
+          <span className="text-[11px] text-emerald-700">
+            Hiện không còn sự cố nào tồn đọng cần giao việc.
+          </span>
         </div>
       )}
 

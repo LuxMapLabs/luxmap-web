@@ -303,14 +303,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   </div>
                 ))}
               </div>
-
-              <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200/80 text-xs text-blue-900 flex items-start gap-2.5">
-                <Camera className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong>Bằng chứng ảnh hiện trường:</strong> Ảnh chụp được gắn mã hàm băm MD5 và thời gian
-                  chụp thực tế từ thiết bị của Kỹ sư, đảm bảo tính pháp lý và độ chính xác phục vụ duyệt nghiệm thu.
-                </div>
-              </div>
             </div>
           )}
 
