@@ -262,12 +262,9 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         })
       }
 
-      // Fit bounds bao quát tuyến đường
-      if (segmentCoordsRef.current.length >= 2) {
-        const bounds = new maplibregl.LngLatBounds()
-        segmentCoordsRef.current.forEach((coord) => bounds.extend(coord))
-        bounds.extend([initialCenter[0], initialCenter[1]])
-        map.fitBounds(bounds, { padding: 40, maxZoom: 18, duration: 600 })
+      // Focus trực tiếp vào cột đang sửa ở mức zoom 17.5 chi tiết (không zoom out cả tuyến đường)
+      if (Number.isFinite(initialCenter[0]) && Number.isFinite(initialCenter[1])) {
+        map.flyTo({ center: [initialCenter[0], initialCenter[1]], zoom: 17.5, duration: 400 })
       }
     })
 
@@ -349,11 +346,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         })
       }
 
-      if (segmentCoords.length >= 2) {
-        const bounds = new maplibregl.LngLatBounds()
-        segmentCoords.forEach((coord) => bounds.extend(coord))
-        map.fitBounds(bounds, { padding: 40, maxZoom: 18, duration: 600 })
-      }
+      // Giữ camera tập trung vào vị trí cột đang sửa, không zoom out theo tuyến
     }
 
     if (map.isStyleLoaded()) {
