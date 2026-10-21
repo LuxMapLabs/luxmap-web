@@ -37,6 +37,10 @@ export const FixtureTableSkeleton: React.FC<FixtureTableSkeletonProps> = ({ rowC
           <td className="py-3.5 px-3.5">
             <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
+          {/* Ngày Tháo Dỡ */}
+          <td className="py-3.5 px-3.5">
+            <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
+          </td>
           {/* Trạng Thái */}
           <td className="py-3.5 px-3.5 text-center">
             <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto" />
