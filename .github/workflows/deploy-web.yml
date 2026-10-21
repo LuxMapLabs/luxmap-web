@@ -1,0 +1,74 @@
+# Deploys the web SPA to the VPS on every push to dev: test, build for the same origin as the API, upload with rsync.
+# The deploy key may ONLY rsync into /opt/luxmap/deploy/web (rrsync on the server) — no shell, no other path.
+# Roll back by reverting the commit on dev; this workflow redeploys the reverted build.
+name: Deploy web to VPS
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  VPS_HOST: 15.235.242.213
+  # Pinned host key (ED25519 SHA256:L96QDJR3RutyOSv9uhlJGwOtCFUOZlMWIqQY5im55gM): a different key fails the deploy.
+  VPS_KNOWN_HOSTS: "15.235.242.213 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHWdkDYmN54A8cpy2EvuOHtPkhx60hwAuwZxujNSy8TI"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - name: Build for the same origin as the API
+        env:
+          VITE_API_URL: /api/v1
+          VITE_MAPTILER_KEY: ${{ secrets.VITE_MAPTILER_KEY }}
+          VITE_DRAFT_TTL_DAYS: "2"
+        run: npm run build
+
+      - name: Refuse a build that points at a dev API
+        run: |
+          if grep -rlE "localhost:[0-9]+" dist/; then
+            echo "::error::the build still points at localhost:<port> — VITE_API_URL was not applied"
+            exit 1
+          fi
+
+      - name: Install the deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Upload — new files first, then index.html and removal of old files
+        run: |
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          rsync -az -e "$SSH" --exclude index.html dist/ "ubuntu@$VPS_HOST:"
+          rsync -az -e "$SSH" --delete dist/ "ubuntu@$VPS_HOST:"
+
+      - name: Check the site serves this build
+        run: |
+          want=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' dist/index.html | head -1)
+          got=$(curl -fsS https://luxmap.com.vn/ | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+          echo "built $want, serving $got"
+          test -n "$want" && test "$want" = "$got"
+          curl -fsS -o /dev/null "https://luxmap.com.vn$want"
