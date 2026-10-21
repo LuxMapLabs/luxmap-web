@@ -12,6 +12,7 @@ export interface WarrantyItem {
     fixture_id: string | null
     fixture_type: FixtureType
     lamp_watt: number
+    lamp_count: number
     install_date: string | null
     warranty_expiry: string | null
     warranty_status: WarrantyStatus
