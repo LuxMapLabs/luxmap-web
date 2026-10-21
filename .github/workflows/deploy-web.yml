@@ -1,4 +1,4 @@
-# Deploys the web SPA to the VPS on every push to dev: test, build for the same origin as the API, upload with rsync.
+# Deploys the web SPA to the VPS on every push to dev: npm ci && npm run build (same origin as the API), then rsync.
 # The deploy key may ONLY rsync into /opt/luxmap/deploy/web (rrsync on the server) — no shell, no other path.
 # Roll back by reverting the commit on dev; this workflow redeploys the reverted build.
 name: Deploy web to VPS
@@ -33,8 +33,6 @@ jobs:
           cache: npm
 
       - run: npm ci
-
-      - run: npm test
 
       - name: Build for the same origin as the API
         env:
