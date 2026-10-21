@@ -1,4 +1,7 @@
-import React, { useRef, useState, useMemo, useCallback } from 'react'
+import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../../redux/store'
+import { toLngLatBounds } from '../../utils/gis-map/mapUtils'
 import * as maplibregl from 'maplibre-gl'
 
 import type { FixtureType, PowerSource, RoadClass, DataSource } from '../../types/common/enums'
@@ -92,6 +95,16 @@ export const GisMapPage: React.FC = () => {
 
   // 1. Khởi tạo MapLibre instance và các điều khiển bản đồ
   const { mapContainerRef, mapRef, popupRef, isMapLoaded } = useGisMapInstance()
+
+  // Open on the account's communes (GET /auth/me map_bounds) — once, so a user who has panned is never pulled back.
+  const mapBounds = useSelector((state: RootState) => state.auth.user?.mapBounds)
+  const framedRef = useRef(false)
+  useEffect(() => {
+    const bounds = toLngLatBounds(mapBounds?.bbox)
+    if (!isMapLoaded || !mapRef.current || !bounds || framedRef.current) return
+    mapRef.current.fitBounds(bounds, { padding: 40, duration: 0 })
+    framedRef.current = true
+  }, [isMapLoaded, mapBounds, mapRef])
 
   // 2. Trạng thái bộ lọc & thanh tìm kiếm
   const [statusFilter, setStatusFilter] = useState<string>('all')

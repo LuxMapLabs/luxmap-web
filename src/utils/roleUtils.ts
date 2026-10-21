@@ -151,6 +151,7 @@ export const mapCurrentUserToUser = (me: CurrentUserResponse): User => {
     roleString: me.role,
     administrativeUnitId: communeIds[0] || '',
     communeIds,
+    mapBounds: me.map_bounds ?? null,
   }
 }
 

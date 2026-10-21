@@ -400,14 +400,14 @@ async function run() {
                 fileContent += `export interface WebAuthTokenResponse {\n    accessToken?: string\n    access_token?: string | null\n    tokenType?: string\n    token_type?: string | null\n    expiresIn?: number\n    expires_in?: number\n}\n\n`
                 fileContent += `export interface WebLoginRequest {\n    username?: string | null\n    password?: string | null\n    rememberMe?: boolean\n    remember_me?: boolean\n    emailOrPhone?: string\n}\n\n`
                 fileContent += `export enum UserRole {\n  ManagementAgency = 0,\n  MaintenanceEngineer = 1,\n  FieldCrew = 2,\n  Admin = 3,\n}\n`
-                fileContent += `\nexport interface User {\n  id?: string\n  userId?: string\n  fullName: string\n  username?: string\n  email: string | null\n  phoneNumber?: string | null\n  role: UserRole\n  roleString?: string\n  administrativeUnitId?: string\n  communeIds?: string[]\n}\n`
+                fileContent += `\nexport interface User {\n  id?: string\n  userId?: string\n  fullName: string\n  username?: string\n  email: string | null\n  phoneNumber?: string | null\n  role: UserRole\n  roleString?: string\n  administrativeUnitId?: string\n  communeIds?: string[]\n  mapBounds?: import('./me').MapBounds | null\n}\n`
                 fileContent += `\nexport interface JwtPayloadClaims {\n  sub: string\n  role: string\n  commune_ids: string[]\n  exp: number\n  iat: number\n  iss?: string\n  aud?: string\n}\n`
                 fileContent += `\nexport interface AuthState {\n  user: User | null\n  isAuthenticated: boolean\n  accessToken?: string | null\n  refreshToken?: string | null\n  loading: boolean\n  isRefreshingProfile?: boolean\n  error: string | null\n}\n`
                 fileContent += `\nexport interface LoginRequest {\n  emailOrPhone: string\n  password: string\n  rememberMe?: boolean\n  username?: string\n  remember_me?: boolean\n}\n`
                 fileContent += `\nexport interface RegisterRequest {\n  username?: string | null\n  fullName?: string\n  full_name?: string | null\n  email?: string | null\n  phoneNumber?: string | null\n  password?: string | null\n  administrativeUnitId?: string\n  role?: UserRole\n}\n`
                 fileContent += `\nexport interface RegisterResponse {\n  user_id?: string | null\n  username?: string | null\n  email?: string | null\n  full_name?: string | null\n  role?: string | null\n  commune_ids?: string | null[]\n  message?: string | null\n}\n`
                 fileContent += `\nexport interface ApiResponse<T> {\n  data: T | null\n  error?: {\n    code: string\n    message: string\n    details?: Record<string, string[]>\n  } | null\n}\n`
-                fileContent += `\nexport interface CurrentUserResponse {\n  user_id: string\n  username: string\n  email: string\n  full_name: string\n  role: string\n  commune_ids: string[]\n}\n`
+                fileContent += `\nexport interface CurrentUserResponse {\n  user_id: string\n  username: string\n  email: string\n  full_name: string\n  role: string\n  commune_ids: string[]\n  map_bounds?: import('./me').MapBounds | null\n}\n`
             }
 
             const outPath = path.resolve(targetDir, `${fileName}.ts`)
