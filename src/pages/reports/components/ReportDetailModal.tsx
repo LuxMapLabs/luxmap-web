@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import { Printer, Download, X, ShieldCheck, Loader2 } from 'lucide-react'
 import type { SuperiorReportItem } from '../../../types/reports/report'
 import { exportReportToPdf } from '../../../utils/reports/reportPdfGenerator'
+import { EvidenceImage } from '../../work-schedule/components/EvidenceImage'
 
 interface ReportDetailModalProps {
   isOpen: boolean
@@ -252,8 +253,9 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                         <span>📸 TRƯỚC TÁC NGHIỆP (BEFORE)</span>
                       </div>
                       <div className="h-44 bg-slate-200 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={beforePhoto.url}
+                        <EvidenceImage
+                          evidenceId={beforePhoto.id}
+                          fallbackSrc={beforePhoto.url}
                           alt="Trước tác nghiệp"
                           className="w-full h-full object-cover"
                         />
@@ -270,8 +272,9 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                         <span>✨ SAU HOÀN TẤT (AFTER)</span>
                       </div>
                       <div className="h-44 bg-slate-200 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={afterPhoto.url}
+                        <EvidenceImage
+                          evidenceId={afterPhoto.id}
+                          fallbackSrc={afterPhoto.url}
                           alt="Sau tác nghiệp"
                           className="w-full h-full object-cover"
                         />

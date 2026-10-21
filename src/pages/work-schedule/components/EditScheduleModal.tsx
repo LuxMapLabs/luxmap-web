@@ -46,11 +46,6 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
   if (!isOpen || !caseItem || !currentPhase) return null
 
-  const getTodayStr = () => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -61,12 +56,6 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
     if (!scheduledDate) {
       toast.warning('Vui lòng chọn ngày thực hiện!')
-      return
-    }
-
-    const todayStr = getTodayStr()
-    if (scheduledDate < todayStr) {
-      toast.error(`Ngày thực hiện không được là ngày trong quá khứ (${scheduledDate}).`)
       return
     }
 
@@ -167,7 +156,6 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               <input
                 type="date"
                 required
-                min={getTodayStr()}
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition cursor-pointer"
