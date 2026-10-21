@@ -37,6 +37,7 @@ export interface User {
   roleString?: string
   administrativeUnitId?: string
   communeIds?: string[]
+  mapBounds?: import('./me').MapBounds | null
 }
 
 export interface JwtPayloadClaims {
@@ -104,4 +105,5 @@ export interface CurrentUserResponse {
   full_name: string
   role: string
   commune_ids: string[]
+  map_bounds?: import('./me').MapBounds | null
 }

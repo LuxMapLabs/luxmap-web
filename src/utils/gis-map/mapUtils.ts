@@ -1,4 +1,23 @@
-export const DEFAULT_MAP_CENTER: [number, number] = [106.4975, 10.9715]
+import type { CommuneBbox } from '../../types/admin/communes'
+
+/** Fallback only — the map opens on the account's `map_bounds` (GET /auth/me). Centre of the surveyed communes. */
+export const DEFAULT_MAP_CENTER: [number, number] = [106.845, 10.826]
+/** Fallback `bbox` for map layers when the account has no `map_bounds` (no commune frame set yet). */
+export const FALLBACK_MAP_BBOX = '106.80,10.78,106.89,10.88'
+
+/** A complete commune frame as MapLibre bounds, or null when any edge is missing. */
+export function toLngLatBounds(bbox?: CommuneBbox | null): [[number, number], [number, number]] | null {
+  if (!bbox) return null
+  const { min_lng, min_lat, max_lng, max_lat } = bbox
+  if ([min_lng, min_lat, max_lng, max_lat].some((v) => typeof v !== 'number' || !Number.isFinite(v))) return null
+  return [[min_lng!, min_lat!], [max_lng!, max_lat!]]
+}
+
+/** The `bbox` query value (`min_lng,min_lat,max_lng,max_lat`) for a commune frame, or null when incomplete. */
+export function toBboxParam(bbox?: CommuneBbox | null): string | null {
+  const b = toLngLatBounds(bbox)
+  return b ? `${b[0][0]},${b[0][1]},${b[1][0]},${b[1][1]}` : null
+}
 export const DEFAULT_MAP_ZOOM = 14.8
 export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY 
 

@@ -11,6 +11,7 @@ import {
 import { fetchMapLayersRequest } from '../../feature/map/mapSlice'
 import { fetchAssetsRequest } from '../../feature/assets/assetSlice'
 import { showToast } from '../../utils/toastUtils'
+import { toBboxParam } from '../../utils/gis-map/mapUtils'
 
 interface UseElectricalCascadeProps {
   statusFilter: string
@@ -39,10 +40,11 @@ export function useElectricalCascade({
     feeders: assetFeeders,
   } = useSelector((state: RootState) => state.assets)
 
-  // Dispatch Saga action to load map layers if not yet loaded
+  // Load map layers for the account's communes (the saga reads map_bounds from the profile); reload if that frame changes.
+  const boundsKey = useSelector((state: RootState) => toBboxParam(state.auth.user?.mapBounds?.bbox) ?? '')
   useEffect(() => {
-    dispatch(fetchMapLayersRequest({ bbox: '106.35,10.85,106.65,11.10' }))
-  }, [dispatch])
+    dispatch(fetchMapLayersRequest())
+  }, [dispatch, boundsKey])
 
   // Tự động nạp dữ liệu kiểm kê tài sản (assets) để lấy external_ref nếu chưa có
   useEffect(() => {

@@ -1,4 +1,7 @@
-import { all, call, put, takeLatest } from 'redux-saga/effects'
+import { all, call, put, select, takeLatest } from 'redux-saga/effects'
+import type { RootState } from '../../redux/store'
+import type { MapBounds } from '../../types/auth/me'
+import { FALLBACK_MAP_BBOX, toBboxParam } from '../../utils/gis-map/mapUtils'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import mapAPI from './mapAPI'
 import type {
@@ -27,7 +30,9 @@ function* handleFetchMapLayers(
   action: PayloadAction<{ bbox?: string; status?: string; segment_id?: string } | undefined>
 ) {
   try {
-    const bbox = action.payload?.bbox || '106.35,10.85,106.65,11.10'
+    // No explicit bbox: the account's communes (GET /auth/me map_bounds), not a hard-coded area.
+    const mapBounds: MapBounds | null | undefined = yield select((state: RootState) => state.auth.user?.mapBounds)
+    const bbox = action.payload?.bbox || toBboxParam(mapBounds?.bbox) || FALLBACK_MAP_BBOX
 
     const commonParams = { bbox }
     const polesParams: { bbox: string; status?: string; segment_id?: string } = { bbox }
