@@ -31,9 +31,14 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
   const segmentName = seg?.segment_name || (seg?.external_ref ? `Tuyến ${seg.external_ref}` : 'Chưa gắn tuyến')
 
   const cab = cabinets.find(
-    (c) => c.cabinet_id === pole.feeder_id || (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase())
+    (c) =>
+      (pole.cabinet_id && (c.cabinet_id === pole.cabinet_id || c.external_ref === pole.cabinet_id)) ||
+      c.cabinet_id === pole.feeder_id ||
+      (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase()) ||
+      (c.feeder_ids && pole.feeder_id && c.feeder_ids.includes(pole.feeder_id))
   )
-  const feederName = cab?.cabinet_name || cab?.external_ref || 'Chưa gắn tủ'
+  const cabName = cab?.cabinet_name || pole.cabinet_name || cab?.external_ref || 'Chưa gắn tủ'
+  const feederName = pole.feeder_id ? `${cabName} • ${pole.feeder_id}` : cabName
 
   const watt = pole.active_fixture?.lamp_watt || 100
   const fixtureStatus = pole.active_fixture ? 'normal' : 'out'

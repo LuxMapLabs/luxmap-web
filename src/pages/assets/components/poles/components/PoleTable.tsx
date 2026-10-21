@@ -59,7 +59,6 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               <th className="p-3.5">Địa bàn</th>
               <th className="p-3.5">Mã bóng</th>
               <th className="p-3.5">Trạng thái</th>
-              <th className="p-3.5">Bảo hành</th>
               <th className="p-3.5 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -68,7 +67,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               <PoleTableSkeleton rowCount={8} />
             ) : poles.length === 0 ? (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
+                <td colSpan={9} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
                   Không tìm thấy cột đèn nào phù hợp với bộ lọc hiện tại.
                 </td>
               </tr>
@@ -81,10 +80,13 @@ export const PoleTable: React.FC<PoleTableProps> = ({
 
                 const targetCab = cabinets.find(
                   (c) =>
+                    (pole.cabinet_id && (c.cabinet_id === pole.cabinet_id || c.external_ref === pole.cabinet_id)) ||
                     c.cabinet_id === pole.feeder_id ||
-                    (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase())
+                    (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase()) ||
+                    (c.feeder_ids && pole.feeder_id && c.feeder_ids.includes(pole.feeder_id))
                 )
-                const feederLabel = targetCab?.cabinet_name || targetCab?.external_ref || 'Chưa gắn'
+                const cabName = targetCab?.cabinet_name || pole.cabinet_name || targetCab?.external_ref || ''
+                const feederLabel = pole.feeder_id ? (cabName ? `${cabName} • ${pole.feeder_id}` : pole.feeder_id) : (cabName || 'Chưa gắn')
                 const fixtureStatus = pole.active_fixture ? 'normal' : 'out'
                 const poleExternal = pole.external_ref || ''
                 const isFlashing = Boolean(
@@ -186,24 +188,6 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                     </td>
                     <td className="p-3.5">
                       <StatusBadge type="fixture" status={fixtureStatus} size="sm" />
-                    </td>
-                    <td className="p-3.5">
-                      {pole.active_fixture ? (
-                        <div className="flex flex-col items-start gap-0.5">
-                          <StatusBadge
-                            type="warranty"
-                            status={pole.active_fixture.warranty_status || 'unknown'}
-                            size="sm"
-                          />
-                          {pole.active_fixture.warranty_expiry && (
-                            <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 pl-0.5">
-                              {pole.active_fixture.warranty_expiry}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 dark:text-slate-500 font-mono">—</span>
-                      )}
                     </td>
                     <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                       <button

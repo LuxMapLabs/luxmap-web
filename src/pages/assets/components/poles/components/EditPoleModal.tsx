@@ -42,17 +42,22 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
   const [externalRef, setExternalRef] = useState('')
   const [segmentId, setSegmentId] = useState('')
   const [cabinetId, setCabinetId] = useState('')
+  const [selectedFeederId, setSelectedFeederId] = useState('')
   const [nearSensitivePoi, setNearSensitivePoi] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [lat, setLat] = useState<number>(0)
   const [lng, setLng] = useState<number>(0)
+
+  // Danh sách mạch điện từ Redux store
+  const allFeeders = useSelector((state: RootState) => state.assets.feeders)
 
   // Khởi tạo state khi mở modal hoặc thay đổi pole
   useEffect(() => {
     if (pole && isOpen) {
       setExternalRef(pole.external_ref || '')
       setSegmentId(pole.segment_id || '')
-      setCabinetId(pole.cabinet_id || pole.feeder_id || '')
+      setCabinetId(pole.cabinet_id || '')
+      setSelectedFeederId(pole.feeder_id || '')
       setNearSensitivePoi(Boolean(pole.near_sensitive_poi))
       setNoteText(pole.note || '')
       setLat(pole.location?.lat ?? 10.9725)
@@ -209,6 +214,32 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
     )
   }, [cabinets, cabinetId])
 
+  // Danh sách mạch điện khả dụng của Tủ điện đang chọn
+  const availableFeeders = useMemo(() => {
+    if (!cabinetId || !allFeeders) return []
+    const cabId = currentCabinet?.cabinet_id || cabinetId
+    const cabExt = currentCabinet?.external_ref
+    return allFeeders.filter((f) => {
+      if (f.cabinet?.cabinet_id && (f.cabinet.cabinet_id === cabId || f.cabinet.cabinet_id === cabExt)) return true
+      if (currentCabinet?.feeder_ids?.includes(f.feeder_id || '')) return true
+      if (cabExt && f.external_ref && f.external_ref.toLowerCase().includes(cabExt.toLowerCase())) return true
+      return false
+    })
+  }, [allFeeders, cabinetId, currentCabinet])
+
+  // Tự động gán mạch nếu tủ chỉ có 1 mạch hoặc mạch hiện tại không hợp lệ
+  useEffect(() => {
+    if (availableFeeders.length === 1) {
+      setSelectedFeederId(availableFeeders[0].feeder_id || '')
+    } else if (availableFeeders.length > 1) {
+      if (!selectedFeederId || !availableFeeders.some((f) => f.feeder_id === selectedFeederId)) {
+        setSelectedFeederId(availableFeeders[0].feeder_id || '')
+      }
+    } else {
+      setSelectedFeederId('')
+    }
+  }, [availableFeeders, selectedFeederId])
+
   if (!isOpen || !pole) return null
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -218,11 +249,17 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
       (c) => c.cabinet_id === cabinetId || c.external_ref === cabinetId
     )
 
+    const effectiveFeederId =
+      selectedFeederId ||
+      availableFeeders[0]?.feeder_id ||
+      (currentCabinet?.feeder_ids?.[0]?.startsWith('FDR-') ? currentCabinet.feeder_ids[0] : null) ||
+      null
+
     const updated: PoleListItem = {
       ...pole,
       external_ref: externalRef.trim() || pole.external_ref,
       segment_id: segmentId || null,
-      feeder_id: cabinetId || null,
+      feeder_id: effectiveFeederId,
       cabinet_id: cabinetId || null,
       cabinet_name: selectedCab?.cabinet_name || null,
       near_sensitive_poi: nearSensitivePoi,
@@ -310,18 +347,22 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
                 </select>
               </div>
 
-              {/* Dòng 2: Tủ điện quản lý & Checkbox POI */}
+              {/* Dòng 2: Tủ điện quản lý & Mạch nguồn */}
               <div className="space-y-1">
                 <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>Tủ Điện Quản Lý (Mạch nguồn):</span>
+                    <span>Tủ Điện Quản Lý:</span>
                   </span>
-                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">(1 Cột - 1 Tủ)</span>
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">(Nguồn cấp)</span>
                 </label>
                 <select
                   value={cabinetId}
-                  onChange={(e) => setCabinetId(e.target.value)}
+                  onChange={(e) => {
+                    const newCab = e.target.value
+                    setCabinetId(newCab)
+                    setSelectedFeederId('')
+                  }}
                   className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
                   <option value="">
@@ -338,6 +379,46 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Dropdown Mạch Điện / Lộ xuất tuyến */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Mạch Điện (Lộ xuất tuyến):</span>
+                  </span>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">(1 Cột - 1 Mạch)</span>
+                </label>
+                <select
+                  value={selectedFeederId}
+                  onChange={(e) => setSelectedFeederId(e.target.value)}
+                  disabled={!cabinetId}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">
+                    {!cabinetId
+                      ? '-- Vui lòng chọn tủ điện trước --'
+                      : availableFeeders.length === 0
+                      ? '(Tủ này chưa có mạch điện khả dụng)'
+                      : '-- Chọn mạch điện cấp nguồn --'}
+                  </option>
+                  {availableFeeders.map((f) => (
+                    <option key={f.feeder_id || f.external_ref} value={f.feeder_id || ''}>
+                      ⚡️ {f.feeder_name || f.external_ref || f.feeder_id} ({f.external_ref || f.feeder_id})
+                    </option>
+                  ))}
+                </select>
+                {cabinetId && availableFeeders.length === 1 && (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 italic">
+                    ✓ Đã tự động chọn mạch duy nhất của tủ này
+                  </p>
+                )}
+                {cabinetId && availableFeeders.length === 0 && (
+                  <p className="text-[11px] text-rose-500 dark:text-rose-400 italic">
+                    ⚠ Tủ này chưa có mạch điện nào. Vui lòng thêm mạch tại Tab Mạch điện.
+                  </p>
+                )}
               </div>
 
               <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center gap-2.5">

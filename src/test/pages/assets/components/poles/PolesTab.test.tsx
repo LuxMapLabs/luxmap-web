@@ -191,7 +191,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       mockPoleWithoutFixture,
     ]
 
-    it('PoleTable render tiêu đề cột "Bảo hành" trong thead', () => {
+    it('PoleTable render tiêu đề cột "Mã bóng" và "Trạng thái" trong thead và không render "Bảo hành"', () => {
       render(
         <PoleTable
           poles={mockPoles}
@@ -202,10 +202,12 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
           onViewCabinetDetail={vi.fn()}
         />
       )
-      expect(screen.getByRole('columnheader', { name: /Bảo hành/i })).toBeInTheDocument()
+      expect(screen.getByRole('columnheader', { name: /Mã bóng/i })).toBeInTheDocument()
+      expect(screen.getByRole('columnheader', { name: /Trạng thái/i })).toBeInTheDocument()
+      expect(screen.queryByRole('columnheader', { name: /Bảo hành/i })).not.toBeInTheDocument()
     })
 
-    it('PoleTable render đầy đủ 4 trạng thái bảo hành và ngày hết hạn tương ứng trên từng dòng', () => {
+    it('PoleTable render trạng thái bóng đèn và mã bóng trên từng dòng và không render badge bảo hành', () => {
       render(
         <PoleTable
           poles={mockPoles}
@@ -217,16 +219,9 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
         />
       )
 
-      expect(screen.getByText('Còn hạn')).toBeInTheDocument()
-      expect(screen.getByText('2028-01-15')).toBeInTheDocument()
-
-      expect(screen.getByText('Sắp hết hạn')).toBeInTheDocument()
-      expect(screen.getByText('2026-11-01')).toBeInTheDocument()
-
-      expect(screen.getByText('Hết hạn')).toBeInTheDocument()
-      expect(screen.getByText('2024-05-10')).toBeInTheDocument()
-
-      expect(screen.getByText('Chưa rõ')).toBeInTheDocument()
+      expect(screen.getAllByText(/Sáng tốt/i).length).toBeGreaterThan(0)
+      expect(screen.queryByText('Còn hạn')).not.toBeInTheDocument()
+      expect(screen.queryByText('Hết hạn')).not.toBeInTheDocument()
     })
 
     it('PoleDetailModal hiển thị KPI Card "Bảo hành bóng" với StatusBadge và ngày hết hạn', () => {
@@ -318,7 +313,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       expect(dashes.length).toBeGreaterThan(0)
     })
 
-    it('PoleTable hiển thị thông báo rỗng với colSpan=10 khi danh sách cột rỗng', () => {
+    it('PoleTable hiển thị thông báo rỗng với colSpan=9 khi danh sách cột rỗng', () => {
       render(
         <PoleTable
           poles={[]}
@@ -331,7 +326,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       )
 
       const emptyCell = screen.getByText(/Không tìm thấy cột đèn nào phù hợp/i).closest('td')
-      expect(emptyCell).toHaveAttribute('colSpan', '10')
+      expect(emptyCell).toHaveAttribute('colSpan', '9')
     })
 
     it('PoleDetailModal xử lý an toàn khi isOpen=false hoặc pole là null', () => {

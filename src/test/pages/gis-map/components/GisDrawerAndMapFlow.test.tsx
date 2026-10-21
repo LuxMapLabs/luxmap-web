@@ -163,6 +163,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
           poles: [mockPoleFeature, mockNormalPoleFeature],
           cabinets: [mockCabinetFeature],
           segments: [mockSegmentFeature],
+          allTopologyEdges: [mockTopologyEdge],
         })
       )
 
@@ -170,6 +171,8 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(nextState.poles).toHaveLength(2)
       expect(nextState.cabinets).toHaveLength(1)
       expect(nextState.segments).toHaveLength(1)
+      expect(nextState.allTopologyEdges).toHaveLength(1)
+      expect(nextState.allTopologyEdges[0].properties.to_pole_id).toBe('POL-001')
       expect(nextState.mapError).toBeNull()
     })
 

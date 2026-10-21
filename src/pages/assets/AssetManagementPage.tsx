@@ -5,16 +5,18 @@ import {
   Zap,
   Route,
   Lightbulb,
+  Cable,
 } from 'lucide-react'
 import { PolesTab } from './components/poles/PolesTab'
 import { FixturesTab } from './components/fixtures/FixturesTab'
 import { CabinetsTab } from './components/cabinets/CabinetsTab'
 import { SegmentsTab } from './components/segments/SegmentsTab'
+import { FeedersTab } from './components/feeders/FeedersTab'
 import { ImportAssetModal } from './components/ImportAssetModal'
 import { TabCountBadge } from './components/common/TabCountBadge'
 import { useAssetData } from '../../hooks/assets/useAssetData'
 
-export type AssetCategory = 'poles' | 'fixtures' | 'cabinets' | 'segments' | 'poles_and_fixtures'
+export type AssetCategory = 'poles' | 'fixtures' | 'cabinets' | 'feeders' | 'segments' | 'poles_and_fixtures'
 
 export const AssetManagementPage: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<AssetCategory>('segments')
@@ -43,6 +45,7 @@ export const AssetManagementPage: React.FC = () => {
     fixtures,
     cabinets,
     segments,
+    feeders,
     isLoadingAssets,
     successBanner,
     handleAddPole,
@@ -54,6 +57,9 @@ export const AssetManagementPage: React.FC = () => {
     handleAddCabinet,
     handleAddCabinets,
     handleUpdateCabinet,
+    handleAddFeeder,
+    handleUpdateFeeder,
+    handleDeleteFeeder,
     handleAddSegment,
     handleUpdateSegment,
     handleImportSuccess,
@@ -77,20 +83,22 @@ export const AssetManagementPage: React.FC = () => {
         )}
 
         {/* Segmented Control Navigation Tabs - Silky Sliding Active Pill */}
-        <div className="relative grid grid-cols-4 bg-slate-100/85 dark:bg-slate-900/85 p-1.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] select-none">
+        <div className="relative grid grid-cols-5 bg-slate-100/85 dark:bg-slate-900/85 p-1.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] select-none">
           {/* Animated Sliding Active Pill */}
           <div
             className="absolute top-1.5 bottom-1.5 left-1.5 rounded-xl bg-white dark:bg-slate-800 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.04)] border border-slate-200/80 dark:border-slate-700/80 pointer-events-none transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
             style={{
-              width: 'calc((100% - 12px) / 4)',
+              width: 'calc((100% - 15px) / 5)',
               transform: `translateX(calc(${
                 activeCategory === 'segments'
                   ? 0
-                  : activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'
+                  : activeCategory === 'cabinets'
                   ? 100
-                  : activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
+                  : activeCategory === 'feeders'
                   ? 200
-                  : 300
+                  : activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
+                  ? 300
+                  : 400
               }%))`,
             }}
           />
@@ -135,14 +143,14 @@ export const AssetManagementPage: React.FC = () => {
               setActiveCategory('cabinets')
             }}
             className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'
+              activeCategory === 'cabinets'
                 ? 'text-slate-900 dark:text-white font-bold'
                 : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
             }`}
           >
             <Zap
               className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'
+                activeCategory === 'cabinets'
                   ? 'text-amber-500 dark:text-amber-400 scale-110 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)]'
                   : 'text-slate-400'
               }`}
@@ -151,8 +159,39 @@ export const AssetManagementPage: React.FC = () => {
             <TabCountBadge
               count={cabinets.length}
               isLoading={isLoadingAssets}
-              isActive={activeCategory === 'cabinets' || (activeCategory as string) === 'feeders'}
+              isActive={activeCategory === 'cabinets'}
               colorScheme="purple"
+            />
+          </button>
+
+          {/* Tab 3: Mạch điện (Feeder) */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedFixtureCode('')
+              setSelectedPoleCode('')
+              setSelectedCabinetCode('')
+              setActiveCategory('feeders')
+            }}
+            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
+              activeCategory === 'feeders'
+                ? 'text-slate-900 dark:text-white font-bold'
+                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+            }`}
+          >
+            <Cable
+              className={`w-4 h-4 transition-all duration-300 ${
+                activeCategory === 'feeders'
+                  ? 'text-emerald-600 dark:text-emerald-400 scale-110 drop-shadow-[0_1px_2px_rgba(5,150,105,0.3)]'
+                  : 'text-slate-400'
+              }`}
+            />
+            <span>Mạch điện</span>
+            <TabCountBadge
+              count={feeders.length}
+              isLoading={isLoadingAssets}
+              isActive={activeCategory === 'feeders'}
+              colorScheme="blue"
             />
           </button>
 
@@ -229,8 +268,8 @@ export const AssetManagementPage: React.FC = () => {
           />
         )}
 
-        {/* Tab 2 Content: Tủ điện & Mạch nguồn (Feeder) */}
-        {(activeCategory === 'cabinets' || (activeCategory as string) === 'feeders') && (
+        {/* Tab 2 Content: Tủ điện */}
+        {activeCategory === 'cabinets' && (
           <CabinetsTab
             cabinets={cabinets}
             segments={segments}
@@ -240,6 +279,20 @@ export const AssetManagementPage: React.FC = () => {
             onAddCabinet={handleAddCabinet}
             onAddCabinets={handleAddCabinets}
             onUpdateCabinet={handleUpdateCabinet}
+            onOpenImport={() => setIsImportModalOpen(true)}
+          />
+        )}
+
+        {/* Tab 3 Content: Mạch điện (Feeder) */}
+        {activeCategory === 'feeders' && (
+          <FeedersTab
+            feeders={feeders}
+            cabinets={cabinets}
+            poles={poles}
+            isLoading={isLoadingAssets}
+            onAddFeeder={handleAddFeeder}
+            onUpdateFeeder={handleUpdateFeeder}
+            onDeleteFeeder={handleDeleteFeeder}
             onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}

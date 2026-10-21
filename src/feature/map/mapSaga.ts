@@ -1,7 +1,11 @@
 import { all, call, put, takeLatest } from 'redux-saga/effects'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import mapAPI from './mapAPI'
-import type { CabinetPropertiesFeatureCollection, CabinetTopologyEdgePropertiesFeatureCollection } from '../../types/map/cabinets'
+import type {
+  CabinetPropertiesFeatureCollection,
+  CabinetTopologyEdgePropertiesFeatureCollection,
+  CabinetTopologyEdgePropertiesFeature,
+} from '../../types/map/cabinets'
 import type { PolePropertiesFeatureCollection, PoleMapDetail } from '../../types/map/poles'
 import type { SegmentPropertiesFeatureCollection } from '../../types/map/segments'
 import {
@@ -46,11 +50,42 @@ function* handleFetchMapLayers(
       call(mapAPI.getPoles, polesParams),
     ])
 
+    // Lấy sơ đồ topology các cạnh mạch điện từ Backend cho toàn bộ tủ điện trong khu vực
+    const cabList = cabsRes.features || []
+    const cabinetIds: string[] = cabList
+      .map((c) => c.properties?.cabinet_id)
+      .filter((id): id is string => Boolean(id))
+
+    let allTopologyEdges: CabinetTopologyEdgePropertiesFeature[] = []
+    if (cabinetIds.length > 0) {
+      try {
+        const topologyResults: (CabinetTopologyEdgePropertiesFeatureCollection | null)[] = yield all(
+          cabinetIds.map((cabId) =>
+            call(function* () {
+              try {
+                const res: CabinetTopologyEdgePropertiesFeatureCollection = yield call(
+                  mapAPI.getCabinetTopology,
+                  cabId
+                )
+                return res
+              } catch {
+                return null
+              }
+            })
+          )
+        )
+        allTopologyEdges = topologyResults.flatMap((res) => res?.features || [])
+      } catch {
+        // Không để lỗi topology ảnh hưởng đến việc load lớp tủ, tuyến, cột
+      }
+    }
+
     yield put(
       fetchMapLayersSuccess({
-        cabinets: cabsRes.features || [],
+        cabinets: cabList,
         segments: segsRes.features || [],
         poles: polesRes.features || [],
+        allTopologyEdges,
       })
     )
   } catch (error: any) {
