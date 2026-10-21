@@ -35,12 +35,12 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         dotClass = 'bg-emerald-500'
         break
       case 'dim':
-        displayLabel = label || 'Đèn mờ'
+        displayLabel = label || 'Sáng yếu'
         bgClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
         dotClass = 'bg-amber-500'
         break
       case 'out':
-        displayLabel = label || 'Đèn tắt'
+        displayLabel = label || 'Mất sáng'
         bgClass = 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800/60'
         dotClass = 'bg-rose-500'
         break

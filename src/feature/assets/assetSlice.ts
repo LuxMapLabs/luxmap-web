@@ -6,6 +6,13 @@ import type { CabinetListItem, CreateCabinetRequest, UpdateCabinetRequest } from
 import type { SegmentListItem, CreateSegmentRequest, UpdateSegmentRequest } from '../../types/assets/segments'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../types/assets/feeders'
 import type { CreateFixtureRequest, RetireFixtureRequest } from '../../types/assets/fixtures'
+import type {
+  IotNodeItem,
+  CreateIotNodeRequest,
+  UpdateIotNodeRequest,
+  SetRelayRequest,
+  IotNodeCredential,
+} from '../../types/assets/iot-nodes'
 
 export interface AssetState {
   // Asset Collections from Backend API
@@ -13,6 +20,7 @@ export interface AssetState {
   cabinets: CabinetListItem[]
   segments: SegmentListItem[]
   feeders: FeederListItem[]
+  iotNodes: IotNodeItem[]
   isLoadingAssets: boolean
   loadAssetsError: string | null
 
@@ -31,6 +39,7 @@ const initialState: AssetState = {
   cabinets: [],
   segments: [],
   feeders: [],
+  iotNodes: [],
   isLoadingAssets: false,
   loadAssetsError: null,
 
@@ -52,6 +61,7 @@ export interface FetchAssetsSuccessPayload {
   cabinets: CabinetListItem[]
   segments: SegmentListItem[]
   feeders?: FeederListItem[]
+  iotNodes?: IotNodeItem[]
 }
 
 export interface CreatePolePayload {
@@ -84,6 +94,22 @@ export interface RetireFixturePayload {
   data: RetireFixtureRequest
 }
 
+export interface UpdateIotNodePayload {
+  nodeId: string
+  data: UpdateIotNodeRequest
+}
+
+export interface SetIotNodeRelayPayload {
+  nodeId: string
+  relayNo: number
+  data: SetRelayRequest
+}
+
+export interface IssueIotNodeCredentialPayload {
+  nodeId: string
+  onSuccess?: (credential: IotNodeCredential) => void
+}
+
 const assetSlice = createSlice({
   name: 'assets',
   initialState,
@@ -99,6 +125,7 @@ const assetSlice = createSlice({
       state.cabinets = action.payload.cabinets
       state.segments = action.payload.segments
       state.feeders = action.payload.feeders || []
+      state.iotNodes = action.payload.iotNodes || []
       state.loadAssetsError = null
     },
     fetchAssetsFailure: (state, action: PayloadAction<string>) => {
@@ -182,6 +209,34 @@ const assetSlice = createSlice({
       state.isMutating = true
       state.mutationError = null
     },
+
+    // --- IoT Nodes Actions ---
+    createIotNodeRequest: (state, action: PayloadAction<CreateIotNodeRequest>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    updateIotNodeRequest: (state, action: PayloadAction<UpdateIotNodePayload>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    deleteIotNodeRequest: (state, action: PayloadAction<string>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    setIotNodeRelayRequest: (state, action: PayloadAction<SetIotNodeRelayPayload>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    issueIotNodeCredentialRequest: (state, action: PayloadAction<IssueIotNodeCredentialPayload>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+
     mutationSuccess: (state, action: PayloadAction<string | undefined>) => {
       void action
       state.isMutating = false
@@ -235,6 +290,11 @@ export const {
   createFixtureRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
+  createIotNodeRequest,
+  updateIotNodeRequest,
+  deleteIotNodeRequest,
+  setIotNodeRelayRequest,
+  issueIotNodeCredentialRequest,
   mutationSuccess,
   mutationFailure,
   importAssetRequest,

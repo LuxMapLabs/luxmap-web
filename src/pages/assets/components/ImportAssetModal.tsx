@@ -28,7 +28,6 @@ import {
   type ImportAssetCategory,
 } from '../../../feature/assets/assetSlice'
 import type { ImportRowError } from '../../../types/assets/import'
-import type { AssetCategory } from '../AssetManagementPage'
 import type { PoleListItem } from '../../../types/assets/poles'
 import type { ActiveFixture } from '../../../types/assets/fixtures'
 import type { ManagedFixture } from '../../../hooks/assets/useAssetData'
@@ -42,7 +41,7 @@ import { formatCommuneDisplayName, getCommuneName } from '../../../constants/com
 export type { FieldDiff, ParsedItemReview }
 
 interface CategoryConfig {
-  id: AssetCategory
+  id: ImportAssetCategory
   label: string
   title: string
   icon: React.ReactNode
@@ -53,7 +52,7 @@ interface CategoryConfig {
 
 const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
   poles: {
-    id: 'poles' as AssetCategory,
+    id: 'poles' as ImportAssetCategory,
     label: 'Cột điện',
     title: 'Cột Điện Chiếu Sáng',
     icon: <Boxes className="w-5 h-5 text-blue-600" />,
@@ -62,25 +61,25 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     description: 'Nạp danh mục Cột điện theo chuẩn Backend. Hệ thống tự động so khớp tọa độ WKT và các thuộc tính cột.',
   },
   fixtures: {
-    id: 'fixtures' as AssetCategory,
-    label: 'Bóng đèn',
-    title: 'Bóng Đèn Chiếu Sáng',
+    id: 'fixtures' as ImportAssetCategory,
+    label: 'Bộ đèn',
+    title: 'Bộ Đèn Chiếu Sáng',
     icon: <Lightbulb className="w-5 h-5 text-amber-500" />,
     templateFileName: 'fixtures.csv',
     templateUrl: '/templates/fixtures.csv',
-    description: 'Nạp danh mục Bóng đèn gắn lên cột. Quản lý công suất (Watt), nguồn điện, ngày lắp đặt và hạn bảo hành theo chuẩn Backend.',
+    description: 'Nạp danh mục Bộ đèn gắn lên cột. Quản lý công suất (Watt), số lượng bóng trên bộ đèn, nguồn điện, ngày lắp đặt và hạn bảo hành theo chuẩn Backend.',
   },
   poles_and_fixtures: {
-    id: 'poles_and_fixtures' as AssetCategory,
-    label: 'Cột & Bóng đèn',
-    title: 'Cột & Bóng Đèn',
+    id: 'poles_and_fixtures' as ImportAssetCategory,
+    label: 'Cột & Bộ đèn',
+    title: 'Cột & Bộ Đèn',
     icon: <Boxes className="w-5 h-5 text-blue-600" />,
     templateFileName: 'poles.csv',
     templateUrl: '/templates/poles.csv',
-    description: 'Nạp danh mục Cột đèn & Bóng đèn. Hệ thống tự động phát hiện bản ghi Mới, Cập nhật thông số và ẩn các bản ghi không thay đổi.',
+    description: 'Nạp danh mục Cột đèn & Bộ đèn. Hệ thống tự động phát hiện bản ghi Mới, Cập nhật thông số và ẩn các bản ghi không thay đổi.',
   },
   cabinets: {
-    id: 'cabinets' as AssetCategory,
+    id: 'cabinets' as ImportAssetCategory,
     label: 'Tủ điện',
     title: 'Tủ Điện',
     icon: <Zap className="w-5 h-5 text-amber-500" />,
@@ -89,7 +88,7 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     description: 'Nạp danh mục trạm tủ điện chiếu sáng theo chuẩn Backend.',
   },
   segments: {
-    id: 'segments' as AssetCategory,
+    id: 'segments' as ImportAssetCategory,
     label: 'Tuyến đường chiếu sáng',
     title: 'Tuyến Đường Chiếu Sáng',
     icon: <Route className="w-5 h-5 text-indigo-600" />,
@@ -107,7 +106,7 @@ interface ImportAssetModalProps {
     newPoles?: PoleListItem[],
     importedFixtures?: ManagedFixture[]
   ) => void
-  category?: AssetCategory
+  category?: ImportAssetCategory
 }
 
 // Robust CSV Line parser supporting quotes and commas
@@ -630,7 +629,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                           </th>
                           <th className="py-2.5 px-3 w-36">
                             {category === 'fixtures'
-                              ? 'Thông số bóng'
+                              ? 'Thông số bộ đèn'
                               : category === 'segments'
                                 ? 'Cấp đường / Chiều dài'
                                 : category === 'cabinets'
@@ -814,10 +813,24 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                             <td className="py-2.5 px-3 align-top font-mono text-[10px] text-slate-600">
                               {(() => {
                                 if (item.category === 'fixtures') {
+                                  const count = item.data.lamp_count || 1
+                                  const totalWatt = item.data.lamp_watt * count
                                   return (
-                                    <div>
-                                      <span className="font-bold text-slate-800">{item.data.lamp_watt} W</span> •{' '}
-                                      {item.data.power_source === 'grid' ? 'Lưới điện' : item.data.power_source}
+                                    <div className="space-y-0.5">
+                                      <div>
+                                        <span className="font-bold text-slate-900">{item.data.lamp_watt} W</span>
+                                        {count > 1 && (
+                                          <span className="text-[9.5px] text-amber-700 font-bold ml-1">
+                                            (x{count} = {totalWatt}W)
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="inline-flex items-center gap-1 text-[9.5px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                        <span>{count} bóng</span>
+                                      </div>
+                                      <div className="text-[9.5px] text-slate-400">
+                                        Nguồn: {item.data.power_source === 'grid' ? 'Lưới điện' : item.data.power_source}
+                                      </div>
                                     </div>
                                   )
                                 }

@@ -268,6 +268,7 @@ describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () =>
     cabinets: [mockCabinetOnSeg, mockCabinetOther],
     segments: [mockSegment],
     feeders: [],
+    iotNodes: [],
     isLoadingAssets: false,
     loadAssetsError: null,
     isMutating: false,

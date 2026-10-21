@@ -146,6 +146,10 @@ export const fixtureImportSchema = z.object({
     .enum(['grid'] as const satisfies readonly [PowerSource, ...PowerSource[]])
     .default('grid'),
   lamp_watt: z.coerce.number().positive('Công suất đèn (lamp_watt) phải lớn hơn 0'),
+  lamp_count: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null ? 1 : Number(val)),
+    z.number().int().min(1, 'Số lượng bóng phải từ 1 đến 4').max(4, 'Số lượng bóng tối đa là 4').default(1)
+  ),
   install_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày lắp đặt phải theo định dạng YYYY-MM-DD'),
   removed_date: z.preprocess(
     (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
@@ -565,6 +569,7 @@ export function validateImportRow(
           fixture_type: (rowObj.fixture_type as FixtureType) || 'led_road_lamp',
           power_source: (rowObj.power_source as PowerSource) || 'grid',
           lamp_watt: parseInt(rowObj.lamp_watt, 10) || 100,
+          lamp_count: parseInt(rowObj.lamp_count, 10) || 1,
           install_date: rowObj.install_date || null,
           removed_date: rowObj.removed_date || null,
           warranty_expiry: rowObj.warranty_expiry || null,
@@ -593,6 +598,7 @@ export function validateImportRow(
           fixture_type: data.fixture_type,
           power_source: data.power_source,
           lamp_watt: data.lamp_watt,
+          lamp_count: data.lamp_count || 1,
           install_date: data.install_date,
           removed_date: data.removed_date || null,
           warranty_expiry: data.warranty_expiry || null,
@@ -610,10 +616,11 @@ export function validateImportRow(
 
     if (!existingFixture) {
       actionType = 'new'
+      const count = data.lamp_count || 1
       diffs.push({
         label: 'Lắp mới',
-        oldVal: 'Chưa có bóng',
-        newVal: `Đèn LED ${data.lamp_watt}W`,
+        oldVal: 'Chưa có bộ đèn',
+        newVal: `Đèn LED ${data.lamp_watt}W (${count} bóng)`,
       })
     } else {
       if (Number(existingFixture.lamp_watt) !== Number(data.lamp_watt)) {
@@ -621,6 +628,15 @@ export function validateImportRow(
           label: 'Công suất đèn',
           oldVal: `${existingFixture.lamp_watt}W`,
           newVal: `${data.lamp_watt}W`,
+        })
+      }
+      const oldLampCount = Number(existingFixture.lamp_count) || 1
+      const newLampCount = Number(data.lamp_count) || 1
+      if (oldLampCount !== newLampCount) {
+        diffs.push({
+          label: 'Số bóng trên bộ đèn',
+          oldVal: `${oldLampCount} bóng`,
+          newVal: `${newLampCount} bóng`,
         })
       }
       if (data.install_date && existingFixture.install_date !== data.install_date) {
@@ -681,6 +697,7 @@ export function validateImportRow(
       fixture_type: data.fixture_type,
       power_source: data.power_source,
       lamp_watt: data.lamp_watt,
+      lamp_count: data.lamp_count || 1,
       install_date: data.install_date,
       removed_date: data.removed_date || null,
       warranty_expiry: data.warranty_expiry || null,

@@ -4,6 +4,7 @@ import { StatusBadge } from '../../../../../components/StatusBadge'
 import { PoleTable } from '../../../../../pages/assets/components/poles/components/PoleTable'
 import { PoleDetailModal } from '../../../../../pages/assets/components/poles/components/PoleDetailModal'
 import { AddFixtureModal } from '../../../../../pages/assets/components/fixtures/components/AddFixtureModal'
+import { FixtureTable } from '../../../../../pages/assets/components/fixtures/components/FixtureTable'
 import assetReducer, {
   fetchAssetsRequest,
   fetchAssetsFailure,
@@ -11,6 +12,7 @@ import assetReducer, {
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
+import type { FixtureStatus } from '../../../../../types/common/enums'
 import { validateImportRow, type ValidationContext } from '../../../../../validations/assetImport.schema'
 
 describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
@@ -134,9 +136,9 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
   }
 
   // =========================================================================
-  // TẦNG 1: STATUS BADGE UNIT TESTS (WARRANTY TYPE)
+  // TẦNG 1: STATUS BADGE UNIT TESTS (WARRANTY & FIXTURE TYPE)
   // =========================================================================
-  describe('1. StatusBadge Component - Type "warranty"', () => {
+  describe('1. StatusBadge Component - Type "warranty" & "fixture"', () => {
     it('render chính xác badge "Còn hạn" (active) với màu xanh lục (emerald)', () => {
       render(<StatusBadge type="warranty" status="active" />)
       const badge = screen.getByText('Còn hạn')
@@ -177,6 +179,20 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       render(<StatusBadge type="warranty" status="active" label="Bảo hành VIP 5 năm" />)
       expect(screen.getByText('Bảo hành VIP 5 năm')).toBeInTheDocument()
     })
+
+    it('render chính xác các trạng thái đo sáng trắc quang fixture: Sáng tốt, Sáng yếu, Mất sáng, Chưa quét', () => {
+      const { rerender } = render(<StatusBadge type="fixture" status="normal" />)
+      expect(screen.getByText('Sáng tốt')).toBeInTheDocument()
+
+      rerender(<StatusBadge type="fixture" status="dim" />)
+      expect(screen.getByText('Sáng yếu')).toBeInTheDocument()
+
+      rerender(<StatusBadge type="fixture" status="out" />)
+      expect(screen.getByText('Mất sáng')).toBeInTheDocument()
+
+      rerender(<StatusBadge type="fixture" status="unknown" />)
+      expect(screen.getByText('Chưa quét')).toBeInTheDocument()
+    })
   })
 
   // =========================================================================
@@ -191,7 +207,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       mockPoleWithoutFixture,
     ]
 
-    it('PoleTable render tiêu đề cột "Mã bóng" và "Trạng thái" trong thead và không render "Bảo hành"', () => {
+    it('PoleTable render tiêu đề cột "Mã bộ đèn" và "Trạng thái" trong thead và không render "Bảo hành"', () => {
       render(
         <PoleTable
           poles={mockPoles}
@@ -202,15 +218,44 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
           onViewCabinetDetail={vi.fn()}
         />
       )
-      expect(screen.getByRole('columnheader', { name: /Mã bóng/i })).toBeInTheDocument()
+      expect(screen.getByRole('columnheader', { name: /Mã bộ đèn/i })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: /Trạng thái/i })).toBeInTheDocument()
       expect(screen.queryByRole('columnheader', { name: /Bảo hành/i })).not.toBeInTheDocument()
     })
 
-    it('PoleTable render trạng thái bóng đèn và mã bóng trên từng dòng và không render badge bảo hành', () => {
+    it('PoleTable render đúng trạng thái đo sáng từ GIS khi có poleStatusMap', () => {
+      const mockStatusMap = new Map<string, FixtureStatus>([
+        ['pole_active_01', 'normal'],
+        ['pole_expiring_02', 'dim'],
+        ['pole_expired_03', 'out'],
+        ['pole_unknown_04', 'unknown'],
+      ])
+
       render(
         <PoleTable
           poles={mockPoles}
+          cabinets={[mockCabinet]}
+          segments={[mockSegment]}
+          poleStatusMap={mockStatusMap}
+          onViewDetail={vi.fn()}
+          onEdit={vi.fn()}
+          onViewCabinetDetail={vi.fn()}
+        />
+      )
+
+      expect(screen.getByText('Sáng tốt')).toBeInTheDocument()
+      expect(screen.getByText('Sáng yếu')).toBeInTheDocument()
+      expect(screen.getByText('Mất sáng')).toBeInTheDocument()
+      expect(screen.getByText('Chưa quét')).toBeInTheDocument()
+      expect(screen.getByText('Chưa gắn bộ đèn')).toBeInTheDocument()
+      expect(screen.queryByText('Còn hạn')).not.toBeInTheDocument()
+      expect(screen.queryByText('Hết hạn')).not.toBeInTheDocument()
+    })
+
+    it('PoleTable mặc định trạng thái là "Chưa quét" khi cột có bóng mới chưa có dữ liệu đo sáng từ GIS', () => {
+      render(
+        <PoleTable
+          poles={[mockPoleWithActiveWarranty]}
           cabinets={[mockCabinet]}
           segments={[mockSegment]}
           onViewDetail={vi.fn()}
@@ -219,12 +264,10 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
         />
       )
 
-      expect(screen.getAllByText(/Sáng tốt/i).length).toBeGreaterThan(0)
-      expect(screen.queryByText('Còn hạn')).not.toBeInTheDocument()
-      expect(screen.queryByText('Hết hạn')).not.toBeInTheDocument()
+      expect(screen.getByText('Chưa quét')).toBeInTheDocument()
     })
 
-    it('PoleDetailModal hiển thị KPI Card "Bảo hành bóng" với StatusBadge và ngày hết hạn', () => {
+    it('PoleDetailModal hiển thị KPI Card "Bảo hành bộ đèn" với StatusBadge và ngày hết hạn', () => {
       render(
         <PoleDetailModal
           isOpen={true}
@@ -235,7 +278,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
         />
       )
 
-      expect(screen.getByText('Bảo hành bóng')).toBeInTheDocument()
+      expect(screen.getByText('Bảo hành bộ đèn')).toBeInTheDocument()
       expect(screen.getByText('Còn hạn')).toBeInTheDocument()
       expect(screen.getByText(/Hạn: 2028-01-15/i)).toBeInTheDocument()
     })
@@ -251,7 +294,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
         />
       )
 
-      expect(screen.getByText('Bảo hành bóng')).toBeInTheDocument()
+      expect(screen.getByText('Bảo hành bộ đèn')).toBeInTheDocument()
       expect(screen.getByText('Chưa rõ')).toBeInTheDocument()
       expect(screen.getByText(/Hạn: —/i)).toBeInTheDocument()
     })
@@ -262,7 +305,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
         <AddFixtureModal
           isOpen={true}
           onClose={vi.fn()}
-          poles={[mockPoleWithActiveWarranty]}
+          poles={[mockPoleWithoutFixture]}
           segments={[mockSegment]}
           onAddFixture={onAddFixtureMock}
         />
@@ -278,10 +321,10 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       fireEvent.change(segmentSelect, { target: { value: mockSegment.segment_id } })
 
       const poleSelect = selects[1]
-      fireEvent.change(poleSelect, { target: { value: mockPoleWithActiveWarranty.pole_id } })
+      fireEvent.change(poleSelect, { target: { value: mockPoleWithoutFixture.pole_id } })
 
-      // Bấm '+ Thêm Bóng Mới'
-      const addRowBtn = screen.getAllByText(/Thêm Bóng Mới/i)[0]
+      // Bấm '+ Thêm Bộ Đèn Mới'
+      const addRowBtn = screen.getAllByText(/Thêm Bộ Đèn Mới/i)[0]
       fireEvent.click(addRowBtn)
 
       // Kiểm tra ô input date hạn bảo hành có mặt
@@ -289,6 +332,47 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       expect(dateInputs.length).toBeGreaterThanOrEqual(2) // Ngày lắp và Hạn bảo hành
       const warrantyInput = dateInputs[1] as HTMLInputElement
       expect(warrantyInput).toBeInTheDocument()
+    })
+
+    it('FixtureTable render cột "Ngày Tháo Dỡ" và hiển thị chính xác ngày tháo dỡ hoặc dấu "—"', () => {
+      const mockFixtures = [
+        {
+          fixture_id: 'FIX-01',
+          pole_id: 'pole_active_01',
+          pole_external_ref: 'POLE-ACTIVE',
+          fixture_type: 'led_road_lamp' as const,
+          power_source: 'grid' as const,
+          lamp_watt: 120,
+          install_date: '2025-01-15',
+          warranty_expiry: '2028-01-15',
+          removed_date: '2026-05-20',
+          data_source: 'field' as const,
+        },
+        {
+          fixture_id: 'FIX-02',
+          pole_id: 'pole_expiring_02',
+          pole_external_ref: 'POLE-EXPIRING',
+          fixture_type: 'led_road_lamp' as const,
+          power_source: 'grid' as const,
+          lamp_watt: 100,
+          install_date: '2025-01-15',
+          warranty_expiry: '2028-01-15',
+          removed_date: null,
+          data_source: 'field' as const,
+        },
+      ]
+
+      render(
+        <FixtureTable
+          fixtures={mockFixtures}
+          poles={[mockPoleWithActiveWarranty, mockPoleWithExpiringWarranty]}
+          onEditFixture={vi.fn()}
+        />
+      )
+
+      expect(screen.getByRole('columnheader', { name: /Ngày Tháo Dỡ/i })).toBeInTheDocument()
+      expect(screen.getByText('2026-05-20')).toBeInTheDocument()
+      expect(screen.getByText('—')).toBeInTheDocument()
     })
   })
 
@@ -308,7 +392,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
         />
       )
 
-      // Khi không có fixture, ô bảo hành hiển thị "—"
+      // Khi không có fixture, ô mã bóng hiển thị "—"
       const dashes = screen.getAllByText('—')
       expect(dashes.length).toBeGreaterThan(0)
     })

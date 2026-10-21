@@ -88,7 +88,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
     },
   ]
 
-  it('1. Render đầy đủ thống kê tổng quan và bảng danh sách mạch điện', () => {
+  it('1. Render đầy đủ thanh công cụ tìm kiếm và bảng danh sách mạch điện (không còn KPI cards)', () => {
     render(
       <FeedersTab
         feeders={mockFeeders}
@@ -101,10 +101,15 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
       />
     )
 
-    // Thống kê
-    expect(screen.getByText('Tổng Số Mạch Điện')).toBeInTheDocument()
-    expect(screen.getByText('Mạch Đang Cấp Nguồn')).toBeInTheDocument()
-    expect(screen.getByText('Tổng Cột Đèn Đấu Nối')).toBeInTheDocument()
+    // Khẳng định các thẻ KPI đã được loại bỏ gọn gàng
+    expect(screen.queryByText('Tổng Số Mạch Điện')).not.toBeInTheDocument()
+    expect(screen.queryByText('Mạch Đang Cấp Nguồn')).not.toBeInTheDocument()
+    expect(screen.queryByText('Tổng Cột Đèn Đấu Nối')).not.toBeInTheDocument()
+
+    // Thanh tìm kiếm và nút bấm chuẩn đồng bộ
+    expect(screen.getByPlaceholderText(/Tìm theo mã lộ, tên mạch, tên tủ, địa bàn/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Import Dữ Liệu/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Thêm Mạch Điện Mới/i })).toBeInTheDocument()
 
     // Bảng dữ liệu
     expect(screen.getByText('FDR-CAB-TL8-A')).toBeInTheDocument()
@@ -148,7 +153,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
       />
     )
 
-    const addBtn = screen.getByRole('button', { name: /Thêm Mạch Điện/i })
+    const addBtn = screen.getByRole('button', { name: /Thêm Mạch Điện Mới/i })
     fireEvent.click(addBtn)
 
     expect(screen.getByText('Thêm Mạch Điện Chiếu Sáng')).toBeInTheDocument()
@@ -191,6 +196,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
       cabinets: [],
       segments: [],
       feeders: [],
+      iotNodes: [],
       isLoadingAssets: false,
       loadAssetsError: null,
       isMutating: false,

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Search, Plus, Upload, Filter, Cable, Zap, Lightbulb } from 'lucide-react'
+import { Search, Plus, Upload } from 'lucide-react'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../../../types/assets/feeders'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { PoleListItem } from '../../../../types/assets/poles'
@@ -31,7 +31,6 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
   onOpenImport,
 }) => {
   const [searchQuery, setSearchQuery] = useState('')
-  const [cabinetFilter, setCabinetFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
 
@@ -44,7 +43,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
   const filteredFeeders = useMemo(() => {
     return feeders.filter((f) => {
       const q = searchQuery.toLowerCase().trim()
-      const matchesQuery =
+      return (
         !q ||
         (f.feeder_id && f.feeder_id.toLowerCase().includes(q)) ||
         (f.feeder_name && f.feeder_name.toLowerCase().includes(q)) ||
@@ -52,15 +51,9 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
         (f.cabinet?.cabinet_name && f.cabinet.cabinet_name.toLowerCase().includes(q)) ||
         (f.cabinet?.cabinet_id && f.cabinet.cabinet_id.toLowerCase().includes(q)) ||
         (f.commune_id && f.commune_id.toLowerCase().includes(q))
-
-      const matchesCabinet =
-        cabinetFilter === 'all' ||
-        f.cabinet?.cabinet_id === cabinetFilter ||
-        (f as unknown as { cabinet_id?: string }).cabinet_id === cabinetFilter
-
-      return matchesQuery && matchesCabinet
+      )
     })
-  }, [feeders, searchQuery, cabinetFilter])
+  }, [feeders, searchQuery])
 
   const totalPages = Math.max(1, Math.ceil(filteredFeeders.length / pageSize))
 
@@ -69,69 +62,13 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
     return filteredFeeders.slice(start, start + pageSize)
   }, [filteredFeeders, currentPage, pageSize])
 
-  // Stats calculation
-  const totalPolesOnFeeders = useMemo(() => {
-    return feeders.reduce((sum, f) => sum + (f.pole_count || 0), 0)
-  }, [feeders])
-
-  const activeFeedersCount = useMemo(() => {
-    return feeders.filter((f) => (f.pole_count || 0) > 0).length
-  }, [feeders])
-
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
-      {/* Top Banner & Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl flex items-center gap-3 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-800/60 shrink-0">
-            <Cable className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Tổng Số Mạch Điện
-            </div>
-            <div className="text-xl font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-              {feeders.length} <span className="text-xs font-normal text-slate-400">lộ</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl flex items-center gap-3 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-800/60 shrink-0">
-            <Zap className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Mạch Đang Cấp Nguồn
-            </div>
-            <div className="text-xl font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-              {activeFeedersCount} <span className="text-xs font-normal text-slate-400">/ {feeders.length} lộ</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl flex items-center gap-3 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-800/60 shrink-0">
-            <Lightbulb className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Tổng Cột Đèn Đấu Nối
-            </div>
-            <div className="text-xl font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-              {totalPolesOnFeeders} <span className="text-xs font-normal text-slate-400">cột</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Action Bar: Search, Filters, and Action Buttons */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        {/* Search & Filters */}
-        <div className="flex items-center gap-2 w-full sm:w-auto flex-1 flex-wrap">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      {/* Action Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        {/* Search Box - Chiều dài co giãn giống tab Bóng đèn */}
+        <div className="flex flex-1 flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-60 relative">
             <input
               type="text"
               value={searchQuery}
@@ -139,49 +76,31 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
                 setSearchQuery(e.target.value)
                 setCurrentPage(1)
               }}
-              placeholder="Tìm theo mã lộ, tên mạch, tên tủ..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+              placeholder="Tìm theo mã lộ, tên mạch, tên tủ, địa bàn..."
+              className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-xs focus:outline-none focus:border-[#1f3864] dark:focus:border-blue-500 font-medium transition"
             />
-          </div>
-
-          {/* Cabinet Dropdown Filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <select
-              value={cabinetFilter}
-              onChange={(e) => {
-                setCabinetFilter(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="py-2 px-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-emerald-500 cursor-pointer"
-            >
-              <option value="all">⚡ Tất cả tủ điện</option>
-              {cabinets.map((cab) => (
-                <option key={cab.cabinet_id} value={cab.cabinet_id || ''}>
-                  {cab.cabinet_name || cab.external_ref || cab.cabinet_id}
-                </option>
-              ))}
-            </select>
+            <Search className="w-4 h-4 text-slate-400 dark:text-slate-400 absolute left-2.5 top-2.5" />
           </div>
         </div>
 
-        {/* Buttons: Add Feeder & Import CSV */}
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        {/* Action Buttons: Import CSV & Add Feeder */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onOpenImport}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors shadow-xs"
+            className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-100 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Nhập dữ liệu tài sản từ file CSV"
           >
-            <Upload className="w-3.5 h-3.5 text-slate-500" />
-            <span>Nạp CSV Mạch</span>
+            <Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />
+            <span>Import Dữ Liệu</span>
           </button>
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+            className="px-4 py-1.5 bg-[#1f3864] dark:bg-blue-600 hover:bg-[#1f3864]/90 dark:hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Thêm Mạch Điện</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Thêm Mạch Điện Mới</span>
           </button>
         </div>
       </div>

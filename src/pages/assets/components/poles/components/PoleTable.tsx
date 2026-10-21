@@ -5,12 +5,14 @@ import { StatusBadge } from '../../../../../components/StatusBadge'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
+import type { FixtureStatus } from '../../../../../types/common/enums'
 import { PoleTableSkeleton } from './PoleTableSkeleton'
 
 export interface PoleTableProps {
   poles: PoleListItem[]
   cabinets: CabinetListItem[]
   segments: SegmentListItem[]
+  poleStatusMap?: Map<string, FixtureStatus>
   isLoading?: boolean
   flashingPoleCode?: string
   onViewDetail: (pole: PoleListItem) => void
@@ -24,6 +26,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
   poles,
   cabinets,
   segments,
+  poleStatusMap,
   isLoading = false,
   flashingPoleCode,
   onViewDetail,
@@ -57,7 +60,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               <th className="p-3.5">Tọa độ GIS</th>
               <th className="p-3.5">Ghi chú</th>
               <th className="p-3.5">Địa bàn</th>
-              <th className="p-3.5">Mã bóng</th>
+              <th className="p-3.5">Mã bộ đèn</th>
               <th className="p-3.5">Trạng thái</th>
               <th className="p-3.5 text-right">Thao tác</th>
             </tr>
@@ -87,7 +90,22 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                 )
                 const cabName = targetCab?.cabinet_name || pole.cabinet_name || targetCab?.external_ref || ''
                 const feederLabel = pole.feeder_id ? (cabName ? `${cabName} • ${pole.feeder_id}` : pole.feeder_id) : (cabName || 'Chưa gắn')
-                const fixtureStatus = pole.active_fixture ? 'normal' : 'out'
+
+                // Trạng thái đo sáng trắc quang đồng bộ từ GIS map
+                let fixtureStatus: FixtureStatus = 'unknown'
+                let fixtureLabel: string | undefined = undefined
+
+                if (!pole.active_fixture) {
+                  fixtureStatus = 'out'
+                  fixtureLabel = 'Chưa gắn bộ đèn'
+                } else {
+                  const statusFromMap =
+                    (pole.pole_id && poleStatusMap?.get(pole.pole_id)) ||
+                    (pole.external_ref && (poleStatusMap?.get(pole.external_ref) || poleStatusMap?.get(pole.external_ref.toLowerCase())))
+                  // Phương án 1 (đã duyệt): Bóng mới thêm/chưa quét trắc quang mang trạng thái 'unknown' (Chưa quét)
+                  fixtureStatus = statusFromMap || 'unknown'
+                }
+
                 const poleExternal = pole.external_ref || ''
                 const isFlashing = Boolean(
                   flashingPoleCode &&
@@ -109,6 +127,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                     <td className="p-3.5 font-medium text-slate-700 dark:text-slate-200 max-w-45 truncate" title={segmentName}>
                       {segmentName}
                     </td>
+                    {/* Tủ điện quản lý */}
                     <td className="p-3.5">
                       <button
                         type="button"
@@ -164,22 +183,40 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                           const fixtureCode =
                             pole.active_fixture?.fixture_id ||
                             (pole.external_ref ? `FIX-${pole.external_ref}` : 'FIX-CHƯA-ĐẶT')
+                          const lampCount = pole.active_fixture?.lamp_count || 1
                           return (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (onSelectFixture) {
-                                  onSelectFixture(fixtureCode)
-                                } else {
-                                  toast.info(`Mã bóng đèn: ${fixtureCode}`)
-                                }
-                              }}
-                              className="cursor-pointer inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 font-semibold shadow-2xs hover:border-amber-400 hover:bg-amber-100/70 transition group"
-                              title={`Mã bóng đèn: ${fixtureCode} — Bấm để chuyển sang tab Bóng đèn`}
-                            >
-                              <Lightbulb className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0 group-hover:scale-110 transition" />
-                              <span className="font-bold font-mono text-xs">{fixtureCode}</span>
-                            </button>
+                            <div className="inline-flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onSelectFixture) {
+                                    onSelectFixture(fixtureCode)
+                                  } else {
+                                    toast.info(`Mã bộ đèn: ${fixtureCode}`)
+                                  }
+                                }}
+                                className="cursor-pointer inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 font-semibold shadow-2xs hover:border-amber-400 hover:bg-amber-100/70 transition group"
+                                title={`Mã bộ đèn: ${fixtureCode} • ${lampCount} bóng — Bấm để chuyển sang tab Bộ đèn`}
+                              >
+                                <Lightbulb className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0 group-hover:scale-110 transition" />
+                                <span className="font-bold font-mono text-xs">{fixtureCode}</span>
+                              </button>
+                              {lampCount > 1 ? (
+                                <span
+                                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700"
+                                  title={`Bộ đèn gồm ${lampCount} bóng`}
+                                >
+                                  x{lampCount}
+                                </span>
+                              ) : (
+                                <span
+                                  className="text-[10px] text-slate-400 font-mono"
+                                  title="Bộ đèn 1 bóng"
+                                >
+                                  (1)
+                                </span>
+                              )}
+                            </div>
                           )
                         })()
                       ) : (
@@ -187,7 +224,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                       )}
                     </td>
                     <td className="p-3.5">
-                      <StatusBadge type="fixture" status={fixtureStatus} size="sm" />
+                      <StatusBadge type="fixture" status={fixtureStatus} label={fixtureLabel} size="sm" />
                     </td>
                     <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                       <button
