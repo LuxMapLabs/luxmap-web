@@ -116,6 +116,10 @@ export interface PolePhotoItem {
     model_version?: string | null
     artifact_version?: string | null
     analyzed_at?: string | null
+    final_cv_state?: 'on' | 'off'
+    review_note?: string | null
+    reviewed_by?: string | null
+    reviewed_at?: string | null
     decision?: 'confirm' | 'reject'
     decided_by?: string | null
     decided_at?: string | null
@@ -131,6 +135,11 @@ export interface PolePhotoItemPagedResult {
     page_size?: number
     total?: number
     items?: PolePhotoItem[]
+}
+
+export interface PolePhotoReviewRequest {
+    final_cv_state: 'on' | 'off'
+    review_note?: string | null
 }
 
 export interface ReviewWorkOrderRequest {

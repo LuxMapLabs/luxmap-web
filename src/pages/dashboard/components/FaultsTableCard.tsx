@@ -14,6 +14,75 @@ interface FaultsTableCardProps {
   offlineCount: number
 }
 
+export function getFaultProgressInfo(fault: FaultItem): {
+  label: string
+  bgClass: string
+  textClass: string
+  borderClass: string
+  dotClass: string
+} {
+  const status = fault.fault_status
+  const woId = fault.work_order_id
+
+  if (status === 'verified') {
+    return {
+      label: woId ? `Đã nghiệm thu (${woId})` : 'Đã nghiệm thu',
+      bgClass: 'bg-emerald-50',
+      textClass: 'text-emerald-700',
+      borderClass: 'border-emerald-200/70',
+      dotClass: 'bg-emerald-500',
+    }
+  }
+
+  if (status === 'resolved') {
+    return {
+      label: woId ? `Chờ nghiệm thu (${woId})` : 'Chờ nghiệm thu',
+      bgClass: 'bg-teal-50',
+      textClass: 'text-teal-700',
+      borderClass: 'border-teal-200/70',
+      dotClass: 'bg-teal-500',
+    }
+  }
+
+  if (status === 'in_progress') {
+    return {
+      label: woId ? `Đang sửa chữa (${woId})` : 'Đang sửa chữa',
+      bgClass: 'bg-amber-50',
+      textClass: 'text-amber-700',
+      borderClass: 'border-amber-200/70',
+      dotClass: 'bg-amber-500 animate-pulse',
+    }
+  }
+
+  if (status === 'confirmed' || (status === 'detected' && woId)) {
+    return {
+      label: woId ? `Chờ sửa chữa (${woId})` : 'Chờ sửa chữa',
+      bgClass: 'bg-blue-50',
+      textClass: 'text-blue-700',
+      borderClass: 'border-blue-200/70',
+      dotClass: 'bg-blue-500',
+    }
+  }
+
+  if (status === 'rejected') {
+    return {
+      label: 'Đã từ chối',
+      bgClass: 'bg-slate-100',
+      textClass: 'text-slate-600',
+      borderClass: 'border-slate-200/70',
+      dotClass: 'bg-slate-400',
+    }
+  }
+
+  return {
+    label: 'Chưa phân lịch',
+    bgClass: 'bg-rose-50',
+    textClass: 'text-rose-700',
+    borderClass: 'border-rose-200/70',
+    dotClass: 'bg-rose-500',
+  }
+}
+
 export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
   faults,
   activeTab,
@@ -43,7 +112,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
           </span>
         </div>
 
-        {/* 4 Tab Lọc Sự Cố (Khớp số học 100%: 19 + 11 + 3 = 33) */}
+        {/* 4 Tab Lọc Sự Cố */}
         <div className="flex gap-1.5 border-b border-slate-100 pb-2.5 mb-3 text-xs flex-wrap">
           <button
             onClick={() => onTabChange('all')}
@@ -132,6 +201,8 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                   const segmentName =
                     segmentNameMap[fault.segment_id || ''] || fault.segment_id || 'Chưa rõ tuyến'
 
+                  const progress = getFaultProgressInfo(fault)
+
                   return (
                     <tr
                       key={idx}
@@ -176,15 +247,12 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                         </div>
                       </td>
                       <td className="py-3 px-3">
-                        {fault.work_order_id ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
-                            Đã giao {fault.work_order_id}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
-                            Chưa phân lịch
-                          </span>
-                        )}
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${progress.bgClass} ${progress.textClass} border ${progress.borderClass} whitespace-nowrap`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${progress.dotClass}`} />
+                          {progress.label}
+                        </span>
                       </td>
                     </tr>
                   )

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { X, CheckCircle, Wrench, Search, Calendar, User, FileText } from 'lucide-react'
+import { X, Wrench, Search, Calendar, User, FileText } from 'lucide-react'
 import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
-import { PoleSelector } from './PoleSelector'
+import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 
 interface CreateNextPhaseModalProps {
   isOpen: boolean
@@ -32,7 +32,7 @@ const getTodayStr = () => {
 export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   isOpen,
   caseCode,
-  segment = 'Tuyến A - Trục chính liên xã Phước Hậu (SEG-001)',
+  segment = 'Tuyến A - Tỉnh Lộ 8 (SEG-001)',
   defaultPoleIds = [],
   targetNextPhaseType,
   assignees,
@@ -59,14 +59,14 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setDate(getTodayStr())
-      if (defaultPoleIds && defaultPoleIds.length > 0) {
-        setSelectedPoleIds([...defaultPoleIds])
-      } else {
-        setSelectedPoleIds([])
-      }
+      const initialPoles =
+        defaultPoleIds && defaultPoleIds.length > 0
+          ? [...defaultPoleIds]
+          : ['POLE-0019', 'POLE-0032']
+      setSelectedPoleIds(initialPoles)
       setSelectedFaultIds([])
     }
-  }, [isOpen, caseCode])
+  }, [isOpen, caseCode, defaultPoleIds])
 
   if (!isOpen) return null
 
@@ -120,62 +120,65 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
         {/* Form Body với thân cuộn mượt mà và footer cố định */}
         <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
-            {/* Banner nguyên tắc tự đóng */}
-            <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
-              <CheckCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                Tiến trình cũ sẽ tự động <strong>chốt hoàn tất</strong>. Giữ nguyên mã{' '}
-                <strong className="font-mono text-blue-700">{caseCode}</strong> và kế thừa toàn bộ hồ
-                sơ cho giai đoạn mới.
-              </div>
-            </div>
-
             {/* Tuyến đường của sự vụ */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-700">Tuyến đường:</label>
               <div className="px-3 py-2 bg-slate-100 rounded-xl text-xs font-semibold text-slate-800">
-                {segment}
+                {formatSegmentDisplay(segment)}
               </div>
             </div>
 
-            {/* Đối tượng thực hiện: Cột đèn có sự cố cho Kiểm tra, Kế thừa tự động cho Sửa chữa */}
+            {/* Đối tượng thực hiện: Kế thừa tự động cho cả Kiểm tra và Sửa chữa */}
             {isRepair ? (
               <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/90 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
-                  <Wrench className="w-4 h-4 text-emerald-600" />
-                  <span>Cột đèn cần Sửa chữa (Tự động kế thừa từ giai đoạn Kiểm tra):</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-0.5">
-                  {selectedPoleIds.length > 0 ? (
-                    selectedPoleIds.map((pid) => (
-                      <span
-                        key={pid}
-                        className="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-950 rounded-xl text-xs font-mono font-black shadow-2xs"
-                      >
-                        {pid}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-500 italic">
-                      Toàn bộ các cột đèn ghi nhận sự cố đã xác nhận từ giai đoạn kiểm tra.
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
+                    <Wrench className="w-4 h-4 text-emerald-600" />
+                    <span>Cột đèn cần Sửa chữa:</span>
+                  </div>
+                  {selectedPoleIds.length > 0 && (
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-lg font-mono">
+                      {selectedPoleIds.length} cột đã xác nhận sự cố
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-emerald-700 italic">
-                  Hệ thống tự động kế thừa hồ sơ sự cố từ giai đoạn kiểm tra. Quản lý không cần chọn lại cột.
-                </p>
+                <div className="flex flex-wrap gap-2 mt-0.5">
+                  {selectedPoleIds.map((pid) => (
+                    <span
+                      key={pid}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-emerald-300 text-emerald-950 rounded-xl text-xs font-mono font-black shadow-2xs"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      {pid}
+                    </span>
+                  ))}
+                </div>
               </div>
             ) : (
-              <PoleSelector
-                segmentStr={segment}
-                selectedPoleIds={selectedPoleIds}
-                onChange={(poleIds, faultIds) => {
-                  setSelectedPoleIds(poleIds)
-                  if (faultIds) setSelectedFaultIds(faultIds)
-                }}
-                taskKindName="Kiểm tra"
-                allowEmpty={false}
-              />
+              <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/90 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-black text-blue-950">
+                    <Search className="w-4 h-4 text-blue-600" />
+                    <span>Cột đèn cần Kiểm tra:</span>
+                  </div>
+                  {selectedPoleIds.length > 0 && (
+                    <span className="text-[11px] font-bold text-blue-700 bg-blue-100/90 px-2 py-0.5 rounded-lg font-mono">
+                      {selectedPoleIds.length} cột ghi nhận sự cố
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2 mt-0.5">
+                  {selectedPoleIds.map((pid) => (
+                    <span
+                      key={pid}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-300 text-blue-950 rounded-xl text-xs font-mono font-black shadow-2xs"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-blue-600" />
+                      {pid}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Chọn Kỹ sư */}

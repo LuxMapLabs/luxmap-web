@@ -11,7 +11,7 @@ import type {
 import type { TaskKind } from '../../types/common/enums'
 import type { ScheduleCase } from '../../types/workSchedule'
 import type { GetWorkOrdersFilter } from './workScheduleAPI'
-import { mapWorkOrdersToScheduleCases } from '../../utils/work-schedule/workScheduleUtils'
+import { mapWorkOrdersToScheduleCases, formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
 
 export interface WorkScheduleState {
   // 1. Thực thể API Backend 
@@ -126,6 +126,32 @@ export const workScheduleSlice = createSlice({
       state.isLoadingDetail = false
       state.workOrderDetail = action.payload
       state.detailError = null
+
+      // Tự động gán poleIds và cập nhật segment từ chi tiết vào phase và case tương ứng
+      const detail = action.payload
+      const poleIds = Array.from(
+        new Set((detail.faults || []).map((f) => f.pole_id).filter(Boolean) as string[])
+      )
+      const segId =
+        detail.segment_id ||
+        (detail.segment_ids && detail.segment_ids.length > 0 ? detail.segment_ids[0] : null) ||
+        (detail.faults && detail.faults[0]?.segment_id)
+
+      state.cases.forEach((c) => {
+        if (poleIds.length > 0) {
+          c.phases.forEach((p) => {
+            if (p.workOrderId === detail.work_order_id) {
+              p.poleIds = poleIds
+            }
+          })
+          if (c.code === (detail.case_id || detail.work_order_id)) {
+            c.poleIds = poleIds
+          }
+        }
+        if (segId && c.code === (detail.case_id || detail.work_order_id)) {
+          c.segment = formatSegmentDisplay(segId, detail.title)
+        }
+      })
     },
     fetchWorkOrderDetailFailure(state, action: PayloadAction<string>) {
       state.isLoadingDetail = false

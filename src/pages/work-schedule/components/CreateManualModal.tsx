@@ -3,6 +3,7 @@ import { X, Calendar, MapPin, User, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
 import { PoleSelector } from './PoleSelector'
+import { FaultSelector } from './FaultSelector'
 
 interface CreateManualModalProps {
   isOpen: boolean
@@ -208,14 +209,6 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               </select>
             </div>
 
-            {/* 1. Với Khảo sát: Áp dụng toàn tuyến */}
-            {initPhase === 'survey' && (
-              <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-2xl text-xs text-blue-900 flex items-center gap-2">
-                <span className="font-extrabold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">Khảo sát đêm:</span>
-                <span>Thu thập dữ liệu đo lux và video trên toàn bộ tuyến đường đã chọn.</span>
-              </div>
-            )}
-
             {/* 2. Với Kiểm tra: Chọn cột đèn có sự cố trên tuyến */}
             {initPhase === 'inspection' && (
               <PoleSelector
@@ -230,17 +223,14 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               />
             )}
 
-            {/* 3. Với Sửa chữa: Chọn cột đèn có sự cố trên tuyến */}
+            {/* 3. Với Sửa chữa: Chọn trực tiếp các sự cố đã xác nhận cần sửa */}
             {initPhase === 'repair' && (
-              <PoleSelector
+              <FaultSelector
                 segmentStr={segment}
-                selectedPoleIds={selectedPoleIds}
-                onChange={(poleIds, faultIds) => {
-                  setSelectedPoleIds(poleIds)
-                  if (faultIds) setSelectedFaultIds(faultIds)
+                selectedFaultIds={selectedFaultIds}
+                onChange={(faultIds) => {
+                  setSelectedFaultIds(faultIds)
                 }}
-                taskKindName="Sửa chữa"
-                allowEmpty={false}
               />
             )}
 

@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Loader2,
   RefreshCw,
-  Info,
 } from 'lucide-react'
 import { faultAPI } from '../../../feature/faults/faultAPI'
 import type { FaultItem } from '../../../types/faults/faults'
@@ -57,7 +56,11 @@ export const FaultSelector: React.FC<FaultSelectorProps> = ({
         status: 'confirmed,in_progress',
         page_size: 50,
       })
-      setFaults(res.items || [])
+      // Chỉ lấy các sự cố chưa nằm trong bất kỳ lệnh công tác nào (!f.work_order_id)
+      const availableFaults = (res.items || []).filter(
+        (f) => !f.work_order_id && (f.fault_status === 'confirmed' || f.fault_status === 'in_progress')
+      )
+      setFaults(availableFaults)
     } catch (err: any) {
       console.warn('Không thể tải sự cố theo tuyến:', err)
       setError('Không thể tải danh sách sự cố từ máy chủ.')
@@ -150,11 +153,6 @@ export const FaultSelector: React.FC<FaultSelectorProps> = ({
         )}
       </div>
 
-      <p className="text-[11px] text-slate-500 italic">
-        Quy chuẩn Backend: Lệnh sửa chữa bắt buộc gắn với các sự cố đã được xác nhận (confirmed)
-        hoặc đang sửa dở (in_progress).
-      </p>
-
       {/* Trạng thái Loading */}
       {isLoading && (
         <div className="flex items-center justify-center p-6 gap-2 text-xs font-semibold text-emerald-700 bg-white rounded-xl border border-emerald-100">
@@ -180,18 +178,16 @@ export const FaultSelector: React.FC<FaultSelectorProps> = ({
         </div>
       )}
 
-      {/* Trạng thái Tuyến không có sự cố confirmed */}
+      {/* Trạng thái Tuyến không còn sự cố chưa giao việc */}
       {!isLoading && !error && faults.length === 0 && (
-        <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 font-bold">
-            <Info className="w-4 h-4 text-amber-600 shrink-0" />
-            Tuyến {segmentId} hiện không có sự cố nào đã xác nhận cần sửa!
-          </div>
-          <p className="text-[11px] text-amber-700">
-            Nếu bạn nghi ngờ cột đèn có lỗi, hãy chuyển loại lệnh sang{' '}
-            <strong className="text-amber-900 font-extrabold">2. Kiểm tra (Inspection)</strong> để
-            giao kỹ sư ra hiện trường xác minh và ghi nhận sự cố trước.
-          </p>
+        <div className="py-4 px-3 text-center rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-800 flex flex-col items-center gap-1.5 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          <span className="font-extrabold text-emerald-950 text-xs">
+            Toàn bộ sự cố trên tuyến này đều đã được lên lịch xử lý.
+          </span>
+          <span className="text-[11px] text-emerald-700">
+            Hiện không còn sự cố nào tồn đọng cần giao việc.
+          </span>
         </div>
       )}
 

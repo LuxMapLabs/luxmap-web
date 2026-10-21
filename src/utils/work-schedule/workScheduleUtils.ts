@@ -11,6 +11,41 @@ type WorkOrderRawItem = WorkOrderItem & Partial<WorkOrderDetail> & {
   ai_detections?: any
 }
 
+export const SEGMENT_NAME_MAP: Record<string, string> = {
+  'SEG-001': 'Tuyến A - Tỉnh Lộ 8 (SEG-001)',
+  'SEG-002': 'Tuyến B - Nguyễn Văn Ni (SEG-002)',
+  'SEG-003': 'Tuyến C - Huỳnh Văn Cọ (SEG-003)',
+}
+
+/**
+ * Định dạng tên hiển thị đầy đủ và thân thiện của tuyến đường
+ */
+export function formatSegmentDisplay(
+  segIdOrName?: string | null,
+  fallbackTitle?: string | null
+): string {
+  if (!segIdOrName || segIdOrName === 'Tuyến chiếu sáng phụ trách') {
+    if (fallbackTitle) {
+      const match = fallbackTitle.match(/SEG-\d+/i)
+      if (match) {
+        const id = match[0].toUpperCase()
+        return SEGMENT_NAME_MAP[id] || `${id} - Tuyến đường phụ trách`
+      }
+    }
+    return 'Tuyến A - Tỉnh Lộ 8 (SEG-001)'
+  }
+
+  const segMatch = segIdOrName.match(/SEG-\d+/i)
+  if (segMatch) {
+    const id = segMatch[0].toUpperCase()
+    if (SEGMENT_NAME_MAP[id]) {
+      return SEGMENT_NAME_MAP[id]
+    }
+  }
+
+  return segIdOrName
+}
+
 /**
  * Tiện ích chuyển đổi danh sách lệnh công tác (WorkOrderItem[]) từ Backend API
  * thành danh sách hồ sơ sự vụ (ScheduleCase[]) gom nhóm theo chuỗi tiến trình Stepper cho giao diện Calendar.
@@ -52,7 +87,7 @@ export function mapWorkOrdersToScheduleCases(
     const workOrderId = raw.work_order_id || ''
     const caseKey = raw.case_id || workOrderId
     const title = raw.title || 'Lệnh công tác'
-    const segment = raw.segment_name || raw.segment_id || 'Tuyến chiếu sáng phụ trách'
+    const segment = formatSegmentDisplay(raw.segment_name || raw.segment_id, title)
     const rawKind = String(raw.task_kind || 'inspection').toLowerCase()
     const woStatus = String(raw.wo_status || 'open').toLowerCase()
     const assignedTo = raw.assigned_to || ''
@@ -75,6 +110,9 @@ export function mapWorkOrdersToScheduleCases(
         phases: [],
       }
     } else {
+      if (raw.segment_name || raw.segment_id) {
+        casesMap[caseKey].segment = formatSegmentDisplay(raw.segment_name || raw.segment_id, title)
+      }
       if (Boolean(endReason)) {
         casesMap[caseKey].isTerminated = true
         casesMap[caseKey].endReason = endReason
