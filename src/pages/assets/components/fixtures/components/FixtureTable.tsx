@@ -1,5 +1,5 @@
 import React from 'react'
-import { Edit2, Archive, CheckCircle2, AlertCircle, Boxes } from 'lucide-react'
+import { Edit2, Archive, CheckCircle2, AlertCircle, Boxes, Lightbulb, PackageMinus } from 'lucide-react'
 import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import { FixtureTableSkeleton } from './FixtureTableSkeleton'
@@ -10,6 +10,7 @@ interface FixtureTableProps {
   flashingFixtureCode?: string
   isLoading?: boolean
   onEditFixture: (fixture: ManagedFixture) => void
+  onRetireFixture?: (fixture: ManagedFixture) => void
   onSelectPole?: (poleCode: string) => void
 }
 
@@ -19,6 +20,7 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
   flashingFixtureCode,
   isLoading = false,
   onEditFixture,
+  onRetireFixture,
   onSelectPole,
 }) => {
   // Pre-build pole map by external_ref for metadata lookup
@@ -60,13 +62,15 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
       <table className="w-full text-left text-xs border-collapse">
         <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 sticky top-0 z-10 select-none">
           <tr>
-            <th className="py-3 px-3.5">Mã bóng</th>
+            <th className="py-3 px-3.5">Mã bộ đèn</th>
             <th className="py-3 px-3.5">Cột Lắp Đặt</th>
             <th className="py-3 px-3.5">Tuyến Đường</th>
+            <th className="py-3 px-3.5 text-center">Số bóng / bộ</th>
             <th className="py-3 px-3.5 text-center">Công Suất</th>
-            <th className="py-3 px-3.5">Loại Bóng / Nguồn</th>
+            <th className="py-3 px-3.5">Loại đèn / Nguồn</th>
             <th className="py-3 px-3.5">Ngày Lắp Đặt</th>
             <th className="py-3 px-3.5">Hạn Bảo Hành</th>
+            <th className="py-3 px-3.5">Ngày Tháo Dỡ</th>
             <th className="py-3 px-3.5 text-center">Trạng Thái</th>
             <th className="py-3 px-3.5 text-center w-24">Thao Tác</th>
           </tr>
@@ -77,10 +81,10 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
             <FixtureTableSkeleton rowCount={8} />
           ) : fixtures.length === 0 ? (
             <tr>
-              <td colSpan={9} className="py-12 text-center text-slate-400">
+              <td colSpan={11} className="py-12 text-center text-slate-400">
                 <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="font-medium text-slate-500">Không tìm thấy bóng đèn nào phù hợp</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Thử thay đổi bộ lọc hoặc thêm bóng đèn mới</p>
+                <p className="font-medium text-slate-500">Không tìm thấy bộ đèn nào phù hợp</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Thử thay đổi bộ lọc hoặc thêm bộ đèn mới</p>
               </td>
             </tr>
           ) : (
@@ -136,6 +140,26 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                     </span>
                   </td>
 
+                  {/* Số lượng bóng */}
+                  <td className="py-2.5 px-3.5 text-center">
+                    {(() => {
+                      const count = fixture.lamp_count || 1
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${
+                            count > 1
+                              ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          }`}
+                          title={`Bộ đèn gồm ${count} bóng`}
+                        >
+                          <Lightbulb className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />
+                          <span>{count} bóng</span>
+                        </span>
+                      )
+                    })()}
+                  </td>
+
                   {/* Công suất */}
                   <td className="py-2.5 px-3.5 text-center">
                     <span
@@ -145,6 +169,11 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                     >
                       {fixture.lamp_watt} W
                     </span>
+                    {(fixture.lamp_count || 1) > 1 && (
+                      <div className="text-[10px] text-amber-700 font-bold mt-0.5" title="Tổng công suất trên cột">
+                        Tổng: {fixture.lamp_watt * (fixture.lamp_count || 1)} W
+                      </div>
+                    )}
                   </td>
 
                   {/* Loại bóng & Nguồn */}
@@ -167,6 +196,11 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                     {fixture.warranty_expiry || '—'}
                   </td>
 
+                  {/* Ngày tháo dỡ */}
+                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-600">
+                    {fixture.removed_date || '—'}
+                  </td>
+
                   {/* Trạng thái (null = Đang hoạt động, có ngày = Đã tháo dỡ) */}
                   <td className="py-2.5 px-3.5 text-center">
                     {!isRetired ? (
@@ -184,7 +218,7 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
 
                   {/* Thao tác */}
                   <td className="py-2.5 px-3.5 text-center">
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center gap-1">
                       <button
                         type="button"
                         onClick={() => onEditFixture(fixture)}
@@ -193,6 +227,16 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
+                      {!isRetired && onRetireFixture && (
+                        <button
+                          type="button"
+                          onClick={() => onRetireFixture(fixture)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                          title="Tháo dỡ bộ đèn"
+                        >
+                          <PackageMinus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

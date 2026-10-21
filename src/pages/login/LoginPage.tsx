@@ -121,24 +121,24 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Form Login (Vuông vức, tinh giản, sắc sảo) */}
-          <form onSubmit={handleSubmit} className="space-y-5 pt-7">
+          <form onSubmit={handleSubmit} className="login-form space-y-5 pt-7">
             {/* Field: Tài khoản / Email */}
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-300 block">
                 Tài khoản / Email
               </label>
-              <div className="relative flex items-center rounded-none border border-slate-700/70 bg-slate-900/70 px-3.5 py-3 group/field focus-within:border-[#5fc4b0] focus-within:ring-1 focus-within:ring-[#5fc4b0]/40 transition-all duration-200">
+              <div className="relative flex items-center rounded-none border border-slate-700/70 bg-[var(--login-input-background)] px-3.5 py-3 group/field focus-within:border-[#5fc4b0] focus-within:ring-1 focus-within:ring-[#5fc4b0]/40 transition-all duration-200">
                 {/* [Mục 2] Icon sáng xanh ngọc khi focus */}
                 <Mail className="w-4.5 h-4.5 text-slate-400 group-focus-within/field:text-[#5fc4b0] transition-colors duration-200 shrink-0" />
                 <input
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin hoặc email"
+                  placeholder="Nhập tên đăng nhập hoặc email"
                   disabled={loading}
                   autoComplete="username"
                   spellCheck={false}
-                  className="w-full text-sm font-medium outline-none bg-transparent pl-3 pr-2 text-white placeholder-slate-500 disabled:opacity-50"
+                  className="login-input w-full min-w-0 text-sm font-medium outline-none bg-transparent pl-3 pr-2 text-white placeholder-slate-500 disabled:opacity-50"
                   required
                 />
               </div>
@@ -149,7 +149,7 @@ export const LoginPage: React.FC = () => {
               <label className="text-xs font-semibold text-slate-300 block">
                 Mật khẩu
               </label>
-              <div className="relative flex items-center rounded-none border border-slate-700/70 bg-slate-900/70 px-3.5 py-3 group/field focus-within:border-[#5fc4b0] focus-within:ring-1 focus-within:ring-[#5fc4b0]/40 transition-all duration-200">
+              <div className="relative flex items-center rounded-none border border-slate-700/70 bg-[var(--login-input-background)] px-3.5 py-3 group/field focus-within:border-[#5fc4b0] focus-within:ring-1 focus-within:ring-[#5fc4b0]/40 transition-all duration-200">
                 {/* [Mục 2] Icon sáng xanh ngọc khi focus */}
                 <Lock className="w-4.5 h-4.5 text-slate-400 group-focus-within/field:text-[#5fc4b0] transition-colors duration-200 shrink-0" />
                 <input
@@ -162,7 +162,7 @@ export const LoginPage: React.FC = () => {
                   disabled={loading}
                   autoComplete="current-password"
                   spellCheck={false}
-                  className="w-full text-sm font-medium outline-none bg-transparent pl-3 pr-2 text-white placeholder-slate-500 disabled:opacity-50"
+                  className="login-input w-full min-w-0 text-sm font-medium outline-none bg-transparent pl-3 pr-2 text-white placeholder-slate-500 disabled:opacity-50"
                   required
                 />
                 <button

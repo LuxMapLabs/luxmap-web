@@ -9,6 +9,7 @@ import {
   type SearchResultItem,
 } from '../../utils/gis-map/gisSearchUtils'
 import { fetchMapLayersRequest } from '../../feature/map/mapSlice'
+import { fetchAssetsRequest } from '../../feature/assets/assetSlice'
 import { showToast } from '../../utils/toastUtils'
 
 interface UseElectricalCascadeProps {
@@ -32,10 +33,23 @@ export function useElectricalCascade({
     isLoadingMap: isLoadingMapData,
   } = useSelector((state: RootState) => state.map)
 
+  const {
+    poles: assetPoles,
+    cabinets: assetCabinets,
+    feeders: assetFeeders,
+  } = useSelector((state: RootState) => state.assets)
+
   // Dispatch Saga action to load map layers if not yet loaded
   useEffect(() => {
     dispatch(fetchMapLayersRequest({ bbox: '106.35,10.85,106.65,11.10' }))
   }, [dispatch])
+
+  // Tự động nạp dữ liệu kiểm kê tài sản (assets) để lấy external_ref nếu chưa có
+  useEffect(() => {
+    if (!assetPoles || assetPoles.length === 0) {
+      dispatch(fetchAssetsRequest())
+    }
+  }, [dispatch, assetPoles])
 
   // Local state for Cabinet Trip/Restore (Simulation)
   const [cabinets, setCabinets] = useState<any[]>([])
@@ -123,8 +137,25 @@ export function useElectricalCascade({
     }
   }
 
-  // Dữ liệu cột điện thực tế từ Backend API (Không còn logic chunkSize tự chia cột)
+  // Dữ liệu cột điện thực tế từ Backend API kết hợp thông tin kiểm kê từ Redux store
   const effectivePoles: PoleFeature[] = useMemo(() => {
+    // Map tra cứu nhanh từ kho tài sản (Asset Inventory) để lấy external_ref, feeder, cabinet
+    const assetPoleMap = new Map<string, any>()
+    ;(assetPoles || []).forEach((ap) => {
+      if (ap.pole_id) assetPoleMap.set(ap.pole_id, ap)
+    })
+
+    const assetFeederMap = new Map<string, any>()
+    ;(assetFeeders || []).forEach((af) => {
+      if (af.feeder_id) assetFeederMap.set(af.feeder_id, af)
+    })
+
+    const assetCabinetMap = new Map<string, any>()
+    ;(assetCabinets || []).forEach((ac) => {
+      if (ac.cabinet_id) assetCabinetMap.set(ac.cabinet_id, ac)
+      if (ac.external_ref) assetCabinetMap.set(ac.external_ref, ac)
+    })
+
     // Map từ cabinet_id -> cabinet status để cập nhật trực tiếp vào pole
     const cabinetStatusMap: Record<string, any> = {}
     cabinets.forEach((c) => {
@@ -136,9 +167,26 @@ export function useElectricalCascade({
 
     return rawPoles.map((f: PolePropertiesFeature) => {
       const p = (f.properties || {}) as any
-      const cabProps = p.cabinet_id ? cabinetStatusMap[p.cabinet_id] : null
-      const isCabFault = cabProps?.status === 'fault'
+      const assetPole = p.pole_id ? assetPoleMap.get(p.pole_id) : null
 
+      // Ưu tiên mã ngoài thực địa (external_ref)
+      const externalRef = assetPole?.external_ref || p.external_ref || p.pole_id
+      const feederId = assetPole?.feeder_id || p.feeder_id
+      const assetFeeder = feederId ? assetFeederMap.get(feederId) : null
+      const feederExternalRef = assetFeeder?.external_ref
+      const feederName = assetFeeder?.feeder_name
+
+      const rawCabinetId = assetPole?.cabinet_id || assetFeeder?.cabinet?.cabinet_id || p.cabinet_id
+      const assetCabinet = rawCabinetId ? assetCabinetMap.get(rawCabinetId) : null
+      const cabProps = rawCabinetId ? cabinetStatusMap[rawCabinetId] : null
+      const cabinetExternalRef = assetCabinet?.external_ref
+      const cabinetName =
+        assetCabinet?.cabinet_name ||
+        cabProps?.cabinet_name ||
+        p.cabinet_name ||
+        (rawCabinetId ? `Tủ ${cabinetExternalRef || rawCabinetId}` : undefined)
+
+      const isCabFault = cabProps?.status === 'fault'
       const geom = f.geometry || { type: 'Point', coordinates: [106.6, 10.8] }
 
       if (isCabFault) {
@@ -147,9 +195,15 @@ export function useElectricalCascade({
           geometry: geom as any,
           properties: {
             ...p,
-            cabinet_name: cabProps.cabinet_name || cabProps.cabinet_id,
+            external_ref: externalRef,
+            feeder_id: feederId,
+            feeder_external_ref: feederExternalRef,
+            feeder_name: feederName,
+            cabinet_id: rawCabinetId,
+            cabinet_name: cabinetName,
+            cabinet_external_ref: cabinetExternalRef,
             fixture_status: 'out',
-            power_loss_reason: `Mất điện do ${cabProps.cabinet_name || cabProps.cabinet_id} bị ngắt điện`,
+            power_loss_reason: `Mất điện do ${cabinetName || rawCabinetId} bị ngắt điện`,
           },
         } as PoleFeature
       }
@@ -159,11 +213,17 @@ export function useElectricalCascade({
         geometry: geom as any,
         properties: {
           ...p,
-          cabinet_name: cabProps?.cabinet_name || p.cabinet_name || p.cabinet_id,
+          external_ref: externalRef,
+          feeder_id: feederId,
+          feeder_external_ref: feederExternalRef,
+          feeder_name: feederName,
+          cabinet_id: rawCabinetId,
+          cabinet_name: cabinetName,
+          cabinet_external_ref: cabinetExternalRef,
         },
       } as PoleFeature
     })
-  }, [rawPoles, cabinets])
+  }, [rawPoles, cabinets, assetPoles, assetFeeders, assetCabinets])
 
   // Calculate Dynamic Segments List & Info from rawSegments (API)
   const segmentsList = useMemo(() => {

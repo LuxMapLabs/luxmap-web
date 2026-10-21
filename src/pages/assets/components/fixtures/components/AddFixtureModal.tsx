@@ -26,6 +26,7 @@ export interface AddFixtureModalProps {
 interface FixtureDraftRow {
   rowId: string
   lamp_watt: number
+  lamp_count: number
   fixture_type: FixtureType
   power_source: PowerSource
   install_date: string
@@ -58,13 +59,16 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
   const [rows, setRows] = useState<FixtureDraftRow[]>([])
   const [validationError, setValidationError] = useState<string | null>(null)
 
-  // Danh sách cột điện thuộc tuyến đường đã chọn
-  const filteredPoles = useMemo(() => {
-    if (!selectedSegmentId) {
-      return []
-    }
+  // Danh sách tất cả cột điện thuộc tuyến đường đã chọn
+  const polesOnSegment = useMemo(() => {
+    if (!selectedSegmentId) return []
     return poles.filter((p) => p.segment_id === selectedSegmentId)
   }, [poles, selectedSegmentId])
+
+  // Danh sách cột điện CHƯA LẮP BỘ ĐÈN thuộc tuyến đường đã chọn
+  const filteredPoles = useMemo(() => {
+    return polesOnSegment.filter((p) => !p.active_fixture)
+  }, [polesOnSegment])
 
   // Khởi tạo mặc định rỗng khi mở modal (Không tự động tạo dòng bóng nào)
   useEffect(() => {
@@ -103,6 +107,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
     const newRow: FixtureDraftRow = {
       rowId: `fix-draft-${Date.now()}-${nextIdx}`,
       lamp_watt: rows.length > 0 ? rows[rows.length - 1].lamp_watt : 100,
+      lamp_count: 1,
       fixture_type: 'led_road_lamp',
       power_source: 'grid',
       install_date: today,
@@ -149,6 +154,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
       fixture_type: r.fixture_type,
       power_source: r.power_source,
       lamp_watt: Number(r.lamp_watt) || 100,
+      lamp_count: Number(r.lamp_count) || 1,
       install_date: r.install_date || null,
       removed_date: null,
       warranty_expiry: r.warranty_expiry || null,
@@ -184,10 +190,10 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                Thêm Bóng Đèn Chiếu Sáng
+                Thêm Bộ Đèn Chiếu Sáng
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Lựa chọn tuyến đường, cột điện và cấu hình bóng đèn gắn trên cột (cần đơn, cần đôi)
+                Lựa chọn tuyến đường, cột điện và cấu hình bộ đèn gắn trên cột
               </p>
             </div>
           </div>
@@ -252,17 +258,18 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                 >
                   {!selectedSegmentId ? (
                     <option value="">(Vui lòng chọn tuyến đường trước)</option>
-                  ) : filteredPoles.length === 0 ? (
+                  ) : polesOnSegment.length === 0 ? (
                     <option value="">(Tuyến này chưa có cột điện nào)</option>
+                  ) : filteredPoles.length === 0 ? (
+                    <option value="">(Tất cả cột trên tuyến này đã lắp bộ đèn)</option>
                   ) : (
                     <>
                       <option value="">-- Chọn cột điện lắp đặt --</option>
                       {filteredPoles.map((p) => {
-                        const label = p.external_ref || p.pole_id || 'Cột không tên'
-                        const subInfo = p.feeder_id || p.cabinet_name ? ` (Nguồn: ${p.cabinet_name || p.feeder_id})` : ''
+                        const label = p.external_ref || 'Cột chưa đặt mã'
                         return (
                           <option key={p.pole_id || ''} value={p.pole_id || ''}>
-                            {label} {subInfo}
+                            {label}
                           </option>
                         )
                       })}
@@ -279,10 +286,10 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5">
                   <Lightbulb className="w-4 h-4 text-amber-500" />
-                  <span>2. Danh Sách Bóng Đèn Gắn Trên Cột</span>
+                  <span>2. Danh Sách Bộ Đèn Gắn Trên Cột</span>
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                  {rows.length} bóng đã thêm
+                  {rows.length} bộ đèn đã thêm
                 </span>
               </div>
 
@@ -293,7 +300,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                 className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
-                <span>+ Thêm Bóng Mới</span>
+                <span>+ Thêm Bộ Đèn Mới</span>
               </button>
             </div>
 
@@ -304,8 +311,9 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                   <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 shadow-2xs">
                     <tr>
                       <th className="py-2.5 px-3 w-12 text-center">STT</th>
+                      <th className="py-2.5 px-3 min-w-32">Số bóng / bộ</th>
                       <th className="py-2.5 px-3 min-w-32">Công suất (*)</th>
-                      <th className="py-2.5 px-3 min-w-36">Loại bóng</th>
+                      <th className="py-2.5 px-3 min-w-36">Loại đèn</th>
                       <th className="py-2.5 px-3 min-w-28">Nguồn điện</th>
                       <th className="py-2.5 px-3 min-w-32">Ngày lắp</th>
                       <th className="py-2.5 px-3 min-w-32">Hạn bảo hành</th>
@@ -315,20 +323,20 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
                     {rows.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-slate-400 dark:text-slate-500">
+                        <td colSpan={8} className="py-8 text-center text-slate-400 dark:text-slate-500">
                           {!selectedPoleId ? (
-                            <span>Vui lòng chọn Tuyến đường và Cột điện ở Mục 1 để bắt đầu thêm bóng đèn.</span>
+                            <span>Vui lòng chọn Tuyến đường và Cột điện ở Mục 1 để bắt đầu thêm bộ đèn.</span>
                           ) : (
                             <span>
-                              Chưa có bóng đèn nào được cấu hình cho cột này. Bấm{' '}
+                              Chưa có bộ đèn nào được cấu hình cho cột này. Bấm{' '}
                               <button
                                 type="button"
                                 onClick={handleAddRow}
                                 className="text-amber-600 dark:text-amber-400 font-bold underline cursor-pointer"
                               >
-                                + Thêm Bóng Mới
+                                + Thêm Bộ Đèn Mới
                               </button>{' '}
-                              để tạo bóng đèn.
+                              để tạo bộ đèn.
                             </span>
                           )}
                         </td>
@@ -342,6 +350,26 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                           {/* STT */}
                           <td className="py-2 px-3 text-center text-slate-400 font-bold">
                             {index + 1}
+                          </td>
+
+                          {/* Số lượng bóng */}
+                          <td className="py-2 px-3">
+                            <select
+                              value={row.lamp_count}
+                              onChange={(e) =>
+                                handleUpdateRow(
+                                  row.rowId,
+                                  'lamp_count',
+                                  parseInt(e.target.value, 10)
+                                )
+                              }
+                              className="w-full p-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 focus:outline-none focus:border-blue-500 cursor-pointer"
+                            >
+                              <option value={1}>1 bóng</option>
+                              <option value={2}>2 bóng</option>
+                              <option value={3}>3 bóng</option>
+                              <option value={4}>4 bóng</option>
+                            </select>
                           </td>
 
                           {/* Công suất (W) */}
@@ -363,6 +391,11 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                                 </option>
                               ))}
                             </select>
+                            {row.lamp_count > 1 && (
+                              <div className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mt-0.5">
+                                Tổng: {row.lamp_watt * row.lamp_count} W
+                              </div>
+                            )}
                           </td>
 
                           {/* Loại bóng */}
@@ -428,7 +461,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleDeleteRow(row.rowId)}
-                              title="Xóa bóng này"
+                              title="Xóa bộ đèn này"
                               className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -458,7 +491,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
               className="px-5 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Xác Nhận Thêm ({rows.length} Bóng)</span>
+              <span>Xác Nhận Thêm ({rows.length} Bộ Đèn)</span>
             </button>
           </div>
         </form>

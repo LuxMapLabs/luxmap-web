@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Search, Plus, Upload, Filter } from 'lucide-react'
-import type { CreateFixtureRequest } from '../../../../types/assets/fixtures'
+import type { CreateFixtureRequest, RetireFixtureRequest } from '../../../../types/assets/fixtures'
 import type { ManagedFixture } from '../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../types/assets/segments'
 import { FixtureTable } from './components/FixtureTable'
 import { AddFixtureModal } from './components/AddFixtureModal'
 import { EditFixtureModal } from './components/EditFixtureModal'
+import { RetireFixtureModal } from './components/RetireFixtureModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface FixturesTabProps {
@@ -19,6 +20,7 @@ export interface FixturesTabProps {
   onAddFixture: (data: CreateFixtureRequest) => void
   onAddFixtures?: (data: CreateFixtureRequest[]) => void
   onUpdateFixture: (updated: ManagedFixture) => void
+  onRetireFixture?: (fixtureId: string, req: RetireFixtureRequest) => void
   onOpenImport: () => void
   onSelectPole?: (poleCode: string) => void
 }
@@ -33,6 +35,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
   onAddFixture,
   onAddFixtures,
   onUpdateFixture,
+  onRetireFixture,
   onOpenImport,
   onSelectPole,
 }) => {
@@ -44,6 +47,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingFixture, setEditingFixture] = useState<ManagedFixture | null>(null)
+  const [retiringFixture, setRetiringFixture] = useState<ManagedFixture | null>(null)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -128,7 +132,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
           <div className="flex-1 min-w-60 relative">
             <input
               type="text"
-              placeholder="Tìm theo mã bóng (FIX-...), mã cột (POLE-0001), công suất..."
+              placeholder="Tìm theo mã bộ đèn (FIX-...), mã cột (POLE-0001), công suất..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
@@ -193,7 +197,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
             className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-sm border border-blue-400/30 transition flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Đăng ký Bóng mới</span>
+            <span>Đăng ký Bộ đèn mới</span>
           </button>
         </div>
       </div>
@@ -205,6 +209,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
         flashingFixtureCode={flashingFixtureCode}
         isLoading={isLoading}
         onEditFixture={(f) => setEditingFixture(f)}
+        onRetireFixture={(f) => setRetiringFixture(f)}
         onSelectPole={onSelectPole}
       />
 
@@ -214,7 +219,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
         currentPage={currentPage}
         pageSize={pageSize}
         totalPages={totalPages}
-        unitLabel="bóng đèn"
+        unitLabel="bộ đèn"
         isLoading={isLoading}
         onPageChange={(page) => setCurrentPage(page)}
       />
@@ -234,7 +239,17 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
         onClose={() => setEditingFixture(null)}
         fixture={editingFixture}
         poles={poles}
+        segments={segments}
         onUpdateFixture={onUpdateFixture}
+      />
+
+      <RetireFixtureModal
+        isOpen={Boolean(retiringFixture)}
+        onClose={() => setRetiringFixture(null)}
+        fixture={retiringFixture}
+        onConfirm={(fixtureId, req) => {
+          onRetireFixture?.(fixtureId, req)
+        }}
       />
     </div>
   )

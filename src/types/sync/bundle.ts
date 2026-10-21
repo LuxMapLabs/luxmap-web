@@ -25,6 +25,7 @@ export interface SyncPoleProperties {
     power_source?: PowerSource
     fixture_type?: FixtureType
     lamp_watt?: number
+    lamp_count?: number
     install_date?: string | null
     warranty_expiry?: string | null
     warranty_status: WarrantyStatus

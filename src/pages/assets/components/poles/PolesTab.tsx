@@ -1,5 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { Search, Plus, Upload, Filter, Printer } from 'lucide-react'
+import type { RootState } from '../../../../redux/rootReducer'
+import { fetchMapLayersRequest } from '../../../../feature/map/mapSlice'
+import type { FixtureStatus } from '../../../../types/common/enums'
+import type { PolePropertiesFeature } from '../../../../types/map/poles'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../types/assets/segments'
@@ -43,6 +48,31 @@ export const PolesTab: React.FC<PolesTabProps> = ({
   onSelectFixture,
   onSelectCabinet,
 }) => {
+  const dispatch = useDispatch()
+  const mapPoles = useSelector((state: RootState) => state.map.poles)
+
+  // Tự động tải lớp bản đồ GIS khi mở trang quản lý tài sản nếu store chưa có
+  useEffect(() => {
+    if (!mapPoles || mapPoles.length === 0) {
+      dispatch(fetchMapLayersRequest())
+    }
+  }, [dispatch, mapPoles])
+
+  // Bản đồ tra cứu trạng thái đo sáng trắc quang theo pole_id / external_ref từ tầng GIS
+  const poleStatusMap = useMemo(() => {
+    const map = new Map<string, FixtureStatus>()
+    if (mapPoles && mapPoles.length > 0) {
+      mapPoles.forEach((feature: PolePropertiesFeature) => {
+        const props = feature.properties
+        if (props?.pole_id && props.fixture_status) {
+          map.set(props.pole_id, props.fixture_status)
+          map.set(props.pole_id.toLowerCase(), props.fixture_status)
+        }
+      })
+    }
+    return map
+  }, [mapPoles])
+
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -78,11 +108,20 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         (pole.commune_id && pole.commune_id.toLowerCase().includes(q)) ||
         cabName.toLowerCase().includes(q)
 
-      const isFixtureActive = Boolean(pole.active_fixture)
+      const hasFixture = Boolean(pole.active_fixture)
+      const currentStatus: FixtureStatus = hasFixture
+        ? (pole.pole_id && poleStatusMap.get(pole.pole_id)) ||
+          (pole.external_ref && (poleStatusMap.get(pole.external_ref) || poleStatusMap.get(pole.external_ref.toLowerCase()))) ||
+          'unknown'
+        : 'out'
+
       const matchesStatus =
         statusFilter === 'all' ||
-        (statusFilter === 'normal' && isFixtureActive) ||
-        (statusFilter === 'out' && !isFixtureActive)
+        (statusFilter === 'no_fixture' && !hasFixture) ||
+        (statusFilter === 'normal' && hasFixture && currentStatus === 'normal') ||
+        (statusFilter === 'dim' && hasFixture && currentStatus === 'dim') ||
+        (statusFilter === 'out' && hasFixture && currentStatus === 'out') ||
+        (statusFilter === 'unknown' && hasFixture && currentStatus === 'unknown')
 
       return matchesQuery && matchesStatus
     })
@@ -90,7 +129,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
     return [...list].sort((a, b) => {
       return (a.external_ref || '').localeCompare(b.external_ref || '', undefined, { numeric: true })
     })
-  }, [poles, segments, cabinets, searchQuery, statusFilter])
+  }, [poles, segments, cabinets, searchQuery, statusFilter, poleStatusMap])
 
   const totalPages = Math.max(1, Math.ceil(filteredPoles.length / pageSize))
 
@@ -139,21 +178,22 @@ export const PolesTab: React.FC<PolesTabProps> = ({
 
   return (
     <>
-      {/* Search & Dynamic Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-1 min-w-[280px]">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" />
+      {/* Action Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="flex flex-1 flex-wrap items-center gap-3">
+          {/* Search Box - Chiều dài co giãn giống tab Bóng đèn */}
+          <div className="flex-1 min-w-60 relative">
             <input
               type="text"
-              placeholder="Tìm kiếm theo mã cột, tuyến đường, tủ điện, địa bàn..."
+              placeholder="Tìm theo mã cột, tuyến đường, địa bàn..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
                 setCurrentPage(1)
               }}
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#1f3864] dark:focus:border-blue-500 transition"
+              className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-xs focus:outline-none focus:border-[#1f3864] dark:focus:border-blue-500 font-medium transition"
             />
+            <Search className="w-4 h-4 text-slate-400 dark:text-slate-400 absolute left-2.5 top-2.5" />
           </div>
 
           {/* Filter Status Dropdown */}
@@ -165,11 +205,14 @@ export const PolesTab: React.FC<PolesTabProps> = ({
                 setStatusFilter(e.target.value)
                 setCurrentPage(1)
               }}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none focus:border-[#1f3864] dark:focus:border-blue-500 transition"
+              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none focus:border-[#1f3864] dark:focus:border-blue-500 transition"
             >
               <option value="all">Tất cả trạng thái</option>
-              <option value="normal">Hoạt động</option>
-              <option value="out">Chưa gắn bóng</option>
+              <option value="normal">🟢 Sáng tốt</option>
+              <option value="dim">🟡 Sáng yếu</option>
+              <option value="out">🔴 Mất sáng</option>
+              <option value="unknown">⚪ Chưa quét</option>
+              <option value="no_fixture">⚫ Chưa gắn bóng</option>
             </select>
           </div>
         </div>
@@ -210,6 +253,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         poles={paginatedPoles}
         cabinets={cabinets}
         segments={segments}
+        poleStatusMap={poleStatusMap}
         isLoading={isLoading}
         flashingPoleCode={flashingPoleCode}
         onViewDetail={(pole) => setDetailPole(pole)}
@@ -258,6 +302,13 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         pole={detailPole}
         segments={segments}
         cabinets={cabinets}
+        fixtureStatus={
+          detailPole
+            ? (detailPole.pole_id && poleStatusMap.get(detailPole.pole_id)) ||
+              (detailPole.external_ref && (poleStatusMap.get(detailPole.external_ref) || poleStatusMap.get(detailPole.external_ref.toLowerCase()))) ||
+              'unknown'
+            : undefined
+        }
         onClose={() => setDetailPole(null)}
         onViewQr={(pole) => setQrPole(pole)}
       />

@@ -212,6 +212,7 @@ export const GisMapPage: React.FC = () => {
     feederLinesData,
     filteredSegmentsData,
     selectedCabinet,
+    selectedSegment,
     segmentInfoMap,
     popupRef,
     isHoveringMarkerRef,

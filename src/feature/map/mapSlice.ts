@@ -10,6 +10,9 @@ export interface MapState {
   isLoadingMap: boolean
   mapError: string | null
 
+  // All Topology Edges (Toàn bộ các đường dây mạch điện PostGIS từ Backend khi load map)
+  allTopologyEdges: CabinetTopologyEdgePropertiesFeature[]
+
   // Cabinet Topology
   selectedCabinetId: string | null
   cabinetTopologyEdges: CabinetTopologyEdgePropertiesFeature[]
@@ -30,6 +33,8 @@ const initialState: MapState = {
   isLoadingMap: false,
   mapError: null,
 
+  allTopologyEdges: [],
+
   selectedCabinetId: null,
   cabinetTopologyEdges: [],
   isLoadingTopology: false,
@@ -45,6 +50,7 @@ export interface FetchMapLayersSuccessPayload {
   poles: PolePropertiesFeature[]
   cabinets: CabinetPropertiesFeature[]
   segments: SegmentPropertiesFeature[]
+  allTopologyEdges?: CabinetTopologyEdgePropertiesFeature[]
 }
 
 const mapSlice = createSlice({
@@ -61,6 +67,7 @@ const mapSlice = createSlice({
       state.poles = action.payload.poles
       state.cabinets = action.payload.cabinets
       state.segments = action.payload.segments
+      state.allTopologyEdges = action.payload.allTopologyEdges || []
       state.mapError = null
     },
     fetchMapLayersFailure: (state, action: PayloadAction<string>) => {

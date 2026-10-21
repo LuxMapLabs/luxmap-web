@@ -13,6 +13,7 @@ interface UseFeederLinesLayerProps {
   feederLinesData?: any[]
   filteredSegmentsData?: any[]
   selectedCabinet?: any | null
+  selectedSegment?: string
   segmentInfoMap: Record<string, SegmentInfo>
   popupRef: React.MutableRefObject<maplibregl.Popup | null>
   isHoveringMarkerRef: React.MutableRefObject<boolean>
@@ -28,6 +29,7 @@ export function useFeederLinesLayer({
   feederLinesData,
   filteredSegmentsData = [],
   selectedCabinet,
+  selectedSegment = 'all',
   popupRef,
   isHoveringMarkerRef,
   activeHoverSourceRef,
@@ -35,7 +37,8 @@ export function useFeederLinesLayer({
   onSelectCabinet,
 }: UseFeederLinesLayerProps) {
   const dispatch = useDispatch<AppDispatch>()
-  const { cabinetTopologyEdges } = useSelector((state: RootState) => state.map)
+  const { cabinetTopologyEdges, allTopologyEdges, cabinets: mapCabinets } = useSelector((state: RootState) => state.map)
+  const { cabinets: assetCabinets, feeders: assetFeeders } = useSelector((state: RootState) => state.assets)
   // 1. Add Sources & Layers on Map Load
   useEffect(() => {
     if (!map || !isMapLoaded) return
@@ -79,8 +82,22 @@ export function useFeederLinesLayer({
       })
     }
 
-    // B. Electrical Feeder & Topology Edges (Sơ đồ cấp nguồn Trụ → Cột, thanh mảnh nằm ĐÈ LÊN TRÊN tuyến đường)
-    const initialFeeders = feederLinesData || filteredSegmentsData
+    // B. Electrical Feeder & Topology Edges (Sơ đồ cấp nguồn Trụ → Cột 100% từ Backend PostGIS, thanh mảnh nằm ĐÈ LÊN TRÊN tuyến đường)
+    const rawInitialFeeders = allTopologyEdges && allTopologyEdges.length > 0 ? allTopologyEdges : (feederLinesData || filteredSegmentsData || [])
+    const initialFeeders = rawInitialFeeders.map((feat: any) => {
+      const p = feat.properties || {}
+      const isFault = p.status === 'fault'
+      return {
+        ...feat,
+        properties: {
+          ...p,
+          status: isFault ? 'fault' : 'active',
+          color: isFault ? '#ef4444' : '#10b981',
+          glow_color: isFault ? '#dc2626' : '#059669',
+        },
+      }
+    })
+
     if (!map.getSource('feeder-lines')) {
       map.addSource('feeder-lines', {
         type: 'geojson',
@@ -95,16 +112,16 @@ export function useFeederLinesLayer({
         id: 'feeder-lines-glow',
         type: 'line',
         source: 'feeder-lines',
-        minzoom: 9.5,
+        minzoom: 8.5,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': [
             'coalesce',
             ['get', 'glow_color'],
-            ['case', ['==', ['get', 'status'], 'fault'], '#e11d48', '#10b981'],
+            ['case', ['==', ['get', 'status'], 'fault'], '#dc2626', '#059669'],
           ],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 13, 4.0, 16, 5.5],
-          'line-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, 0, 12.5, 0.45],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2.0, 12, 3.5, 16, 5.0],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 11.0, 0.45],
           'line-blur': 1.5,
         },
       })
@@ -114,16 +131,16 @@ export function useFeederLinesLayer({
         id: 'feeder-lines-core',
         type: 'line',
         source: 'feeder-lines',
-        minzoom: 9.5,
+        minzoom: 8.5,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-color': [
             'coalesce',
             ['get', 'color'],
-            ['case', ['==', ['get', 'status'], 'fault'], '#f43f5e', '#10b981'],
+            ['case', ['==', ['get', 'status'], 'fault'], '#ef4444', '#10b981'],
           ],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.4, 13, 2.0, 16, 2.8],
-          'line-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, 0, 12.5, 0.95],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.2, 12, 1.8, 16, 2.6],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 11.0, 0.95],
         },
       })
     }
@@ -274,47 +291,97 @@ export function useFeederLinesLayer({
 
     const selCabId = selectedCabinet?.cabinet_id
 
-    if (!selCabId || !cabinetTopologyEdges || cabinetTopologyEdges.length === 0) {
+    // Nguồn dữ liệu: Ưu tiên cabinetTopologyEdges nếu đang click chọn tủ, hoặc nạp toàn bộ allTopologyEdges từ Backend ngay khi mở tab
+    let sourceEdges = (selCabId && cabinetTopologyEdges && cabinetTopologyEdges.length > 0)
+      ? cabinetTopologyEdges
+      : (allTopologyEdges && allTopologyEdges.length > 0)
+      ? allTopologyEdges
+      : cabinetTopologyEdges || []
+
+    // Nếu đang chọn lọc theo tuyến đường cụ thể, chỉ hiển thị các cạnh thuộc tuyến đó
+    if (selectedSegment && selectedSegment !== 'all') {
+      sourceEdges = sourceEdges.filter(
+        (e: any) => e.properties?.segment_id === selectedSegment
+      )
+    }
+
+    if (!sourceEdges || sourceEdges.length === 0) {
       feederSrc.setData({
         type: 'FeatureCollection',
-        features: feederLinesData || filteredSegmentsData || [],
+        features: [],
       })
       return
     }
 
-    const FEEDER_COLOR_PALETTE = [
-      { core: '#10b981', glow: '#059669' }, // Emerald
-      { core: '#3b82f6', glow: '#2563eb' }, // Blue
-      { core: '#f59e0b', glow: '#d97706' }, // Amber
-      { core: '#8b5cf6', glow: '#7c3aed' }, // Purple
-      { core: '#06b6d4', glow: '#0891b2' }, // Cyan
-      { core: '#ec4899', glow: '#db2777' }, // Pink
-      { core: '#f97316', glow: '#ea580c' }, // Orange
-    ]
-
-    const getFeederTheme = (feederId?: string | null) => {
-      if (!feederId) return FEEDER_COLOR_PALETTE[0]
-      let hash = 0
-      for (let i = 0; i < feederId.length; i++) {
-        hash = feederId.charCodeAt(i) + ((hash << 5) - hash)
-      }
-      const index = Math.abs(hash) % FEEDER_COLOR_PALETTE.length
-      return FEEDER_COLOR_PALETTE[index]
+    // Bản đồ trạng thái Tủ điện (Cabinet):
+    const cabinetStatusMap = new Map<string, string>()
+    if (assetCabinets && assetCabinets.length > 0) {
+      assetCabinets.forEach((cab: any) => {
+        if (cab.cabinet_id) {
+          cabinetStatusMap.set(cab.cabinet_id, cab.status || 'active')
+        }
+      })
+    }
+    if (mapCabinets && mapCabinets.length > 0) {
+      mapCabinets.forEach((cab: any) => {
+        const cabId = cab.properties?.cabinet_id
+        if (cabId) {
+          cabinetStatusMap.set(cabId, cab.properties?.status || 'active')
+        }
+      })
+    }
+    if (selectedCabinet?.cabinet_id) {
+      cabinetStatusMap.set(selectedCabinet.cabinet_id, selectedCabinet.status || 'active')
     }
 
-    const features = cabinetTopologyEdges.map((feat: any) => {
+    // Bản đồ Feeder -> Cabinet và Feeder status
+    const feederToCabinetMap = new Map<string, string>()
+    const feederStatusMap = new Map<string, string>()
+    if (assetFeeders && assetFeeders.length > 0) {
+      assetFeeders.forEach((fdr: any) => {
+        if (fdr.feeder_id) {
+          if (fdr.cabinet?.cabinet_id) {
+            feederToCabinetMap.set(fdr.feeder_id, fdr.cabinet.cabinet_id)
+          } else if (fdr.cabinet_id) {
+            feederToCabinetMap.set(fdr.feeder_id, fdr.cabinet_id)
+          }
+          if (fdr.status) {
+            feederStatusMap.set(fdr.feeder_id, fdr.status)
+          }
+        }
+      })
+    }
+
+    // Phân loại chỉ 2 màu:
+    // - Xanh lá cây (#10b981): Đang cấp điện bình thường (active)
+    // - Đỏ (#ef4444): Sự cố / Ngắt nguồn (fault) theo Tủ điện hoặc Feeder
+    const features = sourceEdges.map((feat: any) => {
       const p = feat.properties || {}
-      const isFault = selectedCabinet?.status === 'fault'
-      const theme = getFeederTheme(p.feeder_id)
+      const feederId = p.feeder_id
+      const linkedCabinetId =
+        p.cabinet_id ||
+        (feederId ? feederToCabinetMap.get(feederId) : null) ||
+        (p.order === 1 ? p.from_id : null)
+
+      const cabinetStatus = linkedCabinetId ? cabinetStatusMap.get(linkedCabinetId) : null
+      const feederStatus = feederId ? feederStatusMap.get(feederId) : null
+
+      const isFault =
+        p.status === 'fault' ||
+        feederStatus === 'fault' ||
+        cabinetStatus === 'fault' ||
+        (selectedCabinet?.cabinet_id &&
+          (selectedCabinet.cabinet_id === linkedCabinetId ||
+            selectedCabinet.cabinet_id === p.cabinet_id) &&
+          selectedCabinet.status === 'fault')
+
       return {
         ...feat,
         properties: {
           ...p,
-          cabinet_id: selCabId,
-          cabinet_name: selectedCabinet?.cabinet_name || selCabId,
           status: isFault ? 'fault' : 'active',
-          color: isFault ? '#f43f5e' : theme.core,
-          glow_color: isFault ? '#e11d48' : theme.glow,
+          color: isFault ? '#ef4444' : '#10b981',
+          glow_color: isFault ? '#dc2626' : '#059669',
         },
       }
     })
@@ -323,7 +390,17 @@ export function useFeederLinesLayer({
       type: 'FeatureCollection',
       features,
     })
-  }, [map, isMapLoaded, selectedCabinet, cabinetTopologyEdges, feederLinesData, filteredSegmentsData])
+  }, [
+    map,
+    isMapLoaded,
+    selectedCabinet,
+    cabinetTopologyEdges,
+    allTopologyEdges,
+    mapCabinets,
+    assetCabinets,
+    assetFeeders,
+    selectedSegment,
+  ])
 
   // 3. Update Road Segments Source data
   useEffect(() => {

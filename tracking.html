@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LuxMap Web — Tiến độ</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #09121f; color: #e2e8f0; }
+      body { max-width: 960px; margin: 48px auto; padding: 0 24px; line-height: 1.6; }
+      h1, h2 { color: #5fc4b0; }
+      section { margin: 24px 0; padding: 24px; border: 1px solid #334155; background: #0f172a; }
+      progress { width: 100%; accent-color: #5fc4b0; }
+      code { overflow-wrap: anywhere; }
+      dt { font-weight: 700; margin-top: 12px; }
+      dd { margin-left: 0; }
+    </style>
+  </head>
+  <body>
+    <h1>LuxMap Web — Tiến độ</h1>
+    <p>Giao diện web quản lý tài sản và sự cố chiếu sáng. Bảng này bắt đầu ghi nhận từ ngày 20/10/2026; chưa tổng hợp lịch sử toàn dự án.</p>
+    <section>
+      <h2>Công việc hiện tại</h2>
+      <p>Sửa nền trắng ở ô tài khoản và mật khẩu khi trình duyệt tự điền; làm rõ gợi ý tài khoản.</p>
+      <label for="task-progress">Tiến độ bản sửa mã nguồn: 100%</label>
+      <progress id="task-progress" value="100" max="100">100%</progress>
+      <p>Hoàn tất ngày 20/10/2026: bản sửa <code>6b7a826</code> đã lên Production tại <a href="https://luxmap.com.vn">luxmap.com.vn</a> qua VPS. Vercel chỉ là bản Preview.</p>
+    </section>
+    <section>
+      <h2>Đã hoàn thành</h2>
+      <dl>
+        <dt>20/10/2026 — Giao diện đăng nhập</dt>
+        <dd>Giữ nền tối và chữ trắng khi autofill, dùng chung màu nền cho ô nhập và khung bao. Đổi placeholder thành “Nhập tên đăng nhập hoặc email”.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/login/LoginPage.tsx</code>, <code>src/index.css</code>, <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>fix(auth): preserve dark login autofill and clarify account placeholder</code></dd>
+        <dt>Kiểm chứng</dt>
+        <dd>Chrome headless tái hiện lỗi trước sửa bằng trạng thái :autofill và kiểm tra trực tiếp Production sau sửa: nền tối, chữ trắng, placeholder mới, focus và hiện/ẩn mật khẩu, ảnh desktop 1440×1000 và mobile 390×844. Build production, lint file LoginPage và 120 tests đều đạt. Trang chủ và /map trả đúng bản build mới; /api/v1/auth/me trả 401 khi chưa đăng nhập.</dd>
+        <dt>Bản triển khai</dt>
+        <dd>Build từ <code>7b545d9</code> với <code>VITE_API_URL=/api/v1</code>, rsync hai lượt lên VPS theo mục B của tài liệu backend <code>docs/deploy/update.md</code>. Đã giữ cấu hình bản đồ đang dùng; không thay backend hay database.</dd>
+        <dt>Sao lưu trước triển khai</dt>
+        <dd><code>/home/ubuntu/luxmap-web-before-login-fix-20261020T162140Z.tar.gz</code> trên VPS; đã kiểm tra đọc được archive.</dd>
+      </dl>
+    </section>
+    <section>
+      <h2>Còn lại</h2>
+      <p>Không còn việc chặn bản sửa login. Người đang mở bản cũ tải lại trang bằng Ctrl/Cmd-Shift-R.</p>
+    </section>
+    <section>
+      <h2>Vấn đề đã biết</h2>
+      <p>Chưa kiểm tra Safari/Firefox hoặc đăng nhập bằng tài khoản thật; kiểm tra Production chỉ thao tác giao diện với dữ liệu thử, không gửi yêu cầu đăng nhập.</p>
+    </section>
+  </body>
+</html>

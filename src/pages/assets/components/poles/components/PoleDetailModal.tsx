@@ -1,16 +1,18 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, MapPin, Zap, Lightbulb, AlertTriangle, Bookmark, QrCode, ShieldCheck } from 'lucide-react'
+import { X, MapPin, Lightbulb, AlertTriangle, Bookmark, QrCode } from 'lucide-react'
 import { StatusBadge } from '../../../../../components/StatusBadge'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import type { FixtureStatus } from '../../../../../types/common/enums'
 
 interface PoleDetailModalProps {
   isOpen: boolean
   pole: PoleListItem | null
   segments?: SegmentListItem[]
   cabinets?: CabinetListItem[]
+  fixtureStatus?: FixtureStatus
   onClose: () => void
   onViewQr?: (pole: PoleListItem) => void
 }
@@ -20,6 +22,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
   pole,
   segments = [],
   cabinets = [],
+  fixtureStatus,
   onClose,
   onViewQr,
 }) => {
@@ -31,12 +34,30 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
   const segmentName = seg?.segment_name || (seg?.external_ref ? `Tuyến ${seg.external_ref}` : 'Chưa gắn tuyến')
 
   const cab = cabinets.find(
-    (c) => c.cabinet_id === pole.feeder_id || (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase())
+    (c) =>
+      (pole.cabinet_id && (c.cabinet_id === pole.cabinet_id || c.external_ref === pole.cabinet_id)) ||
+      c.cabinet_id === pole.feeder_id ||
+      (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase()) ||
+      (c.feeder_ids && pole.feeder_id && c.feeder_ids.includes(pole.feeder_id))
   )
-  const feederName = cab?.cabinet_name || cab?.external_ref || 'Chưa gắn tủ'
+  const cabName = cab?.cabinet_name || pole.cabinet_name || cab?.external_ref || 'Chưa gắn tủ'
+  const feederName = pole.feeder_id ? `${cabName} • ${pole.feeder_id}` : cabName
 
   const watt = pole.active_fixture?.lamp_watt || 100
-  const fixtureStatus = pole.active_fixture ? 'normal' : 'out'
+  const lampCount = pole.active_fixture?.lamp_count || 1
+  const totalWatt = watt * lampCount
+
+  // Xác định trạng thái đo sáng trắc quang
+  let displayFixtureStatus: FixtureStatus = fixtureStatus || 'unknown'
+  let displayFixtureLabel: string | undefined = undefined
+
+  if (!pole.active_fixture) {
+    displayFixtureStatus = 'out'
+    displayFixtureLabel = 'Chưa gắn bộ đèn'
+  } else if (!fixtureStatus) {
+    displayFixtureStatus = 'unknown'
+  }
+
   const lat = pole.location?.lat ?? 10.9701
   const lng = pole.location?.lng ?? 106.4896
 
@@ -59,7 +80,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-white text-base">{pole.external_ref}</h3>
-                <StatusBadge type="fixture" status={fixtureStatus} size="sm" />
+                <StatusBadge type="fixture" status={displayFixtureStatus} label={displayFixtureLabel} size="sm" />
               </div>
               <p className="text-xs text-slate-200 dark:text-slate-400 mt-0.5">
                 {segmentName} — {pole.commune_id || 'Củ Chi'}
@@ -69,79 +90,74 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 cursor-pointer"
+            className="w-8 h-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-6 space-y-5 text-xs text-slate-800 dark:text-slate-200 max-h-[75vh] overflow-y-auto">
-          {/* 4 KPI Cards */}
+        {/* Body Info Cards */}
+        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Quick Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xs">
-              <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
-                <Zap className="w-3 h-3 text-amber-500" />
-                <span>Công suất & Nguồn</span>
-              </div>
-              <div className="text-sm font-black text-slate-900 dark:text-slate-100 mt-1">{watt}W</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                {pole.active_fixture?.power_source === 'grid' ? 'Lưới điện 220V' : 'Lưới điện'}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mã bộ đèn</div>
+              <div className="text-sm font-bold font-mono text-slate-800 dark:text-slate-100 mt-1 truncate">
+                {pole.active_fixture?.fixture_id || 'Chưa gắn'}
               </div>
             </div>
-
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xs">
-              <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
-                <Lightbulb className="w-3 h-3 text-blue-500" />
-                <span>Trạng thái bóng</span>
-              </div>
-              <div className="text-sm font-black mt-1 text-emerald-600 dark:text-emerald-400">
-                {pole.active_fixture ? 'Đang hoạt động' : 'Không có bóng'}
-              </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                Mã: {pole.active_fixture?.fixture_id || '—'}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Số bóng / bộ</div>
+              <div className="text-sm font-bold text-blue-600 dark:text-blue-400 mt-1 truncate">
+                {pole.active_fixture ? `${lampCount} bóng` : '—'}
               </div>
             </div>
-
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xs">
-              <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                <span>Bảo hành bóng</span>
-              </div>
-              <div className="mt-1 flex items-center">
-                <StatusBadge
-                  type="warranty"
-                  status={pole.active_fixture?.warranty_status || 'unknown'}
-                  size="sm"
-                />
-              </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
-                Hạn: {pole.active_fixture?.warranty_expiry || '—'}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng công suất</div>
+              <div className="text-sm font-bold text-amber-600 dark:text-amber-400 mt-1">
+                {pole.active_fixture ? (
+                  <>
+                    <span>{totalWatt} W</span>
+                    {lampCount > 1 && (
+                      <span className="text-[10px] text-slate-400 font-normal ml-1">
+                        ({lampCount}x{watt}W)
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  '—'
+                )}
               </div>
             </div>
-
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xs">
-              <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 text-amber-500" />
-                <span>Khu vực nhạy cảm</span>
-              </div>
-              <div className={`text-sm font-black mt-1 ${pole.near_sensitive_poi ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                {pole.near_sensitive_poi ? 'Khu vực nhạy cảm' : 'Bình thường'}
-              </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                Nguồn: {pole.data_source === 'field' ? 'Khảo sát thực địa' : pole.data_source}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bảo hành bộ đèn</div>
+              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                {pole.active_fixture ? (
+                  <>
+                    <StatusBadge
+                      type="warranty"
+                      status={pole.active_fixture.warranty_status || 'unknown'}
+                      size="sm"
+                    />
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Hạn: {pole.active_fixture.warranty_expiry || '—'}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs font-mono text-slate-400">—</span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* GIS Coordinates & Feeder Box */}
-          <div className="p-4 bg-blue-50/60 dark:bg-blue-950/30 rounded-2xl border border-blue-200 dark:border-blue-900/60 space-y-2.5">
-            <div className="font-bold text-blue-950 dark:text-blue-200 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Tọa độ Bản đồ GIS & Đấu nối Tủ điện:</span>
+          {/* Vị trí & Tuyến đường */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">
+                <MapPin className="w-4 h-4 text-blue-500" />
+                <span>Vị trí lắp đặt & Nguồn cấp</span>
               </span>
-              <span className="font-mono text-xs text-blue-700 dark:text-blue-300 font-bold bg-blue-100/70 dark:bg-blue-900/50 px-2 py-0.5 rounded-md">
+              <span className="text-[11px] font-mono text-slate-500">
                 GPS: {lat.toFixed(6)}, {lng.toFixed(6)}
               </span>
             </div>

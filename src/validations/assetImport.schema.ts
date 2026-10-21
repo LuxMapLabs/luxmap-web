@@ -2,6 +2,8 @@ import { z } from 'zod'
 import type { RoadClass, DataSource, FixtureType, PowerSource } from '../types/common/enums'
 import type { PoleListItem, CreatePoleRequest } from '../types/assets/poles'
 import type { CabinetListItem, CreateCabinetRequest } from '../types/assets/cabinets'
+
+import type { FeederListItem, CreateFeederRequest } from '../types/assets/feeders'
 import type { SegmentListItem, CreateSegmentRequest } from '../types/assets/segments'
 import type { CreateFixtureRequest } from '../types/assets/fixtures'
 import type { ManagedFixture } from '../hooks/assets/useAssetData'
@@ -19,7 +21,7 @@ export interface FieldDiff {
 /**
  * UI State thuần túy cho một dòng đối soát dữ liệu nạp
  */
-export interface ItemReview<C extends 'segments' | 'cabinets' | 'fixtures' | 'poles' | 'poles_and_fixtures', T> {
+export interface ItemReview<C extends 'segments' | 'cabinets' | 'feeders' | 'fixtures' | 'poles' | 'poles_and_fixtures', T> {
   category: C
   externalRef: string
   actionType: 'new' | 'updated' | 'unchanged' | 'invalid'
@@ -31,6 +33,8 @@ export interface ItemReview<C extends 'segments' | 'cabinets' | 'fixtures' | 'po
 
 export type SegmentItemReview = ItemReview<'segments', CreateSegmentRequest>
 export type CabinetItemReview = ItemReview<'cabinets', CreateCabinetRequest>
+
+export type FeederItemReview = ItemReview<'feeders', CreateFeederRequest>
 export type FixtureItemReview = ItemReview<'fixtures', CreateFixtureRequest>
 export type PoleItemReview = ItemReview<'poles' | 'poles_and_fixtures', CreatePoleRequest>
 
@@ -40,6 +44,7 @@ export type PoleItemReview = ItemReview<'poles' | 'poles_and_fixtures', CreatePo
 export type ParsedItemReview =
   | SegmentItemReview
   | CabinetItemReview
+  | FeederItemReview
   | FixtureItemReview
   | PoleItemReview
 
@@ -51,6 +56,7 @@ export interface ValidationContext {
   fixtures: ManagedFixture[]
   cabinets: CabinetListItem[]
   segments: SegmentListItem[]
+  feeders?: FeederListItem[]
 }
 
 // ==========================================
@@ -125,17 +131,6 @@ export const poleImportSchema = z.object({
       ...DataSource[],
     ])
     .default('field'),
-  fixture_type: z
-    .enum(['led_road_lamp'] as const satisfies readonly [FixtureType, ...FixtureType[]])
-    .optional(),
-  power_source: z
-    .enum(['grid'] as const satisfies readonly [PowerSource, ...PowerSource[]])
-    .optional(),
-  lamp_watt: z.coerce.number().positive().optional(),
-  warranty_expiry: z.preprocess(
-    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
-    z.string().optional().nullable()
-  ),
   note: z.preprocess(
     (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
     z.string().max(1000, 'Ghi chú không được vượt quá 1000 ký tự').optional().nullable()
@@ -151,6 +146,10 @@ export const fixtureImportSchema = z.object({
     .enum(['grid'] as const satisfies readonly [PowerSource, ...PowerSource[]])
     .default('grid'),
   lamp_watt: z.coerce.number().positive('Công suất đèn (lamp_watt) phải lớn hơn 0'),
+  lamp_count: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null ? 1 : Number(val)),
+    z.number().int().min(1, 'Số lượng bóng phải từ 1 đến 4').max(4, 'Số lượng bóng tối đa là 4').default(1)
+  ),
   install_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày lắp đặt phải theo định dạng YYYY-MM-DD'),
   removed_date: z.preprocess(
     (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
@@ -289,12 +288,12 @@ export const REQUIRED_COLUMNS_BY_CATEGORY: Record<string, { key: string; label: 
  * Validate một dòng dữ liệu CSV tùy theo category, kiểm tra Schema + Ràng buộc quan hệ GIS
  */
 export function validateImportRow(
-  category: 'segments' | 'cabinets' | 'poles' | 'fixtures' | 'poles_and_fixtures',
+  category: 'segments' | 'cabinets' | 'feeders' | 'poles' | 'fixtures' | 'poles_and_fixtures',
   rowObj: Record<string, string>,
   context: ValidationContext,
   rowIndex: number
 ): ParsedItemReview {
-  const { segments, cabinets, poles } = context
+  const { segments, cabinets, poles, feeders = [] } = context
 
   // 0. KIỂM TRA TÍNH TOÀN VẸN 100%: Mọi cột bắt buộc không được để trống bất kỳ ô nào
   const requiredCols = REQUIRED_COLUMNS_BY_CATEGORY[category] || []
@@ -570,6 +569,7 @@ export function validateImportRow(
           fixture_type: (rowObj.fixture_type as FixtureType) || 'led_road_lamp',
           power_source: (rowObj.power_source as PowerSource) || 'grid',
           lamp_watt: parseInt(rowObj.lamp_watt, 10) || 100,
+          lamp_count: parseInt(rowObj.lamp_count, 10) || 1,
           install_date: rowObj.install_date || null,
           removed_date: rowObj.removed_date || null,
           warranty_expiry: rowObj.warranty_expiry || null,
@@ -598,6 +598,7 @@ export function validateImportRow(
           fixture_type: data.fixture_type,
           power_source: data.power_source,
           lamp_watt: data.lamp_watt,
+          lamp_count: data.lamp_count || 1,
           install_date: data.install_date,
           removed_date: data.removed_date || null,
           warranty_expiry: data.warranty_expiry || null,
@@ -615,10 +616,11 @@ export function validateImportRow(
 
     if (!existingFixture) {
       actionType = 'new'
+      const count = data.lamp_count || 1
       diffs.push({
         label: 'Lắp mới',
-        oldVal: 'Chưa có bóng',
-        newVal: `Đèn LED ${data.lamp_watt}W`,
+        oldVal: 'Chưa có bộ đèn',
+        newVal: `Đèn LED ${data.lamp_watt}W (${count} bóng)`,
       })
     } else {
       if (Number(existingFixture.lamp_watt) !== Number(data.lamp_watt)) {
@@ -626,6 +628,15 @@ export function validateImportRow(
           label: 'Công suất đèn',
           oldVal: `${existingFixture.lamp_watt}W`,
           newVal: `${data.lamp_watt}W`,
+        })
+      }
+      const oldLampCount = Number(existingFixture.lamp_count) || 1
+      const newLampCount = Number(data.lamp_count) || 1
+      if (oldLampCount !== newLampCount) {
+        diffs.push({
+          label: 'Số bóng trên bộ đèn',
+          oldVal: `${oldLampCount} bóng`,
+          newVal: `${newLampCount} bóng`,
         })
       }
       if (data.install_date && existingFixture.install_date !== data.install_date) {
@@ -686,6 +697,7 @@ export function validateImportRow(
       fixture_type: data.fixture_type,
       power_source: data.power_source,
       lamp_watt: data.lamp_watt,
+      lamp_count: data.lamp_count || 1,
       install_date: data.install_date,
       removed_date: data.removed_date || null,
       warranty_expiry: data.warranty_expiry || null,
@@ -757,20 +769,50 @@ export function validateImportRow(
     }
   }
 
-  // 2. Kiểm tra ràng buộc Tủ điện (nếu có cung cấp) theo feeder_external_ref
-  let cabObj: CabinetListItem | undefined = undefined
+  // 2. Kiểm tra ràng buộc Mạch điện / Tủ điện (nếu có cung cấp) theo feeder_external_ref
+  let matchedFeeder: FeederListItem | undefined = undefined
+  let matchedCab: CabinetListItem | undefined = undefined
   if (data.feeder_external_ref) {
-    cabObj = cabinets.find(
-      (c) =>
-        (c.external_ref && c.external_ref.toLowerCase() === data.feeder_external_ref!.toLowerCase()) ||
-        (c.cabinet_id && c.cabinet_id.toLowerCase() === data.feeder_external_ref!.toLowerCase())
+    const rawRef = data.feeder_external_ref.trim().toLowerCase()
+    // Tra cứu trong danh mục Mạch điện (feeders)
+    matchedFeeder = feeders.find(
+      (f) =>
+        (f.external_ref && f.external_ref.toLowerCase() === rawRef) ||
+        (f.feeder_id && f.feeder_id.toLowerCase() === rawRef) ||
+        (f.feeder_name && f.feeder_name.toLowerCase() === rawRef)
     )
-    if (!cabObj) {
+
+    // Nếu không tìm thấy theo feeder, tra cứu theo Tủ điện (cabinets)
+    if (!matchedFeeder) {
+      matchedCab = cabinets.find(
+        (c) =>
+          (c.external_ref && c.external_ref.toLowerCase() === rawRef) ||
+          (c.cabinet_id && c.cabinet_id.toLowerCase() === rawRef) ||
+          (c.cabinet_name && c.cabinet_name.toLowerCase() === rawRef)
+      )
+      if (matchedCab) {
+        const cabId = matchedCab.cabinet_id || matchedCab.external_ref
+        matchedFeeder = feeders.find(
+          (f) =>
+            f.cabinet?.cabinet_id === cabId ||
+            (f as any).cabinet_id === cabId ||
+            matchedCab?.feeder_ids?.includes(f.feeder_id || '')
+        )
+      }
+    } else if (matchedFeeder.cabinet?.cabinet_id) {
+      matchedCab = cabinets.find(
+        (c) =>
+          c.cabinet_id === matchedFeeder!.cabinet?.cabinet_id ||
+          c.external_ref === matchedFeeder!.cabinet?.cabinet_id
+      )
+    }
+
+    if (!matchedFeeder && !matchedCab) {
       return {
         category: category as 'poles' | 'poles_and_fixtures',
         externalRef: data.external_ref,
         actionType: 'invalid',
-        errorMsg: `Tủ điện [${data.feeder_external_ref}] chưa có trong hệ thống GIS. Cần có Tủ điện trước khi nạp Cột!`,
+        errorMsg: `Mạch/Tủ điện [${data.feeder_external_ref}] chưa có trong hệ thống GIS. Vui lòng kiểm tra lại mã lộ hoặc nạp Mạch/Tủ trước!`,
         data: {
           external_ref: data.external_ref,
           segment_id: segObj.segment_id || data.segment_external_ref,
@@ -792,10 +834,6 @@ export function validateImportRow(
   )
 
   const segName = segObj.segment_name || data.segment_external_ref
-  const watt = data.lamp_watt || existingPole?.active_fixture?.lamp_watt || 100
-  const powerSource = data.power_source || existingPole?.active_fixture?.power_source || 'grid'
-  const fixtureType = data.fixture_type || existingPole?.active_fixture?.fixture_type || 'led_road_lamp'
-  const warrantyExpiry = data.warranty_expiry || existingPole?.active_fixture?.warranty_expiry || null
 
   let actionType: 'new' | 'updated' | 'unchanged' = 'new'
   const diffs: FieldDiff[] = []
@@ -805,7 +843,7 @@ export function validateImportRow(
     diffs.push({
       label: 'Đăng ký mới',
       oldVal: 'Chưa có trên GIS',
-      newVal: `Tạo mới (${watt}W, ${segName})`,
+      newVal: `Tạo mới (${segName}${matchedFeeder?.feeder_name ? ` • ${matchedFeeder.feeder_name}` : ''})`,
     })
   } else {
     // 1. So sánh Tọa độ GIS
@@ -831,55 +869,43 @@ export function validateImportRow(
       })
     }
 
-    // 3. So sánh Tủ điện quản lý
+    // 3. So sánh Mạch điện & Tủ điện cấp nguồn
     const currentFeederId = existingPole.feeder_id || null
-    const newFeederId = cabObj?.cabinet_id || null
-    if (data.feeder_external_ref && currentFeederId !== newFeederId) {
-      const oldCab = cabinets.find((c) => c.cabinet_id === currentFeederId || c.external_ref === currentFeederId)
+    const effectiveNewFeederId =
+      matchedFeeder?.feeder_id ||
+      matchedFeeder?.external_ref ||
+      matchedCab?.cabinet_id ||
+      data.feeder_external_ref ||
+      null
+
+    if (data.feeder_external_ref && currentFeederId !== effectiveNewFeederId) {
+      const oldFeeder = feeders.find(
+        (f) => f.feeder_id === currentFeederId || f.external_ref === currentFeederId
+      )
+      const oldCab = cabinets.find(
+        (c) => c.cabinet_id === existingPole.cabinet_id || c.external_ref === existingPole.cabinet_id
+      )
+      const oldLabel =
+        oldFeeder?.feeder_name ||
+        (oldCab
+          ? `Tủ ${oldCab.cabinet_name || oldCab.external_ref}`
+          : currentFeederId
+          ? `Lộ ${currentFeederId}`
+          : 'Chưa gán mạch')
+      const newLabel =
+        matchedFeeder?.feeder_name ||
+        (matchedCab
+          ? `Tủ ${matchedCab.cabinet_name || matchedCab.external_ref}`
+          : `Lộ ${data.feeder_external_ref}`)
+
       diffs.push({
-        label: 'Tủ điện quản lý',
-        oldVal: oldCab?.cabinet_name || (currentFeederId ? `Tủ ${currentFeederId}` : 'Chưa gán tủ'),
-        newVal: cabObj?.cabinet_name || `Tủ ${data.feeder_external_ref}`,
+        label: 'Mạch điện cấp nguồn',
+        oldVal: oldLabel,
+        newVal: newLabel,
       })
     }
 
-    // 4. So sánh Công suất đèn
-    if (data.lamp_watt && Number(existingPole.active_fixture?.lamp_watt) !== Number(data.lamp_watt)) {
-      diffs.push({
-        label: 'Công suất đèn',
-        oldVal: `${existingPole.active_fixture?.lamp_watt ?? 100}W`,
-        newVal: `${data.lamp_watt}W`,
-      })
-    }
-
-    // 5. So sánh Nguồn điện
-    if (data.power_source && existingPole.active_fixture?.power_source !== data.power_source) {
-      diffs.push({
-        label: 'Nguồn điện',
-        oldVal: existingPole.active_fixture?.power_source === 'grid' ? 'Lưới điện' : 'Năng lượng MT',
-        newVal: data.power_source === 'grid' ? 'Lưới điện' : 'Năng lượng MT',
-      })
-    }
-
-    // 6. So sánh Loại bóng đèn
-    if (data.fixture_type && existingPole.active_fixture?.fixture_type !== data.fixture_type) {
-      diffs.push({
-        label: 'Loại bóng đèn',
-        oldVal: existingPole.active_fixture?.fixture_type || 'Chưa phân loại',
-        newVal: data.fixture_type,
-      })
-    }
-
-    // 7. So sánh Hạn bảo hành
-    if (data.warranty_expiry && existingPole.active_fixture?.warranty_expiry !== data.warranty_expiry) {
-      diffs.push({
-        label: 'Hạn bảo hành',
-        oldVal: existingPole.active_fixture?.warranty_expiry || 'Chưa thiết lập',
-        newVal: data.warranty_expiry,
-      })
-    }
-
-    // 8. So sánh Khu vực nhạy cảm (POI)
+    // 4. So sánh Khu vực nhạy cảm (POI)
     if (data.near_sensitive_poi !== undefined && existingPole.near_sensitive_poi !== data.near_sensitive_poi) {
       diffs.push({
         label: 'Khu vực nhạy cảm (POI)',
@@ -888,7 +914,7 @@ export function validateImportRow(
       })
     }
 
-    // 9. So sánh Ghi chú hiện trường
+    // 5. So sánh Ghi chú hiện trường
     const incomingNote = data.note !== undefined ? data.note?.trim() || null : null
     const currentNote = existingPole.note?.trim() || null
     if (incomingNote !== null && incomingNote !== currentNote) {
@@ -905,7 +931,12 @@ export function validateImportRow(
   const poleDto: CreatePoleRequest = {
     external_ref: data.external_ref,
     segment_id: segObj.segment_id || data.segment_external_ref,
-    feeder_id: cabObj?.cabinet_id || data.feeder_external_ref || null,
+    feeder_id:
+      matchedFeeder?.feeder_id ||
+      matchedFeeder?.external_ref ||
+      matchedCab?.cabinet_id ||
+      data.feeder_external_ref ||
+      null,
     commune_id: data.commune_id,
     geom_wkt: data.geom_wkt,
     near_sensitive_poi: data.near_sensitive_poi,
@@ -913,26 +944,12 @@ export function validateImportRow(
     note: data.note || existingPole?.note || null,
   }
 
-  const fixtureDto: CreateFixtureRequest | undefined =
-    data.lamp_watt || data.fixture_type || data.power_source || data.warranty_expiry
-      ? {
-          pole_id: existingPole?.pole_id || null,
-          fixture_type: fixtureType,
-          power_source: powerSource,
-          lamp_watt: watt,
-          install_date: new Date().toISOString().split('T')[0],
-          removed_date: null,
-          warranty_expiry: warrantyExpiry || null,
-          data_source: data.data_source,
-        }
-      : undefined
-
   return {
     category: category as 'poles' | 'poles_and_fixtures',
     externalRef: data.external_ref,
     actionType,
     data: poleDto,
-    fixtureData: fixtureDto,
+    fixtureData: undefined,
     diffs,
   }
 }

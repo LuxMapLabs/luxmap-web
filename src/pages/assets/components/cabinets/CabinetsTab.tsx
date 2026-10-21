@@ -214,6 +214,7 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
         isOpen={!!editCabinet}
         cabinet={editCabinet}
         availableSegments={segments}
+        availableCabinets={cabinets}
         onClose={() => setEditCabinet(null)}
         onSave={handleSaveCabinet}
       />

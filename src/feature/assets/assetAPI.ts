@@ -12,6 +12,12 @@ import type {
   CabinetDetail,
 } from '../../types/assets/cabinets'
 import type {
+  FeederListItemPagedResult,
+  CreateFeederRequest,
+  UpdateFeederRequest,
+  FeederDetail,
+} from '../../types/assets/feeders'
+import type {
   PoleListItemPagedResult,
   CreatePoleRequest,
   UpdatePoleRequest,
@@ -20,8 +26,16 @@ import type {
   CreateFixtureRequest,
   RetireFixtureRequest,
 } from '../../types/assets/fixtures'
+import type {
+  IotNodeItemPagedResult,
+  IotNodeItem,
+  CreateIotNodeRequest,
+  UpdateIotNodeRequest,
+  SetRelayRequest,
+  IotNodeCredential,
+} from '../../types/assets/iot-nodes'
 
-export type ImportAssetCategory = 'segments' | 'cabinets' | 'poles' | 'fixtures' | 'poles_and_fixtures'
+export type ImportAssetCategory = 'segments' | 'cabinets' | 'feeders' | 'poles' | 'fixtures' | 'poles_and_fixtures'
 
 export interface AssetQueryParams {
   page?: number
@@ -58,6 +72,48 @@ export const assetAPI = {
   },
 
   /**
+   * Lấy danh sách Mạch điện (Feeders)
+   * GET /api/v1/assets/feeders
+   */
+  getFeeders: async (params?: AssetQueryParams): Promise<FeederListItemPagedResult> => {
+    const response = await apiClient.get<FeederListItemPagedResult>('/assets/feeders', { params })
+    return response.data
+  },
+
+  /**
+   * Lấy chi tiết Mạch điện
+   * GET /api/v1/assets/feeders/{feederId}
+   */
+  getFeederDetail: async (feederId: string): Promise<FeederDetail> => {
+    const response = await apiClient.get<FeederDetail>(`/assets/feeders/${encodeURIComponent(feederId)}`)
+    return response.data
+  },
+
+  /**
+   * Thêm mới Mạch điện
+   * POST /api/v1/assets/feeders
+   */
+  createFeeder: async (data: CreateFeederRequest): Promise<void> => {
+    await apiClient.post('/assets/feeders', data)
+  },
+
+  /**
+   * Cập nhật Mạch điện
+   * PUT /api/v1/assets/feeders/{feederId}
+   */
+  updateFeeder: async (feederId: string, data: UpdateFeederRequest): Promise<void> => {
+    await apiClient.put(`/assets/feeders/${encodeURIComponent(feederId)}`, data)
+  },
+
+  /**
+   * Xóa Mạch điện
+   * DELETE /api/v1/assets/feeders/{feederId}
+   */
+  deleteFeeder: async (feederId: string): Promise<void> => {
+    await apiClient.delete(`/assets/feeders/${encodeURIComponent(feederId)}`)
+  },
+
+  /**
    * Lấy danh sách Cột điện chiếu sáng
    * GET /api/v1/assets/poles
    */
@@ -86,8 +142,14 @@ export const assetAPI = {
    * Thêm mới Tủ điện
    * POST /api/v1/assets/cabinets
    */
-  createCabinet: async (data: CreateCabinetRequest): Promise<void> => {
-    await apiClient.post('/assets/cabinets', data)
+  createCabinet: async (data: CreateCabinetRequest): Promise<string | null> => {
+    const response = await apiClient.post('/assets/cabinets', data)
+    const loc = (response.headers?.location || response.headers?.Location) as string | undefined
+    if (loc) {
+      const parts = loc.split('/')
+      return parts[parts.length - 1] || null
+    }
+    return null
   },
 
   /**
@@ -157,6 +219,19 @@ export const assetAPI = {
   },
 
   /**
+   * Nạp danh mục Mạch điện qua CSV
+   * POST /api/v1/assets/import/feeders
+   */
+  importFeeders: async (file: File): Promise<ImportResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post<ImportResult>('/assets/import/feeders', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+
+  /**
    * Nạp danh mục Cột điện chiếu sáng qua CSV
    * POST /api/v1/assets/import/poles
    */
@@ -179,6 +254,71 @@ export const assetAPI = {
     const response = await apiClient.post<ImportResult>('/assets/import/fixtures', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
+    return response.data
+  },
+
+  /**
+   * Lấy danh sách Thiết bị IoT
+   * GET /api/v1/assets/iot-nodes
+   */
+  getIotNodes: async (params?: AssetQueryParams): Promise<IotNodeItemPagedResult> => {
+    const response = await apiClient.get<IotNodeItemPagedResult>('/assets/iot-nodes', { params })
+    return response.data
+  },
+
+  /**
+   * Lấy chi tiết Thiết bị IoT
+   * GET /api/v1/assets/iot-nodes/{nodeId}
+   */
+  getIotNodeDetail: async (nodeId: string): Promise<IotNodeItem> => {
+    const response = await apiClient.get<IotNodeItem>(`/assets/iot-nodes/${encodeURIComponent(nodeId)}`)
+    return response.data
+  },
+
+  /**
+   * Đăng ký Thiết bị IoT mới
+   * POST /api/v1/assets/iot-nodes
+   */
+  createIotNode: async (data: CreateIotNodeRequest): Promise<string | null> => {
+    const response = await apiClient.post('/assets/iot-nodes', data)
+    const loc = (response.headers?.location || response.headers?.Location) as string | undefined
+    if (loc) {
+      const parts = loc.split('/')
+      return parts[parts.length - 1] || null
+    }
+    return null
+  },
+
+  /**
+   * Cập nhật Thiết bị IoT
+   * PUT /api/v1/assets/iot-nodes/{nodeId}
+   */
+  updateIotNode: async (nodeId: string, data: UpdateIotNodeRequest): Promise<void> => {
+    await apiClient.put(`/assets/iot-nodes/${encodeURIComponent(nodeId)}`, data)
+  },
+
+  /**
+   * Xóa Thiết bị IoT
+   * DELETE /api/v1/assets/iot-nodes/{nodeId}
+   */
+  deleteIotNode: async (nodeId: string): Promise<void> => {
+    await apiClient.delete(`/assets/iot-nodes/${encodeURIComponent(nodeId)}`)
+  },
+
+  /**
+   * Đấu nối hoặc hủy nối Rơ-le của Thiết bị IoT
+   * PUT /api/v1/assets/iot-nodes/{nodeId}/relays/{relayNo}
+   */
+  setIotNodeRelay: async (nodeId: string, relayNo: number, data: SetRelayRequest): Promise<void> => {
+    await apiClient.put(`/assets/iot-nodes/${encodeURIComponent(nodeId)}/relays/${relayNo}`, data)
+  },
+
+  /**
+   * Cấp phát Secret xác thực mới cho Thiết bị IoT
+   * POST /api/v1/assets/iot-nodes/{nodeId}/credential
+   */
+  issueIotNodeCredential: async (nodeId: string): Promise<IotNodeCredential> => {
+    const response = await apiClient.post<IotNodeCredential>(`/assets/iot-nodes/${encodeURIComponent(nodeId)}/credential`)
     return response.data
   },
 }
