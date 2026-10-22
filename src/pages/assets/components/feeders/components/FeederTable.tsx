@@ -1,7 +1,6 @@
 import React from 'react'
 import { Eye, Edit2, Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
-import { formatCommuneDisplayName } from '../../../../../constants/communes'
 
 export interface FeederTableProps {
   feeders: FeederListItem[]
@@ -56,7 +55,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
               <th className="py-3 px-4">Mã Mạch</th>
               <th className="py-3 px-4">Tên Mạch Xuất Tuyến</th>
               <th className="py-3 px-4">Tủ Điện Cấp Nguồn</th>
-              <th className="py-3 px-4">Khu Vực Quản Lý</th>
+              <th className="py-3 px-4">Địa bàn</th>
               <th className="py-3 px-4 text-center">Số Cột Đèn</th>
               <th className="py-3 px-4 text-center">Tuyến Cáp (GIS)</th>
               <th className="py-3 px-4 text-right">Thao Tác</th>
@@ -113,11 +112,11 @@ export const FeederTable: React.FC<FeederTableProps> = ({
                     )}
                   </td>
 
-                  {/* Khu Vực */}
+                  {/* Địa bàn */}
                   <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>{formatCommuneDisplayName(feeder.commune_id || '')}</span>
+                      <span>{feeder.commune_name || feeder.commune_id || '—'}</span>
                     </div>
                   </td>
 

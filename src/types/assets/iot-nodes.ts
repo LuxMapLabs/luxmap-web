@@ -20,6 +20,7 @@ export interface IotNodeItem {
     node_id: string | null
     cabinet_id: string | null
     commune_id: string | null
+    commune_name?: string | null
     node_role: NodeRole
     data_source: DataSource
     supports_remote_control: boolean

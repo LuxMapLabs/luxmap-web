@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
-import { formatCommuneDisplayName } from '../../../../../constants/communes'
 
 export interface IotNodeDetailModalProps {
   isOpen: boolean
@@ -114,11 +113,13 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
                 <span>Khu Vực Quản Lý</span>
               </div>
               <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                {formatCommuneDisplayName(node.commune_id)}
+                {node.commune_name || node.commune_id || 'Chưa gán địa bàn'}
               </div>
-              <div className="text-[11px] font-mono text-slate-400">
-                Mã xã: {node.commune_id}
-              </div>
+              {node.commune_id && node.commune_name && (
+                <div className="text-[11px] font-mono text-slate-400">
+                  Mã địa bàn: {node.commune_id}
+                </div>
+              )}
             </div>
 
             {/* Nguồn dữ liệu & Điều khiển */}

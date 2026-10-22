@@ -176,7 +176,9 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                         <span className="text-slate-400 dark:text-slate-500 font-mono">—</span>
                       )}
                     </td>
-                    <td className="p-3.5 text-slate-500 dark:text-slate-300">{pole.commune_id || 'Củ Chi'}</td>
+                    <td className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">
+                      {pole.commune_name || pole.commune_id || '—'}
+                    </td>
                     <td className="p-3.5">
                       {pole.active_fixture ? (
                         (() => {
