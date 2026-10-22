@@ -18,8 +18,7 @@ export interface EditCabinetModalProps {
   onSave: (updated: CabinetListItem) => void
 }
 
-export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
-  isOpen,
+const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: CabinetListItem }> = ({
   cabinet,
   availableSegments = [],
   availableCabinets = [],
@@ -28,23 +27,23 @@ export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
 }) => {
   const mapSegments = useSelector((state: RootState) => state.map.segments)
 
-  const [cabinetName, setCabinetName] = useState(() => cabinet?.cabinet_name || '')
-  const [externalRef, setExternalRef] = useState(() => cabinet?.external_ref || '')
-  const [lat, setLat] = useState(() => (cabinet?.location?.lat ? String(cabinet.location.lat) : '10.9701'))
-  const [lng, setLng] = useState(() => (cabinet?.location?.lng ? String(cabinet.location.lng) : '106.4896'))
-  const [dataSource, setDataSource] = useState<DataSource>(() => cabinet?.data_source || 'field')
+  const [cabinetName, setCabinetName] = useState(() => cabinet.cabinet_name || '')
+  const [externalRef, setExternalRef] = useState(() => cabinet.external_ref || '')
+  const [lat, setLat] = useState(() => (cabinet.location?.lat ? String(cabinet.location.lat) : '10.9701'))
+  const [lng, setLng] = useState(() => (cabinet.location?.lng ? String(cabinet.location.lng) : '106.4896'))
+  const [dataSource, setDataSource] = useState<DataSource>(() => cabinet.data_source || 'field')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    if (cabinet && isOpen) {
+    if (cabinet) {
       setCabinetName(cabinet.cabinet_name || '')
       setExternalRef(cabinet.external_ref || '')
-      setLat(cabinet.location?.lat ? String(cabinet.location.lat) : '10.9701')
-      setLng(cabinet.location?.lng ? String(cabinet.location.lng) : '106.4896')
+      if (cabinet.location?.lat) setLat(String(cabinet.location.lat))
+      if (cabinet.location?.lng) setLng(String(cabinet.location.lng))
       setDataSource(cabinet.data_source || 'field')
       setErrorMsg(null)
     }
-  }, [cabinet, isOpen])
+  }, [cabinet])
 
   // Trích xuất tuyến đường lân cận nếu tủ có liên kết tuyến
   const segmentCoords = useMemo<[number, number][]>(() => {
@@ -76,8 +75,6 @@ export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
 
     return []
   }, [availableSegments, cabinet, mapSegments])
-
-  if (!isOpen || !cabinet) return null
 
   const parsedLat = parseFloat(lat) || 10.9701
   const parsedLng = parseFloat(lng) || 106.4896
@@ -294,6 +291,7 @@ export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
             {/* CỘT PHẢI (~60%): BẢN ĐỒ VỆ TINH GIS ĐỊNH VỊ */}
             <div className="md:col-span-7 h-[380px] md:h-full relative overflow-hidden bg-slate-950">
               <EditCabinetMap
+                key={cabinet?.cabinet_id || cabinet?.external_ref || 'edit-cabinet-map'}
                 lat={parsedLat}
                 lng={parsedLng}
                 currentCabinetId={cabinet?.cabinet_id}
@@ -312,5 +310,16 @@ export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
       </div>
     </div>,
     document.body
+  )
+}
+
+export const EditCabinetModal: React.FC<EditCabinetModalProps> = (props) => {
+  if (!props.isOpen || !props.cabinet) return null
+  return (
+    <EditCabinetModalInner
+      key={props.cabinet.cabinet_id || props.cabinet.external_ref || 'edit-cabinet-dialog'}
+      {...props}
+      cabinet={props.cabinet}
+    />
   )
 }

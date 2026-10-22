@@ -383,7 +383,7 @@ export const resolveNonOverlappingRoutePoint = (
   rawLat: number,
   coords: [number, number][],
   obstaclePoints: [number, number][],
-  minClearance: number = 15
+  minClearance: number = 2
 ): [number, number] => {
   if (!coords || coords.length < 2) return [rawLng, rawLat]
 

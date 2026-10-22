@@ -14,6 +14,7 @@ import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
+import { DEFAULT_MAP_CENTER } from '../../../../../utils/gis-map/mapUtils'
 import { EditPoleMap } from './EditPoleMap'
 
 export interface EditPoleModalProps {
@@ -26,8 +27,7 @@ export interface EditPoleModalProps {
   onSave: (updatedPole: PoleListItem) => void
 }
 
-export const EditPoleModal: React.FC<EditPoleModalProps> = ({
-  isOpen,
+const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> = ({
   pole,
   segments = [],
   cabinets = [],
@@ -35,35 +35,59 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
   onClose,
   onSave,
 }) => {
-  // Lấy danh sách layer tuyến đường PostGIS từ Redux store
-  const mapSegments = useSelector((state: RootState) => state.map.segments)
+  // Lấy danh sách layer tuyến đường PostGIS và mapBounds từ Redux store
+  const mapSegments = useSelector((state: RootState) => state?.map?.segments ?? [])
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
 
-  // Form State
-  const [externalRef, setExternalRef] = useState('')
-  const [segmentId, setSegmentId] = useState('')
-  const [cabinetId, setCabinetId] = useState('')
-  const [selectedFeederId, setSelectedFeederId] = useState('')
-  const [nearSensitivePoi, setNearSensitivePoi] = useState(false)
-  const [noteText, setNoteText] = useState('')
-  const [lat, setLat] = useState<number>(0)
-  const [lng, setLng] = useState<number>(0)
+  const fallbackLat =
+    typeof mapBounds?.center?.lat === 'number' && Number.isFinite(mapBounds.center.lat)
+      ? mapBounds.center.lat
+      : DEFAULT_MAP_CENTER[1]
+  const fallbackLng =
+    typeof mapBounds?.center?.lng === 'number' && Number.isFinite(mapBounds.center.lng)
+      ? mapBounds.center.lng
+      : DEFAULT_MAP_CENTER[0]
+
+  const initialLat =
+    typeof pole.location?.lat === 'number' && Number.isFinite(pole.location.lat) && pole.location.lat !== 0
+      ? pole.location.lat
+      : fallbackLat
+  const initialLng =
+    typeof pole.location?.lng === 'number' && Number.isFinite(pole.location.lng) && pole.location.lng !== 0
+      ? pole.location.lng
+      : fallbackLng
+
+  // Form State khởi tạo trực tiếp từ dữ liệu thực tế của cột đang sửa
+  const [externalRef, setExternalRef] = useState(pole.external_ref || '')
+  const [segmentId, setSegmentId] = useState(pole.segment_id || '')
+  const [cabinetId, setCabinetId] = useState(pole.cabinet_id || '')
+  const [selectedFeederId, setSelectedFeederId] = useState(pole.feeder_id || '')
+  const [nearSensitivePoi, setNearSensitivePoi] = useState(Boolean(pole.near_sensitive_poi))
+  const [noteText, setNoteText] = useState(pole.note || '')
+  const [lat, setLat] = useState<number>(initialLat)
+  const [lng, setLng] = useState<number>(initialLng)
 
   // Danh sách mạch điện từ Redux store
   const allFeeders = useSelector((state: RootState) => state.assets.feeders)
 
-  // Khởi tạo state khi mở modal hoặc thay đổi pole
+  // Đồng bộ lại state nếu pole object thay đổi từ ngoài
   useEffect(() => {
-    if (pole && isOpen) {
+    if (pole) {
       setExternalRef(pole.external_ref || '')
       setSegmentId(pole.segment_id || '')
       setCabinetId(pole.cabinet_id || '')
       setSelectedFeederId(pole.feeder_id || '')
       setNearSensitivePoi(Boolean(pole.near_sensitive_poi))
       setNoteText(pole.note || '')
-      setLat(pole.location?.lat ?? 10.9725)
-      setLng(pole.location?.lng ?? 106.492)
+
+      if (typeof pole.location?.lat === 'number' && Number.isFinite(pole.location.lat) && pole.location.lat !== 0) {
+        setLat(pole.location.lat)
+      }
+      if (typeof pole.location?.lng === 'number' && Number.isFinite(pole.location.lng) && pole.location.lng !== 0) {
+        setLng(pole.location.lng)
+      }
     }
-  }, [pole, isOpen])
+  }, [pole])
 
   // Trích xuất tuyến đường chiếu sáng (Polyline Coordinates)
   const segmentCoords = useMemo<[number, number][]>(() => {
@@ -239,8 +263,6 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
       setSelectedFeederId('')
     }
   }, [availableFeeders, selectedFeederId])
-
-  if (!isOpen || !pole) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -477,6 +499,7 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
 
             {/* CỘT PHẢI: BẢN ĐỒ GIS THEO NGỮ CẢNH (58% width trên md) */}
             <EditPoleMap
+              key={pole.pole_id || pole.external_ref || 'edit-pole-map'}
               lat={lat}
               lng={lng}
               segmentCoords={segmentCoords}
@@ -510,6 +533,17 @@ export const EditPoleModal: React.FC<EditPoleModalProps> = ({
       </div>
     </div>,
     document.body
+  )
+}
+
+export const EditPoleModal: React.FC<EditPoleModalProps> = (props) => {
+  if (!props.isOpen || !props.pole) return null
+  return (
+    <EditPoleModalInner
+      key={props.pole.pole_id || props.pole.external_ref || 'edit-pole-dialog'}
+      {...props}
+      pole={props.pole}
+    />
   )
 }
 

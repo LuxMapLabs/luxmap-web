@@ -2,10 +2,13 @@ import React, { useEffect, useRef, useState, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers, Crosshair, Eye, EyeOff } from 'lucide-react'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
+  applyMapBoundsLimits,
 } from '../../../../../utils/gis-map/mapUtils'
 
 export interface EditCabinetMapProps {
@@ -31,6 +34,8 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null)
   const currentCabinetMarkerRef = useRef<maplibregl.Marker | null>(null)
   const otherMarkersRef = useRef<maplibregl.Marker[]>([])
+
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
 
   const [showOtherCabinets, setShowOtherCabinets] = useState(false)
 
@@ -67,17 +72,22 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     let isMounted = true
 
-    // Xác định tâm chính xác ngay tại vị trí tủ điện
-    const initialCenter: [number, number] =
-      Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0
-        ? [lng, lat]
-        : DEFAULT_MAP_CENTER
+    // Xác định tâm chính xác ngay tại vị trí tủ điện hoặc từ mapBounds Backend
+    const isCoordValid = Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0
+    const initialCenter: [number, number] = isCoordValid
+      ? [lng, lat]
+      : typeof mapBounds?.center?.lng === 'number' &&
+        typeof mapBounds?.center?.lat === 'number' &&
+        Number.isFinite(mapBounds.center.lng) &&
+        Number.isFinite(mapBounds.center.lat)
+      ? [mapBounds.center.lng, mapBounds.center.lat]
+      : DEFAULT_MAP_CENTER
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
-      zoom: 18, // Cận cảnh thực địa rõ nét
+      zoom: isCoordValid ? 18 : 15, // Cận cảnh thực địa rõ nét
       maxZoom: 20,
       pitch: 0,
       bearing: 0,
@@ -85,6 +95,16 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.resize()
+        }
+      })
+      resizeObserver.observe(mapContainerRef.current)
+    }
 
     // Marker Tủ điện màu tím nổi bật có tia sét ⚡ kéo thả định vị
     const markerEl = document.createElement('div')
@@ -156,14 +176,15 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     map.on('load', () => {
       if (!isMounted) return
 
+      applyMapBoundsLimits(map, mapBounds)
+
       setTimeout(() => {
         map.resize()
-        // Focus thẳng vào vị trí tủ điện khi load xong
+        // Focus thẳng 100% vào vị trí tủ điện khi load xong
         if (Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0) {
-          map.flyTo({
+          map.jumpTo({
             center: [lng, lat],
             zoom: 18,
-            essential: true,
           })
         }
       }, 150)
@@ -208,6 +229,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     return () => {
       isMounted = false
+      resizeObserver?.disconnect()
       marker.remove()
       otherMarkersRef.current.forEach((m) => m.remove())
       otherMarkersRef.current = []
@@ -215,9 +237,16 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       mapRef.current = null
       currentCabinetMarkerRef.current = null
     }
-  }, []) // Chỉ khởi tạo 1 lần
+  }, [mapBounds]) // Chỉ khởi tạo 1 lần
 
-  // Tự động focus camera ngay vào vị trí tủ điện khi mở modal hoặc thay đổi tủ
+  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  useEffect(() => {
+    if (mapRef.current) {
+      applyMapBoundsLimits(mapRef.current, mapBounds)
+    }
+  }, [mapBounds])
+
+  // Tự động focus camera và dời ghim ngay vào vị trí tủ điện khi mở modal hoặc thay đổi tọa độ
   useEffect(() => {
     if (
       mapRef.current &&
@@ -226,35 +255,22 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       lng !== 0 &&
       lat !== 0
     ) {
+      if (currentCabinetMarkerRef.current) {
+        const currentPos = currentCabinetMarkerRef.current.getLngLat()
+        if (
+          Math.abs(currentPos.lng - lng) > 0.000001 ||
+          Math.abs(currentPos.lat - lat) > 0.000001
+        ) {
+          currentCabinetMarkerRef.current.setLngLat([lng, lat])
+        }
+      }
       mapRef.current.flyTo({
         center: [lng, lat],
         zoom: 18,
         essential: true,
       })
-      if (currentCabinetMarkerRef.current) {
-        currentCabinetMarkerRef.current.setLngLat([lng, lat])
-      }
     }
-  }, [currentCabinetId])
-
-  // Cập nhật vị trí ghim khi lat/lng thay đổi từ input
-  useEffect(() => {
-    if (
-      currentCabinetMarkerRef.current &&
-      Number.isFinite(lng) &&
-      Number.isFinite(lat) &&
-      lng !== 0 &&
-      lat !== 0
-    ) {
-      const currentPos = currentCabinetMarkerRef.current.getLngLat()
-      if (
-        Math.abs(currentPos.lng - lng) > 0.000001 ||
-        Math.abs(currentPos.lat - lat) > 0.000001
-      ) {
-        currentCabinetMarkerRef.current.setLngLat([lng, lat])
-      }
-    }
-  }, [lat, lng])
+  }, [lng, lat, currentCabinetId])
 
   // Đồng bộ markers các tủ lân cận (chỉ hiển thị khi người dùng bật xem)
   useEffect(() => {
