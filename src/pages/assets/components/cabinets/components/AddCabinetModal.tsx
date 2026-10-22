@@ -13,7 +13,6 @@ import {
   MapPin,
   HelpCircle,
 } from 'lucide-react'
-import { DatePicker } from '../../../../../components/DatePicker'
 import { AddCabinetMap } from './AddCabinetMap'
 import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
 import { fetchMapLayersRequest } from '../../../../../feature/map/mapSlice'
@@ -53,12 +52,8 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
   // Map segments from Redux for real GIS line
   const mapSegments = useSelector((state: RootState) => state.map.segments)
 
-  // Top Section: Segment, Date
+  // Top Section: Segment (Tùy chọn)
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
-  const [installedDateStr, setInstalledDateStr] = useState(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })
 
   // Cabinets Rows Draft List
   const [rows, setRows] = useState<CabinetRowDraft[]>([])
@@ -97,19 +92,6 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
     return []
   }, [selectedSegmentId, mapSegments, currentSegment])
 
-  // DatePicker handler
-  const installedDate = installedDateStr ? new Date(installedDateStr.replace(/-/g, '/')) : null
-  const handleDateChange = (date: Date | null) => {
-    if (date) {
-      const y = date.getFullYear()
-      const m = String(date.getMonth() + 1).padStart(2, '0')
-      const d = String(date.getDate()).padStart(2, '0')
-      setInstalledDateStr(`${y}-${m}-${d}`)
-    } else {
-      setInstalledDateStr('')
-    }
-  }
-
   // Handle Segment Change: recalculate IDs
   const handleSegmentChange = (newSegmentId: string) => {
     setSelectedSegmentId(newSegmentId)
@@ -127,8 +109,8 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
         const letter = String.fromCharCode(65 + idx)
         return {
           ...row,
-          cabinet_id: `CAB-${segCode}-${letter}`,
-          cabinet_name: `Tủ ${letter} - ${segName}`,
+          cabinet_id: newSegmentId ? `CAB-${segCode}-${letter}` : `CAB-${letter}`,
+          cabinet_name: newSegmentId ? `Tủ ${letter} - ${segName}` : `Tủ điện ${letter}`,
         }
       })
     )
@@ -148,20 +130,19 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
   const handleAddRow = useCallback((coords?: { lat: number; lng: number }) => {
     setErrorMsg(null)
 
-    if (!selectedSegmentId) {
-      setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1 trước khi thêm tủ điện!')
-      return
-    }
-
     const nextIndex = rows.length
     const letter = String.fromCharCode(65 + (nextIndex % 26))
 
-    let segCode = 'TL8'
-    if (resolvedSegmentName.includes('Nguyễn Văn Ni') || selectedSegmentId.includes('002')) segCode = 'NVN'
-    else if (resolvedSegmentName.includes('Huỳnh Văn Cọ') || selectedSegmentId.includes('003')) segCode = 'HVC'
+    let autoCabinetId = `CAB-${letter}`
+    let autoCabinetName = `Tủ điện ${letter}`
 
-    const autoCabinetId = `CAB-${segCode}-${letter}`
-    const autoCabinetName = `Tủ ${letter} - ${resolvedSegmentName || selectedSegmentId}`
+    if (selectedSegmentId) {
+      let segCode = 'TL8'
+      if (resolvedSegmentName.includes('Nguyễn Văn Ni') || selectedSegmentId.includes('002')) segCode = 'NVN'
+      else if (resolvedSegmentName.includes('Huỳnh Văn Cọ') || selectedSegmentId.includes('003')) segCode = 'HVC'
+      autoCabinetId = `CAB-${segCode}-${letter}`
+      autoCabinetName = `Tủ ${letter} - ${resolvedSegmentName || selectedSegmentId}`
+    }
 
     let baseLat = 10.9701
     let baseLng = 106.4896
@@ -226,11 +207,6 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
 
   // Map click when no row is selected or user wants to add by map click
   const handleMapClickAdd = useCallback((coords: { lat: number; lng: number }) => {
-    if (!selectedSegmentId) {
-      setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1 trước khi chọn vị trí trên bản đồ!')
-      return
-    }
-
     if (selectedRowId) {
       // If a row is already selected, update its position to the clicked point
       handleMapUpdateCoords(selectedRowId, coords)
@@ -238,20 +214,15 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
       // If no row is selected, add a new row at this clicked location
       handleAddRow(coords)
     }
-  }, [selectedSegmentId, selectedRowId, handleMapUpdateCoords, handleAddRow])
+  }, [selectedRowId, handleMapUpdateCoords, handleAddRow])
 
   // Submit Handler
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
 
-    if (!selectedSegmentId) {
-      setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1!')
-      return
-    }
-
     if (rows.length === 0) {
-      setErrorMsg('Vui lòng bấm "+ Thêm Tủ Điện" để thêm ít nhất một tủ điện vào tuyến!')
+      setErrorMsg('Vui lòng bấm "+ Thêm Tủ Điện" hoặc nhấp chuột lên bản đồ để thêm ít nhất một tủ điện!')
       return
     }
 
@@ -359,55 +330,33 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
           <div className="p-4 sm:p-5 overflow-y-auto flex-1 text-xs text-slate-800 dark:text-slate-200 grid grid-cols-1 lg:grid-cols-12 gap-5">
             {/* Left Column (6/12 cols): Route setup & Cabinets list */}
             <div className="lg:col-span-6 flex flex-col space-y-4">
-              {/* SECTION 1: THÔNG TIN TUYẾN ĐƯỜNG & NGÀY VẬN HÀNH */}
-              <div className="p-4 bg-purple-50/50 hover:bg-purple-50/70 dark:bg-purple-950/20 dark:hover:bg-purple-950/30 rounded-2xl border border-purple-200/80 hover:border-purple-300 dark:border-purple-900/50 space-y-3 shadow-2xs transition-all duration-200">
+              {/* SECTION 1: LỌC NHANH TUYẾN ĐƯỜNG TRÊN BẢN ĐỒ (TÙY CHỌN) */}
+              <div className="p-3.5 bg-purple-50/50 hover:bg-purple-50/70 dark:bg-purple-950/20 dark:hover:bg-purple-950/30 rounded-2xl border border-purple-200/80 hover:border-purple-300 dark:border-purple-900/50 space-y-2.5 shadow-2xs transition-all duration-200">
                 <div className="flex items-center justify-between border-b border-purple-200/60 dark:border-purple-900/40 pb-2">
                   <div className="flex items-center gap-2 font-bold text-purple-950 dark:text-purple-200 text-xs">
                     <Route className="w-4 h-4 text-purple-700 dark:text-purple-400 drop-shadow-2xs" />
-                    <span>1. Thiết Lập Tuyến Đường Cài Đặt Tủ</span>
+                    <span>1. Lọc nhanh tuyến đường trên bản đồ (tùy chọn):</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Select Segment */}
-                  <div className="space-y-1">
-                    <label className="font-bold text-purple-950 dark:text-purple-200 text-xs flex items-center justify-between">
-                      <span>Tuyến đường:</span>
-                      <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">(Bắt buộc)</span>
-                    </label>
-                    <select
-                      value={selectedSegmentId}
-                      onChange={(e) => handleSegmentChange(e.target.value)}
-                      className={`w-full p-2 bg-white dark:bg-slate-900 border rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-600 ${
-                        !selectedSegmentId
-                          ? 'text-slate-400 border-purple-200 dark:border-purple-900/60'
-                          : 'text-slate-900 dark:text-slate-100 border-purple-300 hover:border-purple-400 dark:border-purple-800'
-                      }`}
-                    >
-                      <option value="" disabled className="text-slate-400 font-normal">
-                        -- Chọn tuyến đường áp dụng --
+                <div className="space-y-1">
+                  <select
+                    value={selectedSegmentId}
+                    onChange={(e) => handleSegmentChange(e.target.value)}
+                    className="w-full p-2 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-600 text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="" className="text-slate-400 font-normal">
+                      -- Không chọn (Xem toàn bộ mạng lưới) --
+                    </option>
+                    {segmentList.map((seg) => (
+                      <option key={seg.segment_id || ''} value={seg.segment_id || ''} className="text-slate-900 dark:text-slate-100">
+                        {seg.segment_name} ({seg.segment_id} • {seg.pole_count || 0} cột)
                       </option>
-                      {segmentList.map((seg) => (
-                        <option key={seg.segment_id || ''} value={seg.segment_id || ''} className="text-slate-900 dark:text-slate-100">
-                          {seg.segment_name} ({seg.segment_id} • {seg.pole_count || 0} cột)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Installed Date */}
-                  <div className="space-y-1">
-                    <label className="font-semibold text-purple-950 dark:text-purple-200 text-xs flex items-center justify-between">
-                      <span>Ngày vận hành:</span>
-                      <span className="text-[10px] text-slate-400 font-normal">(Áp dụng chung)</span>
-                    </label>
-                    <DatePicker
-                      value={installedDate}
-                      onChange={handleDateChange}
-                      placeholder="Chọn ngày vận hành"
-                      className="w-full"
-                    />
-                  </div>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                    💡 Chọn tuyến đường để tô sáng trên bản đồ và gợi ý tên; hoặc nhấp chuột lên bản đồ để thêm tủ điện tự do.
+                  </p>
                 </div>
               </div>
 
