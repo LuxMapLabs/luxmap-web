@@ -35,6 +35,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const currentPoleMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const isUserInteractingRef = useRef<boolean>(false)
   const cabinetMarkerRef = useRef<maplibregl.Marker | null>(null)
   const existingPolePopupRef = useRef<maplibregl.Popup | null>(null)
 
@@ -145,6 +146,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     currentPoleMarkerRef.current = marker
 
     const handleMarkerDrag = () => {
+      isUserInteractingRef.current = true
       const pos = marker.getLngLat()
       if (segmentCoordsRef.current.length >= 2) {
         const snappedPoint = getSnappedSafeCoordRef.current(pos.lng, pos.lat)
@@ -166,6 +168,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
     // Click bản đồ để dời vị trí ghim (bám tim đường & tránh đè cột)
     map.on('click', (e: maplibregl.MapMouseEvent) => {
+      isUserInteractingRef.current = true
       if (segmentCoordsRef.current.length >= 2) {
         const snappedPoint = getSnappedSafeCoordRef.current(e.lngLat.lng, e.lngLat.lat)
         marker.setLngLat(snappedPoint)
@@ -321,27 +324,49 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     }
   }, [mapBounds])
 
-  // Tự động focus camera và dời marker khi lat / lng của cột thay đổi
+  // Tự động đồng bộ marker và focus camera (giữ nguyên 100% mức zoom của người dùng) khi lat / lng thay đổi
   useEffect(() => {
+    const map = mapRef.current
     if (
-      mapRef.current &&
-      Number.isFinite(lng) &&
-      Number.isFinite(lat) &&
-      lng !== 0 &&
-      lat !== 0
+      !map ||
+      !Number.isFinite(lng) ||
+      !Number.isFinite(lat) ||
+      lng === 0 ||
+      lat === 0
     ) {
-      if (currentPoleMarkerRef.current) {
-        const currentPos = currentPoleMarkerRef.current.getLngLat()
-        if (
-          Math.abs(currentPos.lng - lng) > 0.000001 ||
-          Math.abs(currentPos.lat - lat) > 0.000001
-        ) {
-          currentPoleMarkerRef.current.setLngLat([lng, lat])
-        }
+      return
+    }
+
+    if (currentPoleMarkerRef.current) {
+      const currentPos = currentPoleMarkerRef.current.getLngLat()
+      if (
+        Math.abs(currentPos.lng - lng) > 0.000001 ||
+        Math.abs(currentPos.lat - lat) > 0.000001
+      ) {
+        currentPoleMarkerRef.current.setLngLat([lng, lat])
       }
-      mapRef.current.flyTo({
+    }
+
+    // Nếu người dùng vừa trực tiếp kéo ghim hoặc click trên bản đồ thì không can thiệp camera hay zoom
+    if (isUserInteractingRef.current) {
+      isUserInteractingRef.current = false
+      return
+    }
+
+    // Nếu thay đổi từ bên ngoài (nhập tay tọa độ ở form): lướt nhẹ nhàng đến tọa độ mới nhưng GIỮ NGUYÊN mức zoom hiện tại
+    const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : undefined
+    if (typeof map.easeTo === 'function') {
+      map.easeTo({
         center: [lng, lat],
-        zoom: 18,
+        ...(currentZoom !== undefined ? { zoom: currentZoom } : {}),
+        duration: 300,
+        essential: true,
+      })
+    } else if (typeof map.flyTo === 'function') {
+      map.flyTo({
+        center: [lng, lat],
+        ...(currentZoom !== undefined ? { zoom: currentZoom } : {}),
+        duration: 300,
         essential: true,
       })
     }

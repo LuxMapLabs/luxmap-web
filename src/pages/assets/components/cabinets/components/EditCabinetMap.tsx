@@ -38,6 +38,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const currentCabinetMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const isUserInteractingRef = useRef<boolean>(false)
   const otherMarkersRef = useRef<maplibregl.Marker[]>([])
 
   const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
@@ -219,6 +220,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     })
 
     const handleMarkerDrag = () => {
+      isUserInteractingRef.current = true
       const pos = marker.getLngLat()
       onChangeCoordsRef.current({
         lng: Number(pos.lng.toFixed(6)),
@@ -238,6 +240,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     // Sự kiện nhấp chuột (click) lên bản đồ để di chuyển tủ điện ngay lập tức
     map.on('click', (e: maplibregl.MapMouseEvent) => {
+      isUserInteractingRef.current = true
       const clickedLng = Number(e.lngLat.lng.toFixed(6))
       const clickedLat = Number(e.lngLat.lat.toFixed(6))
       onChangeCoordsRef.current({
@@ -386,27 +389,49 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     }
   }, [segmentCoords])
 
-  // Tự động focus camera và dời ghim ngay vào vị trí tủ điện khi mở modal hoặc thay đổi tọa độ
+  // Tự động focus camera và dời ghim (giữ nguyên 100% mức zoom hiện tại) khi tọa độ thay đổi
   useEffect(() => {
+    const map = mapRef.current
     if (
-      mapRef.current &&
-      Number.isFinite(lng) &&
-      Number.isFinite(lat) &&
-      lng !== 0 &&
-      lat !== 0
+      !map ||
+      !Number.isFinite(lng) ||
+      !Number.isFinite(lat) ||
+      lng === 0 ||
+      lat === 0
     ) {
-      if (currentCabinetMarkerRef.current) {
-        const currentPos = currentCabinetMarkerRef.current.getLngLat()
-        if (
-          Math.abs(currentPos.lng - lng) > 0.000001 ||
-          Math.abs(currentPos.lat - lat) > 0.000001
-        ) {
-          currentCabinetMarkerRef.current.setLngLat([lng, lat])
-        }
+      return
+    }
+
+    if (currentCabinetMarkerRef.current) {
+      const currentPos = currentCabinetMarkerRef.current.getLngLat()
+      if (
+        Math.abs(currentPos.lng - lng) > 0.000001 ||
+        Math.abs(currentPos.lat - lat) > 0.000001
+      ) {
+        currentCabinetMarkerRef.current.setLngLat([lng, lat])
       }
-      mapRef.current.flyTo({
+    }
+
+    // Nếu người dùng vừa trực tiếp kéo ghim hoặc click trên bản đồ thì không can thiệp camera hay zoom
+    if (isUserInteractingRef.current) {
+      isUserInteractingRef.current = false
+      return
+    }
+
+    // Nếu thay đổi từ bên ngoài: lướt nhẹ nhàng đến tọa độ mới nhưng GIỮ NGUYÊN mức zoom hiện tại
+    const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : undefined
+    if (typeof map.easeTo === 'function') {
+      map.easeTo({
         center: [lng, lat],
-        zoom: 18,
+        ...(currentZoom !== undefined ? { zoom: currentZoom } : {}),
+        duration: 300,
+        essential: true,
+      })
+    } else if (typeof map.flyTo === 'function') {
+      map.flyTo({
+        center: [lng, lat],
+        ...(currentZoom !== undefined ? { zoom: currentZoom } : {}),
+        duration: 300,
         essential: true,
       })
     }
@@ -455,14 +480,27 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     })
   }, [showOtherCabinets, filteredOtherCabinets])
 
-  // Hàm đưa camera quay về vị trí tủ đang sửa
+  // Hàm đưa camera quay về vị trí tủ đang sửa (bảo lưu mức zoom của người dùng)
   const handleRecenter = () => {
-    if (mapRef.current && Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0) {
-      mapRef.current.flyTo({
-        center: [lng, lat],
-        zoom: 18,
-        essential: true,
-      })
+    const map = mapRef.current
+    if (map && Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0) {
+      const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : undefined
+      const targetZoom = currentZoom !== undefined ? Math.max(currentZoom, 16) : 18
+      if (typeof map.easeTo === 'function') {
+        map.easeTo({
+          center: [lng, lat],
+          zoom: targetZoom,
+          duration: 350,
+          essential: true,
+        })
+      } else if (typeof map.flyTo === 'function') {
+        map.flyTo({
+          center: [lng, lat],
+          zoom: targetZoom,
+          duration: 350,
+          essential: true,
+        })
+      }
     }
   }
 
