@@ -16,6 +16,7 @@ export interface CabinetListItem {
     external_ref?: string | null
     cabinet_name: string | null
     commune_id: string | null
+    commune_name?: string | null
     data_source: DataSource
     location: AssetLocation
     feeder_ids: string[]

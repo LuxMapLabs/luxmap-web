@@ -2,7 +2,6 @@ import React from 'react'
 import { Eye, Edit2, Database } from 'lucide-react'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import { SegmentTableSkeleton } from './SegmentTableSkeleton'
-import { getCommuneName } from '../../../../../constants/communes'
 import { getDataSourceDisplayName } from '../../../../../constants/enums'
 
 export interface SegmentTableProps {
@@ -76,7 +75,7 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
                     {seg.pole_count} cột
                   </td>
                   <td className="p-3.5 text-slate-600 dark:text-slate-300 font-medium">
-                    {getCommuneName(seg.commune_id)}
+                    {seg.commune_name || seg.commune_id || '—'}
                   </td>
                   <td className="p-3.5">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-sky-300 border border-blue-200/60 dark:border-blue-800/60 whitespace-nowrap">

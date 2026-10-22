@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
-import { formatCommuneDisplayName } from '../../../../../constants/communes'
 import { IotNodeTableSkeleton } from './IotNodeTableSkeleton'
 
 export interface IotNodeTableProps {
@@ -85,7 +84,7 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
             <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold select-none uppercase tracking-wider text-[11px]">
               <th className="py-3 px-4">Mã Thiết Bị</th>
               <th className="py-3 px-4">Tủ Điện Cấp Nguồn</th>
-              <th className="py-3 px-4">Khu Vực Quản Lý</th>
+              <th className="py-3 px-4">Địa bàn</th>
               <th className="py-3 px-4 text-center">Nguồn Dữ Liệu</th>
               <th className="py-3 px-4 text-center">Điều Khiển Từ Xa</th>
               <th className="py-3 px-4 text-center">Xác Thực (Secret)</th>
@@ -139,9 +138,9 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
                       )}
                     </td>
 
-                    {/* Khu Vực Quản Lý */}
+                    {/* Địa bàn */}
                     <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                      {formatCommuneDisplayName(node.commune_id)}
+                      {node.commune_name || node.commune_id || '—'}
                     </td>
 
                     {/* Nguồn Dữ Liệu */}

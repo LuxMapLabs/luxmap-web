@@ -7,14 +7,16 @@ import {
   Edit3,
   MapPin,
   Zap,
+  AlertCircle,
 } from 'lucide-react'
 import type { FeatureCollection, Feature } from 'geojson'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
-import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
+import { parseLineStringWkt, resolveNonOverlappingRoutePoint } from '../../../../../utils/gis-map/routeUtils'
 import { DEFAULT_MAP_CENTER } from '../../../../../utils/gis-map/mapUtils'
+import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
 import { EditPoleMap } from './EditPoleMap'
 
 export interface EditPoleModalProps {
@@ -66,6 +68,9 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
   const [noteText, setNoteText] = useState(pole.note || '')
   const [lat, setLat] = useState<number>(initialLat)
   const [lng, setLng] = useState<number>(initialLng)
+  const [latStr, setLatStr] = useState<string>(initialLat.toFixed(6))
+  const [lngStr, setLngStr] = useState<string>(initialLng.toFixed(6))
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // Danh sách mạch điện từ Redux store
   const allFeeders = useSelector((state: RootState) => state.assets.feeders)
@@ -82,10 +87,13 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
 
       if (typeof pole.location?.lat === 'number' && Number.isFinite(pole.location.lat) && pole.location.lat !== 0) {
         setLat(pole.location.lat)
+        setLatStr(pole.location.lat.toFixed(6))
       }
       if (typeof pole.location?.lng === 'number' && Number.isFinite(pole.location.lng) && pole.location.lng !== 0) {
         setLng(pole.location.lng)
+        setLngStr(pole.location.lng.toFixed(6))
       }
+      setErrorMsg(null)
     }
   }, [pole])
 
@@ -264,8 +272,75 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
     }
   }, [availableFeeders, selectedFeederId])
 
+  // Danh sách các cột khác cùng tuyến để né va chạm
+  const obstaclePoints = useMemo<[number, number][]>(() => {
+    return allPoles
+      .filter(
+        (p) =>
+          p.segment_id === segmentId &&
+          (p.pole_id || p.external_ref) !== (pole.pole_id || pole.external_ref) &&
+          p.location &&
+          Number.isFinite(p.location.lat) &&
+          Number.isFinite(p.location.lng)
+      )
+      .map((p) => [p.location!.lng, p.location!.lat] as [number, number])
+  }, [allPoles, segmentId, pole.pole_id, pole.external_ref])
+
+  // Validate và chuẩn hóa tọa độ (hỗ trợ snap bám tim đường và né đè cột như trên bản đồ)
+  const validateAndFormatCoords = (rawLngStr: string, rawLatStr: string): { lng: number; lat: number } | null => {
+    const trimmedLat = rawLatStr.trim()
+    const trimmedLng = rawLngStr.trim()
+
+    if (!trimmedLat || !trimmedLng) {
+      setErrorMsg('Vui lòng nhập đầy đủ Vĩ độ và Kinh độ!')
+      return null
+    }
+
+    const parsedNLat = parseFloat(trimmedLat)
+    const parsedNLng = parseFloat(trimmedLng)
+
+    if (isNaN(parsedNLat) || isNaN(parsedNLng)) {
+      setErrorMsg('Tọa độ GIS không hợp lệ! Vui lòng nhập số thực cho Vĩ độ và Kinh độ.')
+      return null
+    }
+
+    if (parsedNLat < -90 || parsedNLat > 90 || parsedNLng < -180 || parsedNLng > 180) {
+      setErrorMsg('Tọa độ vượt quá phạm vi địa lý hợp lệ (Vĩ độ: -90..90, Kinh độ: -180..180)!')
+      return null
+    }
+
+    let finalLng = Number(parsedNLng.toFixed(6))
+    let finalLat = Number(parsedNLat.toFixed(6))
+
+    // Nếu thuộc tuyến đường, áp dụng thuật toán snap bám tim đường và né va chạm cột y như thao tác trên bản đồ
+    if (segmentCoords.length >= 2) {
+      const snapped = resolveNonOverlappingRoutePoint(parsedNLng, parsedNLat, segmentCoords, obstaclePoints, 2)
+      finalLng = Number(snapped[0].toFixed(6))
+      finalLat = Number(snapped[1].toFixed(6))
+    }
+
+    setErrorMsg(null)
+    return { lng: finalLng, lat: finalLat }
+  }
+
+  const handleCoordBlur = () => {
+    const result = validateAndFormatCoords(lngStr, latStr)
+    if (result) {
+      setLng(result.lng)
+      setLat(result.lat)
+      setLngStr(result.lng.toFixed(6))
+      setLatStr(result.lat.toFixed(6))
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMsg(null)
+
+    const validatedCoords = validateAndFormatCoords(lngStr, latStr)
+    if (!validatedCoords) {
+      return
+    }
 
     const selectedCab = cabinets.find(
       (c) => c.cabinet_id === cabinetId || c.external_ref === cabinetId
@@ -286,7 +361,7 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
       cabinet_name: selectedCab?.cabinet_name || null,
       near_sensitive_poi: nearSensitivePoi,
       note: noteText.trim() ? noteText.trim() : null,
-      location: { lat, lng },
+      location: { lat: validatedCoords.lat, lng: validatedCoords.lng },
       updated_at: new Date().toISOString(),
     }
 
@@ -327,6 +402,14 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Error Notification */}
+        {errorMsg && (
+          <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         {/* Body Form Layout 2 Cột */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -378,29 +461,24 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
                   </span>
                   <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">(Nguồn cấp)</span>
                 </label>
-                <select
+                <CabinetSearchSelect
+                  cabinets={availableCabinetsOnSegment}
                   value={cabinetId}
-                  onChange={(e) => {
-                    const newCab = e.target.value
+                  onChange={(newCab) => {
                     setCabinetId(newCab)
                     setSelectedFeederId('')
                   }}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  <option value="">
-                    {availableCabinetsOnSegment.length === 0
+                  placeholder={
+                    availableCabinetsOnSegment.length === 0
                       ? '(Tuyến này chưa có tủ điện khả dụng)'
-                      : '-- Chọn tủ điện quản lý --'}
-                  </option>
-                  {availableCabinetsOnSegment.map((c) => (
-                    <option
-                      key={c.cabinet_id || c.external_ref || Math.random()}
-                      value={c.cabinet_id || c.external_ref || ''}
-                    >
-                      ⚡️ {c.cabinet_name || c.external_ref || c.cabinet_id} ({c.external_ref || c.cabinet_id})
-                    </option>
-                  ))}
-                </select>
+                      : '-- Chọn tủ điện quản lý --'
+                  }
+                  disabled={availableCabinetsOnSegment.length === 0}
+                  disabledPlaceholder="(Tuyến này chưa có tủ điện khả dụng)"
+                  accentColor="indigo"
+                  allowClear={true}
+                  getId={(c) => c.cabinet_id || c.external_ref || ''}
+                />
               </div>
 
               {/* Dropdown Mạch Điện / Lộ xuất tuyến */}
@@ -475,24 +553,53 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
                 />
               </div>
 
-              {/* Dòng 4: Tọa độ số hiển thị */}
+              {/* Dòng 4: Tọa độ số hiển thị & cho phép nhập tay */}
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
-                  <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Tọa độ WGS84 Hiện Tại:</span>
+                <div className="flex items-center justify-between font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Tọa độ WGS84 Hiện Tại:</span>
+                  </span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                    (Có thể nhập tay)
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 font-mono">
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans">Kinh độ (Lng)</span>
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{lng.toFixed(6)}</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                      Kinh độ (Lng):
+                    </label>
+                    <input
+                      type="text"
+                      value={lngStr}
+                      onChange={(e) => {
+                        setLngStr(e.target.value)
+                        setErrorMsg(null)
+                      }}
+                      onBlur={handleCoordBlur}
+                      placeholder="VD: 106.489639"
+                      className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 shadow-2xs"
+                    />
                   </div>
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans">Vĩ độ (Lat)</span>
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{lat.toFixed(6)}</span>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
+                      Vĩ độ (Lat):
+                    </label>
+                    <input
+                      type="text"
+                      value={latStr}
+                      onChange={(e) => {
+                        setLatStr(e.target.value)
+                        setErrorMsg(null)
+                      }}
+                      onBlur={handleCoordBlur}
+                      placeholder="VD: 10.970187"
+                      className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 shadow-2xs"
+                    />
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-400 italic">
-                  💡 Kéo ghim màu cam hoặc click trực tiếp trên bản đồ để định vị lại tọa độ cột.
+                  💡 Nhập tay tọa độ hoặc kéo ghim màu cam / click trực tiếp trên bản đồ để định vị lại.
                 </p>
               </div>
             </div>
@@ -508,6 +615,9 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
               onChangeCoords={({ lat: newLat, lng: newLng }) => {
                 setLat(newLat)
                 setLng(newLng)
+                setLatStr(newLat.toFixed(6))
+                setLngStr(newLng.toFixed(6))
+                setErrorMsg(null)
               }}
             />
           </div>

@@ -5,6 +5,8 @@ import { Layers, Crosshair, Eye, EyeOff } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
+import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
@@ -16,6 +18,8 @@ export interface EditCabinetMapProps {
   lng: number
   currentCabinetId?: string | null
   currentExternalRef?: string | null
+  activeSegmentId?: string | null
+  availableSegments?: SegmentListItem[]
   segmentCoords?: [number, number][]
   otherCabinets?: CabinetListItem[]
   onChangeCoords: (coords: { lat: number; lng: number }) => void
@@ -26,6 +30,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   lng,
   currentCabinetId,
   currentExternalRef,
+  availableSegments = [],
   segmentCoords = [],
   otherCabinets = [],
   onChangeCoords,
@@ -36,9 +41,67 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   const otherMarkersRef = useRef<maplibregl.Marker[]>([])
 
   const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const mapSegments = useSelector((state: RootState) => state.map.segments)
+
+  // Tạo GeoJSON FeatureCollection chứa toàn bộ các tuyến đường trên GIS
+  const allRoutesGeoJson = useMemo<GeoJSON.FeatureCollection>(() => {
+    const features: GeoJSON.Feature[] = []
+
+    if (mapSegments && mapSegments.length > 0) {
+      mapSegments.forEach((seg) => {
+        if (
+          seg.geometry?.type === 'LineString' &&
+          Array.isArray(seg.geometry.coordinates) &&
+          seg.geometry.coordinates.length >= 2
+        ) {
+          features.push({
+            type: 'Feature',
+            properties: {
+              segment_id: seg.properties?.segment_id || '',
+              segment_name: seg.properties?.segment_name || '',
+            },
+            geometry: {
+              type: 'LineString',
+              coordinates: seg.geometry.coordinates as [number, number][],
+            },
+          })
+        }
+      })
+    }
+
+    if (features.length === 0 && availableSegments && availableSegments.length > 0) {
+      availableSegments.forEach((seg) => {
+        if ('geom_wkt' in seg && typeof seg.geom_wkt === 'string') {
+          const parsed = parseLineStringWkt(seg.geom_wkt)
+          if (parsed.length >= 2) {
+            features.push({
+              type: 'Feature',
+              properties: {
+                segment_id: seg.segment_id || '',
+                segment_name: seg.segment_name || '',
+              },
+              geometry: {
+                type: 'LineString',
+                coordinates: parsed,
+              },
+            })
+          }
+        }
+      })
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features,
+    }
+  }, [mapSegments, availableSegments])
 
   const [showOtherCabinets, setShowOtherCabinets] = useState(false)
 
+  const allRoutesGeoJsonRef = useRef(allRoutesGeoJson)
+  allRoutesGeoJsonRef.current = allRoutesGeoJson
+  const segmentCoordsRef = useRef(segmentCoords)
+  segmentCoordsRef.current = segmentCoords
   const onChangeCoordsRef = useRef(onChangeCoords)
   onChangeCoordsRef.current = onChangeCoords
 
@@ -173,6 +236,19 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       handleMarkerDrag()
     })
 
+    // Sự kiện nhấp chuột (click) lên bản đồ để di chuyển tủ điện ngay lập tức
+    map.on('click', (e: maplibregl.MapMouseEvent) => {
+      const clickedLng = Number(e.lngLat.lng.toFixed(6))
+      const clickedLat = Number(e.lngLat.lat.toFixed(6))
+      onChangeCoordsRef.current({
+        lng: clickedLng,
+        lat: clickedLat,
+      })
+      if (currentCabinetMarkerRef.current) {
+        currentCabinetMarkerRef.current.setLngLat([clickedLng, clickedLat])
+      }
+    })
+
     map.on('load', () => {
       if (!isMounted) return
 
@@ -189,8 +265,40 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
         }
       }, 150)
 
-      // Source & layer vẽ tuyến đường nếu có
-      if (segmentCoords.length >= 2 && !map.getSource('edit-cabinet-route')) {
+      map.getCanvas().style.cursor = 'crosshair'
+
+      // 1. Source & layer vẽ TOÀN BỘ các tuyến đường trên GIS (đường nền màu dịu)
+      if (!map.getSource('edit-cabinet-all-routes')) {
+        map.addSource('edit-cabinet-all-routes', {
+          type: 'geojson',
+          data: allRoutesGeoJsonRef.current,
+        })
+
+        map.addLayer({
+          id: 'edit-cabinet-all-routes-glow',
+          type: 'line',
+          source: 'edit-cabinet-all-routes',
+          paint: {
+            'line-color': '#475569',
+            'line-width': 4.5,
+            'line-opacity': 0.4,
+          },
+        })
+
+        map.addLayer({
+          id: 'edit-cabinet-all-routes-core',
+          type: 'line',
+          source: 'edit-cabinet-all-routes',
+          paint: {
+            'line-color': '#94a3b8',
+            'line-width': 2.5,
+            'line-opacity': 0.75,
+          },
+        })
+      }
+
+      // 2. Source & layer vẽ tuyến đường đang chọn / liên kết của tủ điện (Highlight nổi bật)
+      if (!map.getSource('edit-cabinet-route')) {
         map.addSource('edit-cabinet-route', {
           type: 'geojson',
           data: {
@@ -198,7 +306,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
             properties: {},
             geometry: {
               type: 'LineString',
-              coordinates: segmentCoords,
+              coordinates: segmentCoordsRef.current.length >= 2 ? segmentCoordsRef.current : [],
             },
           },
         })
@@ -209,8 +317,8 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
           source: 'edit-cabinet-route',
           paint: {
             'line-color': '#0284c7',
-            'line-width': 7,
-            'line-opacity': 0.6,
+            'line-width': 8,
+            'line-opacity': 0.7,
           },
         })
 
@@ -220,8 +328,8 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
           source: 'edit-cabinet-route',
           paint: {
             'line-color': '#38bdf8',
-            'line-width': 3.5,
-            'line-opacity': 0.95,
+            'line-width': 4,
+            'line-opacity': 1,
           },
         })
       }
@@ -245,6 +353,38 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       applyMapBoundsLimits(mapRef.current, mapBounds)
     }
   }, [mapBounds])
+
+  // Cập nhật GeoJSON toàn bộ các tuyến đường khi mapSegments thay đổi
+  useEffect(() => {
+    if (!mapRef.current) return
+    const src = mapRef.current.getSource('edit-cabinet-all-routes') as maplibregl.GeoJSONSource
+    if (src) {
+      src.setData(allRoutesGeoJson)
+    }
+  }, [allRoutesGeoJson])
+
+  // Cập nhật GeoJSON tuyến đường active và focus nhanh tới tuyến đường khi người dùng chọn
+  useEffect(() => {
+    if (!mapRef.current) return
+    const src = mapRef.current.getSource('edit-cabinet-route') as maplibregl.GeoJSONSource
+    if (src) {
+      src.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: segmentCoords.length >= 2 ? segmentCoords : [],
+        },
+      })
+    }
+
+    // Tự động focus nhanh tới tuyến đường khi người dùng chọn tuyến
+    if (segmentCoords.length >= 2) {
+      const bounds = new maplibregl.LngLatBounds()
+      segmentCoords.forEach((pt) => bounds.extend(pt))
+      mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 17 })
+    }
+  }, [segmentCoords])
 
   // Tự động focus camera và dời ghim ngay vào vị trí tủ điện khi mở modal hoặc thay đổi tọa độ
   useEffect(() => {
@@ -345,7 +485,17 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
           <div className="w-4 h-4 rounded-md bg-purple-600 border border-white flex items-center justify-center text-[10px] text-yellow-300 font-bold shrink-0 shadow-xs">
             ⚡
           </div>
-          <span className="text-slate-200 font-medium">Tủ đang sửa (Kéo để dời vị trí)</span>
+          <span className="text-slate-200 font-medium">Tủ đang sửa (Kéo hoặc nhấp chuột để đặt)</span>
+        </div>
+
+        <div className="flex items-center gap-2 pt-0.5">
+          <div className="w-4 h-1.5 rounded-full bg-sky-400 shrink-0 shadow-xs" />
+          <span className="text-sky-300 font-medium text-[10px]">Tuyến đường liên kết</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-1.5 rounded-full bg-slate-400 shrink-0" />
+          <span className="text-slate-300 font-medium text-[10px]">Các tuyến đường khác</span>
         </div>
 
         {/* Toggle ẩn/hiện các tủ khác để tránh rối mắt */}
@@ -375,7 +525,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
         )}
 
         <p className="text-[10px] text-amber-200/90 pt-1 border-t border-slate-800">
-          💡 Nhấn và giữ ghim ⚡ để kéo thả đến vị trí thực địa chính xác.
+          💡 Nhấp chuột lên bản đồ hoặc kéo ghim ⚡ để đặt vị trí thực địa chính xác.
         </p>
       </div>
 

@@ -35,6 +35,7 @@ export interface PoleListItem {
     cabinet_name?: string | null
     cabinet_source?: TopologySource
     commune_id: string | null
+    commune_name?: string | null
     data_source: DataSource
     near_sensitive_poi: boolean
     location: AssetLocation

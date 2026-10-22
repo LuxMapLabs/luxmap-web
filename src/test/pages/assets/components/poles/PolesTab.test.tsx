@@ -490,5 +490,38 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       expect(failedState.poles[0].external_ref).toBe('POLE-ACTIVE')
       expect(failedState.poles[1].external_ref).toBe('POLE-EXPIRING')
     })
+
+    it('hiển thị chính xác tên địa bàn từ Backend (commune_name) thay vì mock cứng hoặc chỉ hiện id', () => {
+      const poleWithCommuneName: PoleListItem = {
+        ...mockPoleWithActiveWarranty,
+        pole_id: 'pole_with_name_01',
+        external_ref: 'POLE-CNAME-01',
+        commune_id: 'COM-002',
+        commune_name: 'Xã Tân An Hội',
+      }
+      const poleFallbackId: PoleListItem = {
+        ...mockPoleWithActiveWarranty,
+        pole_id: 'pole_fallback_02',
+        external_ref: 'POLE-FALLBACK-02',
+        commune_id: 'COM-005',
+        commune_name: undefined,
+      }
+
+      render(
+        <PoleTable
+          poles={[poleWithCommuneName, poleFallbackId]}
+          segments={[mockSegment]}
+          cabinets={[mockCabinet]}
+          onViewDetail={vi.fn()}
+          onEdit={vi.fn()}
+          onViewCabinetDetail={vi.fn()}
+        />
+      )
+
+      // Cột 1 có commune_name -> hiển thị "Xã Tân An Hội"
+      expect(screen.getByText('Xã Tân An Hội')).toBeInTheDocument()
+      // Cột 2 chưa có commune_name -> fallback an toàn về "COM-005"
+      expect(screen.getByText('COM-005')).toBeInTheDocument()
+    })
   })
 })

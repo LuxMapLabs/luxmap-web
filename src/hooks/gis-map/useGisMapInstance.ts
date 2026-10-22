@@ -46,49 +46,6 @@ export function useGisMapInstance() {
       'bottom-right'
     )
 
-    // GPS Geolocate Control
-    const geolocate = new maplibregl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: false,
-      showUserLocation: true,
-    })
-
-    geolocate.on('trackuserlocationstart', () => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.add('is-searching-location')
-    })
-
-    geolocate.on('geolocate', (e: maplibregl.GeolocatePositionEvent) => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.add('is-searching-location')
-
-      if (e?.coords) {
-        map.flyTo({
-          center: [e.coords.longitude, e.coords.latitude],
-          zoom: 17,
-          speed: 1.2,
-        })
-        map.once('moveend', () => {
-          btn?.classList.remove('is-searching-location')
-        })
-      } else {
-        btn?.classList.remove('is-searching-location')
-      }
-    })
-
-    geolocate.on('error', (err: maplibregl.GeolocateErrorEvent) => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.remove('is-searching-location')
-      console.warn('Geolocation error:', err)
-      if (err?.code === 1) {
-        alert(
-          'Trình duyệt chưa được cấp quyền Vị trí (Location). Bạn vui lòng bấm vào biểu tượng cài đặt trên thanh địa chỉ URL để cấp quyền nhé!'
-        )
-      }
-    })
-
-    map.addControl(geolocate, 'bottom-right')
-
     // Tooltip Popup
     const popup = new maplibregl.Popup({
       closeButton: false,
