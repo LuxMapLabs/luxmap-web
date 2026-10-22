@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { X, Cable, Zap, AlertCircle } from 'lucide-react'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { CreateFeederRequest } from '../../../../../types/assets/feeders'
+import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
 
 export interface AddFeederModalProps {
   isOpen: boolean
@@ -89,27 +90,25 @@ export const AddFeederModal: React.FC<AddFeederModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Tủ Điện Cấp Nguồn:
             </label>
-            <select
+            <CabinetSearchSelect
+              cabinets={cabinets}
               value={cabinetId}
-              onChange={(e) => {
-                const newCabId = e.target.value
+              onChange={(newCabId) => {
                 setCabinetId(newCabId)
                 if (newCabId && !feederName) {
-                  const cab = cabinets.find((c) => c.cabinet_id === newCabId)
+                  const cab = cabinets.find(
+                    (c) => c.cabinet_id === newCabId || c.external_ref === newCabId
+                  )
                   if (cab) {
-                    setFeederName(`Lộ 1 - ${cab.cabinet_name || cab.cabinet_id}`)
+                    setFeederName(`Lộ 1 - ${cab.cabinet_name || cab.external_ref || cab.cabinet_id}`)
                   }
                 }
               }}
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
-            >
-              <option value="">-- Chọn tủ điện đấu nối --</option>
-              {cabinets.map((cab) => (
-                <option key={cab.cabinet_id} value={cab.cabinet_id || ''}>
-                  ⚡ {cab.cabinet_name || cab.external_ref || cab.cabinet_id} ({cab.cabinet_id})
-                </option>
-              ))}
-            </select>
+              placeholder="-- Chọn tủ điện đấu nối --"
+              accentColor="emerald"
+              allowClear={true}
+              getId={(c) => c.cabinet_id || ''}
+            />
             <p className="text-[11px] text-slate-400 italic">
               Lộ xuất tuyến sẽ được gắn trực tiếp vào trạm tủ điều khiển này.
             </p>

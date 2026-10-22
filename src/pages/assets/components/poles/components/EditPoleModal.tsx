@@ -16,6 +16,7 @@ import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import { parseLineStringWkt, resolveNonOverlappingRoutePoint } from '../../../../../utils/gis-map/routeUtils'
 import { DEFAULT_MAP_CENTER } from '../../../../../utils/gis-map/mapUtils'
+import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
 import { EditPoleMap } from './EditPoleMap'
 
 export interface EditPoleModalProps {
@@ -460,29 +461,24 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
                   </span>
                   <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">(Nguồn cấp)</span>
                 </label>
-                <select
+                <CabinetSearchSelect
+                  cabinets={availableCabinetsOnSegment}
                   value={cabinetId}
-                  onChange={(e) => {
-                    const newCab = e.target.value
+                  onChange={(newCab) => {
                     setCabinetId(newCab)
                     setSelectedFeederId('')
                   }}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  <option value="">
-                    {availableCabinetsOnSegment.length === 0
+                  placeholder={
+                    availableCabinetsOnSegment.length === 0
                       ? '(Tuyến này chưa có tủ điện khả dụng)'
-                      : '-- Chọn tủ điện quản lý --'}
-                  </option>
-                  {availableCabinetsOnSegment.map((c) => (
-                    <option
-                      key={c.cabinet_id || c.external_ref || Math.random()}
-                      value={c.cabinet_id || c.external_ref || ''}
-                    >
-                      ⚡️ {c.cabinet_name || c.external_ref || c.cabinet_id} ({c.external_ref || c.cabinet_id})
-                    </option>
-                  ))}
-                </select>
+                      : '-- Chọn tủ điện quản lý --'
+                  }
+                  disabled={availableCabinetsOnSegment.length === 0}
+                  disabledPlaceholder="(Tuyến này chưa có tủ điện khả dụng)"
+                  accentColor="indigo"
+                  allowClear={true}
+                  getId={(c) => c.cabinet_id || c.external_ref || ''}
+                />
               </div>
 
               {/* Dropdown Mạch Điện / Lộ xuất tuyến */}
