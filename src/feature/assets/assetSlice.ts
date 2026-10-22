@@ -32,6 +32,9 @@ export interface AssetState {
   isImporting: boolean
   importResult: ImportResult | null
   error: string | null
+
+  // Export Modal State
+  isExportModalOpen?: boolean
 }
 
 const initialState: AssetState = {
@@ -49,6 +52,8 @@ const initialState: AssetState = {
   isImporting: false,
   importResult: null,
   error: null,
+
+  isExportModalOpen: false,
 }
 
 export interface ImportAssetPayload {
@@ -268,6 +273,14 @@ const assetSlice = createSlice({
       state.importResult = null
       state.error = null
     },
+
+    // --- Export Modal Actions ---
+    openExportModal: (state) => {
+      state.isExportModalOpen = true
+    },
+    closeExportModal: (state) => {
+      state.isExportModalOpen = false
+    },
   },
 })
 
@@ -301,6 +314,8 @@ export const {
   importAssetSuccess,
   importAssetFailure,
   resetImportState,
+  openExportModal,
+  closeExportModal,
 } = assetSlice.actions
 
 export type { ImportAssetCategory }
