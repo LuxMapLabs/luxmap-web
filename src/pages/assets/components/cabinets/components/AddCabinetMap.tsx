@@ -2,10 +2,13 @@ import React, { useEffect, useRef } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers } from 'lucide-react'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
+  applyMapBoundsLimits,
 } from '../../../../../utils/gis-map/mapUtils'
 
 export interface CabinetRowDraft {
@@ -39,6 +42,8 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map())
 
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+
   const rowsRef = useRef(rows)
   rowsRef.current = rows
 
@@ -57,7 +62,14 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
 
     let isMounted = true
 
-    let initialCenter: [number, number] = DEFAULT_MAP_CENTER
+    let initialCenter: [number, number] =
+      typeof mapBounds?.center?.lng === 'number' &&
+      typeof mapBounds?.center?.lat === 'number' &&
+      Number.isFinite(mapBounds.center.lng) &&
+      Number.isFinite(mapBounds.center.lat)
+        ? [mapBounds.center.lng, mapBounds.center.lat]
+        : DEFAULT_MAP_CENTER
+
     if (segmentCoords.length >= 2) {
       initialCenter = segmentCoords[0]
     } else if (existingCabinets.length > 0 && existingCabinets[0].location) {
@@ -74,6 +86,16 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
 
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.resize()
+        }
+      })
+      resizeObserver.observe(mapContainerRef.current)
+    }
 
     map.on('click', (e: maplibregl.MapMouseEvent) => {
       const clickedLng = Number(e.lngLat.lng.toFixed(6))
@@ -95,6 +117,8 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
 
     map.on('load', () => {
       if (!isMounted) return
+
+      applyMapBoundsLimits(map, mapBounds)
 
       setTimeout(() => {
         map.resize()
@@ -174,12 +198,20 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
 
     return () => {
       isMounted = false
+      resizeObserver?.disconnect()
       markersRef.current.forEach((m) => m.remove())
       markersRef.current.clear()
       map.remove()
       mapRef.current = null
     }
-  }, [segmentCoords])
+  }, [segmentCoords, mapBounds])
+
+  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  useEffect(() => {
+    if (mapRef.current) {
+      applyMapBoundsLimits(mapRef.current, mapBounds)
+    }
+  }, [mapBounds])
 
   // Cập nhật Markers cho các hàng tủ trong rows
   useEffect(() => {

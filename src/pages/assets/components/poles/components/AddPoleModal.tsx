@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER } from '../../../../../utils/gis-map/mapUtils'
+import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER, applyMapBoundsLimits } from '../../../../../utils/gis-map/mapUtils'
 import {
   snapPointToPolyline,
   parseLineStringWkt,
@@ -79,6 +79,9 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
   const [selectedCabinetId, setSelectedCabinetId] = useState('')
   const [selectedFeederId, setSelectedFeederId] = useState('')
+
+  // Map Bounds từ Backend để giới hạn không gian địa bàn
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
 
   // Danh sách mạch điện từ Redux store
   const allFeeders = useSelector((state: RootState) => state.assets.feeders)
@@ -369,7 +372,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
         .map((pt) => snapPointToPolyline(pt, coords).accumulatedDist)
         .sort((a, b) => a - b)
 
-      const MIN_CLEARANCE = 15 // meters: khoảng cách an toàn tối thiểu tránh đè cột
+      const MIN_CLEARANCE = 2 // meters: khoảng cách an toàn tối thiểu tránh đè trùng khít cột
 
       // Build & merge overlapping forbidden intervals [d - MIN_CLEARANCE, d + MIN_CLEARANCE]
       const rawIntervals = obstacleDists.map((d) => [
@@ -518,17 +521,36 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   useEffect(() => {
     if (!isOpen || !mapContainerRef.current) return
 
+    const initialCenter: [number, number] =
+      typeof mapBounds?.center?.lng === 'number' &&
+      typeof mapBounds?.center?.lat === 'number' &&
+      Number.isFinite(mapBounds.center.lng) &&
+      Number.isFinite(mapBounds.center.lat)
+        ? [mapBounds.center.lng, mapBounds.center.lat]
+        : DEFAULT_MAP_CENTER
+
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: GOOGLE_HYBRID_STYLE,
-      center: DEFAULT_MAP_CENTER,
+      center: initialCenter,
       zoom: 14.5,
       attributionControl: false,
     })
 
     mapRef.current = map
 
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.resize()
+        }
+      })
+      resizeObserver.observe(mapContainerRef.current)
+    }
+
     map.on('load', () => {
+      applyMapBoundsLimits(map, mapBounds)
       setTimeout(() => {
         map.resize()
       }, 100)
@@ -660,6 +682,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     const markersMap = markersMapRef.current
 
     return () => {
+      resizeObserver?.disconnect()
       if (existingPolePopupRef.current) {
         existingPolePopupRef.current.remove()
         existingPolePopupRef.current = null
@@ -673,7 +696,14 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       map.remove()
       mapRef.current = null
     }
-  }, [isOpen, addPoleAtPoint])
+  }, [isOpen, addPoleAtPoint, mapBounds])
+
+  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  useEffect(() => {
+    if (mapRef.current) {
+      applyMapBoundsLimits(mapRef.current, mapBounds)
+    }
+  }, [mapBounds])
 
   // Synchronize existing poles GeoJSON data when selected segment or allPoles changes
   useEffect(() => {

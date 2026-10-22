@@ -2,14 +2,16 @@ import React, { useEffect, useRef } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers } from 'lucide-react'
+import { useSelector } from 'react-redux'
 import type { FeatureCollection } from 'geojson'
+import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
+  applyMapBoundsLimits,
 } from '../../../../../utils/gis-map/mapUtils'
 import {
-  snapPointToPolyline,
   resolveNonOverlappingRoutePoint,
 } from '../../../../../utils/gis-map/routeUtils'
 
@@ -36,6 +38,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   const cabinetMarkerRef = useRef<maplibregl.Marker | null>(null)
   const existingPolePopupRef = useRef<maplibregl.Popup | null>(null)
 
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const mapBoundsRef = useRef(mapBounds)
+  mapBoundsRef.current = mapBounds
+
   const segmentCoordsRef = useRef(segmentCoords)
   segmentCoordsRef.current = segmentCoords
 
@@ -44,8 +50,6 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
   const onChangeCoordsRef = useRef(onChangeCoords)
   onChangeCoordsRef.current = onChangeCoords
-
-  const initialCoordsRef = useRef<[number, number]>([lng, lat])
 
   // Helper trích xuất các điểm cột khác làm chướng ngại vật
   const getObstaclePoints = (): [number, number][] => {
@@ -67,7 +71,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     const coords = segmentCoordsRef.current
     if (!coords || coords.length < 2) return [rawLng, rawLat]
     const obstacles = getObstaclePoints()
-    return resolveNonOverlappingRoutePoint(rawLng, rawLat, coords, obstacles, 15)
+    return resolveNonOverlappingRoutePoint(rawLng, rawLat, coords, obstacles, 2)
   }
 
   const getSnappedSafeCoordRef = useRef(getSnappedSafeCoord)
@@ -79,17 +83,23 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
     let isMounted = true
 
-    const [initLng, initLat] = initialCoordsRef.current
-    const initialCenter: [number, number] =
-      Number.isFinite(initLng) && Number.isFinite(initLat)
-        ? [initLng, initLat]
-        : DEFAULT_MAP_CENTER
+    const isCoordValid =
+      Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0
+
+    const initialCenter: [number, number] = isCoordValid
+      ? [lng, lat]
+      : typeof mapBoundsRef.current?.center?.lng === 'number' &&
+        typeof mapBoundsRef.current?.center?.lat === 'number' &&
+        Number.isFinite(mapBoundsRef.current.center.lng) &&
+        Number.isFinite(mapBoundsRef.current.center.lat)
+      ? [mapBoundsRef.current.center.lng, mapBoundsRef.current.center.lat]
+      : DEFAULT_MAP_CENTER
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
-      zoom: 17,
+      zoom: isCoordValid ? 18 : 15,
       maxZoom: 20,
       pitch: 0,
       bearing: 0,
@@ -97,6 +107,17 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+
+    // Tự động resize bản đồ khi kích thước modal / container thay đổi
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.resize()
+        }
+      })
+      resizeObserver.observe(mapContainerRef.current)
+    }
 
     // Tạo Marker chấm tròn LED cam 16px kéo thả định vị cột
     const markerEl = document.createElement('div')
@@ -262,14 +283,20 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         })
       }
 
-      // Focus trực tiếp vào cột đang sửa ở mức zoom 17.5 chi tiết (không zoom out cả tuyến đường)
-      if (Number.isFinite(initialCenter[0]) && Number.isFinite(initialCenter[1])) {
-        map.flyTo({ center: [initialCenter[0], initialCenter[1]], zoom: 17.5, duration: 400 })
+      // Áp dụng giới hạn Bbox và minZoom từ Backend
+      applyMapBoundsLimits(map, mapBoundsRef.current)
+
+      // Focus trực tiếp 100% vào cột đang sửa ở mức zoom 18 chi tiết (ngay tâm màn hình)
+      if (isCoordValid) {
+        map.jumpTo({ center: [lng, lat], zoom: 18 })
+      } else if (Number.isFinite(initialCenter[0]) && Number.isFinite(initialCenter[1])) {
+        map.flyTo({ center: [initialCenter[0], initialCenter[1]], zoom: 15, duration: 400 })
       }
     })
 
     return () => {
       isMounted = false
+      resizeObserver?.disconnect()
       if (existingPolePopupRef.current) {
         existingPolePopupRef.current.remove()
         existingPolePopupRef.current = null
@@ -287,26 +314,42 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     }
   }, [])
 
-  // Đồng bộ vị trí Marker khi lat / lng thay đổi từ ngoài form
+  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  useEffect(() => {
+    if (mapRef.current) {
+      applyMapBoundsLimits(mapRef.current, mapBounds)
+    }
+  }, [mapBounds])
+
+  // Tự động focus camera và dời marker khi lat / lng của cột thay đổi
   useEffect(() => {
     if (
-      currentPoleMarkerRef.current &&
+      mapRef.current &&
       Number.isFinite(lng) &&
-      Number.isFinite(lat)
+      Number.isFinite(lat) &&
+      lng !== 0 &&
+      lat !== 0
     ) {
-      const currentPos = currentPoleMarkerRef.current.getLngLat()
-      if (
-        Math.abs(currentPos.lng - lng) > 0.000001 ||
-        Math.abs(currentPos.lat - lat) > 0.000001
-      ) {
-        currentPoleMarkerRef.current.setLngLat([lng, lat])
+      if (currentPoleMarkerRef.current) {
+        const currentPos = currentPoleMarkerRef.current.getLngLat()
+        if (
+          Math.abs(currentPos.lng - lng) > 0.000001 ||
+          Math.abs(currentPos.lat - lat) > 0.000001
+        ) {
+          currentPoleMarkerRef.current.setLngLat([lng, lat])
+        }
       }
+      mapRef.current.flyTo({
+        center: [lng, lat],
+        zoom: 18,
+        essential: true,
+      })
     }
   }, [lng, lat])
 
   const prevSegmentCoordsKeyRef = useRef<string>('')
 
-  // 1. Cập nhật Route Line & Fit bounds CHỈ KHI tuyến đường (segmentCoords) thực sự thay đổi
+  // 1. Cập nhật Route Line khi tuyến đường (segmentCoords) thay đổi (giữ nguyên tọa độ cột, không tự ý snap đè)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -317,21 +360,6 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     const isSegmentChanged = coordsKey !== prevSegmentCoordsKeyRef.current
     if (!isSegmentChanged) return
     prevSegmentCoordsKeyRef.current = coordsKey
-
-    // Tự động snap cột về tuyến mới nếu nằm ngoài hoặc cách xa tuyến (> 50m)
-    if (segmentCoords.length >= 2 && Number.isFinite(lng) && Number.isFinite(lat)) {
-      const snapped = snapPointToPolyline([lng, lat], segmentCoords)
-      if (snapped.distMeters > 50) {
-        const targetPoint = segmentCoords[0]
-        onChangeCoordsRef.current({
-          lng: Number(targetPoint[0].toFixed(6)),
-          lat: Number(targetPoint[1].toFixed(6)),
-        })
-        if (currentPoleMarkerRef.current) {
-          currentPoleMarkerRef.current.setLngLat(targetPoint)
-        }
-      }
-    }
 
     const updateRouteLayer = () => {
       const routeSource = map.getSource('edit-segment-route') as maplibregl.GeoJSONSource | undefined

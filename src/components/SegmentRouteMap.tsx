@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER } from '../utils/gis-map/mapUtils'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../redux/rootReducer'
+import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER, applyMapBoundsLimits } from '../utils/gis-map/mapUtils'
 import { projectPointOnSegment, calculateDistanceMeters } from '../utils/gis-map/routeUtils'
 import {
   ZoomIn,
@@ -99,6 +101,8 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const vertexMarkersRef = useRef<maplibregl.Marker[]>([])
   const isDraggingRef = useRef<boolean>(false)
   const currentCoordsRef = useRef<[number, number][]>([...coordinates])
+
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
 
   // Persistent reference to original DB route to protect from accidental deletion
   const initialDbRouteRef = useRef<[number, number][]>([])
@@ -757,6 +761,14 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     initialDbStartRef.current = hasStartCoord ? startCoord! : dedupedCoords.length > 0 ? dedupedCoords[0] : null
     initialDbEndRef.current = hasEndCoord ? endCoord! : dedupedCoords.length > 1 ? dedupedCoords[dedupedCoords.length - 1] : null
 
+    const fallbackCenter: [number, number] =
+      typeof mapBounds?.center?.lng === 'number' &&
+      typeof mapBounds?.center?.lat === 'number' &&
+      Number.isFinite(mapBounds.center.lng) &&
+      Number.isFinite(mapBounds.center.lat)
+        ? [mapBounds.center.lng, mapBounds.center.lat]
+        : DEFAULT_MAP_CENTER
+
     const center: [number, number] =
       dedupedCoords.length > 0
         ? dedupedCoords[0]
@@ -764,7 +776,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
         ? startCoord!
         : validPoles.length > 0
         ? validPoles[0].coord
-        : DEFAULT_MAP_CENTER
+        : fallbackCenter
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -778,6 +790,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     mapRef.current = map
 
     map.on('load', () => {
+      applyMapBoundsLimits(map, mapBounds)
       // 1. Add Road Route Line Source & Layers
       map.addSource('route-line', {
         type: 'geojson',
@@ -1071,14 +1084,17 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       }
     }, 220)
 
-    const resizeObserver = new ResizeObserver(() => {
-      map.resize()
-    })
-    resizeObserver.observe(containerRef.current)
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        map.resize()
+      })
+      resizeObserver.observe(containerRef.current)
+    }
 
     return () => {
       clearTimeout(resizeTimer)
-      resizeObserver.disconnect()
+      resizeObserver?.disconnect()
       startMarkerRef.current?.remove()
       endMarkerRef.current?.remove()
       startMarkerRef.current = null
@@ -1096,7 +1112,15 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     ensureStartMarker,
     ensureEndMarker,
     syncVertexMarkers,
+    mapBounds,
   ])
+
+  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  useEffect(() => {
+    if (mapRef.current) {
+      applyMapBoundsLimits(mapRef.current, mapBounds)
+    }
+  }, [mapBounds])
 
   // Sync cursor when editMode changes
   useEffect(() => {

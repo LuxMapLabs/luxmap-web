@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../redux/rootReducer'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
+  applyMapBoundsLimits,
 } from '../utils/gis-map/mapUtils'
 import { Crosshair, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 
@@ -50,9 +53,20 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     }
   }, [originalLat, originalLng])
 
-  // Valid coordinate fallback
-  const validLat = Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : DEFAULT_MAP_CENTER[1]
-  const validLng = Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : DEFAULT_MAP_CENTER[0]
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+
+  // Valid coordinate fallback prioritizing mapBounds.center from Backend
+  const fallbackLat =
+    typeof mapBounds?.center?.lat === 'number' && Number.isFinite(mapBounds.center.lat)
+      ? mapBounds.center.lat
+      : DEFAULT_MAP_CENTER[1]
+  const fallbackLng =
+    typeof mapBounds?.center?.lng === 'number' && Number.isFinite(mapBounds.center.lng)
+      ? mapBounds.center.lng
+      : DEFAULT_MAP_CENTER[0]
+
+  const validLat = Number.isFinite(lat) && lat >= -90 && lat <= 90 && lat !== 0 ? lat : fallbackLat
+  const validLng = Number.isFinite(lng) && lng >= -180 && lng <= 180 && lng !== 0 ? lng : fallbackLng
 
   const [currentDisplayCoords, setCurrentDisplayCoords] = useState<{ lat: number; lng: number }>({
     lat: validLat,
@@ -204,20 +218,34 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       map.resize()
     }, 200)
 
-    const resizeObserver = new ResizeObserver(() => {
-      map.resize()
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        map.resize()
+      })
+      resizeObserver.observe(containerRef.current)
+    }
+
+    map.on('load', () => {
+      applyMapBoundsLimits(map, mapBounds)
     })
-    resizeObserver.observe(containerRef.current)
 
     return () => {
       clearTimeout(resizeTimer)
-      resizeObserver.disconnect()
+      resizeObserver?.disconnect()
       marker.remove()
       map.remove()
       mapRef.current = null
       markerRef.current = null
     }
-  }, [createMarkerElement, readOnly, initialZoom])
+  }, [createMarkerElement, readOnly, initialZoom, mapBounds])
+
+  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  useEffect(() => {
+    if (mapRef.current) {
+      applyMapBoundsLimits(mapRef.current, mapBounds)
+    }
+  }, [mapBounds])
 
   // Sync external prop changes (e.g. user manually typing lat/lng in input fields)
   useEffect(() => {
