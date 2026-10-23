@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { Eye, Edit2, Zap, CheckCircle, MapPin } from 'lucide-react'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import { formatFriendlyCommuneName } from '../../../../../constants/communes'
 import { CabinetTableSkeleton } from './CabinetTableSkeleton'
 
 export interface CabinetTableProps {
@@ -83,7 +84,7 @@ export const CabinetTable: React.FC<CabinetTableProps> = ({
                     </div>
                   </td>
                   <td className="p-3.5 text-slate-600 dark:text-slate-300 font-medium">
-                    {cab.commune_name || cab.commune_id || '—'}
+                    {formatFriendlyCommuneName(cab.commune_name, cab.commune_id)}
                   </td>
                   <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200 font-mono">
                     {cab.feeder_ids?.length || 0} mạch

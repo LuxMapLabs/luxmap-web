@@ -7,6 +7,7 @@ import { extractSegmentCoordinates } from '../../../../../utils/gis-map/routeUti
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { RootState } from '../../../../../redux/rootReducer'
 import { getDataSourceDisplayName } from '../../../../../constants/enums'
+import { formatFriendlyCommuneName } from '../../../../../constants/communes'
 
 interface SegmentDetailModalProps {
   segment: SegmentListItem | null
@@ -126,7 +127,7 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
                 <MapPin className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
                 <span>Địa bàn quản lý:</span>
               </span>
-              <strong className="text-slate-800 dark:text-slate-200">{segment.commune_name || segment.commune_id || 'Chưa gán địa bàn'}</strong>
+              <strong className="text-slate-800 dark:text-slate-200">{formatFriendlyCommuneName(segment.commune_name, segment.commune_id, 'Chưa gán địa bàn')}</strong>
             </div>
 
             <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">

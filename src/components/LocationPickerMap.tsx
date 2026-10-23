@@ -7,6 +7,9 @@ import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
   applyMapBoundsLimits,
+  MAP_MAX_ZOOM,
+  MAP_ASSET_PICKER_ZOOM,
+  MAP_DEFAULT_MIN_ZOOM,
 } from '../utils/gis-map/mapUtils'
 import { Crosshair, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 
@@ -29,7 +32,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   onChange,
   height = '240px',
   readOnly = false,
-  initialZoom = 17,
+  initialZoom = MAP_ASSET_PICKER_ZOOM,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -148,8 +151,8 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
       zoom: initialZoom,
-      minZoom: 6,
-      maxZoom: 20,
+      minZoom: MAP_DEFAULT_MIN_ZOOM,
+      maxZoom: MAP_MAX_ZOOM,
       attributionControl: false,
     })
 

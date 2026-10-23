@@ -10,6 +10,7 @@ import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
   applyMapBoundsLimits,
+  MAP_MAX_ZOOM,
 } from '../../../../../utils/gis-map/mapUtils'
 import {
   resolveNonOverlappingRoutePoint,
@@ -101,9 +102,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
       zoom: isCoordValid ? 18 : 15,
-      maxZoom: 20,
+      maxZoom: MAP_MAX_ZOOM,
       pitch: 0,
       bearing: 0,
+      attributionControl: false,
     })
 
     mapRef.current = map

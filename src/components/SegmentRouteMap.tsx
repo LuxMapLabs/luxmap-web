@@ -3,7 +3,14 @@ import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../redux/rootReducer'
-import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER, applyMapBoundsLimits } from '../utils/gis-map/mapUtils'
+import {
+  GOOGLE_HYBRID_STYLE,
+  DEFAULT_MAP_CENTER,
+  applyMapBoundsLimits,
+  MAP_MAX_ZOOM,
+  FIT_BOUNDS_ROUTE_INSTANT,
+  FIT_BOUNDS_ROUTE_SMOOTH,
+} from '../utils/gis-map/mapUtils'
 import { projectPointOnSegment, calculateDistanceMeters } from '../utils/gis-map/routeUtils'
 import {
   ZoomIn,
@@ -784,7 +791,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       center,
       zoom: 15,
       minZoom: 6,
-      maxZoom: 20,
+      maxZoom: MAP_MAX_ZOOM,
       attributionControl: false,
     })
     mapRef.current = map
@@ -1065,7 +1072,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       // Fit bounds nicely if coords exist
       const b = getBounds()
       if (b) {
-        map.fitBounds(b, { padding: 40, duration: 400, maxZoom: 17 })
+        map.fitBounds(b, FIT_BOUNDS_ROUTE_SMOOTH)
       }
 
       setTimeout(() => {
@@ -1080,7 +1087,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       map.resize()
       const b = getBounds()
       if (b) {
-        map.fitBounds(b, { padding: 40, duration: 0, maxZoom: 17 })
+        map.fitBounds(b, FIT_BOUNDS_ROUTE_INSTANT)
       }
     }, 220)
 
@@ -1192,7 +1199,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const handleFitBounds = () => {
     const bounds = getBounds()
     if (mapRef.current && bounds) {
-      mapRef.current.fitBounds(bounds, { padding: 40, duration: 400, maxZoom: 17 })
+      mapRef.current.fitBounds(bounds, FIT_BOUNDS_ROUTE_SMOOTH)
     }
   }
 
@@ -1289,7 +1296,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
 
     const bounds = getBounds(targetRoute)
     if (mapRef.current && bounds) {
-      mapRef.current.fitBounds(bounds, { padding: 40, duration: 400, maxZoom: 17 })
+      mapRef.current.fitBounds(bounds, FIT_BOUNDS_ROUTE_SMOOTH)
     }
   }
 

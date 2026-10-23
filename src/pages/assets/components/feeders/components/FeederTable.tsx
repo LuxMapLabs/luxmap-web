@@ -1,6 +1,7 @@
 import React from 'react'
 import { Eye, Edit2, Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
+import { formatFriendlyCommuneName } from '../../../../../constants/communes'
 
 export interface FeederTableProps {
   feeders: FeederListItem[]
@@ -116,7 +117,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
                   <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>{feeder.commune_name || feeder.commune_id || '—'}</span>
+                      <span>{formatFriendlyCommuneName(feeder.commune_name, feeder.commune_id)}</span>
                     </div>
                   </td>
 

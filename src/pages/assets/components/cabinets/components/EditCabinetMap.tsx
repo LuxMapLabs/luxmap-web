@@ -11,6 +11,7 @@ import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
   applyMapBoundsLimits,
+  MAP_MAX_ZOOM,
 } from '../../../../../utils/gis-map/mapUtils'
 
 export interface EditCabinetMapProps {
@@ -152,9 +153,10 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
       zoom: isCoordValid ? 18 : 15, // Cận cảnh thực địa rõ nét
-      maxZoom: 20,
+      maxZoom: MAP_MAX_ZOOM,
       pitch: 0,
       bearing: 0,
+      attributionControl: false,
     })
 
     mapRef.current = map
