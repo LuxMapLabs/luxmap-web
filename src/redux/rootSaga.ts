@@ -1,7 +1,8 @@
 import { all, fork } from 'redux-saga/effects'
 import authSaga from '../feature/auth/authSaga'
 import assetSaga from '../feature/assets/assetSaga'
-import adminUserSaga from '../feature/admin/adminUserSaga'
+import adminUserSaga from '../feature/users/userSaga'
+import adminCommuneSaga from '../feature/communes/communeSaga'
 import mapSaga from '../feature/map/mapSaga'
 import citizenReportSaga from '../feature/citizen-report/citizenReportSaga'
 import { citizenReportsSaga } from '../feature/citizen-reports/citizenReportsSaga'
@@ -14,6 +15,7 @@ export default function* rootSaga() {
         fork(authSaga),
         fork(assetSaga),
         fork(adminUserSaga),
+        fork(adminCommuneSaga),
         fork(mapSaga),
         fork(citizenReportSaga),
         fork(citizenReportsSaga),

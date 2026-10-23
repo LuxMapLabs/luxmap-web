@@ -15,6 +15,7 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   FileDown,
+  Compass,
 } from 'lucide-react'
 import { openExportModal } from '../feature/assets/assetSlice'
 import { User, UserRole } from '../types/auth/web'
@@ -55,6 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isAssets = location.pathname.startsWith('/assets')
   const isCitizenReports = location.pathname.startsWith('/citizen-reports')
   const isReports = location.pathname.startsWith('/reports')
+  const isCommunesAdmin = location.pathname.startsWith('/admin/communes')
   const isAdminPath = location.pathname.startsWith('/admin')
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
@@ -141,6 +143,8 @@ export const Header: React.FC<HeaderProps> = ({
               <MessageSquareWarning className="w-4.5 h-4.5" />
             ) : isReports ? (
               <ClipboardCheck className="w-4.5 h-4.5" />
+            ) : isCommunesAdmin ? (
+              <Compass className="w-4.5 h-4.5" />
             ) : isAdminPath ? (
               <ShieldCheck className="w-4.5 h-4.5" />
             ) : (
@@ -159,6 +163,8 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Phản ánh người dân'
                 : isReports
                 ? 'Báo cáo & Nghiệm thu'
+                : isCommunesAdmin
+                ? 'Quản lý Địa bàn & Khung Bản đồ (BBox)'
                 : isAdminPath
                 ? 'Quản trị hệ thống'
                 : 'Bản đồ chiếu sáng'}
@@ -174,6 +180,8 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Thẩm định và xử lý báo cáo sự cố chiếu sáng từ mã QR'
                 : isReports
                 ? 'Tổng hợp số liệu vận hành & chất lượng chiếu sáng'
+                : isCommunesAdmin
+                ? 'Khai báo đơn vị hành chính xã/thị trấn và thiết lập khung bao bản đồ định vị'
                 : isAdminPath
                 ? 'Cấu hình và phân quyền người dùng'
                 : 'Giám sát lưới điện & hiện trạng tài sản theo thời gian thực'}
