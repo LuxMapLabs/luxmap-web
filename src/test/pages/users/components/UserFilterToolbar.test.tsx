@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { UserFilterToolbar, UserFilterToolbarProps } from '../../../../pages/admin/components/UserFilterToolbar'
+import { UserFilterToolbar, UserFilterToolbarProps } from '../../../../pages/users/components/UserFilterToolbar'
 import adminUserReducer, {
   fetchUsersRequest,
   fetchUsersSuccess,
@@ -8,7 +8,7 @@ import adminUserReducer, {
   createUserRequest,
   createUserFailure,
   setFilters,
-} from '../../../../feature/admin/adminUserSlice'
+} from '../../../../feature/users/userSlice'
 import type {
   UserAccountItem,
   UserAccountItemPagedResult,
@@ -17,7 +17,7 @@ import type {
 import type { UserRole } from '../../../../types/common/enums'
 import { USER_ROLE_LABELS } from '../../../../constants/enums'
 
-describe('UserFilterToolbar & Admin Page Data Flow (src/test/pages/admin/)', () => {
+describe('UserFilterToolbar & Admin Page Data Flow (src/test/pages/users/)', () => {
   const defaultProps: UserFilterToolbarProps = {
     searchTerm: '',
     selectedRole: '',
