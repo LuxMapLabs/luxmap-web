@@ -6,6 +6,8 @@ import rootReducer from '../../../../../redux/rootReducer'
 import { CabinetsTab, CabinetsTabProps } from '../../../../../pages/assets/components/cabinets/CabinetsTab'
 import { CabinetTable } from '../../../../../pages/assets/components/cabinets/components/CabinetTable'
 import { CabinetDetailModal } from '../../../../../pages/assets/components/cabinets/components/CabinetDetailModal'
+import { EditCabinetModal } from '../../../../../pages/assets/components/cabinets/components/EditCabinetModal'
+import { AddCabinetModal } from '../../../../../pages/assets/components/cabinets/components/AddCabinetModal'
 import assetReducer, {
   fetchAssetsRequest,
   fetchAssetsSuccess,
@@ -506,6 +508,60 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       // Dữ liệu tủ điện cũ vẫn được bảo tồn để người dùng không bị mất trắng màn hình
       expect(failedState.cabinets).toHaveLength(1)
       expect(failedState.cabinets[0].external_ref).toBe('CAB-TL01')
+    })
+
+    it('EditCabinetModal render dropdown Lọc nhanh tuyến đường trên bản đồ với tùy chọn rỗng mặc định', () => {
+      const store = configureStore({ reducer: rootReducer })
+      const mockSave = vi.fn()
+      const mockClose = vi.fn()
+
+      render(
+        <Provider store={store}>
+          <EditCabinetModal
+            isOpen={true}
+            cabinet={mockCabinetWithGeo}
+            availableSegments={[mockSegment]}
+            onClose={mockClose}
+            onSave={mockSave}
+          />
+        </Provider>
+      )
+
+      expect(screen.getByText('Lọc nhanh tuyến đường trên bản đồ (tùy chọn):')).toBeInTheDocument()
+      expect(screen.getByText('-- Không chọn (Xem toàn bộ mạng lưới) --')).toBeInTheDocument()
+      expect(screen.getByText(/💡 Kéo ghim ⚡ hoặc nhấp chuột lên bản đồ/i)).toBeInTheDocument()
+    })
+
+    it('AddCabinetModal không còn trường Ngày vận hành và cho phép thêm tủ điện mà không bắt buộc chọn tuyến đường', () => {
+      const store = configureStore({ reducer: rootReducer })
+      const mockAdd = vi.fn()
+      const mockClose = vi.fn()
+
+      render(
+        <Provider store={store}>
+          <AddCabinetModal
+            isOpen={true}
+            existingCount={0}
+            availableSegments={[mockSegment]}
+            onClose={mockClose}
+            onAddCabinet={mockAdd}
+          />
+        </Provider>
+      )
+
+      // Đảm bảo KHÔNG còn trường ngày vận hành
+      expect(screen.queryByText(/Ngày vận hành/i)).toBeNull()
+
+      // Bấm nút thêm tủ điện trực tiếp mà không cần chọn tuyến đường
+      const addRowBtn = screen.getByRole('button', { name: /\+ Thêm Tủ Điện/i })
+      fireEvent.click(addRowBtn)
+
+      // Hàng tủ điện được tạo thành công với tên mặc định Tủ điện A
+      expect(screen.getByDisplayValue('Tủ điện A')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Lat')).toHaveValue('10.970100')
+      expect(screen.getByPlaceholderText('Lng')).toHaveValue('106.489600')
+      // Không bị báo lỗi bắt buộc chọn tuyến đường
+      expect(screen.queryByText(/Vui lòng chọn Tuyến đường áp dụng/i)).toBeNull()
     })
   })
 })

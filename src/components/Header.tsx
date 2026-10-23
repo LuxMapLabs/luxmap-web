@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import {
   Bell,
   Map,
@@ -13,7 +14,9 @@ import {
   MessageSquareWarning,
   ClipboardCheck,
   LayoutDashboard,
+  FileDown,
 } from 'lucide-react'
+import { openExportModal } from '../feature/assets/assetSlice'
 import { User, UserRole } from '../types/auth/web'
 import { getRoleName } from '../utils/roleUtils'
 import { ProfileModal } from './ProfileModal'
@@ -45,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   isRefreshingProfile = false,
   className = '',
 }) => {
+  const dispatch = useDispatch()
   const location = useLocation()
   const isDashboard = location.pathname.startsWith('/dashboard')
   const isWorkSchedule = location.pathname.startsWith('/work-schedule')
@@ -178,6 +182,19 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         {/* Right: Notification Bell + Interactive Profile Dropdown + Quick Logout */}
         <div className="flex items-center gap-3 shrink-0">
+          {/* Quick Export Asset CSV Button - Chỉ hiển thị khi đang ở phân hệ Quản lý tài sản */}
+          {isAssets && (
+            <button
+              type="button"
+              onClick={() => dispatch(openExportModal())}
+              className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50/80 hover:bg-emerald-100/90 text-emerald-600 hover:text-emerald-700 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border border-emerald-200/90 shadow-2xs group"
+              title="Xuất dữ liệu tài sản ra tệp CSV (Excel)"
+              aria-label="Xuất dữ liệu tài sản"
+            >
+              <FileDown className="w-4 h-4 text-emerald-600 group-hover:-translate-y-0.5 transition-transform duration-200" />
+            </button>
+          )}
+
           {/* Notification Bell with pulse ping */}
           <button
             type="button"

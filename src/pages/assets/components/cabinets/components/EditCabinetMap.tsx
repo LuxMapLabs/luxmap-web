@@ -2,10 +2,15 @@ import React, { useEffect, useRef, useState, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers, Crosshair, Eye, EyeOff } from 'lucide-react'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
+import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
+  applyMapBoundsLimits,
 } from '../../../../../utils/gis-map/mapUtils'
 
 export interface EditCabinetMapProps {
@@ -13,6 +18,8 @@ export interface EditCabinetMapProps {
   lng: number
   currentCabinetId?: string | null
   currentExternalRef?: string | null
+  activeSegmentId?: string | null
+  availableSegments?: SegmentListItem[]
   segmentCoords?: [number, number][]
   otherCabinets?: CabinetListItem[]
   onChangeCoords: (coords: { lat: number; lng: number }) => void
@@ -23,6 +30,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   lng,
   currentCabinetId,
   currentExternalRef,
+  availableSegments = [],
   segmentCoords = [],
   otherCabinets = [],
   onChangeCoords,
@@ -30,10 +38,71 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const currentCabinetMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const isUserInteractingRef = useRef<boolean>(false)
   const otherMarkersRef = useRef<maplibregl.Marker[]>([])
+
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const mapSegments = useSelector((state: RootState) => state.map.segments)
+
+  // Tạo GeoJSON FeatureCollection chứa toàn bộ các tuyến đường trên GIS
+  const allRoutesGeoJson = useMemo<GeoJSON.FeatureCollection>(() => {
+    const features: GeoJSON.Feature[] = []
+
+    if (mapSegments && mapSegments.length > 0) {
+      mapSegments.forEach((seg) => {
+        if (
+          seg.geometry?.type === 'LineString' &&
+          Array.isArray(seg.geometry.coordinates) &&
+          seg.geometry.coordinates.length >= 2
+        ) {
+          features.push({
+            type: 'Feature',
+            properties: {
+              segment_id: seg.properties?.segment_id || '',
+              segment_name: seg.properties?.segment_name || '',
+            },
+            geometry: {
+              type: 'LineString',
+              coordinates: seg.geometry.coordinates as [number, number][],
+            },
+          })
+        }
+      })
+    }
+
+    if (features.length === 0 && availableSegments && availableSegments.length > 0) {
+      availableSegments.forEach((seg) => {
+        if ('geom_wkt' in seg && typeof seg.geom_wkt === 'string') {
+          const parsed = parseLineStringWkt(seg.geom_wkt)
+          if (parsed.length >= 2) {
+            features.push({
+              type: 'Feature',
+              properties: {
+                segment_id: seg.segment_id || '',
+                segment_name: seg.segment_name || '',
+              },
+              geometry: {
+                type: 'LineString',
+                coordinates: parsed,
+              },
+            })
+          }
+        }
+      })
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features,
+    }
+  }, [mapSegments, availableSegments])
 
   const [showOtherCabinets, setShowOtherCabinets] = useState(false)
 
+  const allRoutesGeoJsonRef = useRef(allRoutesGeoJson)
+  allRoutesGeoJsonRef.current = allRoutesGeoJson
+  const segmentCoordsRef = useRef(segmentCoords)
+  segmentCoordsRef.current = segmentCoords
   const onChangeCoordsRef = useRef(onChangeCoords)
   onChangeCoordsRef.current = onChangeCoords
 
@@ -67,17 +136,22 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     let isMounted = true
 
-    // Xác định tâm chính xác ngay tại vị trí tủ điện
-    const initialCenter: [number, number] =
-      Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0
-        ? [lng, lat]
-        : DEFAULT_MAP_CENTER
+    // Xác định tâm chính xác ngay tại vị trí tủ điện hoặc từ mapBounds Backend
+    const isCoordValid = Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0
+    const initialCenter: [number, number] = isCoordValid
+      ? [lng, lat]
+      : typeof mapBounds?.center?.lng === 'number' &&
+        typeof mapBounds?.center?.lat === 'number' &&
+        Number.isFinite(mapBounds.center.lng) &&
+        Number.isFinite(mapBounds.center.lat)
+      ? [mapBounds.center.lng, mapBounds.center.lat]
+      : DEFAULT_MAP_CENTER
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
-      zoom: 18, // Cận cảnh thực địa rõ nét
+      zoom: isCoordValid ? 18 : 15, // Cận cảnh thực địa rõ nét
       maxZoom: 20,
       pitch: 0,
       bearing: 0,
@@ -85,6 +159,16 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.resize()
+        }
+      })
+      resizeObserver.observe(mapContainerRef.current)
+    }
 
     // Marker Tủ điện màu tím nổi bật có tia sét ⚡ kéo thả định vị
     const markerEl = document.createElement('div')
@@ -136,6 +220,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     })
 
     const handleMarkerDrag = () => {
+      isUserInteractingRef.current = true
       const pos = marker.getLngLat()
       onChangeCoordsRef.current({
         lng: Number(pos.lng.toFixed(6)),
@@ -153,23 +238,70 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       handleMarkerDrag()
     })
 
+    // Sự kiện nhấp chuột (click) lên bản đồ để di chuyển tủ điện ngay lập tức
+    map.on('click', (e: maplibregl.MapMouseEvent) => {
+      isUserInteractingRef.current = true
+      const clickedLng = Number(e.lngLat.lng.toFixed(6))
+      const clickedLat = Number(e.lngLat.lat.toFixed(6))
+      onChangeCoordsRef.current({
+        lng: clickedLng,
+        lat: clickedLat,
+      })
+      if (currentCabinetMarkerRef.current) {
+        currentCabinetMarkerRef.current.setLngLat([clickedLng, clickedLat])
+      }
+    })
+
     map.on('load', () => {
       if (!isMounted) return
 
+      applyMapBoundsLimits(map, mapBounds)
+
       setTimeout(() => {
         map.resize()
-        // Focus thẳng vào vị trí tủ điện khi load xong
+        // Focus thẳng 100% vào vị trí tủ điện khi load xong
         if (Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0) {
-          map.flyTo({
+          map.jumpTo({
             center: [lng, lat],
             zoom: 18,
-            essential: true,
           })
         }
       }, 150)
 
-      // Source & layer vẽ tuyến đường nếu có
-      if (segmentCoords.length >= 2 && !map.getSource('edit-cabinet-route')) {
+      map.getCanvas().style.cursor = 'crosshair'
+
+      // 1. Source & layer vẽ TOÀN BỘ các tuyến đường trên GIS (đường nền màu dịu)
+      if (!map.getSource('edit-cabinet-all-routes')) {
+        map.addSource('edit-cabinet-all-routes', {
+          type: 'geojson',
+          data: allRoutesGeoJsonRef.current,
+        })
+
+        map.addLayer({
+          id: 'edit-cabinet-all-routes-glow',
+          type: 'line',
+          source: 'edit-cabinet-all-routes',
+          paint: {
+            'line-color': '#475569',
+            'line-width': 4.5,
+            'line-opacity': 0.4,
+          },
+        })
+
+        map.addLayer({
+          id: 'edit-cabinet-all-routes-core',
+          type: 'line',
+          source: 'edit-cabinet-all-routes',
+          paint: {
+            'line-color': '#94a3b8',
+            'line-width': 2.5,
+            'line-opacity': 0.75,
+          },
+        })
+      }
+
+      // 2. Source & layer vẽ tuyến đường đang chọn / liên kết của tủ điện (Highlight nổi bật)
+      if (!map.getSource('edit-cabinet-route')) {
         map.addSource('edit-cabinet-route', {
           type: 'geojson',
           data: {
@@ -177,7 +309,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
             properties: {},
             geometry: {
               type: 'LineString',
-              coordinates: segmentCoords,
+              coordinates: segmentCoordsRef.current.length >= 2 ? segmentCoordsRef.current : [],
             },
           },
         })
@@ -188,8 +320,8 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
           source: 'edit-cabinet-route',
           paint: {
             'line-color': '#0284c7',
-            'line-width': 7,
-            'line-opacity': 0.6,
+            'line-width': 8,
+            'line-opacity': 0.7,
           },
         })
 
@@ -199,8 +331,8 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
           source: 'edit-cabinet-route',
           paint: {
             'line-color': '#38bdf8',
-            'line-width': 3.5,
-            'line-opacity': 0.95,
+            'line-width': 4,
+            'line-opacity': 1,
           },
         })
       }
@@ -208,6 +340,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     return () => {
       isMounted = false
+      resizeObserver?.disconnect()
       marker.remove()
       otherMarkersRef.current.forEach((m) => m.remove())
       otherMarkersRef.current = []
@@ -215,37 +348,61 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       mapRef.current = null
       currentCabinetMarkerRef.current = null
     }
-  }, []) // Chỉ khởi tạo 1 lần
+  }, [mapBounds]) // Chỉ khởi tạo 1 lần
 
-  // Tự động focus camera ngay vào vị trí tủ điện khi mở modal hoặc thay đổi tủ
+  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
   useEffect(() => {
-    if (
-      mapRef.current &&
-      Number.isFinite(lng) &&
-      Number.isFinite(lat) &&
-      lng !== 0 &&
-      lat !== 0
-    ) {
-      mapRef.current.flyTo({
-        center: [lng, lat],
-        zoom: 18,
-        essential: true,
-      })
-      if (currentCabinetMarkerRef.current) {
-        currentCabinetMarkerRef.current.setLngLat([lng, lat])
-      }
+    if (mapRef.current) {
+      applyMapBoundsLimits(mapRef.current, mapBounds)
     }
-  }, [currentCabinetId])
+  }, [mapBounds])
 
-  // Cập nhật vị trí ghim khi lat/lng thay đổi từ input
+  // Cập nhật GeoJSON toàn bộ các tuyến đường khi mapSegments thay đổi
   useEffect(() => {
+    if (!mapRef.current) return
+    const src = mapRef.current.getSource('edit-cabinet-all-routes') as maplibregl.GeoJSONSource
+    if (src) {
+      src.setData(allRoutesGeoJson)
+    }
+  }, [allRoutesGeoJson])
+
+  // Cập nhật GeoJSON tuyến đường active và focus nhanh tới tuyến đường khi người dùng chọn
+  useEffect(() => {
+    if (!mapRef.current) return
+    const src = mapRef.current.getSource('edit-cabinet-route') as maplibregl.GeoJSONSource
+    if (src) {
+      src.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: segmentCoords.length >= 2 ? segmentCoords : [],
+        },
+      })
+    }
+
+    // Tự động focus nhanh tới tuyến đường khi người dùng chọn tuyến
+    if (segmentCoords.length >= 2) {
+      const bounds = new maplibregl.LngLatBounds()
+      segmentCoords.forEach((pt) => bounds.extend(pt))
+      mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 17 })
+    }
+  }, [segmentCoords])
+
+  // Tự động focus camera và dời ghim (giữ nguyên 100% mức zoom hiện tại) khi tọa độ thay đổi
+  useEffect(() => {
+    const map = mapRef.current
     if (
-      currentCabinetMarkerRef.current &&
-      Number.isFinite(lng) &&
-      Number.isFinite(lat) &&
-      lng !== 0 &&
-      lat !== 0
+      !map ||
+      !Number.isFinite(lng) ||
+      !Number.isFinite(lat) ||
+      lng === 0 ||
+      lat === 0
     ) {
+      return
+    }
+
+    if (currentCabinetMarkerRef.current) {
       const currentPos = currentCabinetMarkerRef.current.getLngLat()
       if (
         Math.abs(currentPos.lng - lng) > 0.000001 ||
@@ -254,7 +411,31 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
         currentCabinetMarkerRef.current.setLngLat([lng, lat])
       }
     }
-  }, [lat, lng])
+
+    // Nếu người dùng vừa trực tiếp kéo ghim hoặc click trên bản đồ thì không can thiệp camera hay zoom
+    if (isUserInteractingRef.current) {
+      isUserInteractingRef.current = false
+      return
+    }
+
+    // Nếu thay đổi từ bên ngoài: lướt nhẹ nhàng đến tọa độ mới nhưng GIỮ NGUYÊN mức zoom hiện tại
+    const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : undefined
+    if (typeof map.easeTo === 'function') {
+      map.easeTo({
+        center: [lng, lat],
+        ...(currentZoom !== undefined ? { zoom: currentZoom } : {}),
+        duration: 300,
+        essential: true,
+      })
+    } else if (typeof map.flyTo === 'function') {
+      map.flyTo({
+        center: [lng, lat],
+        ...(currentZoom !== undefined ? { zoom: currentZoom } : {}),
+        duration: 300,
+        essential: true,
+      })
+    }
+  }, [lng, lat, currentCabinetId])
 
   // Đồng bộ markers các tủ lân cận (chỉ hiển thị khi người dùng bật xem)
   useEffect(() => {
@@ -299,14 +480,27 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     })
   }, [showOtherCabinets, filteredOtherCabinets])
 
-  // Hàm đưa camera quay về vị trí tủ đang sửa
+  // Hàm đưa camera quay về vị trí tủ đang sửa (bảo lưu mức zoom của người dùng)
   const handleRecenter = () => {
-    if (mapRef.current && Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0) {
-      mapRef.current.flyTo({
-        center: [lng, lat],
-        zoom: 18,
-        essential: true,
-      })
+    const map = mapRef.current
+    if (map && Number.isFinite(lng) && Number.isFinite(lat) && lng !== 0 && lat !== 0) {
+      const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : undefined
+      const targetZoom = currentZoom !== undefined ? Math.max(currentZoom, 16) : 18
+      if (typeof map.easeTo === 'function') {
+        map.easeTo({
+          center: [lng, lat],
+          zoom: targetZoom,
+          duration: 350,
+          essential: true,
+        })
+      } else if (typeof map.flyTo === 'function') {
+        map.flyTo({
+          center: [lng, lat],
+          zoom: targetZoom,
+          duration: 350,
+          essential: true,
+        })
+      }
     }
   }
 
@@ -329,7 +523,17 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
           <div className="w-4 h-4 rounded-md bg-purple-600 border border-white flex items-center justify-center text-[10px] text-yellow-300 font-bold shrink-0 shadow-xs">
             ⚡
           </div>
-          <span className="text-slate-200 font-medium">Tủ đang sửa (Kéo để dời vị trí)</span>
+          <span className="text-slate-200 font-medium">Tủ đang sửa (Kéo hoặc nhấp chuột để đặt)</span>
+        </div>
+
+        <div className="flex items-center gap-2 pt-0.5">
+          <div className="w-4 h-1.5 rounded-full bg-sky-400 shrink-0 shadow-xs" />
+          <span className="text-sky-300 font-medium text-[10px]">Tuyến đường liên kết</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-1.5 rounded-full bg-slate-400 shrink-0" />
+          <span className="text-slate-300 font-medium text-[10px]">Các tuyến đường khác</span>
         </div>
 
         {/* Toggle ẩn/hiện các tủ khác để tránh rối mắt */}
@@ -359,7 +563,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
         )}
 
         <p className="text-[10px] text-amber-200/90 pt-1 border-t border-slate-800">
-          💡 Nhấn và giữ ghim ⚡ để kéo thả đến vị trí thực địa chính xác.
+          💡 Nhấp chuột lên bản đồ hoặc kéo ghim ⚡ để đặt vị trí thực địa chính xác.
         </p>
       </div>
 

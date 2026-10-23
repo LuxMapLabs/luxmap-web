@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useSelector } from 'react-redux'
-import { Zap, X, CheckCircle2, MapPin, AlertCircle } from 'lucide-react'
+import { useSelector, useDispatch } from 'react-redux'
+import { Zap, X, CheckCircle2, MapPin, AlertCircle, Route } from 'lucide-react'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { DataSource } from '../../../../../types/common/enums'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
+import { fetchMapLayersRequest } from '../../../../../feature/map/mapSlice'
 import { EditCabinetMap } from './EditCabinetMap'
 
 export interface EditCabinetModalProps {
@@ -18,48 +19,49 @@ export interface EditCabinetModalProps {
   onSave: (updated: CabinetListItem) => void
 }
 
-export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
-  isOpen,
+const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: CabinetListItem }> = ({
   cabinet,
   availableSegments = [],
   availableCabinets = [],
   onClose,
   onSave,
 }) => {
+  const dispatch = useDispatch()
   const mapSegments = useSelector((state: RootState) => state.map.segments)
 
-  const [cabinetName, setCabinetName] = useState(() => cabinet?.cabinet_name || '')
-  const [externalRef, setExternalRef] = useState(() => cabinet?.external_ref || '')
-  const [lat, setLat] = useState(() => (cabinet?.location?.lat ? String(cabinet.location.lat) : '10.9701'))
-  const [lng, setLng] = useState(() => (cabinet?.location?.lng ? String(cabinet.location.lng) : '106.4896'))
-  const [dataSource, setDataSource] = useState<DataSource>(() => cabinet?.data_source || 'field')
+  // Fetch map layers nếu chưa có dữ liệu GIS
+  useEffect(() => {
+    if (!mapSegments || mapSegments.length === 0) {
+      dispatch(fetchMapLayersRequest())
+    }
+  }, [mapSegments, dispatch])
+
+  const [cabinetName, setCabinetName] = useState(() => cabinet.cabinet_name || '')
+  const [externalRef, setExternalRef] = useState(() => cabinet.external_ref || '')
+  const [lat, setLat] = useState(() => (cabinet.location?.lat ? String(cabinet.location.lat) : '10.9701'))
+  const [lng, setLng] = useState(() => (cabinet.location?.lng ? String(cabinet.location.lng) : '106.4896'))
+  const [dataSource, setDataSource] = useState<DataSource>(() => cabinet.data_source || 'field')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string>('')
+
   useEffect(() => {
-    if (cabinet && isOpen) {
+    if (cabinet) {
       setCabinetName(cabinet.cabinet_name || '')
       setExternalRef(cabinet.external_ref || '')
-      setLat(cabinet.location?.lat ? String(cabinet.location.lat) : '10.9701')
-      setLng(cabinet.location?.lng ? String(cabinet.location.lng) : '106.4896')
+      if (cabinet.location?.lat) setLat(String(cabinet.location.lat))
+      if (cabinet.location?.lng) setLng(String(cabinet.location.lng))
       setDataSource(cabinet.data_source || 'field')
       setErrorMsg(null)
     }
-  }, [cabinet, isOpen])
+  }, [cabinet])
 
-  // Trích xuất tuyến đường lân cận nếu tủ có liên kết tuyến
+  // Trích xuất tọa độ của tuyến đường đang chọn để highlight trên bản đồ
   const segmentCoords = useMemo<[number, number][]>(() => {
-    if (!availableSegments || availableSegments.length === 0) return []
-
-    // Tìm tuyến tương ứng
-    const found = availableSegments.find((s) => {
-      if (cabinet?.commune_id && s.commune_id === cabinet.commune_id) return true
-      return false
-    })
-
-    if (!found) return []
+    if (!selectedSegmentId) return []
 
     // 1. LineString từ mapSegments PostGIS
-    const mapSeg = mapSegments.find((s) => s.properties?.segment_id === found.segment_id)
+    const mapSeg = mapSegments?.find((s) => s.properties?.segment_id === selectedSegmentId)
     if (
       mapSeg &&
       mapSeg.geometry?.type === 'LineString' &&
@@ -69,15 +71,14 @@ export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
     }
 
     // 2. LineString từ geom_wkt
-    if ('geom_wkt' in found && typeof found.geom_wkt === 'string') {
+    const found = availableSegments.find((s) => s.segment_id === selectedSegmentId)
+    if (found && 'geom_wkt' in found && typeof found.geom_wkt === 'string') {
       const parsed = parseLineStringWkt(found.geom_wkt)
       if (parsed.length >= 2) return parsed
     }
 
     return []
-  }, [availableSegments, cabinet, mapSegments])
-
-  if (!isOpen || !cabinet) return null
+  }, [selectedSegmentId, availableSegments, mapSegments])
 
   const parsedLat = parseFloat(lat) || 10.9701
   const parsedLng = parseFloat(lng) || 106.4896
@@ -188,6 +189,29 @@ export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
                   />
                 </div>
 
+                {/* Lọc nhanh tuyến đường trên bản đồ (tùy chọn) */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center gap-1.5">
+                    <Route className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Lọc nhanh tuyến đường trên bản đồ (tùy chọn):</span>
+                  </label>
+                  <select
+                    value={selectedSegmentId}
+                    onChange={(e) => setSelectedSegmentId(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-600 shadow-2xs cursor-pointer"
+                  >
+                    <option value="">-- Không chọn (Xem toàn bộ mạng lưới) --</option>
+                    {availableSegments.map((seg) => (
+                      <option key={seg.segment_id} value={seg.segment_id || ''}>
+                        {seg.segment_name} ({seg.external_ref || seg.segment_id})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 italic">
+                    💡 Chọn một tuyến đường để tô sáng nổi bật trên bản đồ khi cần đối chiếu.
+                  </p>
+                </div>
+
                 {/* Mã tham chiếu thực địa (External Ref) */}
                 <div className="space-y-1.5">
                   <label className="font-bold text-slate-700 dark:text-slate-300 text-xs">
@@ -294,10 +318,13 @@ export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
             {/* CỘT PHẢI (~60%): BẢN ĐỒ VỆ TINH GIS ĐỊNH VỊ */}
             <div className="md:col-span-7 h-[380px] md:h-full relative overflow-hidden bg-slate-950">
               <EditCabinetMap
+                key={cabinet?.cabinet_id || cabinet?.external_ref || 'edit-cabinet-map'}
                 lat={parsedLat}
                 lng={parsedLng}
                 currentCabinetId={cabinet?.cabinet_id}
                 currentExternalRef={cabinet?.external_ref}
+                activeSegmentId={selectedSegmentId}
+                availableSegments={availableSegments}
                 segmentCoords={segmentCoords}
                 otherCabinets={availableCabinets}
                 onChangeCoords={({ lat: newLat, lng: newLng }) => {
@@ -312,5 +339,16 @@ export const EditCabinetModal: React.FC<EditCabinetModalProps> = ({
       </div>
     </div>,
     document.body
+  )
+}
+
+export const EditCabinetModal: React.FC<EditCabinetModalProps> = (props) => {
+  if (!props.isOpen || !props.cabinet) return null
+  return (
+    <EditCabinetModalInner
+      key={props.cabinet.cabinet_id || props.cabinet.external_ref || 'edit-cabinet-dialog'}
+      {...props}
+      cabinet={props.cabinet}
+    />
   )
 }

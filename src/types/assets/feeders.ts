@@ -33,6 +33,7 @@ export interface FeederListItem {
     external_ref?: string | null
     feeder_name: string | null
     commune_id: string | null
+    commune_name?: string | null
     has_geometry: boolean
     pole_count: number
     cabinet?: FeederCabinet

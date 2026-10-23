@@ -83,7 +83,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
                 <StatusBadge type="fixture" status={displayFixtureStatus} label={displayFixtureLabel} size="sm" />
               </div>
               <p className="text-xs text-slate-200 dark:text-slate-400 mt-0.5">
-                {segmentName} — {pole.commune_id || 'Củ Chi'}
+                {segmentName} — {pole.commune_name || pole.commune_id || 'Chưa gán địa bàn'}
               </p>
             </div>
           </div>
@@ -163,7 +163,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
             </div>
             <div className="text-slate-600 dark:text-slate-300 text-xs space-y-1">
               <div>
-                <strong className="text-slate-800 dark:text-slate-200">Tuyến đường:</strong> {segmentName} ({pole.commune_id || 'Củ Chi'})
+                <strong className="text-slate-800 dark:text-slate-200">Tuyến đường:</strong> {segmentName} ({pole.commune_name || pole.commune_id || 'Chưa gán địa bàn'})
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <strong className="text-slate-800 dark:text-slate-200">Tủ điện quản lý:</strong>{' '}

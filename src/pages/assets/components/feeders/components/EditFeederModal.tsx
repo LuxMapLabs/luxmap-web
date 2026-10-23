@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Cable, Zap, AlertCircle } from 'lucide-react'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { FeederListItem, UpdateFeederRequest } from '../../../../../types/assets/feeders'
+import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
 
 export interface EditFeederModalProps {
   isOpen: boolean
@@ -104,18 +105,15 @@ export const EditFeederModal: React.FC<EditFeederModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Tủ Điện Cấp Nguồn:
             </label>
-            <select
+            <CabinetSearchSelect
+              cabinets={cabinets}
               value={cabinetId}
-              onChange={(e) => setCabinetId(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500"
-            >
-              <option value="">-- Chưa đấu nối vào tủ điện --</option>
-              {cabinets.map((cab) => (
-                <option key={cab.cabinet_id} value={cab.cabinet_id || ''}>
-                  ⚡ {cab.cabinet_name || cab.external_ref || cab.cabinet_id} ({cab.cabinet_id})
-                </option>
-              ))}
-            </select>
+              onChange={(newCabId) => setCabinetId(newCabId)}
+              placeholder="-- Chưa đấu nối vào tủ điện --"
+              accentColor="amber"
+              allowClear={true}
+              getId={(c) => c.cabinet_id || ''}
+            />
           </div>
 
           {/* Tên Mạch Điện */}

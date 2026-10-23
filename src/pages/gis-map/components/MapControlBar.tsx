@@ -313,7 +313,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
       <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex items-start gap-2.5 pointer-events-none">
         {/* Left Column: Search Box on top, Tools directly underneath */}
         <div className="flex flex-col gap-2 pointer-events-auto shrink-0">
-          {searchInputNode('w-72 sm:w-80 md:w-96')}
+          {searchInputNode('w-64 sm:w-72 md:w-80')}
           {toolsNode('max-w-[150px] sm:max-w-[180px]')}
         </div>
 
@@ -330,7 +330,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
   return (
     <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between gap-3 pointer-events-none">
       <div className="flex items-center gap-2.5 pointer-events-auto">
-        {searchInputNode('w-80 md:w-[420px] lg:w-[480px] xl:w-[540px]')}
+        {searchInputNode('w-64 sm:w-72 md:w-80 lg:w-[320px] xl:w-[360px]')}
         {statusPillsNode}
       </div>
 

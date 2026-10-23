@@ -1,4 +1,7 @@
 import React, { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { RootState } from '../../redux/rootReducer'
+import { closeExportModal } from '../../feature/assets/assetSlice'
 import {
   CheckCircle,
   Boxes,
@@ -15,6 +18,7 @@ import { SegmentsTab } from './components/segments/SegmentsTab'
 import { FeedersTab } from './components/feeders/FeedersTab'
 import { IotNodesTab } from './components/iot/IotNodesTab'
 import { ImportAssetModal } from './components/ImportAssetModal'
+import { ExportAssetModal, type ExportableCategory } from './components/ExportAssetModal'
 import { TabCountBadge } from './components/common/TabCountBadge'
 import { useAssetData } from '../../hooks/assets/useAssetData'
 
@@ -28,11 +32,20 @@ export type AssetCategory =
   | 'poles_and_fixtures'
 
 export const AssetManagementPage: React.FC = () => {
+  const dispatch = useDispatch()
+  const isExportModalOpen = useSelector((state: RootState) => Boolean(state.assets.isExportModalOpen))
   const [activeCategory, setActiveCategory] = useState<AssetCategory>('segments')
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [selectedFixtureCode, setSelectedFixtureCode] = useState<string>('')
   const [selectedPoleCode, setSelectedPoleCode] = useState<string>('')
   const [selectedCabinetCode, setSelectedCabinetCode] = useState<string>('')
+
+  const exportCategory: ExportableCategory =
+    activeCategory === 'iot_nodes'
+      ? 'cabinets'
+      : activeCategory === 'poles_and_fixtures'
+      ? 'poles'
+      : activeCategory
 
   const handleSelectFixture = (fixtureCode: string) => {
     setSelectedFixtureCode(fixtureCode)
@@ -404,6 +417,18 @@ export const AssetManagementPage: React.FC = () => {
         category={activeCategory === 'iot_nodes' ? 'cabinets' : activeCategory}
         onClose={() => setIsImportModalOpen(false)}
         onImportSuccess={handleImportSuccess}
+      />
+
+      {/* Global Export Modal */}
+      <ExportAssetModal
+        isOpen={isExportModalOpen}
+        initialCategory={exportCategory}
+        onClose={() => dispatch(closeExportModal())}
+        poles={poles}
+        cabinets={cabinets}
+        segments={segments}
+        feeders={feeders}
+        fixtures={fixtures}
       />
     </div>
   )

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER } from '../../../../../utils/gis-map/mapUtils'
+import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER, applyMapBoundsLimits } from '../../../../../utils/gis-map/mapUtils'
 import {
   snapPointToPolyline,
   parseLineStringWkt,
@@ -26,6 +26,7 @@ import type { RootState } from '../../../../../redux/rootReducer'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
 
 interface AddPoleModalProps {
   isOpen: boolean
@@ -79,6 +80,9 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
   const [selectedCabinetId, setSelectedCabinetId] = useState('')
   const [selectedFeederId, setSelectedFeederId] = useState('')
+
+  // Map Bounds từ Backend để giới hạn không gian địa bàn
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
 
   // Danh sách mạch điện từ Redux store
   const allFeeders = useSelector((state: RootState) => state.assets.feeders)
@@ -369,7 +373,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
         .map((pt) => snapPointToPolyline(pt, coords).accumulatedDist)
         .sort((a, b) => a - b)
 
-      const MIN_CLEARANCE = 15 // meters: khoảng cách an toàn tối thiểu tránh đè cột
+      const MIN_CLEARANCE = 2 // meters: khoảng cách an toàn tối thiểu tránh đè trùng khít cột
 
       // Build & merge overlapping forbidden intervals [d - MIN_CLEARANCE, d + MIN_CLEARANCE]
       const rawIntervals = obstacleDists.map((d) => [
@@ -518,17 +522,36 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   useEffect(() => {
     if (!isOpen || !mapContainerRef.current) return
 
+    const initialCenter: [number, number] =
+      typeof mapBounds?.center?.lng === 'number' &&
+      typeof mapBounds?.center?.lat === 'number' &&
+      Number.isFinite(mapBounds.center.lng) &&
+      Number.isFinite(mapBounds.center.lat)
+        ? [mapBounds.center.lng, mapBounds.center.lat]
+        : DEFAULT_MAP_CENTER
+
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: GOOGLE_HYBRID_STYLE,
-      center: DEFAULT_MAP_CENTER,
+      center: initialCenter,
       zoom: 14.5,
       attributionControl: false,
     })
 
     mapRef.current = map
 
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.resize()
+        }
+      })
+      resizeObserver.observe(mapContainerRef.current)
+    }
+
     map.on('load', () => {
+      applyMapBoundsLimits(map, mapBounds)
       setTimeout(() => {
         map.resize()
       }, 100)
@@ -660,6 +683,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     const markersMap = markersMapRef.current
 
     return () => {
+      resizeObserver?.disconnect()
       if (existingPolePopupRef.current) {
         existingPolePopupRef.current.remove()
         existingPolePopupRef.current = null
@@ -673,7 +697,14 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       map.remove()
       mapRef.current = null
     }
-  }, [isOpen, addPoleAtPoint])
+  }, [isOpen, addPoleAtPoint, mapBounds])
+
+  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  useEffect(() => {
+    if (mapRef.current) {
+      applyMapBoundsLimits(mapRef.current, mapBounds)
+    }
+  }, [mapBounds])
 
   // Synchronize existing poles GeoJSON data when selected segment or allPoles changes
   useEffect(() => {
@@ -1056,32 +1087,30 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                       <span>Tủ điện quản lý nguồn:</span>
                       <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">(1 Cột - 1 Tủ)</span>
                     </label>
-                    <select
+                    <CabinetSearchSelect
+                      cabinets={availableCabinetsOnSegment}
                       value={selectedCabinetId}
-                      onChange={(e) => {
-                        setSelectedCabinetId(e.target.value)
+                      onChange={(newCabId) => {
+                        setSelectedCabinetId(newCabId)
                         setErrorMsg(null)
                       }}
-                      disabled={!selectedSegmentId}
-                      className={`w-full p-2 bg-white dark:bg-slate-900 border rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800 ${
-                        !selectedCabinetId
-                          ? 'text-slate-400 border-slate-300 dark:border-slate-700'
-                          : 'text-slate-900 dark:text-slate-100 border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500'
-                      }`}
-                    >
-                      <option value="" disabled className="text-slate-400 font-normal">
-                        {selectedSegmentId
+                      placeholder={
+                        selectedSegmentId
                           ? availableCabinetsOnSegment.length > 0
                             ? '-- Chọn tủ điện quản lý --'
                             : '-- Tuyến này chưa có tủ điện --'
-                          : '-- Vui lòng chọn Tuyến trước --'}
-                      </option>
-                      {availableCabinetsOnSegment.map((cab) => (
-                        <option key={cab.cabinet_id || cab.external_ref || ''} value={cab.cabinet_id || cab.external_ref || ''} className="text-slate-900 dark:text-slate-100">
-                          ⚡️ {cab.cabinet_name || cab.external_ref || cab.cabinet_id} ({cab.external_ref || cab.cabinet_id})
-                        </option>
-                      ))}
-                    </select>
+                          : '-- Vui lòng chọn Tuyến trước --'
+                      }
+                      disabled={!selectedSegmentId || availableCabinetsOnSegment.length === 0}
+                      disabledPlaceholder={
+                        !selectedSegmentId
+                          ? '-- Vui lòng chọn Tuyến trước --'
+                          : '-- Tuyến này chưa có tủ điện --'
+                      }
+                      accentColor="indigo"
+                      allowClear={true}
+                      getId={(c) => c.cabinet_id || c.external_ref || ''}
+                    />
 
                     {/* 3. Select Feeder */}
                     <div className="space-y-1 pt-1">

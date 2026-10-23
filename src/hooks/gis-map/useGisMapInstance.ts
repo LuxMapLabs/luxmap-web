@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../../redux/store'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import {
@@ -12,14 +14,23 @@ export function useGisMapInstance() {
   const mapRef = useRef<maplibregl.Map | null>(null)
   const popupRef = useRef<maplibregl.Popup | null>(null)
   const [isMapLoaded, setIsMapLoaded] = useState<boolean>(false)
+  const mapBounds = useSelector((state: RootState) => state.auth.user?.mapBounds)
 
   useEffect(() => {
     if (!mapContainerRef.current) return
 
+    const centerLng = mapBounds?.center?.lng
+    const centerLat = mapBounds?.center?.lat
+    const initialCenter: [number, number] =
+      typeof centerLng === 'number' && Number.isFinite(centerLng) &&
+      typeof centerLat === 'number' && Number.isFinite(centerLat)
+        ? [centerLng, centerLat]
+        : DEFAULT_MAP_CENTER
+
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: GOOGLE_HYBRID_STYLE,
-      center: DEFAULT_MAP_CENTER,
+      center: initialCenter,
       zoom: DEFAULT_MAP_ZOOM,
       minZoom: 6,
       maxZoom: 20,
@@ -34,49 +45,6 @@ export function useGisMapInstance() {
       new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),
       'bottom-right'
     )
-
-    // GPS Geolocate Control
-    const geolocate = new maplibregl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: false,
-      showUserLocation: true,
-    })
-
-    geolocate.on('trackuserlocationstart', () => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.add('is-searching-location')
-    })
-
-    geolocate.on('geolocate', (e: maplibregl.GeolocatePositionEvent) => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.add('is-searching-location')
-
-      if (e?.coords) {
-        map.flyTo({
-          center: [e.coords.longitude, e.coords.latitude],
-          zoom: 17,
-          speed: 1.2,
-        })
-        map.once('moveend', () => {
-          btn?.classList.remove('is-searching-location')
-        })
-      } else {
-        btn?.classList.remove('is-searching-location')
-      }
-    })
-
-    geolocate.on('error', (err: maplibregl.GeolocateErrorEvent) => {
-      const btn = document.querySelector('.maplibregl-ctrl-geolocate')
-      btn?.classList.remove('is-searching-location')
-      console.warn('Geolocation error:', err)
-      if (err?.code === 1) {
-        alert(
-          'Trình duyệt chưa được cấp quyền Vị trí (Location). Bạn vui lòng bấm vào biểu tượng cài đặt trên thanh địa chỉ URL để cấp quyền nhé!'
-        )
-      }
-    })
-
-    map.addControl(geolocate, 'bottom-right')
 
     // Tooltip Popup
     const popup = new maplibregl.Popup({

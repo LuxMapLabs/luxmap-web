@@ -27,6 +27,8 @@ export type FixtureType = 'led_road_lamp'
 
 export type InspectionOutcome = 'fault_present' | 'fault_absent' | 'inconclusive'
 
+export type JobState = 'ok' | 'failing' | 'stalled' | 'running'
+
 export type LightingAckResult = 'applied' | 'failed'
 
 export type LightingCommandStatus = 'pending' | 'delivered' | 'applied' | 'failed' | 'expired' | 'superseded'
@@ -52,6 +54,8 @@ export type RoadClass = 'inter_commune' | 'inter_village'
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
 
 export type SourceChannel = 'cv' | 'iot' | 'field_report'
+
+export type StorageBucket = 'survey' | 'evidence' | 'video' | 'citizen'
 
 export type SurveyRawKind = 'gps_track' | 'lux_log' | 'capture_config'
 
