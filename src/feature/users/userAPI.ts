@@ -15,7 +15,7 @@ export interface UserQueryParams {
   status?: string
 }
 
-export const adminUserAPI = {
+export const userAPI = {
   /**
    * Lấy danh sách tài khoản người dùng
    * GET /api/v1/admin/users
@@ -35,7 +35,7 @@ export const adminUserAPI = {
   },
 
   /**
-   * Tạo tài khoản người dùng mới
+   * Khởi tạo tài khoản mới
    * POST /api/v1/admin/users
    */
   createUser: async (payload: CreateUserRequest): Promise<CreateUserResponse> => {
@@ -44,30 +44,28 @@ export const adminUserAPI = {
   },
 
   /**
-   * Cập nhật thông tin tài khoản người dùng
-   * PATCH /api/v1/admin/users/{id}
+   * Cập nhật thông tin tài khoản
+   * PUT /api/v1/admin/users/{id}
    */
   updateUser: async (id: string, payload: UpdateUserRequest): Promise<UserAccountItem> => {
-    const response = await apiClient.patch<UserAccountItem>(`/admin/users/${id}`, payload)
+    const response = await apiClient.put<UserAccountItem>(`/admin/users/${id}`, payload)
     return response.data
   },
 
   /**
-   * Khóa tài khoản người dùng
+   * Khóa tài khoản
    * POST /api/v1/admin/users/{id}/lock
    */
-  lockUser: async (id: string): Promise<UserAccountItem> => {
-    const response = await apiClient.post<UserAccountItem>(`/admin/users/${id}/lock`)
-    return response.data
+  lockUser: async (id: string): Promise<void> => {
+    await apiClient.post(`/admin/users/${id}/lock`)
   },
 
   /**
-   * Mở khóa tài khoản người dùng
+   * Mở khóa tài khoản
    * POST /api/v1/admin/users/{id}/unlock
    */
-  unlockUser: async (id: string): Promise<UserAccountItem> => {
-    const response = await apiClient.post<UserAccountItem>(`/admin/users/${id}/unlock`)
-    return response.data
+  unlockUser: async (id: string): Promise<void> => {
+    await apiClient.post(`/admin/users/${id}/unlock`)
   },
 
   /**
@@ -79,3 +77,5 @@ export const adminUserAPI = {
     return response.data
   },
 }
+
+export const adminUserAPI = userAPI

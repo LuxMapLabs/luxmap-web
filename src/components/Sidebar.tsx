@@ -12,6 +12,7 @@ import {
   FileCheck2,
   MessageSquareWarning,
   LayoutDashboard,
+  Compass,
 } from 'lucide-react'
 import { User } from '../types/auth/web'
 import { canAccessTab } from '../utils/roleUtils'
@@ -43,7 +44,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isAssets = location.pathname.startsWith('/assets')
   const isReports = location.pathname.startsWith('/reports')
   const isCitizenReports = location.pathname.startsWith('/citizen-reports')
-  const isAdminPath = location.pathname.startsWith('/admin')
+  const isUsersAdmin = location.pathname === '/admin/system' || location.pathname.startsWith('/admin/users')
+  const isCommunesAdmin = location.pathname.startsWith('/admin/communes')
 
   // Lấy pendingCount từ store để gắn badge
   const pendingCount = useSelector(
@@ -264,28 +266,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab 5: Quản trị hệ thống (Chỉ dành cho Admin) */}
+        {/* Tab 5: Quản lý người dùng (Dành cho Admin) */}
         {showAdmin && (
           <NavLink
             to="/admin/system"
-            title="Quản trị hệ thống"
+            title="Quản lý tài khoản"
             className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
               isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
             } ${
-              isAdminPath
+              isUsersAdmin
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
             }`}
           >
             <ShieldCheck
               className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
-                isAdminPath ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+                isUsersAdmin ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
               }`}
             />
             {!isCollapsed && (
-              <span className="flex-1 tracking-tight whitespace-nowrap">Quản trị hệ thống</span>
+              <span className="flex-1 tracking-tight whitespace-nowrap">Quản lý tài khoản</span>
             )}
-            {!isCollapsed && isAdminPath && (
+            {!isCollapsed && isUsersAdmin && (
+              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
+            )}
+          </NavLink>
+        )}
+
+        {/* Tab 6: Quản lý địa bàn (Trang riêng dành cho Admin) */}
+        {showAdmin && (
+          <NavLink
+            to="/admin/communes"
+            title="Địa bàn & Khung BBox"
+            className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
+              isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
+            } ${
+              isCommunesAdmin
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+            }`}
+          >
+            <Compass
+              className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
+                isCommunesAdmin ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+              }`}
+            />
+            {!isCollapsed && (
+              <span className="flex-1 tracking-tight whitespace-nowrap">Địa bàn & Khung BBox</span>
+            )}
+            {!isCollapsed && isCommunesAdmin && (
               <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
             )}
           </NavLink>

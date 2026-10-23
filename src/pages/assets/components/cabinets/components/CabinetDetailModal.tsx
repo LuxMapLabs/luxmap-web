@@ -2,6 +2,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { X, Zap, MapPin } from 'lucide-react'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import { formatFriendlyCommuneName } from '../../../../../constants/communes'
 
 interface CabinetDetailModalProps {
   cabinet: CabinetListItem | null
@@ -79,7 +80,7 @@ export const CabinetDetailModal: React.FC<CabinetDetailModalProps> = ({
             </div>
             <div className="text-slate-600 dark:text-slate-300 space-y-1">
               <div><strong>Mã định danh (ID):</strong> {cabinet.cabinet_id || 'Chưa gán'}</div>
-              <div><strong>Địa bàn quản lý:</strong> {cabinet.commune_name || cabinet.commune_id || 'Chưa gán địa bàn'}</div>
+              <div><strong>Địa bàn quản lý:</strong> {formatFriendlyCommuneName(cabinet.commune_name, cabinet.commune_id, 'Chưa gán địa bàn')}</div>
               <div><strong>Mã tham chiếu ngoài:</strong> {cabinet.external_ref || 'Không có'}</div>
               {cabinet.iot_node_id && (
                 <div><strong>Mã bộ điều khiển IoT:</strong> {cabinet.iot_node_id}</div>

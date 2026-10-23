@@ -52,3 +52,26 @@ export function formatCommuneDisplayName(communeId?: string | null): string {
   }
   return trimmed
 }
+
+/**
+ * Trả về tên địa bàn thân thiện (chuỗi tiếng Việt chuẩn).
+ * Ưu tiên commune_name từ Backend, nếu chưa có thì tra cứu CU_CHI_COMMUNES_MAP.
+ * Tuyệt đối KHÔNG hiển thị mã ID thô (COM-001, UUID) lên giao diện người dùng.
+ */
+export function formatFriendlyCommuneName(
+  communeName?: string | null,
+  communeId?: string | null,
+  fallback: string = '—'
+): string {
+  if (communeName && communeName.trim()) {
+    return communeName.trim()
+  }
+  if (communeId && communeId.trim()) {
+    const trimmedId = communeId.trim()
+    const mapped = CU_CHI_COMMUNES_MAP[trimmedId]
+    if (mapped) {
+      return mapped
+    }
+  }
+  return fallback
+}

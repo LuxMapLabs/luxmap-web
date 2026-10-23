@@ -6,12 +6,26 @@ import type { Map as MapLibreMap, StyleSpecification } from 'maplibre-gl'
 export const DEFAULT_MAP_CENTER: [number, number] = [106.4975, 10.9715]
 /** Fallback `bbox` for map layers when the account has no `map_bounds` (no commune frame set yet). */
 
-/** A complete commune frame as MapLibre bounds, or null when any edge is missing. */
-export function toLngLatBounds(bbox?: CommuneBbox | null): [[number, number], [number, number]] | null {
+/** A complete commune frame as MapLibre bounds, or null when any edge is missing. Supports numbers and numeric strings with comma/dot. */
+export function toLngLatBounds(bbox?: any | null): [[number, number], [number, number]] | null {
   if (!bbox) return null
-  const { min_lng, min_lat, max_lng, max_lat } = bbox
-  if ([min_lng, min_lat, max_lng, max_lat].some((v) => typeof v !== 'number' || !Number.isFinite(v))) return null
-  return [[min_lng!, min_lat!], [max_lng!, max_lat!]]
+  const parseCoord = (v: any): number | null => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    if (typeof v === 'string') {
+      const normalized = v.trim().replace(',', '.')
+      const num = parseFloat(normalized)
+      if (Number.isFinite(num)) return num
+    }
+    return null
+  }
+
+  const min_lng = parseCoord(bbox.min_lng)
+  const min_lat = parseCoord(bbox.min_lat)
+  const max_lng = parseCoord(bbox.max_lng)
+  const max_lat = parseCoord(bbox.max_lat)
+
+  if (min_lng === null || min_lat === null || max_lng === null || max_lat === null) return null
+  return [[min_lng, min_lat], [max_lng, max_lat]]
 }
 
 /** The `bbox` query value (`min_lng,min_lat,max_lng,max_lat`) for a commune frame, or null when incomplete. */
@@ -39,6 +53,88 @@ export function applyMapBoundsLimits(
 }
 
 export const DEFAULT_MAP_ZOOM = 14.8
+
+// ==========================================
+// 1. GIỚI HẠN CAMERA TOÀN CỤC (GLOBAL MAP LIMITS)
+// ==========================================
+/** Mức zoom tối đa cho phép của bản đồ nền (tránh bể hạt ngói vệ tinh) */
+export const MAP_MAX_ZOOM = 20
+
+/** Mức zoom tối thiểu mặc định toàn cục */
+export const MAP_DEFAULT_MIN_ZOOM = 6
+
+/** Mức zoom cận cảnh tiêu chuẩn khi chọn vị trí tài sản (Location Picker) */
+export const MAP_ASSET_PICKER_ZOOM = 17
+
+// ==========================================
+// 2. CẤU HÌNH FITBOUNDS PRESETS CHUẨN HÓA (FITBOUNDS CONFIG PRESETS)
+// ==========================================
+
+/**
+ * [PHẠM VI ĐỊA BÀN / XÃ - ADMIN BBOX] (Commune Scope - Macro)
+ * Phóng bao quát toàn bộ khung địa bàn xã khi mở modal xem chi tiết
+ */
+export const FIT_BOUNDS_COMMUNE = {
+  padding: 40,
+  maxZoom: 14.5,
+  duration: 300,
+} as const
+
+/** Mở nhanh khung địa bàn xã không hiệu ứng (ví dụ sau khi resize modal) */
+export const FIT_BOUNDS_COMMUNE_INSTANT = {
+  padding: 40,
+  maxZoom: 14.5,
+  duration: 0,
+} as const
+
+/**
+ * [PHẠM VI THÊM MỚI TÀI SẢN / CỌT / TỦ] (Asset Add Scope)
+ * Tự động focus vào tuyến đường khi chọn tuyến để hỗ trợ cắm mốc mới
+ */
+export const FIT_BOUNDS_ASSET_ADD_INSTANT = {
+  padding: 40,
+  maxZoom: 17,
+  duration: 0,
+} as const
+
+export const FIT_BOUNDS_ASSET_ADD_SMOOTH = {
+  padding: 40,
+  maxZoom: 17,
+  duration: 600,
+} as const
+
+/**
+ * [PHẠM VI TUYẾN ĐƯỜNG / SEGMENT ROUTE MAP] (LineString Route Scope)
+ * Bao quát toàn bộ chiều dài tuyến từ điểm đầu đến điểm cuối (Add, Edit, Detail)
+ */
+export const FIT_BOUNDS_ROUTE_INSTANT = {
+  padding: 40,
+  maxZoom: 17,
+  duration: 0,
+} as const
+
+export const FIT_BOUNDS_ROUTE_SMOOTH = {
+  padding: 40,
+  maxZoom: 17,
+  duration: 400,
+} as const
+
+/**
+ * [PHẠM VI GIS MAP TOÀN CẢNH & PHÂN TUYẾN]
+ * Khi người dùng chọn lọc hiển thị tất cả tuyến hoặc 1 tuyến cụ thể trên GIS Map chính
+ */
+export const FIT_BOUNDS_GIS_PANORAMA = {
+  padding: 60,
+  maxZoom: 15.5,
+  duration: 800,
+} as const
+
+export const FIT_BOUNDS_GIS_SEGMENT = {
+  padding: 80,
+  maxZoom: 16.5,
+  duration: 800,
+} as const
+
 export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY 
 
 /**

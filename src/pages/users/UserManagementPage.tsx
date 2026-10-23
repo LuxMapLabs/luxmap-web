@@ -15,7 +15,7 @@ import {
   inviteUserRequest,
   setFilters,
   setPage,
-} from '../../feature/admin/adminUserSlice'
+} from '../../feature/users/userSlice'
 import { UserTable } from './components/UserTable'
 import { UserFilterToolbar } from './components/UserFilterToolbar'
 import { CreateUserModal } from './components/CreateUserModal'
@@ -56,7 +56,6 @@ export const AdminManagementPage: React.FC = () => {
 
   // Lọc bỏ tài khoản đang đăng nhập (chính mình) và lọc theo từ khóa tìm kiếm (họ tên, username, email)
   const filteredUsers = useMemo(() => {
-    // 1. Loại bỏ tài khoản của chính mình khỏi bảng quản lý
     const otherUsers = users.filter((u) => {
       if (!currentUser) return true
       const matchId =
@@ -73,7 +72,6 @@ export const AdminManagementPage: React.FC = () => {
       return !isSelf
     })
 
-    // 2. Lọc theo ô tìm kiếm
     if (!filters.search.trim()) return otherUsers
     const query = filters.search.toLowerCase().trim()
     return otherUsers.filter((u) => {
@@ -174,4 +172,5 @@ export const AdminManagementPage: React.FC = () => {
   )
 }
 
-export default AdminManagementPage
+export const UserManagementPage = AdminManagementPage
+export default UserManagementPage

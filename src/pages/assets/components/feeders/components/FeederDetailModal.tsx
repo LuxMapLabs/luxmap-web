@@ -2,6 +2,7 @@ import React from 'react'
 import { X, Cable, Zap, MapPin, Calendar, User, Lightbulb } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { PoleListItem } from '../../../../../types/assets/poles'
+import { formatFriendlyCommuneName } from '../../../../../constants/communes'
 
 export interface FeederDetailModalProps {
   isOpen: boolean
@@ -82,7 +83,7 @@ export const FeederDetailModal: React.FC<FeederDetailModalProps> = ({
                 Địa Bàn Quản Lý:
               </span>
               <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                {feeder.commune_name || feeder.commune_id || 'Chưa gán địa bàn'}
+                {formatFriendlyCommuneName(feeder.commune_name, feeder.commune_id, 'Chưa gán địa bàn')}
               </p>
               {feeder.commune_id && feeder.commune_name && (
                 <span className="inline-block font-mono text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded">
