@@ -9,6 +9,7 @@ import citizenReportReducer from '../feature/citizen-report/citizenReportSlice'
 import citizenReportsReducer from '../feature/citizen-reports/citizenReportsSlice'
 import qrCodeReducer from '../feature/qr-code/qrCodeSlice'
 import dashboardReducer from '../feature/dashboard/dashboardSlice'
+import settingsReducer from '../feature/settings/settingsSlice'
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -21,6 +22,7 @@ const rootReducer = combineReducers({
     citizenReports: citizenReportsReducer,
     qrCode: qrCodeReducer,
     dashboard: dashboardReducer,
+    settings: settingsReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>

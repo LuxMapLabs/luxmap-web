@@ -520,8 +520,8 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
 
       // Cột 1 có commune_name -> hiển thị "Xã Tân An Hội"
       expect(screen.getByText('Xã Tân An Hội')).toBeInTheDocument()
-      // Cột 2 chưa có commune_name -> fallback an toàn về "COM-005"
-      expect(screen.getByText('COM-005')).toBeInTheDocument()
+      // Cột 2 chưa có commune_name -> formatFriendlyCommuneName tự động map COM-005 sang "Xã Phú Hòa Đông"
+      expect(screen.getByText('Xã Phú Hòa Đông')).toBeInTheDocument()
     })
   })
 })

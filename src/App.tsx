@@ -19,6 +19,7 @@ import { WorkSchedulePage } from './pages/work-schedule/WorkSchedulePage'
 import { AssetManagementPage } from './pages/assets/AssetManagementPage'
 import { AdminManagementPage } from './pages/users/UserManagementPage'
 import { CommunesManagementPage } from './pages/communes/CommunesManagementPage'
+import { SystemSettingsPage } from './pages/settings/SystemSettingsPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
 import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
@@ -108,6 +109,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={[UserRole.Admin]} />}>
               <Route path="/admin/system" element={<AdminManagementPage />} />
               <Route path="/admin/communes" element={<CommunesManagementPage />} />
+              <Route path="/admin/settings" element={<SystemSettingsPage />} />
             </Route>
           </Route>
 
