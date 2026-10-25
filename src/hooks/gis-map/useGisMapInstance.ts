@@ -7,6 +7,8 @@ import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
   DEFAULT_MAP_ZOOM,
+  MAP_MAX_ZOOM,
+  MAP_DEFAULT_MIN_ZOOM,
 } from '../../utils/gis-map/mapUtils'
 
 export function useGisMapInstance() {
@@ -32,8 +34,8 @@ export function useGisMapInstance() {
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
       zoom: DEFAULT_MAP_ZOOM,
-      minZoom: 6,
-      maxZoom: 20,
+      minZoom: MAP_DEFAULT_MIN_ZOOM,
+      maxZoom: MAP_MAX_ZOOM,
       attributionControl: false,
     })
 

@@ -13,6 +13,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
+import { formatFriendlyCommuneName } from '../../../../../constants/communes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 
 export interface IotNodeDetailModalProps {
@@ -113,11 +114,11 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
                 <span>Khu Vực Quản Lý</span>
               </div>
               <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                {node.commune_name || node.commune_id || 'Chưa gán địa bàn'}
+                {formatFriendlyCommuneName(undefined, node.commune_id, 'Chưa gán địa bàn')}
               </div>
-              {node.commune_id && node.commune_name && (
+              {false && (
                 <div className="text-[11px] font-mono text-slate-400">
-                  Mã địa bàn: {node.commune_id}
+                  Mã địa bàn: {node?.commune_id}
                 </div>
               )}
             </div>

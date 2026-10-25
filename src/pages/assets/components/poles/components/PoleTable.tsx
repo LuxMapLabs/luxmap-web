@@ -6,6 +6,7 @@ import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { FixtureStatus } from '../../../../../types/common/enums'
+import { formatFriendlyCommuneName } from '../../../../../constants/communes'
 import { PoleTableSkeleton } from './PoleTableSkeleton'
 
 export interface PoleTableProps {
@@ -177,7 +178,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                       )}
                     </td>
                     <td className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">
-                      {pole.commune_name || pole.commune_id || '—'}
+                      {formatFriendlyCommuneName(pole.commune_name, pole.commune_id)}
                     </td>
                     <td className="p-3.5">
                       {pole.active_fixture ? (

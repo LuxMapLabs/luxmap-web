@@ -15,6 +15,7 @@ import {
 import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import { IotNodeTableSkeleton } from './IotNodeTableSkeleton'
+import { formatFriendlyCommuneName } from '../../../../../constants/communes'
 
 export interface IotNodeTableProps {
   iotNodes: IotNodeItem[]
@@ -140,7 +141,7 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
 
                     {/* Địa bàn */}
                     <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                      {node.commune_name || node.commune_id || '—'}
+                      {formatFriendlyCommuneName(undefined, node.commune_id)}
                     </td>
 
                     {/* Nguồn Dữ Liệu */}
