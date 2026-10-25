@@ -16,6 +16,7 @@ import {
   setFilters,
   setPage,
 } from '../../feature/users/userSlice'
+import { fetchCommunesRequest } from '../../feature/communes/communeSlice'
 import { UserTable } from './components/UserTable'
 import { UserFilterToolbar } from './components/UserFilterToolbar'
 import { CreateUserModal } from './components/CreateUserModal'
@@ -41,6 +42,11 @@ export const AdminManagementPage: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserAccountItem | null>(null)
   const [lockingUser, setLockingUser] = useState<UserAccountItem | null>(null)
+
+  // Tải danh mục địa bàn từ API Backend để map tên động
+  useEffect(() => {
+    dispatch(fetchCommunesRequest())
+  }, [dispatch])
 
   // Tải danh sách người dùng khi mount hoặc khi filter thay đổi
   useEffect(() => {

@@ -10,6 +10,7 @@ import qrCodeSaga from '../feature/qr-code/qrCodeSaga'
 import workScheduleSaga from '../feature/work-schedule/workScheduleSaga'
 import dashboardSaga from '../feature/dashboard/dashboardSaga'
 import settingsSaga from '../feature/settings/settingsSaga'
+import adminSystemSaga from '../feature/adminSystem/adminSystemSaga'
 
 export default function* rootSaga() {
     yield all([
@@ -24,5 +25,6 @@ export default function* rootSaga() {
         fork(workScheduleSaga),
         fork(dashboardSaga),
         fork(settingsSaga),
+        fork(adminSystemSaga),
     ])
 }

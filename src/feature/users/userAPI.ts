@@ -45,10 +45,10 @@ export const userAPI = {
 
   /**
    * Cập nhật thông tin tài khoản
-   * PUT /api/v1/admin/users/{id}
+   * PATCH /api/v1/admin/users/{id}
    */
   updateUser: async (id: string, payload: UpdateUserRequest): Promise<UserAccountItem> => {
-    const response = await apiClient.put<UserAccountItem>(`/admin/users/${id}`, payload)
+    const response = await apiClient.patch<UserAccountItem>(`/admin/users/${id}`, payload)
     return response.data
   },
 

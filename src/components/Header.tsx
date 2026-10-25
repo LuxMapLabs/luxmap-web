@@ -59,6 +59,8 @@ export const Header: React.FC<HeaderProps> = ({
   const isReports = location.pathname.startsWith('/reports')
   const isCommunesAdmin = location.pathname.startsWith('/admin/communes')
   const isSettingsAdmin = location.pathname.startsWith('/admin/settings')
+  const isAdminDashboard = location.pathname === '/admin/dashboard' || location.pathname === '/admin'
+  const isUsersAdmin = location.pathname === '/admin/system' || location.pathname.startsWith('/admin/users')
   const isAdminPath = location.pathname.startsWith('/admin')
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
@@ -149,7 +151,9 @@ export const Header: React.FC<HeaderProps> = ({
               <Compass className="w-4.5 h-4.5" />
             ) : isSettingsAdmin ? (
               <SlidersHorizontal className="w-4.5 h-4.5" />
-            ) : isAdminPath ? (
+            ) : isAdminDashboard ? (
+              <LayoutDashboard className="w-4.5 h-4.5" />
+            ) : isUsersAdmin || isAdminPath ? (
               <ShieldCheck className="w-4.5 h-4.5" />
             ) : (
               <Map className="w-4.5 h-4.5" />
@@ -171,6 +175,10 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Quản lý Địa bàn & Khung Bản đồ (BBox)'
                 : isSettingsAdmin
                 ? 'Cấu hình hệ thống'
+                : isAdminDashboard
+                ? 'Tổng quan hệ thống'
+                : isUsersAdmin
+                ? 'Quản lý tài khoản'
                 : isAdminPath
                 ? 'Quản trị hệ thống'
                 : 'Bản đồ chiếu sáng'}
@@ -190,6 +198,10 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Khai báo đơn vị hành chính xã/thị trấn và thiết lập khung bao bản đồ định vị'
                 : isSettingsAdmin
                 ? 'Thiết lập ngưỡng phát hiện đèn mờ & thời gian cảnh báo mất kết nối IoT'
+                : isAdminDashboard
+                ? 'Giám sát hạ tầng máy chủ, tiến trình nền, lưu trữ & tổng quan vận hành'
+                : isUsersAdmin
+                ? 'Cấu hình và phân quyền người dùng'
                 : isAdminPath
                 ? 'Cấu hình và phân quyền người dùng'
                 : 'Giám sát lưới điện & hiện trạng tài sản theo thời gian thực'}
