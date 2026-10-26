@@ -1,6 +1,9 @@
 import React from 'react'
+import { useSelector } from 'react-redux'
 import { X, SearchCheck, Layers, Calendar, User, Hash, Loader2, AlertCircle } from 'lucide-react'
+import type { RootState } from '../../../redux/rootReducer'
 import type { ArtifactVersionUsage } from '../../../types/admin/artifact-versions'
+import { resolveUserDisplayName } from '../../../utils/userUtils'
 
 interface ArtifactUsageModalProps {
   isOpen: boolean
@@ -24,6 +27,9 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
   usage,
   onClose,
 }) => {
+  const users = useSelector((state: RootState) => state.adminUsers?.users || [])
+  const currentUser = useSelector((state: RootState) => state.auth?.user)
+
   if (!isOpen) return null
 
   const version = usage?.version
@@ -100,7 +106,12 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
                     <User className="w-3.5 h-3.5 text-slate-400" />
                     <span>Tạo bởi:</span>
                     <strong className="text-slate-800">
-                      {version.created_by || 'Hệ thống tự động (Server)'}
+                      {resolveUserDisplayName(
+                        version.created_by,
+                        users,
+                        currentUser,
+                        'Hệ thống tự động (Server)'
+                      )}
                     </strong>
                   </div>
 
