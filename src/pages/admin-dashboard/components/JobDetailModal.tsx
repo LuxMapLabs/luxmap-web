@@ -1,7 +1,7 @@
 import React from 'react'
 import { X, Cpu, Clock, CheckCircle2, AlertOctagon, RefreshCw, AlertTriangle, ShieldAlert } from 'lucide-react'
 import type { JobStatusItem } from '../../../types/admin/system'
-import { formatFullDateTime, formatRelativeTime, formatFutureTime } from '../utils/formatters'
+import { formatFullDateTime, formatRelativeTime, formatFutureTime } from '../../../utils/admin-dashboard/formatters'
 
 interface JobDetailModalProps {
   job: JobStatusItem | null

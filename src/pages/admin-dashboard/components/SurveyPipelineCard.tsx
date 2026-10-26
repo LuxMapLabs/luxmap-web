@@ -1,7 +1,7 @@
 import React from 'react'
 import { Activity, AlertTriangle, CheckCircle, Clock, PlayCircle, XCircle } from 'lucide-react'
 import type { SurveyProcessingSummary } from '../../../types/admin/system'
-import { formatRelativeTime } from '../utils/formatters'
+import { formatRelativeTime } from '../../../utils/admin-dashboard/formatters'
 
 interface SurveyPipelineCardProps {
   survey?: SurveyProcessingSummary
