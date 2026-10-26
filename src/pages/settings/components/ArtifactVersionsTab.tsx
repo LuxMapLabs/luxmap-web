@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   RefreshCw,
@@ -6,6 +6,8 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  Search,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { RootState } from '../../../redux/rootReducer'
@@ -53,6 +55,19 @@ export const ArtifactVersionsTab: React.FC = () => {
 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const displayedItems = useMemo(() => {
+    if (!searchQuery.trim()) return items
+    const q = searchQuery.toLowerCase().trim()
+    return items.filter(
+      (item) =>
+        item.version?.toLowerCase().includes(q) ||
+        item.component?.toLowerCase().includes(q) ||
+        item.artifact_hash?.toLowerCase().includes(q) ||
+        item.created_by?.toLowerCase().includes(q)
+    )
+  }, [items, searchQuery])
 
   const loadData = (targetPage = page, targetFilter = componentFilter) => {
     dispatch(
@@ -111,10 +126,10 @@ export const ArtifactVersionsTab: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* 1. Header Toolbar */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-3xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         {/* Left: Component Filter */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 font-semibold">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 font-semibold shadow-2xs">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <span>Phân loại:</span>
             <select
@@ -130,13 +145,38 @@ export const ArtifactVersionsTab: React.FC = () => {
             </select>
           </div>
 
-          <span className="text-xs text-slate-400 font-medium">
-            Tổng cộng <strong className="text-slate-800 font-bold">{total}</strong> phiên bản được ghi nhận
+          <span className="text-xs text-slate-400 font-medium hidden lg:inline">
+            Tổng cộng <strong className="text-slate-800 font-bold">{total}</strong> bản ghi
           </span>
         </div>
 
+        {/* Center: Search Input (Lấp đầy khoảng trống trung tâm) */}
+        <div className="flex-1 max-w-md mx-auto w-full md:w-auto">
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+              <Search className="w-3.5 h-3.5" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm theo phiên bản (1.0.0), mã băm SHA-256..."
+              className="w-full pl-9 pr-8 py-1.5 text-xs rounded-2xl border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition shadow-2xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Right: Actions */}
-        <div className="flex items-center gap-2.5 self-end md:self-auto">
+        <div className="flex items-center gap-2.5 self-end md:self-auto shrink-0">
           <button
             type="button"
             onClick={() => loadData(page, componentFilter)}
@@ -154,7 +194,7 @@ export const ArtifactVersionsTab: React.FC = () => {
             className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
           >
             <Plus className="w-4 h-4" />
-            <span>Đăng ký Firmware</span>
+            <span>Đăng ký Phiên bản</span>
           </button>
         </div>
       </div>
@@ -175,9 +215,10 @@ export const ArtifactVersionsTab: React.FC = () => {
 
       {/* 3. Data Table */}
       <ArtifactVersionTable
-        items={items}
+        items={displayedItems}
         isLoading={isLoading}
         onViewUsage={handleViewUsage}
+        onOpenRegister={handleOpenRegister}
       />
 
       {/* 4. Pagination */}

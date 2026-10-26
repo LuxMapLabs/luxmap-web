@@ -13,6 +13,8 @@ import {
   User,
   Code,
   X,
+  PackageSearch,
+  Plus,
 } from 'lucide-react'
 import type { ArtifactVersionItem } from '../../../types/admin/artifact-versions'
 
@@ -20,6 +22,7 @@ interface ArtifactVersionTableProps {
   items: ArtifactVersionItem[]
   isLoading: boolean
   onViewUsage: (versionId: number) => void
+  onOpenRegister?: () => void
 }
 
 const formatDateTime = (dateStr?: string | null): string => {
@@ -33,6 +36,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
   items,
   isLoading,
   onViewUsage,
+  onOpenRegister,
 }) => {
   const [copiedHash, setCopiedHash] = useState<string | null>(null)
   const [viewMetadata, setViewMetadata] = useState<{ id: number; data: any } | null>(null)
@@ -128,8 +132,30 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400">
-                  Chưa có phiên bản nào được ghi nhận cho bộ lọc này.
+                <td colSpan={8} className="py-16 text-center">
+                  <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-100 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
+                      <PackageSearch className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">
+                        Chưa có phiên bản nào phù hợp
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        Các mô hình AI và thuật toán trắc đạc được tự động báo cáo khi khởi chạy Worker; các phiên bản Firmware hoặc thành phần mới có thể được đăng ký chủ động.
+                      </p>
+                    </div>
+                    {onOpenRegister && (
+                      <button
+                        type="button"
+                        onClick={onOpenRegister}
+                        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer shadow-xs hover:shadow-sm"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Đăng ký phiên bản mới</span>
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (
