@@ -11,7 +11,11 @@ import {
   Minus,
   Plus,
   Radio,
+  SlidersHorizontal,
+  Layers,
+  Settings2,
 } from 'lucide-react'
+import { ArtifactVersionsTab } from './components/ArtifactVersionsTab'
 import type { RootState } from '../../redux/rootReducer'
 import type { SettingItem } from '../../types/admin/settings'
 import {
@@ -597,6 +601,8 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
  */
 export const SystemSettingsPage: React.FC = () => {
   const dispatch = useDispatch()
+  const [activeTab, setActiveTab] = useState<'parameters' | 'artifacts'>('parameters')
+
   const { items, isLoading, isUpdating, error } = useSelector(
     (state: RootState) => state.settings
   )
@@ -642,47 +648,100 @@ export const SystemSettingsPage: React.FC = () => {
   return (
     <div className="h-full w-full bg-slate-50 overflow-y-auto p-4 sm:p-6 md:p-8 font-sans text-slate-800 select-none">
       <div className="w-full max-w-[1600px] mx-auto space-y-6">
-        {/* Thông báo lỗi nếu có */}
-        {error && (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-xs text-rose-700 shadow-2xs">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+        {/* Header & Tab Switcher Navigation */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs shrink-0 ring-3 ring-slate-100">
+              <Settings2 className="w-5 h-5 text-indigo-400" />
             </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                Cấu hình & Phiên bản Hệ thống
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Quản lý tham số kỹ thuật thời gian thực và sổ đăng ký định danh phần mềm, thuật toán LuxMap
+              </p>
+            </div>
+          </div>
+
+          {/* Segmented Control Switcher */}
+          <div className="inline-flex p-1 bg-slate-200/80 rounded-xl border border-slate-300/70 shadow-inner self-start sm:self-auto">
             <button
               type="button"
-              onClick={() => dispatch(fetchSettingsRequest())}
-              className="font-bold hover:underline ml-3 cursor-pointer"
+              onClick={() => setActiveTab('parameters')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'parameters'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              Thử lại
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600" />
+              <span>Tham số vận hành</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('artifacts')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'artifacts'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Sổ đăng ký phiên bản (Artifact Registry)</span>
             </button>
           </div>
-        )}
+        </div>
 
-        {/* 2 Card cấu hình song song 2 cột - Trải rộng khớp màn hình */}
-        {isLoading && items.length === 0 ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
-            {[1, 2].map((idx) => (
-              <div
-                key={idx}
-                className="h-[440px] rounded-2xl bg-white animate-pulse border border-slate-200/80 shadow-xs"
-              />
-            ))}
-          </div>
+        {/* Tab 1: Tham số vận hành */}
+        {activeTab === 'parameters' ? (
+          <>
+            {/* Thông báo lỗi nếu có */}
+            {error && (
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-xs text-rose-700 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dispatch(fetchSettingsRequest())}
+                  className="font-bold hover:underline ml-3 cursor-pointer"
+                >
+                  Thử lại
+                </button>
+              </div>
+            )}
+
+            {/* 2 Card cấu hình song song 2 cột - Trải rộng khớp màn hình */}
+            {isLoading && items.length === 0 ? (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
+                {[1, 2].map((idx) => (
+                  <div
+                    key={idx}
+                    className="h-[440px] rounded-2xl bg-white animate-pulse border border-slate-200/80 shadow-xs"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
+                <DimCard
+                  setting={dimSetting}
+                  isUpdating={isUpdating}
+                  onSave={handleSaveSetting}
+                />
+
+                <IotCard
+                  setting={iotSetting}
+                  isUpdating={isUpdating}
+                  onSave={handleSaveSetting}
+                />
+              </div>
+            )}
+          </>
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
-            <DimCard
-              setting={dimSetting}
-              isUpdating={isUpdating}
-              onSave={handleSaveSetting}
-            />
-
-            <IotCard
-              setting={iotSetting}
-              isUpdating={isUpdating}
-              onSave={handleSaveSetting}
-            />
-          </div>
+          /* Tab 2: Sổ đăng ký phiên bản (Artifact Registry) */
+          <ArtifactVersionsTab />
         )}
       </div>
     </div>

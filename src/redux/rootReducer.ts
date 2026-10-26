@@ -11,6 +11,7 @@ import qrCodeReducer from '../feature/qr-code/qrCodeSlice'
 import dashboardReducer from '../feature/dashboard/dashboardSlice'
 import settingsReducer from '../feature/settings/settingsSlice'
 import adminSystemReducer from '../feature/adminSystem/adminSystemSlice'
+import adminArtifactVersionReducer from '../feature/adminArtifactVersions/artifactVersionSlice'
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -25,6 +26,7 @@ const rootReducer = combineReducers({
     dashboard: dashboardReducer,
     settings: settingsReducer,
     adminSystem: adminSystemReducer,
+    adminArtifactVersions: adminArtifactVersionReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>
