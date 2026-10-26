@@ -13,7 +13,6 @@ import {
   Radio,
   SlidersHorizontal,
   Layers,
-  Settings2,
 } from 'lucide-react'
 import { ArtifactVersionsTab } from './components/ArtifactVersionsTab'
 import type { RootState } from '../../redux/rootReducer'
@@ -648,28 +647,13 @@ export const SystemSettingsPage: React.FC = () => {
   return (
     <div className="h-full w-full bg-slate-50 overflow-y-auto p-4 sm:p-6 md:p-8 font-sans text-slate-800 select-none">
       <div className="w-full max-w-[1600px] mx-auto space-y-6">
-        {/* Header & Tab Switcher Navigation */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs shrink-0 ring-3 ring-slate-100">
-              <Settings2 className="w-5 h-5 text-indigo-400" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                Cấu hình & Phiên bản Hệ thống
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Quản lý tham số kỹ thuật thời gian thực và sổ đăng ký định danh phần mềm, thuật toán LuxMap
-              </p>
-            </div>
-          </div>
-
-          {/* Segmented Control Switcher */}
-          <div className="inline-flex p-1 bg-slate-200/80 rounded-xl border border-slate-300/70 shadow-inner self-start sm:self-auto">
+        {/* Navigation Tabs (Sub-Navigation gọn gàng, đồng bộ với Header chính của Layout) */}
+        <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-200/80">
+          <div className="inline-flex p-1 bg-slate-200/80 rounded-xl border border-slate-300/70 shadow-inner">
             <button
               type="button"
               onClick={() => setActiveTab('parameters')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'parameters'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -681,7 +665,7 @@ export const SystemSettingsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('artifacts')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'artifacts'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'

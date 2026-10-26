@@ -197,7 +197,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : isCommunesAdmin
                 ? 'Khai báo đơn vị hành chính xã/thị trấn và thiết lập khung bao bản đồ định vị'
                 : isSettingsAdmin
-                ? 'Thiết lập ngưỡng phát hiện đèn mờ & thời gian cảnh báo mất kết nối IoT'
+                ? 'Thiết lập tham số vận hành & sổ đăng ký phiên bản phần mềm, thuật toán'
                 : isAdminDashboard
                 ? 'Giám sát hạ tầng máy chủ, tiến trình nền, lưu trữ & tổng quan vận hành'
                 : isUsersAdmin
