@@ -5,6 +5,8 @@
 
 export type AgendaFlag = 'in_progress' | 'scheduled_tonight' | 'carried_over' | 'unscheduled' | 'overdue'
 
+export type CancellationRequestStatus = 'none' | 'pending' | 'rejected'
+
 export type CitizenPhotoHint = 'lamp_on' | 'lamp_off' | 'inconclusive'
 
 export type CitizenReportKind = 'lamp_out' | 'lamp_dim' | 'pole_damaged' | 'other'
@@ -43,7 +45,7 @@ export type NodeStatus = 'online' | 'offline' | 'never_reported'
 
 export type NotificationEntityType = 'work_order' | 'survey_sweep' | 'fault' | 'citizen_report'
 
-export type NotificationType = 'work_order_assigned' | 'work_order_unassigned' | 'work_order_rescheduled' | 'work_order_returned' | 'work_order_cancelled' | 'work_order_completed' | 'work_order_verified' | 'survey_returned' | 'survey_ready_for_review' | 'survey_processing_failed' | 'fault_reported' | 'citizen_report_received' | 'work_order_overdue'
+export type NotificationType = 'work_order_cancellation_requested' | 'work_order_cancellation_rejected' | 'work_order_assigned' | 'work_order_unassigned' | 'work_order_rescheduled' | 'work_order_returned' | 'work_order_cancelled' | 'work_order_completed' | 'work_order_verified' | 'survey_returned' | 'survey_ready_for_review' | 'survey_processing_failed' | 'fault_reported' | 'citizen_report_received' | 'work_order_overdue'
 
 export type PhotosDroppedReason = 'over_quota' | 'over_budget'
 

@@ -1,9 +1,11 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import { createPortal } from 'react-dom'
 import { X, Route, CheckCircle2, AlertCircle } from 'lucide-react'
 import { SegmentRouteMap } from '../../../../../components/SegmentRouteMap'
 import { calculateRouteLengthMeters } from '../../../../../utils/gis-map/routeUtils'
-import { CU_CHI_COMMUNES_MAP } from '../../../../../constants/communes'
+import type { RootState } from '../../../../../redux/rootReducer'
+import { fetchCommunesRequest } from '../../../../../feature/communes/communeSlice'
 import type { RoadClass } from '../../../../../types/common/enums'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 
@@ -20,13 +22,28 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
   onAddSegment,
   existingCount,
 }) => {
+  const dispatch = useDispatch()
+  const communes = useSelector((state: RootState) => state.adminCommunes.communes)
+
+  useEffect(() => {
+    if (communes.length === 0) {
+      dispatch(fetchCommunesRequest())
+    }
+  }, [dispatch, communes.length])
+
   const nextCode = `SEG-${String(existingCount + 1).padStart(3, '0')}`
 
   const segmentId = nextCode
   const [segmentName, setSegmentName] = useState('')
   const [roadClass, setRoadClass] = useState<RoadClass>('inter_commune')
   const [lengthM, setLengthM] = useState('0')
-  const [communeId, setCommuneId] = useState('COM-001')
+  const [communeId, setCommuneId] = useState('')
+
+  useEffect(() => {
+    if (communes.length > 0 && !communeId) {
+      setCommuneId(communes[0]?.commune_id || '')
+    }
+  }, [communes, communeId])
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -171,13 +188,11 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                   onChange={(e) => setCommuneId(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
                 >
-                  {Object.entries(CU_CHI_COMMUNES_MAP)
-                    .filter(([code]) => code.startsWith('COM-'))
-                    .map(([code, name]) => (
-                      <option key={code} value={code}>
-                        {name} ({code})
-                      </option>
-                    ))}
+                  {communes.map((c) => (
+                    <option key={c.commune_id || ''} value={c.commune_id || ''}>
+                      {c.name || c.commune_id} ({c.commune_id})
+                    </option>
+                  ))}
                 </select>
               </div>
 

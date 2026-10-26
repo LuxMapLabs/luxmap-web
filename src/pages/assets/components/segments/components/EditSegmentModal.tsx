@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux'
 import { Route, X, CheckCircle2, MapPin, RotateCcw } from 'lucide-react'
 import { SegmentRouteMap, SegmentPoleItem } from '../../../../../components/SegmentRouteMap'
 import { calculateRouteLengthMeters, extractSegmentCoordinates } from '../../../../../utils/gis-map/routeUtils'
-import { CU_CHI_COMMUNES_MAP } from '../../../../../constants/communes'
+
 import type { RoadClass } from '../../../../../types/common/enums'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { RootState } from '../../../../../redux/rootReducer'
@@ -29,6 +29,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
 }) => {
   // Lấy danh sách cột thực tế từ Redux Store
   const allPoles = useSelector((state: RootState) => state.assets.poles)
+  const communes = useSelector((state: RootState) => state.adminCommunes.communes)
 
   // Lọc danh sách cột đèn thực tế thuộc tuyến đường này
   const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
@@ -223,11 +224,9 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
             onChange={(e) => setCommuneId(e.target.value)}
             className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
           >
-            {Object.entries(CU_CHI_COMMUNES_MAP)
-              .filter(([code]) => code.startsWith('COM-'))
-              .map(([code, name]) => (
-                <option key={code} value={code}>
-                  {name} ({code})
+            {communes.map((c) => (
+                <option key={c.commune_id || ''} value={c.commune_id || ''}>
+                  {c.name || c.commune_id} ({c.commune_id})
                 </option>
               ))}
           </select>

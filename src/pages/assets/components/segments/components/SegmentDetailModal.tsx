@@ -7,7 +7,7 @@ import { extractSegmentCoordinates } from '../../../../../utils/gis-map/routeUti
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { RootState } from '../../../../../redux/rootReducer'
 import { getDataSourceDisplayName } from '../../../../../constants/enums'
-import { formatFriendlyCommuneName } from '../../../../../constants/communes'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
 interface SegmentDetailModalProps {
   segment: SegmentListItem | null

@@ -36,7 +36,7 @@ import {
   type FieldDiff,
   type ParsedItemReview,
 } from '../../../validations/assetImport.schema'
-import { formatCommuneDisplayName, getCommuneName } from '../../../constants/communes'
+import { formatCommuneDisplayName, getCommuneName } from '../../../utils/assets/communeUtils'
 
 export type { FieldDiff, ParsedItemReview }
 
