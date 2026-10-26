@@ -28,8 +28,8 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   onSave,
 }) => {
   // Lấy danh sách cột thực tế từ Redux Store
-  const allPoles = useSelector((state: RootState) => state.assets.poles)
-  const communes = useSelector((state: RootState) => state.adminCommunes.communes)
+  const allPoles = useSelector((state: RootState) => state.assets?.poles || [])
+  const communes = useSelector((state: RootState) => state.adminCommunes?.communes || [])
 
   // Lọc danh sách cột đèn thực tế thuộc tuyến đường này
   const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
