@@ -35,6 +35,7 @@ export const AdminManagementPage: React.FC = () => {
     pageSize,
     isLoading,
     isSubmitting,
+    invitingUserId,
     filters,
   } = useSelector((state: RootState) => state.adminUsers)
 
@@ -109,7 +110,7 @@ export const AdminManagementPage: React.FC = () => {
   }
 
   const handleInvite = (user: UserAccountItem) => {
-    if (user.user_id) {
+    if (user.user_id && user.status === 'invited') {
       dispatch(inviteUserRequest(user.user_id))
     }
   }
@@ -134,6 +135,7 @@ export const AdminManagementPage: React.FC = () => {
         <UserTable
           users={filteredUsers}
           isLoading={isLoading}
+          invitingUserId={invitingUserId}
           onEdit={(user) => setEditingUser(user)}
           onToggleLock={(user) => setLockingUser(user)}
           onInvite={handleInvite}

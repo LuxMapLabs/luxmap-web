@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSelector } from 'react-redux'
 import {
   Edit2,
@@ -8,6 +8,8 @@ import {
   MapPin,
   Globe,
   UserCheck,
+  Loader2,
+  Check,
 } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
 import type { UserAccountItem } from '../../../types/admin/users'
@@ -17,6 +19,7 @@ import { UserTableSkeleton } from './UserTableSkeleton'
 export interface UserTableProps {
   users: UserAccountItem[]
   isLoading?: boolean
+  invitingUserId?: string | null
   onEdit: (user: UserAccountItem) => void
   onToggleLock: (user: UserAccountItem) => void
   onInvite: (user: UserAccountItem) => void
@@ -25,12 +28,33 @@ export interface UserTableProps {
 export const UserTable: React.FC<UserTableProps> = ({
   users,
   isLoading = false,
+  invitingUserId,
   onEdit,
   onToggleLock,
   onInvite,
 }) => {
   // Lấy danh mục địa bàn thực tế từ Redux để map tên động theo ID
   const communes = useSelector((state: RootState) => state.adminCommunes.communes)
+
+  // Hiệu ứng phản hồi thành công sau khi gửi email (giữ trong 3.5 giây)
+  const [recentlyInvitedIds, setRecentlyInvitedIds] = useState<Record<string, boolean>>({})
+  const prevInvitingRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (prevInvitingRef.current && !invitingUserId) {
+      const finishedId = prevInvitingRef.current
+      setRecentlyInvitedIds((prev) => ({ ...prev, [finishedId]: true }))
+      const timer = setTimeout(() => {
+        setRecentlyInvitedIds((prev) => {
+          const next = { ...prev }
+          delete next[finishedId]
+          return next
+        })
+      }, 3500)
+      return () => clearTimeout(timer)
+    }
+    prevInvitingRef.current = invitingUserId || null
+  }, [invitingUserId])
 
   // Helper render danh sách xã thân thiện
   const renderCommuneScope = (communeIds?: string[] | null) => {
@@ -135,6 +159,12 @@ export const UserTable: React.FC<UserTableProps> = ({
                 const roleBadge = getUserRoleBadge(user.role)
                 const initials = getInitials(user.full_name, user.username)
 
+                // Trạng thái thao tác gửi email mời
+                const isInviting = Boolean(user.user_id && user.user_id === invitingUserId)
+                const isRecentlyInvited = Boolean(user.user_id && recentlyInvitedIds[user.user_id])
+                const isInviteDisabled =
+                  user.status !== 'invited' || Boolean(invitingUserId) || isRecentlyInvited
+
                 return (
                   <tr
                     key={user.user_id || user.username || Math.random()}
@@ -181,6 +211,11 @@ export const UserTable: React.FC<UserTableProps> = ({
                           <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-500/20" />
                           <span>Tạm khóa</span>
                         </div>
+                      ) : user.status === 'invited' ? (
+                        <div className="inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-amber-500/20" />
+                          <span>Chờ kích hoạt</span>
+                        </div>
                       ) : (
                         <div className="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-medium">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
@@ -207,14 +242,37 @@ export const UserTable: React.FC<UserTableProps> = ({
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* Invite Button */}
+                        {/* Invite Button: có Loading Spinner, Anti-Spam disable & Visual Feedback */}
                         <button
                           type="button"
+                          disabled={isInviteDisabled}
                           onClick={() => onInvite(user)}
-                          className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95"
-                          title="Gửi lại email mời đặt mật khẩu"
+                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition shadow-2xs ${
+                            isRecentlyInvited
+                              ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 cursor-default'
+                              : isInviting
+                              ? 'border-blue-300 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 cursor-wait'
+                              : user.status === 'invited'
+                              ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 cursor-pointer active:scale-95'
+                              : 'border-slate-100 dark:border-slate-800/40 bg-slate-50 dark:bg-slate-900/40 text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40'
+                          }`}
+                          title={
+                            isInviting
+                              ? 'Đang gửi email mời, vui lòng đợi...'
+                              : isRecentlyInvited
+                              ? 'Đã gửi email mời thành công!'
+                              : user.status === 'invited'
+                              ? 'Gửi lại email mời đặt mật khẩu'
+                              : 'Chỉ có thể gửi lại lời mời cho tài khoản đang chờ kích hoạt (Invited)'
+                          }
                         >
-                          <Mail className="w-3.5 h-3.5" />
+                          {isInviting ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 dark:text-blue-400" />
+                          ) : isRecentlyInvited ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-in zoom-in duration-200" />
+                          ) : (
+                            <Mail className="w-3.5 h-3.5" />
+                          )}
                         </button>
 
                         {/* Visual Safety Divider */}
@@ -249,4 +307,3 @@ export const UserTable: React.FC<UserTableProps> = ({
     </div>
   )
 }
-
