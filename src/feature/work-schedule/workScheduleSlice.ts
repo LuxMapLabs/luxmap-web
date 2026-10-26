@@ -41,7 +41,7 @@ export interface WorkScheduleState {
   viewingPhaseIndex: number
   currentMonth: number // 0-indexed
   currentYear: number
-  filterPhase: 'all' | TaskKind | 'ended'
+  filterPhase: 'all' | TaskKind | 'ended' | 'has_report' | 'has_cancel'
 }
 
 const now = new Date()
@@ -127,7 +127,7 @@ export const workScheduleSlice = createSlice({
       state.workOrderDetail = action.payload
       state.detailError = null
 
-      // Tự động gán poleIds và cập nhật segment từ chi tiết vào phase và case tương ứng
+      // Tự động gán poleIds, cập nhật báo cáo và segment từ chi tiết vào phase và case tương ứng
       const detail = action.payload
       const poleIds = Array.from(
         new Set((detail.faults || []).map((f) => f.pole_id).filter(Boolean) as string[])
@@ -138,18 +138,45 @@ export const workScheduleSlice = createSlice({
         (detail.faults && detail.faults[0]?.segment_id)
 
       state.cases.forEach((c) => {
-        if (poleIds.length > 0) {
-          c.phases.forEach((p) => {
-            if (p.workOrderId === detail.work_order_id) {
+        c.phases.forEach((p) => {
+          if (p.workOrderId === detail.work_order_id) {
+            if (poleIds.length > 0) {
               p.poleIds = poleIds
             }
-          })
-          if (c.code === (detail.case_id || detail.work_order_id)) {
+            if (detail.note) {
+              p.notes = detail.note
+            }
+            if (detail.materials_note) {
+              p.materialsNote = detail.materials_note
+            }
+            if (detail.wo_status) {
+              p.rawStatus = detail.wo_status
+              if (detail.wo_status === 'done') p.status = 'reported'
+              else if (detail.wo_status === 'verified') p.status = 'ended'
+            }
+            if (detail.report_note || detail.wo_status === 'done' || detail.wo_status === 'verified') {
+              p.report = {
+                ...(p.report || {
+                  submittedAt: `${p.date} 17:00`,
+                  summary: 'Báo cáo kỹ thuật hiện trường',
+                }),
+                summary: detail.report_note || p.report?.summary || 'Báo cáo kỹ thuật hiện trường',
+                submittedAt: detail.completed_at
+                  ? new Date(detail.completed_at).toLocaleString('vi-VN')
+                  : p.report?.submittedAt || `${p.date} 17:00`,
+                usedMaterialsNote: detail.materials_used || p.report?.usedMaterialsNote,
+                suggestedMaterialsNote: detail.materials_note || p.report?.suggestedMaterialsNote,
+              }
+            }
+          }
+        })
+        if (c.code === (detail.case_id || detail.work_order_id)) {
+          if (poleIds.length > 0) {
             c.poleIds = poleIds
           }
-        }
-        if (segId && c.code === (detail.case_id || detail.work_order_id)) {
-          c.segment = formatSegmentDisplay(segId, detail.title)
+          if (segId) {
+            c.segment = formatSegmentDisplay(segId, detail.title)
+          }
         }
       })
     },
@@ -299,6 +326,28 @@ export const workScheduleSlice = createSlice({
       state.actionError = action.payload
     },
 
+    rejectCancellationRequest(
+      state,
+      _action: PayloadAction<{
+        workOrderId: string
+        rejectReason: string
+      }>
+    ) {
+      state.isSubmitting = true
+      state.actionError = null
+    },
+    rejectCancellationSuccess(state, action: PayloadAction<WorkOrderDetail>) {
+      state.isSubmitting = false
+      state.actionError = null
+      if (state.workOrderDetail && state.workOrderDetail.work_order_id === action.payload.work_order_id) {
+        state.workOrderDetail = action.payload
+      }
+    },
+    rejectCancellationFailure(state, action: PayloadAction<string>) {
+      state.isSubmitting = false
+      state.actionError = action.payload
+    },
+
     // -------------------------------------------------------------
     // 5. UI STATE REDUCERS (Lịch, Bộ lọc, Stepper modal)
     // -------------------------------------------------------------
@@ -375,6 +424,9 @@ export const {
   returnWorkOrderRequest,
   returnWorkOrderSuccess,
   returnWorkOrderFailure,
+  rejectCancellationRequest,
+  rejectCancellationSuccess,
+  rejectCancellationFailure,
   setCurrentMonth,
   changeMonth,
   setFilterPhase,

@@ -11,6 +11,12 @@ interface CreateManualModalProps {
   defaultDate?: string
   isDateLocked?: boolean
   assignees: WorkOrderAssignee[]
+  initialPhase?: TaskKind
+  initialSegmentId?: string
+  initialPoleIds?: string[]
+  initialFaultIds?: string[]
+  initialTitle?: string
+  initialNotes?: string
   onClose: () => void
   onSubmit: (payload: {
     title: string
@@ -40,18 +46,28 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   isOpen,
   defaultDate,
   assignees,
+  initialPhase,
+  initialSegmentId,
+  initialPoleIds,
+  initialFaultIds,
+  initialTitle,
+  initialNotes,
   onClose,
   onSubmit,
 }) => {
-  const [initPhase, setInitPhase] = useState<TaskKind>('survey')
-  const [title, setTitle] = useState('')
+  const [initPhase, setInitPhase] = useState<TaskKind>(initialPhase || 'survey')
+  const [title, setTitle] = useState(initialTitle || '')
   const [segmentsList, setSegmentsList] = useState<string[]>(FALLBACK_SEGMENTS)
   const [segment, setSegment] = useState(FALLBACK_SEGMENTS[0])
-  const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>([])
-  const [selectedFaultIds, setSelectedFaultIds] = useState<string[]>([])
+  const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(initialPoleIds || [])
+  const [selectedFaultIds, setSelectedFaultIds] = useState<string[]>(initialFaultIds || [])
   const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || '')
   const [date, setDate] = useState(defaultDate || getTodayStr())
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(initialNotes || '')
+
+  const isPrefillAppliedRef = React.useRef(false)
+  const prevSegmentRef = React.useRef(segment)
+  const prevPhaseRef = React.useRef(initPhase)
 
   // Tải danh sách toàn bộ tuyến đường thực tế từ Backend API
   useEffect(() => {
@@ -64,6 +80,13 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
             (s) => `${s.segment_name || s.segment_id} (${s.segment_id})`
           )
           setSegmentsList(list)
+          if (initialSegmentId) {
+            const found = list.find((s) => s.includes(initialSegmentId))
+            if (found) {
+              setSegment(found)
+              return
+            }
+          }
           setSegment((prev) => (list.includes(prev) ? prev : list[0]))
         }
       })
@@ -73,7 +96,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [initialSegmentId])
 
   // Đồng bộ kỹ sư khi danh sách assignees tải xong từ API
   useEffect(() => {
@@ -82,19 +105,64 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
     }
   }, [assignees, assigneeId])
 
-  // Đồng bộ ngày khi mở modal từ ô lịch hoặc nút tạo mới
+  // Đồng bộ ngày và dữ liệu prefill khi mở modal
   useEffect(() => {
     if (isOpen) {
       const todayStr = getTodayStr()
       const effectiveDate = defaultDate && defaultDate >= todayStr ? defaultDate : todayStr
       setDate(effectiveDate)
-    }
-  }, [defaultDate, isOpen])
 
-  // Reset khi đổi tuyến đường hoặc giai đoạn
+      if (initialPhase) {
+        setInitPhase(initialPhase)
+      }
+      if (initialTitle) {
+        setTitle(initialTitle)
+      }
+      if (initialNotes) {
+        setNotes(initialNotes)
+      }
+      if (initialPoleIds && initialPoleIds.length > 0) {
+        setSelectedPoleIds(initialPoleIds)
+      }
+      if (initialFaultIds && initialFaultIds.length > 0) {
+        setSelectedFaultIds(initialFaultIds)
+      }
+      if (initialSegmentId && segmentsList.length > 0) {
+        const found = segmentsList.find((s) => s.includes(initialSegmentId))
+        if (found) {
+          setSegment(found)
+        }
+      }
+      isPrefillAppliedRef.current = true
+    } else {
+      isPrefillAppliedRef.current = false
+    }
+  }, [
+    isOpen,
+    defaultDate,
+    initialPhase,
+    initialTitle,
+    initialNotes,
+    initialPoleIds,
+    initialFaultIds,
+    initialSegmentId,
+    segmentsList,
+  ])
+
+  // Reset khi người dùng chủ động đổi tuyến đường hoặc giai đoạn (bỏ qua khi prefill)
   useEffect(() => {
-    setSelectedPoleIds([])
-    setSelectedFaultIds([])
+    if (isPrefillAppliedRef.current) {
+      isPrefillAppliedRef.current = false
+      prevSegmentRef.current = segment
+      prevPhaseRef.current = initPhase
+      return
+    }
+    if (prevSegmentRef.current !== segment || prevPhaseRef.current !== initPhase) {
+      setSelectedPoleIds([])
+      setSelectedFaultIds([])
+      prevSegmentRef.current = segment
+      prevPhaseRef.current = initPhase
+    }
   }, [segment, initPhase])
 
   // Điều kiện vô hiệu hóa nút "+ Tạo sự vụ":

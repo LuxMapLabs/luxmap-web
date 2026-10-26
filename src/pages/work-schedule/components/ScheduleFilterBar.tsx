@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import {
   RotateCcw,
   Plus,
@@ -9,11 +9,13 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
+import { ScheduleCase } from '../../../types/workSchedule'
 
 interface ScheduleFilterBarProps {
   currentMonth: number
   currentYear: number
   filterPhase: WorkScheduleState['filterPhase']
+  cases?: ScheduleCase[]
   onSelectMonthYear: (month: number, year: number) => void
   onResetToday: () => void
   onFilterChange: (phase: WorkScheduleState['filterPhase']) => void
@@ -41,6 +43,7 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
   currentMonth,
   currentYear,
   filterPhase,
+  cases,
   onSelectMonthYear,
   onResetToday,
   onFilterChange,
@@ -49,6 +52,38 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const [viewingYear, setViewingYear] = useState(currentYear)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Tính toán nhanh số lượng ca cần chú ý trong tháng
+  const metrics = useMemo(() => {
+    let pendingCancel = 0
+    let pendingReport = 0
+    let inProgress = 0
+    let ended = 0
+
+    ;(cases || []).forEach((c) => {
+      ;(c?.phases || []).forEach((p) => {
+        if (!p || !p.date || p.rawStatus === 'cancelled') return
+        const isEnded = p.status === 'ended' || c.isTerminated
+        if (isEnded) {
+          ended++
+        } else if (p.cancellationRequest?.status === 'pending') {
+          pendingCancel++
+        } else if (p.status === 'reported') {
+          pendingReport++
+        } else {
+          inProgress++
+        }
+      })
+    })
+
+    return {
+      pendingCancel,
+      pendingReport,
+      inProgress,
+      ended,
+      total: pendingCancel + pendingReport + inProgress + ended,
+    }
+  }, [cases])
 
   // Đồng bộ viewingYear khi currentYear bên ngoài thay đổi
   useEffect(() => {
@@ -202,20 +237,57 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
         </button>
       </div>
 
+      {/* Cụm Action Chips Đếm Nhanh Cho Quản Lý */}
+      {(metrics.pendingCancel > 0 || metrics.pendingReport > 0) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {metrics.pendingCancel > 0 && (
+            <button
+              type="button"
+              onClick={() => onFilterChange(filterPhase === 'has_cancel' ? 'all' : 'has_cancel')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                filterPhase === 'has_cancel'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+              }`}
+              title="Bấm để lọc các ca kỹ sư xin hủy"
+            >
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span>⚠️ {metrics.pendingCancel} Xin hủy</span>
+            </button>
+          )}
+
+          {metrics.pendingReport > 0 && (
+            <button
+              type="button"
+              onClick={() => onFilterChange(filterPhase === 'has_report' ? 'all' : 'has_report')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                filterPhase === 'has_report'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+              }`}
+              title="Bấm để lọc các ca có báo cáo chờ duyệt"
+            >
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span>📄 {metrics.pendingReport} Chờ duyệt báo cáo</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Cụm bộ lọc & Nút tạo sự vụ */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 hover:border-slate-300 transition-colors">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
           <select
-            value={filterPhase}
+            value={filterPhase === 'has_report' || filterPhase === 'has_cancel' ? 'all' : filterPhase}
             onChange={(e) => onFilterChange(e.target.value as any)}
             className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer"
           >
-            <option value="all">Tất cả các giai đoạn</option>
+            <option value="all">Tất cả ({metrics.total})</option>
             <option value="survey">🟡 1. Khảo sát</option>
             <option value="inspection">🔵 2. Kiểm tra</option>
             <option value="repair">🟢 3. Sửa chữa</option>
-            <option value="ended">⚪ Đã kết thúc</option>
+            <option value="ended">⚪ Đã kết thúc ({metrics.ended})</option>
           </select>
         </div>
 

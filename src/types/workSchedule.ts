@@ -61,6 +61,14 @@ export interface SchedulePhase {
   materialsNote?: string // Ghi chú vật tư tự do (textarea)
   workOrderId?: string
   poleIds?: string[] // Danh sách các cột đèn cụ thể cần kiểm tra / sửa chữa
+  cancellationRequest?: {
+    status: 'none' | 'pending' | 'rejected'
+    reason: string
+    requestedAt?: string
+    requestedBy?: string
+    rejectReason?: string
+    rejectedAt?: string
+  }
   report?: {
     submittedAt: string
     summary: string
@@ -86,5 +94,6 @@ export interface ScheduleCase {
   isTerminated: boolean         // True nếu bị từ chối duyệt hoặc đóng sớm
   endReason?: string
   poleIds?: string[]            // Cột đèn liên quan của sự vụ
+  hasPendingCancellationRequest?: boolean // Có yêu cầu xin hủy lịch từ kỹ sư hiện trường đang chờ duyệt
   phases: SchedulePhase[]       // Lịch sử các giai đoạn
 }

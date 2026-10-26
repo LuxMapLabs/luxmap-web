@@ -39,6 +39,9 @@ import {
   returnWorkOrderRequest,
   returnWorkOrderSuccess,
   returnWorkOrderFailure,
+  rejectCancellationRequest,
+  rejectCancellationSuccess,
+  rejectCancellationFailure,
   closeCaseDetail,
 } from './workScheduleSlice'
 
@@ -268,6 +271,33 @@ function* handleReturnWorkOrder(
   }
 }
 
+/**
+ * Worker saga từ chối (bác bỏ) yêu cầu xin hủy lịch của kỹ sư
+ */
+function* handleRejectCancellation(
+  action: PayloadAction<{
+    workOrderId: string
+    rejectReason: string
+  }>
+) {
+  const { workOrderId, rejectReason } = action.payload
+  try {
+    const updated: WorkOrderDetail = yield call(
+      workScheduleAPI.rejectCancellation,
+      workOrderId,
+      rejectReason
+    )
+    yield put(rejectCancellationSuccess(updated))
+    toast.success('✓ Đã gửi phản hồi từ chối yêu cầu hủy về cho Kỹ sư hiện trường!')
+    yield put(fetchWorkOrdersRequest(undefined))
+    yield put(fetchWorkOrderDetailRequest(workOrderId))
+  } catch (error: any) {
+    const errorMsg = extractApiErrorMessage(error, 'Không thể gửi phản hồi từ chối yêu cầu hủy')
+    yield put(rejectCancellationFailure(errorMsg))
+    toast.error(errorMsg)
+  }
+}
+
 export default function* workScheduleSaga() {
   yield all([
     takeLatest(fetchWorkOrdersRequest.type, handleFetchWorkOrders),
@@ -279,5 +309,6 @@ export default function* workScheduleSaga() {
     takeLatest(verifyWorkOrderRequest.type, handleVerifyWorkOrder),
     takeLatest(cancelWorkOrderRequest.type, handleCancelWorkOrder),
     takeLatest(returnWorkOrderRequest.type, handleReturnWorkOrder),
+    takeLatest(rejectCancellationRequest.type, handleRejectCancellation),
   ])
 }

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { RootState } from '../../redux/rootReducer'
+import { TaskKind } from '../../types/workSchedule'
 import {
   setCurrentMonth,
   setFilterPhase,
@@ -18,7 +20,9 @@ import {
   returnWorkOrderRequest,
   fetchWorkOrderDetailRequest,
   clearWorkOrderDetail,
+  rejectCancellationRequest,
 } from '../../feature/work-schedule/workScheduleSlice'
+import { workScheduleAPI } from '../../feature/work-schedule/workScheduleAPI'
 import { ScheduleFilterBar } from './components/ScheduleFilterBar'
 import { CalendarGrid } from './components/CalendarGrid'
 import { CaseDetailModal } from './components/CaseDetailModal'
@@ -59,6 +63,8 @@ export const WorkSchedulePage: React.FC = () => {
     dispatch(fetchAssigneesRequest(activeCommuneId))
   }, [dispatch, currentMonth, currentYear, activeCommuneId])
 
+  const location = useLocation()
+
   const getTodayStr = () => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -68,6 +74,48 @@ export const WorkSchedulePage: React.FC = () => {
   const [isCreateManualOpen, setIsCreateManualOpen] = useState(false)
   const [manualDefaultDate, setManualDefaultDate] = useState(getTodayStr)
   const [isDateLockedFromCell, setIsDateLockedFromCell] = useState(false)
+
+  // Context điền sẵn dữ liệu khi chuyển từ Dashboard sang tạo lịch
+  const [prefillContext, setPrefillContext] = useState<{
+    initialPhase?: TaskKind
+    initialSegmentId?: string
+    initialPoleIds?: string[]
+    initialFaultIds?: string[]
+    initialTitle?: string
+    initialNotes?: string
+  } | null>(null)
+
+  // Nhận diện điều hướng từ Bảng Giám Sát Sự Cố Dashboard (Hàng Chưa Phân Lịch)
+  useEffect(() => {
+    if (location.state && (location.state as any).openCreateModal) {
+      const state = location.state as any
+      const fault = state.prefillFault
+      const poleId = state.prefillPoleId || fault?.pole_id
+      const faultId = state.prefillFaultId || fault?.fault_id
+      const segmentId = state.prefillSegmentId || fault?.segment_id
+      const note = state.prefillNote || fault?.note || fault?.review_note || ''
+
+      const suggestedTitle = poleId
+        ? `Kiểm tra sự cố mất sáng - Cột ${poleId}`
+        : `Kiểm tra sự cố hiện trường ${segmentId ? `(${segmentId})` : ''}`
+
+      setPrefillContext({
+        initialPhase: 'inspection',
+        initialSegmentId: segmentId,
+        initialPoleIds: poleId ? [poleId] : [],
+        initialFaultIds: faultId ? [faultId] : [],
+        initialTitle: suggestedTitle,
+        initialNotes: note ? `[Khảo sát hiện trường ghi nhận]: ${note}` : undefined,
+      })
+
+      setManualDefaultDate(getTodayStr())
+      setIsDateLockedFromCell(false)
+      setIsCreateManualOpen(true)
+
+      // Dọn sạch state để tránh việc người dùng F5 lại tự động mở lại modal
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
 
   const [isNextPhaseModalOpen, setIsNextPhaseModalOpen] = useState(false)
   const [targetNextPhaseType, setTargetNextPhaseType] = useState<'inspection' | 'repair'>('inspection')
@@ -161,7 +209,7 @@ export const WorkSchedulePage: React.FC = () => {
         : selectedCase?.poleIds ||
           currentPhase?.poleIds ||
           currentPhase?.report?.aiDetections?.map((d) => d.poleId) ||
-          ['POLE-0019', 'POLE-0032']
+          []
 
     setNextPhaseContext({
       caseCode: effectiveCaseCode,
@@ -330,6 +378,83 @@ export const WorkSchedulePage: React.FC = () => {
     return Promise.resolve()
   }
 
+  // Xử lý Quản lý duyệt xin hủy -> Phân công Kỹ sư mới & Dời ngày làm việc (nếu có)
+  const handleApproveCancellationReassign = async (params: {
+    newAssigneeId: string
+    scheduledDate: string
+    dueDate: string
+    note?: string
+  }): Promise<void> => {
+    const currentPhase =
+      selectedCase?.phases[viewingPhaseIndex] ||
+      selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const workOrderId = currentPhase?.workOrderId
+
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để điều phối lại.')
+      return
+    }
+
+    try {
+      await workScheduleAPI.approveCancellationReassign(workOrderId, {
+        newAssigneeId: params.newAssigneeId || undefined,
+        scheduledDate: params.scheduledDate,
+        dueDate: params.dueDate,
+        note: params.note,
+      })
+
+      toast.success('Đã duyệt yêu cầu xin hủy và cập nhật điều phối lịch thành công!')
+      // Tải lại danh sách lịch và chi tiết lệnh
+      dispatch(fetchWorkOrdersRequest(undefined))
+      dispatch(fetchWorkOrderDetailRequest(workOrderId))
+    } catch (err: any) {
+      toast.error('Không thể điều phối lại lịch công tác: ' + (err?.message || 'Lỗi hệ thống'))
+    }
+  }
+
+  // Xử lý Quản lý duyệt xin hủy -> Hủy bỏ hẳn lịch
+  const handleApproveCancellationCancel = (reason: string): Promise<void> => {
+    const currentPhase =
+      selectedCase?.phases[viewingPhaseIndex] ||
+      selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const workOrderId = currentPhase?.workOrderId
+
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để hủy.')
+      return Promise.resolve()
+    }
+
+    dispatch(
+      cancelWorkOrderRequest({
+        workOrderId,
+        note: reason,
+        successMessage: 'Đã duyệt yêu cầu xin hủy và đóng ca làm việc thành công.',
+      })
+    )
+    return Promise.resolve()
+  }
+
+  // Xử lý Quản lý không duyệt (Bác bỏ) -> Bắt buộc kỹ sư tiếp tục thực hiện & phản hồi lý do
+  const handleRejectCancellation = (rejectReason: string): Promise<void> => {
+    const currentPhase =
+      selectedCase?.phases[viewingPhaseIndex] ||
+      selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const workOrderId = currentPhase?.workOrderId
+
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để phản hồi.')
+      return Promise.resolve()
+    }
+
+    dispatch(
+      rejectCancellationRequest({
+        workOrderId,
+        rejectReason,
+      })
+    )
+    return Promise.resolve()
+  }
+
   return (
     <div className="h-full w-full overflow-y-auto custom-scrollbar bg-slate-50 select-none">
       {/* Vùng nội dung toàn trang: Tự do giãn nở và cuộn mượt mà */}
@@ -340,6 +465,7 @@ export const WorkSchedulePage: React.FC = () => {
             currentMonth={currentMonth}
             currentYear={currentYear}
             filterPhase={filterPhase}
+            cases={cases}
             onSelectMonthYear={(m, y) => dispatch(setCurrentMonth({ month: m, year: y }))}
             onResetToday={() => {
               const d = new Date()
@@ -379,6 +505,9 @@ export const WorkSchedulePage: React.FC = () => {
         onSubmitSuperior={handleSubmitSuperior}
         onEditSchedule={handleEditSchedule}
         onCancelSchedule={handleCancelSchedule}
+        onApproveCancellationReassign={handleApproveCancellationReassign}
+        onApproveCancellationCancel={handleApproveCancellationCancel}
+        onRejectCancellation={handleRejectCancellation}
       />
 
       {/* Modal 2: Tạo giai đoạn tiếp theo (giữ nguyên mã sự vụ) */}
@@ -403,14 +532,26 @@ export const WorkSchedulePage: React.FC = () => {
         onSubmit={handleNextPhaseSubmit}
       />
 
-      {/* Modal 3: Tạo sự vụ mới từ đầu */}
+      {/* Modal 3: Tạo sự vụ mới từ đầu (hỗ trợ tự động điền thông tin từ Dashboard) */}
       <CreateManualModal
         isOpen={isCreateManualOpen}
         defaultDate={manualDefaultDate}
         isDateLocked={isDateLockedFromCell}
         assignees={assignees}
-        onClose={() => setIsCreateManualOpen(false)}
-        onSubmit={handleCreateNewCaseSubmit}
+        initialPhase={prefillContext?.initialPhase}
+        initialSegmentId={prefillContext?.initialSegmentId}
+        initialPoleIds={prefillContext?.initialPoleIds}
+        initialFaultIds={prefillContext?.initialFaultIds}
+        initialTitle={prefillContext?.initialTitle}
+        initialNotes={prefillContext?.initialNotes}
+        onClose={() => {
+          setIsCreateManualOpen(false)
+          setPrefillContext(null)
+        }}
+        onSubmit={(payload) => {
+          handleCreateNewCaseSubmit(payload)
+          setPrefillContext(null)
+        }}
       />
     </div>
   )

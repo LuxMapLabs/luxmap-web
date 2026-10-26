@@ -1,5 +1,5 @@
 import React from 'react'
-import { Lightbulb, AlertTriangle, AlertOctagon, ShieldCheck } from 'lucide-react'
+import { Lightbulb, AlertTriangle, AlertOctagon, ShieldCheck, ArrowDownRight } from 'lucide-react'
 
 interface DashboardKpiCardsProps {
   fixtureKpis: {
@@ -17,20 +17,37 @@ interface DashboardKpiCardsProps {
     expiringCount: number
     expiredCount: number
   }
+  onClickNormal?: () => void
+  onClickPendingFaults?: () => void
+  onClickSevereFaults?: () => void
+  onClickWarranty?: () => void
 }
 
 export const DashboardKpiCards: React.FC<DashboardKpiCardsProps> = ({
   fixtureKpis,
   faultsCount,
   warrantyKpis,
+  onClickNormal,
+  onClickPendingFaults,
+  onClickSevereFaults,
+  onClickWarranty,
 }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* KPI 1: Tỷ lệ chiếu sáng bình thường */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+      {/* KPI 1: Tỷ lệ chiếu sáng bình thường -> Trỏ xuống Biểu đồ */}
+      <div
+        onClick={onClickNormal}
+        title="Bấm để cuộn xuống xem Biểu đồ phân tích chiếu sáng"
+        className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-lg hover:border-emerald-400 hover:-translate-y-1 transition-all cursor-pointer group active:scale-[0.98]"
+      >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500">Tỷ lệ sáng bình thường</span>
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-500 group-hover:text-emerald-700 transition-colors">
+              Tỷ lệ sáng bình thường
+            </span>
+            <ArrowDownRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 transition-colors" />
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100 group-hover:scale-105 transition-all">
             <Lightbulb className="w-5 h-5" />
           </div>
         </div>
@@ -47,15 +64,26 @@ export const DashboardKpiCards: React.FC<DashboardKpiCardsProps> = ({
         <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">
           <span>Sáng yếu: <strong className="text-amber-600">{fixtureKpis.totalDim}</strong></span>
           <span>Mất sáng: <strong className="text-red-600">{fixtureKpis.totalOut}</strong></span>
-          <span>Đạt chuẩn: <strong className="text-emerald-600">{fixtureKpis.normalPct}%</strong></span>
+          <span className="text-emerald-600 font-bold group-hover:underline flex items-center gap-0.5">
+            Xem biểu đồ ↘
+          </span>
         </div>
       </div>
 
-      {/* KPI 2: Sự cố đang tồn đọng */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+      {/* KPI 2: Sự cố đang tồn đọng -> Trỏ xuống Bảng giám sát sự cố (Tất cả) */}
+      <div
+        onClick={onClickPendingFaults}
+        title="Bấm để cuộn xuống Bảng giám sát sự cố bóng đèn (Tất cả sự cố)"
+        className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-lg hover:border-rose-400 hover:-translate-y-1 transition-all cursor-pointer group active:scale-[0.98]"
+      >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500">Sự cố đang tồn đọng</span>
-          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-500 group-hover:text-rose-700 transition-colors">
+              Sự cố đang tồn đọng
+            </span>
+            <ArrowDownRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-rose-600 transition-colors" />
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 group-hover:scale-105 transition-all">
             <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
@@ -67,18 +95,30 @@ export const DashboardKpiCards: React.FC<DashboardKpiCardsProps> = ({
             Cần khắc phục
           </span>
         </div>
-        <p className="text-[11px] text-slate-500 leading-snug">
-          {faultsCount > 0
-            ? `Ghi nhận ${faultsCount} sự cố bóng đèn trên tuyến.`
-            : 'Hiện không có sự cố nào chưa được khắc phục.'}
-        </p>
+        <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">
+          <span className="truncate max-w-[150px]">
+            {faultsCount > 0 ? `Ghi nhận ${faultsCount} sự cố` : 'Không có sự cố'}
+          </span>
+          <span className="text-rose-600 font-bold group-hover:underline flex items-center gap-0.5">
+            Xem sự cố ↘
+          </span>
+        </div>
       </div>
 
-      {/* KPI 3: Mất sáng nghiêm trọng (Nguy cơ an toàn / Điểm mù) */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+      {/* KPI 3: Mất sáng nghiêm trọng -> Trỏ xuống Bảng sự cố và chuyển tab Mất sáng hoàn toàn */}
+      <div
+        onClick={onClickSevereFaults}
+        title="Bấm để cuộn xuống Bảng sự cố và lọc các cột Mất sáng hoàn toàn"
+        className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-lg hover:border-rose-500 hover:-translate-y-1 transition-all cursor-pointer group active:scale-[0.98]"
+      >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500">Mất sáng nghiêm trọng</span>
-          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-500 group-hover:text-rose-700 transition-colors">
+              Mất sáng nghiêm trọng
+            </span>
+            <ArrowDownRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-rose-600 transition-colors" />
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 group-hover:scale-105 transition-all">
             <AlertOctagon className="w-5 h-5" />
           </div>
         </div>
@@ -99,16 +139,25 @@ export const DashboardKpiCards: React.FC<DashboardKpiCardsProps> = ({
           </div>
           <div className="flex justify-between text-[11px] text-slate-500 font-medium">
             <span>Sáng yếu: <strong className="text-amber-600 font-bold">{fixtureKpis.totalDim} cột</strong></span>
-            <span className="text-rose-600 font-bold">Khẩn cấp</span>
+            <span className="text-rose-600 font-bold group-hover:underline">Lọc mất sáng ↘</span>
           </div>
         </div>
       </div>
 
-      {/* KPI 4: Cảnh báo bảo hành (<= 30 ngày) */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+      {/* KPI 4: Cảnh báo bảo hành (<= 30 ngày) -> Trỏ xuống Bảng bảo hành */}
+      <div
+        onClick={onClickWarranty}
+        title="Bấm để cuộn xuống Bảng theo dõi bảo hành"
+        className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-lg hover:border-amber-400 hover:-translate-y-1 transition-all cursor-pointer group active:scale-[0.98]"
+      >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500">Bảo hành cần xử lý (≤ 1 tháng)</span>
-          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-500 group-hover:text-amber-700 transition-colors">
+              Bảo hành cần xử lý (≤ 1 tháng)
+            </span>
+            <ArrowDownRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-600 transition-colors" />
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-100 group-hover:scale-105 transition-all">
             <ShieldCheck className="w-5 h-5" />
           </div>
         </div>
@@ -120,11 +169,12 @@ export const DashboardKpiCards: React.FC<DashboardKpiCardsProps> = ({
             Bóng đèn
           </span>
         </div>
-        <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-          <span>Đã quá hạn: <strong className="text-red-600 font-bold">{warrantyKpis.expiredCount}</strong></span>
-          <span>Sắp hết (≤30đ): <strong className="text-amber-600 font-bold">{warrantyKpis.expiringCount}</strong></span>
+        <div className="flex justify-between text-[11px] text-slate-500 font-medium border-t border-slate-100 pt-2">
+          <span>Quá hạn: <strong className="text-red-600 font-bold">{warrantyKpis.expiredCount}</strong></span>
+          <span className="text-amber-600 font-bold group-hover:underline">Xem bảo hành ↘</span>
         </div>
       </div>
     </div>
   )
 }
+
