@@ -12,7 +12,9 @@ export const store = configureStore({
             thunk: true,
             serializableCheck: false,
         }).concat(sagaMiddleware),
-    devTools: true, // Kích hoạt Redux DevTools extension
+    devTools: {
+        name: 'LuxMap Web Store',
+    },
 })
 
 sagaMiddleware.run(rootSaga)

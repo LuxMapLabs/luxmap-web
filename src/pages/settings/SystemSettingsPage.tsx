@@ -112,7 +112,7 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
                   Ngưỡng phát hiện đèn mờ
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60">
+                  <span className="font-mono text-[11px] font-semibold text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-300 shadow-2xs">
                     dim_threshold_ratio
                   </span>
                   <span className="text-[11px] text-slate-400">• Đơn vị: ratio</span>
@@ -167,12 +167,13 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
                   <Minus className="w-3.5 h-3.5" />
                 </button>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   step={0.01}
                   min={min}
                   max={max}
-                  value={value}
-                  onChange={(e) => handleNumericChange(parseFloat(e.target.value))}
+                  value={value.toFixed(2)}
+                  onChange={(e) => handleNumericChange(parseFloat(e.target.value.replace(',', '.')))}
                   disabled={isUpdating}
                   className="w-16 py-1.5 text-xs font-bold font-mono text-center outline-none bg-transparent text-slate-900 border-x border-slate-200"
                 />
@@ -370,7 +371,7 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
                   Thời gian chờ mất kết nối IoT
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60">
+                  <span className="font-mono text-[11px] font-semibold text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-300 shadow-2xs">
                     iot_offline_after_minutes
                   </span>
                   <span className="text-[11px] text-slate-400">• Đơn vị: phút</span>
@@ -425,7 +426,8 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
                   <Minus className="w-3.5 h-3.5" />
                 </button>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   step={5}
                   min={min}
                   max={max}
@@ -474,6 +476,41 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
               <div className="flex justify-between text-[11px] text-slate-400 font-mono font-medium pt-0.5">
                 <span>{min} phút (Tối thiểu)</span>
                 <span>{max} phút (24 giờ)</span>
+              </div>
+            </div>
+
+            {/* Phím mốc chọn nhanh phổ biến (Preset Quick Pills) */}
+            <div className="pt-2 border-t border-blue-100/60">
+              <span className="text-[10.5px] font-semibold text-slate-400 block mb-1.5">
+                Mốc chọn nhanh phổ biến:
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { label: '15p', val: 15 },
+                  { label: '30p', val: 30 },
+                  { label: '1h (60p)', val: 60 },
+                  { label: '2h', val: 120 },
+                  { label: '6h', val: 360 },
+                  { label: '12h', val: 720 },
+                  { label: '24h', val: 1440 },
+                ].map((preset) => {
+                  const isSelected = value === preset.val
+                  return (
+                    <button
+                      key={preset.val}
+                      type="button"
+                      onClick={() => handleNumericChange(preset.val)}
+                      disabled={isUpdating}
+                      className={`px-2 py-1 rounded-lg text-[10.5px] font-mono font-semibold transition cursor-pointer border shadow-2xs ${
+                        isSelected
+                          ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-500/20'
+                          : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 

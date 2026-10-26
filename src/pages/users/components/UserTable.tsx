@@ -1,4 +1,5 @@
 import React from 'react'
+import { useSelector } from 'react-redux'
 import {
   Edit2,
   Lock,
@@ -8,9 +9,9 @@ import {
   Globe,
   UserCheck,
 } from 'lucide-react'
+import type { RootState } from '../../../redux/rootReducer'
 import type { UserAccountItem } from '../../../types/admin/users'
 import { getUserRoleBadge } from '../../../constants/enums'
-import { getCommuneName } from '../../../constants/communes'
 import { UserTableSkeleton } from './UserTableSkeleton'
 
 export interface UserTableProps {
@@ -28,6 +29,9 @@ export const UserTable: React.FC<UserTableProps> = ({
   onToggleLock,
   onInvite,
 }) => {
+  // Lấy danh mục địa bàn thực tế từ Redux để map tên động theo ID
+  const communes = useSelector((state: RootState) => state.adminCommunes.communes)
+
   // Helper render danh sách xã thân thiện
   const renderCommuneScope = (communeIds?: string[] | null) => {
     // Nếu rỗng hoặc chứa dấu '*' -> Toàn hệ thống
@@ -56,7 +60,10 @@ export const UserTable: React.FC<UserTableProps> = ({
       )
     }
 
-    const names = validIds.map((id) => getCommuneName(id))
+    const names = validIds.map((id) => {
+      const found = communes.find((c) => c.commune_id === id)
+      return found?.name || id
+    })
     if (names.length <= 2) {
       return (
         <div className="flex flex-wrap items-center gap-1 text-[11px]">
@@ -89,20 +96,14 @@ export const UserTable: React.FC<UserTableProps> = ({
     )
   }
 
-  // Helper avatar styling theo vai trò
-  const getAvatarStyle = (role?: string | null) => {
-    switch (role) {
-      case 'system_admin':
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 ring-purple-200 dark:ring-purple-800'
-      case 'manager':
-        return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 ring-indigo-200 dark:ring-indigo-800'
-      case 'superior':
-        return 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 ring-amber-200 dark:ring-amber-800'
-      case 'field_engineer':
-        return 'bg-sky-100 text-sky-700 dark:bg-sky-950/80 dark:text-sky-300 ring-sky-200 dark:ring-sky-800'
-      default:
-        return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 ring-slate-200 dark:ring-slate-700'
+  // Helper lấy 2 chữ cái đầu viết hoa đại diện người dùng
+  const getInitials = (name?: string | null, username?: string | null) => {
+    const raw = (name || username || 'User').trim()
+    const parts = raw.split(/\s+/).filter(Boolean)
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     }
+    return raw.slice(0, 2).toUpperCase()
   }
 
   return (
@@ -111,12 +112,12 @@ export const UserTable: React.FC<UserTableProps> = ({
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50/75 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200/80 dark:border-slate-800">
             <tr>
-              <th className="py-3 px-3.5">Người dùng / Tài khoản</th>
-              <th className="py-3 px-3.5">Vai trò (RBAC)</th>
-              <th className="py-3 px-3.5">Phạm vi địa bàn</th>
-              <th className="py-3 px-3.5">Trạng thái</th>
-              <th className="py-3 px-3.5">Ngày tạo</th>
-              <th className="py-3 px-3.5 text-right">Thao tác</th>
+              <th className="py-3 px-3.5 w-[30%] min-w-[220px]">Người dùng / Tài khoản</th>
+              <th className="py-3 px-3.5 w-[18%] min-w-[150px]">Vai trò (RBAC)</th>
+              <th className="py-3 px-3.5 w-[18%] min-w-[140px]">Phạm vi địa bàn</th>
+              <th className="py-3 px-3.5 w-[12%] min-w-[100px]">Trạng thái</th>
+              <th className="py-3 px-3.5 w-[10%] min-w-[95px]">Ngày tạo</th>
+              <th className="py-3 px-3.5 w-[12%] min-w-[125px] text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
@@ -132,11 +133,7 @@ export const UserTable: React.FC<UserTableProps> = ({
               users.map((user) => {
                 const isLocked = user.status === 'locked'
                 const roleBadge = getUserRoleBadge(user.role)
-                const avatarLetter = (user.full_name || user.username || 'U')
-                  .trim()
-                  .charAt(0)
-                  .toUpperCase()
-                const avatarClass = getAvatarStyle(user.role)
+                const initials = getInitials(user.full_name, user.username)
 
                 return (
                   <tr
@@ -147,9 +144,9 @@ export const UserTable: React.FC<UserTableProps> = ({
                     <td className="py-2.5 px-3.5">
                       <div className="flex items-center gap-2.5">
                         <div
-                          className={`w-7.5 h-7.5 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ring-1 shadow-2xs ${avatarClass}`}
+                          className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] font-mono tracking-tight shrink-0 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700 shadow-2xs"
                         >
-                          {avatarLetter}
+                          {initials}
                         </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-900 dark:text-white truncate">
@@ -197,14 +194,14 @@ export const UserTable: React.FC<UserTableProps> = ({
                       {user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : '—'}
                     </td>
 
-                    {/* Compact Icon Actions */}
+                    {/* Action Buttons với Safety Divider & Hit Target >= 32px */}
                     <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1">
+                      <div className="inline-flex items-center gap-1.5 justify-end">
                         {/* Edit Button */}
                         <button
                           type="button"
                           onClick={() => onEdit(user)}
-                          className="w-7 h-7 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 flex items-center justify-center transition cursor-pointer shadow-2xs"
+                          className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95"
                           title="Chỉnh sửa tài khoản"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -214,22 +211,25 @@ export const UserTable: React.FC<UserTableProps> = ({
                         <button
                           type="button"
                           onClick={() => onInvite(user)}
-                          className="w-7 h-7 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 flex items-center justify-center transition cursor-pointer shadow-2xs"
+                          className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95"
                           title="Gửi lại email mời đặt mật khẩu"
                         >
                           <Mail className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* Lock/Unlock Button */}
+                        {/* Visual Safety Divider */}
+                        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
+                        {/* High-Risk Lock/Unlock Button */}
                         <button
                           type="button"
                           onClick={() => onToggleLock(user)}
-                          className={`w-7 h-7 rounded-lg border flex items-center justify-center transition cursor-pointer shadow-2xs ${
+                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95 ${
                             isLocked
-                              ? 'border-emerald-200/80 dark:border-emerald-850/80 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                              : 'border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400'
+                              ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300'
+                              : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-100 hover:border-rose-300 text-rose-600 dark:text-rose-400'
                           }`}
-                          title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+                          title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản (Thao tác bảo mật)'}
                         >
                           {isLocked ? (
                             <Unlock className="w-3.5 h-3.5" />

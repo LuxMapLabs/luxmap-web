@@ -126,15 +126,17 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
     })
   }
 
-  // Cập nhật từng cạnh BBox từ ô input hỗ trợ cả dấu phẩy lẫn dấu chấm
+  // Cập nhật từng cạnh BBox từ ô input hỗ trợ cả dấu phẩy lẫn dấu chấm, chuẩn hóa 100% về dấu chấm
   const handleCoordInputChange = (key: keyof CommuneBbox, val: string) => {
     const normalized = val.trim().replace(',', '.')
+    if (normalized !== '' && !/^-?\d*\.?\d*$/.test(normalized)) return
+
     const num = parseFloat(normalized)
     setBbox((prev) => {
       const current = prev || { min_lng: 106.47, min_lat: 10.95, max_lng: 106.53, max_lat: 11.01 }
       return {
         ...current,
-        [key]: isNaN(num) ? (val as any) : num,
+        [key]: isNaN(num) || normalized.endsWith('.') || normalized === '-' ? (normalized as any) : num,
       }
     })
     setHasBbox(true)
@@ -191,14 +193,14 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
           <div className="lg:col-span-5 space-y-4">
             {/* Tên địa bàn */}
             <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                Tên Địa Bàn Xã / Thị Trấn <span className="text-rose-500">*</span>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 h-6 flex items-center mb-1.5">
+                Tên Địa Bàn Xã / Thị Trấn <span className="text-rose-500 ml-1">*</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="VD: Thị trấn Củ Chi, Xã Tân An Hội..."
+                placeholder="VD: Xã Phước Đồng, Thị trấn Diên Khánh, Phường Tân Phú..."
                 className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition ${
                   errors.name ? 'border-rose-500' : 'border-slate-200 dark:border-slate-700'
                 }`}
@@ -247,95 +249,105 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                 </div>
               )}
 
-              {/* 4 Ô Nhập Số Tọa Độ */}
+              {/* 4 Ô Nhập Số Tọa Độ: Chuẩn La bàn GIS (Bắc ở trên, Nam ở dưới) */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2.5">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10.5px] font-semibold text-slate-500 mb-0.5">Kinh độ Tây (min_lng)</label>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={bbox?.min_lng ?? ''}
-                      onChange={(e) => handleCoordInputChange('min_lng', e.target.value)}
-                      placeholder="106.45..."
-                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold"
-                    />
+                <div className="space-y-2">
+                  {/* Bắc (Top) */}
+                  <div className="flex justify-center">
+                    <div className="w-full sm:w-56">
+                      <label className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5 text-center">
+                        Vĩ độ Bắc (max_lat)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={bbox?.max_lat !== undefined && bbox?.max_lat !== null ? String(bbox.max_lat) : ''}
+                        onChange={(e) => handleCoordInputChange('max_lat', e.target.value)}
+                        placeholder="11.02..."
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10.5px] font-semibold text-slate-500 mb-0.5">Vĩ độ Nam (min_lat)</label>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={bbox?.min_lat ?? ''}
-                      onChange={(e) => handleCoordInputChange('min_lat', e.target.value)}
-                      placeholder="10.95..."
-                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold"
-                    />
+
+                  {/* Tây (Left) & Đông (Right) */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
+                        Kinh độ Tây (min_lng)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={bbox?.min_lng !== undefined && bbox?.min_lng !== null ? String(bbox.min_lng) : ''}
+                        onChange={(e) => handleCoordInputChange('min_lng', e.target.value)}
+                        placeholder="106.45..."
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5 text-right">
+                        Kinh độ Đông (max_lng)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={bbox?.max_lng !== undefined && bbox?.max_lng !== null ? String(bbox.max_lng) : ''}
+                        onChange={(e) => handleCoordInputChange('max_lng', e.target.value)}
+                        placeholder="106.52..."
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Nam (Bottom) */}
+                  <div className="flex justify-center">
+                    <div className="w-full sm:w-56">
+                      <label className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5 text-center">
+                        Vĩ độ Nam (min_lat)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={bbox?.min_lat !== undefined && bbox?.min_lat !== null ? String(bbox.min_lat) : ''}
+                        onChange={(e) => handleCoordInputChange('min_lat', e.target.value)}
+                        placeholder="10.95..."
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10.5px] font-semibold text-slate-500 mb-0.5">Kinh độ Đông (max_lng)</label>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={bbox?.max_lng ?? ''}
-                      onChange={(e) => handleCoordInputChange('max_lng', e.target.value)}
-                      placeholder="106.52..."
-                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10.5px] font-semibold text-slate-500 mb-0.5">Vĩ độ Bắc (max_lat)</label>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={bbox?.max_lat ?? ''}
-                      onChange={(e) => handleCoordInputChange('max_lat', e.target.value)}
-                      placeholder="11.02..."
-                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="text-[10.5px] text-slate-500 pt-1 border-t border-slate-200/50 dark:border-slate-700/50 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[10.5px] text-slate-500 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-2">
                   <span>
                     Kích thước:{' '}
-                    <strong className="text-blue-600 dark:text-blue-400 font-mono">
+                    <strong className="text-blue-600 dark:text-blue-400 font-mono font-medium">
                       {bboxDimensionText || '—'}
                     </strong>
                   </span>
                   {hasBbox ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>Đã gắn khung</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Đã gắn khung BBox</span>
                     </span>
                   ) : (
-                    <span className="text-amber-500">Chưa có khung BBox</span>
+                    <span className="text-amber-700 dark:text-amber-400 font-medium">Chưa có khung BBox</span>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Hướng dẫn thao tác nhanh */}
-            <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl space-y-1 text-[11px] text-blue-900 dark:text-blue-300">
-              <p className="font-bold">💡 Mẹo tinh chỉnh khung BBox trên bản đồ:</p>
-              <ul className="list-disc pl-4 space-y-0.5 text-blue-800 dark:text-blue-400">
-                <li>Nắm kéo <strong>4 chốt góc vuông</strong> hoặc <strong>4 nhãn hướng (Bắc, Nam, Tây, Đông)</strong> trên cạnh khung để kéo dài hoặc thu nhỏ khung.</li>
-                <li>Tick vào <strong>&quot;Di chuyển khung&quot;</strong> trên góc bản đồ để nắm kéo di chuyển toàn bộ khung BBox; bỏ tick để khóa vị trí khung.</li>
-                {isEdit ? (
-                  <li>Bấm <strong>&quot;Đặt lại&quot;</strong> để khôi phục tọa độ khung về trạng thái gốc ban đầu.</li>
-                ) : (
-                  <li>Bấm <strong>&quot;Xóa bỏ&quot;</strong> nếu muốn xóa khung BBox vừa vẽ để vẽ lại khung mới.</li>
-                )}
-              </ul>
+            {/* Hướng dẫn thao tác nhanh tinh gọn (Inline Alert Banner) */}
+            <div className="p-2.5 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl text-[11px] text-blue-900 dark:text-blue-300 flex items-start gap-2 shadow-2xs">
+              <span className="text-sm shrink-0">💡</span>
+              <p className="leading-snug">
+                Nắm kéo <strong>4 chốt góc vuông</strong> hoặc <strong>4 nhãn hướng (Bắc, Nam, Tây, Đông)</strong> để co giãn khung; tick <strong>&quot;Di chuyển khung&quot;</strong> trên bản đồ để dời toàn bộ vị trí BBox.
+              </p>
             </div>
           </div>
 
           {/* Cột Phải: Bản đồ 2 lớp gán nhãn BBox */}
           <div className="lg:col-span-7 flex flex-col min-h-[420px]">
-            <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1 shrink-0">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 h-6 flex items-center mb-1.5 shrink-0">
               Bản Đồ Vẽ & Tinh Chỉnh Khung BBox Trực Quan
             </label>
             <div className="w-full flex-1 rounded-2xl overflow-hidden min-h-[400px]">

@@ -216,9 +216,12 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
     const isCorner = key === 'nw' || key === 'ne' || key === 'se' || key === 'sw'
 
     if (isCorner) {
-      inner.style.width = '16px'
-      inner.style.height = '16px'
-      inner.style.borderRadius = '4px'
+      inner.style.width = '10px'
+      inner.style.height = '10px'
+      inner.style.borderRadius = '2px'
+      inner.style.backgroundColor = 'rgba(29, 78, 216, 0.9)'
+      inner.style.border = '1px solid #ffffff'
+      inner.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)'
     } else {
       const edgeLabelMap: Record<'n' | 's' | 'e' | 'w', string> = {
         n: 'Bắc',
@@ -227,23 +230,25 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
         e: 'Đông',
       }
       inner.textContent = edgeLabelMap[key]
-      inner.style.padding = '2px 8px'
-      inner.style.borderRadius = '999px'
-      inner.style.color = '#ffffff'
-      inner.style.fontSize = '10.5px'
-      inner.style.fontWeight = '800'
-      inner.style.lineHeight = '1.25'
-      inner.style.letterSpacing = '0.02em'
+      inner.style.padding = '0px 4px'
+      inner.style.height = '15px'
+      inner.style.borderRadius = '4px'
+      inner.style.color = '#f8fafc'
+      inner.style.fontSize = '8.5px'
+      inner.style.fontWeight = '700'
+      inner.style.lineHeight = '15px'
+      inner.style.letterSpacing = '0.01em'
       inner.style.whiteSpace = 'nowrap'
       inner.style.userSelect = 'none'
       inner.style.display = 'flex'
       inner.style.alignItems = 'center'
       inner.style.justifyContent = 'center'
+      inner.style.backgroundColor = 'rgba(30, 58, 138, 0.85)'
+      inner.style.border = '1px solid rgba(255, 255, 255, 0.75)'
+      inner.style.boxShadow = '0 1px 3px rgba(0,0,0,0.35)'
+      inner.style.backdropFilter = 'blur(2px)'
     }
 
-    inner.style.backgroundColor = '#1d4ed8'
-    inner.style.border = '2px solid #ffffff'
-    inner.style.boxShadow = '0 2px 8px rgba(0,0,0,0.6)'
     inner.style.transition = 'transform 0.12s ease, background-color 0.12s ease'
 
     const cursorMap: Record<HandleKey, string> = {
@@ -271,12 +276,12 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
     wrapper.title = titleMap[key]
 
     wrapper.onmouseenter = () => {
-      inner.style.transform = 'scale(1.18)'
-      inner.style.backgroundColor = '#2563eb'
+      inner.style.transform = 'scale(1.2)'
+      inner.style.backgroundColor = '#1d4ed8'
     }
     wrapper.onmouseleave = () => {
       inner.style.transform = 'scale(1)'
-      inner.style.backgroundColor = '#1d4ed8'
+      inner.style.backgroundColor = isCorner ? 'rgba(29, 78, 216, 0.9)' : 'rgba(30, 58, 138, 0.85)'
     }
 
     wrapper.appendChild(inner)
@@ -1034,10 +1039,10 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
                 </button>
               ) : (
                 <label
-                  className={`px-2.5 py-1.5 rounded-xl backdrop-blur-md border text-[11px] font-bold shadow-lg flex items-center gap-1.5 pointer-events-auto cursor-pointer transition ${
+                  className={`px-3 py-1.5 rounded-xl backdrop-blur-md border text-[11px] font-semibold shadow-md flex items-center gap-2 pointer-events-auto cursor-pointer transition select-none ${
                     isMoveBoxEnabled
-                      ? 'bg-blue-600/95 border-blue-400 text-white'
-                      : 'bg-slate-900/85 border-slate-700/80 text-slate-200 hover:bg-slate-800/90'
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/25 ring-2 ring-blue-500/30'
+                      : 'bg-white/95 text-slate-800 border-slate-200/90 hover:bg-white hover:border-slate-300'
                   }`}
                   title="Tick chọn để nắm kéo di chuyển toàn bộ khung BBox; bỏ tick để khóa vị trí khung"
                 >
@@ -1045,7 +1050,7 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
                     type="checkbox"
                     checked={isMoveBoxEnabled}
                     onChange={(e) => setIsMoveBoxEnabled(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded accent-white cursor-pointer"
+                    className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
                   />
                   <Move className="w-3.5 h-3.5" />
                   <span>Di chuyển khung</span>
@@ -1055,9 +1060,9 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
 
             {activeBbox && (
               <div className="flex items-center">
-                <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/85 backdrop-blur-md border border-slate-700/80 text-white text-[11px] font-bold shadow-lg flex items-center gap-1.5 pointer-events-auto">
-                  <span className="text-slate-300 font-medium">Kích thước:</span>
-                  <span className="text-blue-400 font-mono">{bboxDimensionText}</span>
+                <div className="px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/90 text-slate-700 text-[11px] font-medium shadow-md flex items-center gap-1.5 pointer-events-auto">
+                  <span className="text-slate-400">Kích thước:</span>
+                  <span className="text-blue-600 font-mono font-semibold">{bboxDimensionText}</span>
                 </div>
               </div>
             )}
@@ -1065,17 +1070,17 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
         ) : (
           activeBbox && (
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/85 backdrop-blur-md border border-slate-700/80 text-white text-[11px] font-bold shadow-lg flex items-center gap-1.5 pointer-events-auto">
-                <span className="text-slate-300 font-medium">Kích thước:</span>
-                <span className="text-blue-400 font-mono">{bboxDimensionText}</span>
+              <div className="px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/90 text-slate-700 text-[11px] font-medium shadow-md flex items-center gap-1.5 pointer-events-auto">
+                <span className="text-slate-400">Kích thước:</span>
+                <span className="text-blue-600 font-mono font-semibold">{bboxDimensionText}</span>
               </div>
 
               {!readOnly && (
                 <label
-                  className={`px-2.5 py-1.5 rounded-xl backdrop-blur-md border text-[11px] font-bold shadow-lg flex items-center gap-1.5 pointer-events-auto cursor-pointer transition ${
+                  className={`px-3 py-1.5 rounded-xl backdrop-blur-md border text-[11px] font-semibold shadow-md flex items-center gap-2 pointer-events-auto cursor-pointer transition select-none ${
                     isMoveBoxEnabled
-                      ? 'bg-blue-600/95 border-blue-400 text-white'
-                      : 'bg-slate-900/85 border-slate-700/80 text-slate-200 hover:bg-slate-800/90'
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/25 ring-2 ring-blue-500/30'
+                      : 'bg-white/95 text-slate-800 border-slate-200/90 hover:bg-white hover:border-slate-300'
                   }`}
                   title="Tick chọn để nắm kéo di chuyển toàn bộ khung BBox; bỏ tick để khóa vị trí khung"
                 >
@@ -1083,7 +1088,7 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
                     type="checkbox"
                     checked={isMoveBoxEnabled}
                     onChange={(e) => setIsMoveBoxEnabled(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded accent-white cursor-pointer"
+                    className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
                   />
                   <Move className="w-3.5 h-3.5" />
                   <span>Di chuyển khung</span>
