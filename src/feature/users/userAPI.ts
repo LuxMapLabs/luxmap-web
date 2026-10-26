@@ -56,16 +56,18 @@ export const userAPI = {
    * Khóa tài khoản
    * POST /api/v1/admin/users/{id}/lock
    */
-  lockUser: async (id: string): Promise<void> => {
-    await apiClient.post(`/admin/users/${id}/lock`)
+  lockUser: async (id: string): Promise<UserAccountItem> => {
+    const response = await apiClient.post<UserAccountItem>(`/admin/users/${id}/lock`)
+    return response.data
   },
 
   /**
    * Mở khóa tài khoản
    * POST /api/v1/admin/users/{id}/unlock
    */
-  unlockUser: async (id: string): Promise<void> => {
-    await apiClient.post(`/admin/users/${id}/unlock`)
+  unlockUser: async (id: string): Promise<UserAccountItem> => {
+    const response = await apiClient.post<UserAccountItem>(`/admin/users/${id}/unlock`)
+    return response.data
   },
 
   /**

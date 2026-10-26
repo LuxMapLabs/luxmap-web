@@ -19,6 +19,7 @@ export interface AdminUserState {
 
   // Action states (create, update, lock, unlock, invite)
   isSubmitting: boolean
+  invitingUserId: string | null
   actionError: string | null
   actionSuccessMessage: string | null
 
@@ -42,6 +43,7 @@ const initialState: AdminUserState = {
   error: null,
 
   isSubmitting: false,
+  invitingUserId: null,
   actionError: null,
   actionSuccessMessage: null,
 
@@ -131,9 +133,12 @@ const adminUserSlice = createSlice({
     lockUserSuccess: (state, action: PayloadAction<UserAccountItem>) => {
       state.isSubmitting = false
       const updated = action.payload
-      const index = state.users.findIndex((u) => u.user_id === updated.user_id)
-      if (index !== -1) {
-        state.users[index] = { ...state.users[index], ...updated, status: 'locked' }
+      const targetId = updated?.user_id
+      if (targetId) {
+        const index = state.users.findIndex((u) => u.user_id === targetId)
+        if (index !== -1) {
+          state.users[index] = { ...state.users[index], ...updated, status: 'locked' }
+        }
       }
       state.actionSuccessMessage = 'Đã khóa tài khoản thành công'
     },
@@ -150,9 +155,16 @@ const adminUserSlice = createSlice({
     unlockUserSuccess: (state, action: PayloadAction<UserAccountItem>) => {
       state.isSubmitting = false
       const updated = action.payload
-      const index = state.users.findIndex((u) => u.user_id === updated.user_id)
-      if (index !== -1) {
-        state.users[index] = { ...state.users[index], ...updated, status: 'active' }
+      const targetId = updated?.user_id
+      if (targetId) {
+        const index = state.users.findIndex((u) => u.user_id === targetId)
+        if (index !== -1) {
+          state.users[index] = {
+            ...state.users[index],
+            ...updated,
+            status: updated?.password_set_at ? 'active' : 'invited',
+          }
+        }
       }
       state.actionSuccessMessage = 'Đã mở khóa tài khoản thành công'
     },
@@ -162,16 +174,19 @@ const adminUserSlice = createSlice({
     },
 
     // --- Invite User ---
-    inviteUserRequest: (state, _action: PayloadAction<string>) => {
+    inviteUserRequest: (state, action: PayloadAction<string>) => {
       state.isSubmitting = true
+      state.invitingUserId = action.payload
       state.actionError = null
     },
     inviteUserSuccess: (state, _action: PayloadAction<InvitationResponse>) => {
       state.isSubmitting = false
+      state.invitingUserId = null
       state.actionSuccessMessage = 'Đã gửi lại lời mời kích hoạt thành công'
     },
     inviteUserFailure: (state, action: PayloadAction<string>) => {
       state.isSubmitting = false
+      state.invitingUserId = null
       state.actionError = action.payload
     },
 

@@ -32,6 +32,19 @@ import {
 } from './userSlice'
 
 /**
+ * Trích xuất thông điệp lỗi chuẩn từ backend ApiErrorResponse hoặc generic Axios error
+ */
+function getErrorMessage(error: any, fallback: string): string {
+  return (
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.message ||
+    error?.response?.data?.detail ||
+    error?.message ||
+    fallback
+  )
+}
+
+/**
  * Worker saga tải danh sách người dùng
  */
 function* handleFetchUsers(action: PayloadAction<UserQueryParams | undefined>) {
@@ -39,11 +52,10 @@ function* handleFetchUsers(action: PayloadAction<UserQueryParams | undefined>) {
     const result: UserAccountItemPagedResult = yield call(adminUserAPI.getUsers, action.payload)
     yield put(fetchUsersSuccess(result))
   } catch (error: any) {
-    const errorMsg =
-      error?.response?.data?.message ||
-      error?.response?.data?.detail ||
-      error?.message ||
+    const errorMsg = getErrorMessage(
+      error,
       'Không thể tải danh sách tài khoản người dùng từ hệ thống.'
+    )
     yield put(fetchUsersFailure(errorMsg))
   }
 }
@@ -59,11 +71,7 @@ function* handleCreateUser(action: PayloadAction<CreateUserRequest>) {
     // Tải lại danh sách người dùng mới nhất
     yield put(fetchUsersRequest())
   } catch (error: any) {
-    const errorMsg =
-      error?.response?.data?.message ||
-      error?.response?.data?.detail ||
-      error?.message ||
-      'Lỗi khi tạo tài khoản người dùng.'
+    const errorMsg = getErrorMessage(error, 'Lỗi khi tạo tài khoản người dùng.')
     yield put(createUserFailure(errorMsg))
     toast.error(`Tạo tài khoản thất bại: ${errorMsg}`)
   }
@@ -79,11 +87,7 @@ function* handleUpdateUser(action: PayloadAction<UpdateUserPayload>) {
     yield put(updateUserSuccess(result))
     toast.success('Cập nhật thông tin tài khoản thành công!')
   } catch (error: any) {
-    const errorMsg =
-      error?.response?.data?.message ||
-      error?.response?.data?.detail ||
-      error?.message ||
-      'Lỗi khi cập nhật tài khoản.'
+    const errorMsg = getErrorMessage(error, 'Lỗi khi cập nhật tài khoản.')
     yield put(updateUserFailure(errorMsg))
     toast.error(`Cập nhật thất bại: ${errorMsg}`)
   }
@@ -99,11 +103,7 @@ function* handleLockUser(action: PayloadAction<string>) {
     yield put(lockUserSuccess(result))
     toast.success('Đã khóa tài khoản thành công!')
   } catch (error: any) {
-    const errorMsg =
-      error?.response?.data?.message ||
-      error?.response?.data?.detail ||
-      error?.message ||
-      'Không thể khóa tài khoản.'
+    const errorMsg = getErrorMessage(error, 'Không thể khóa tài khoản.')
     yield put(lockUserFailure(errorMsg))
     toast.error(`Lỗi khóa tài khoản: ${errorMsg}`)
   }
@@ -119,11 +119,7 @@ function* handleUnlockUser(action: PayloadAction<string>) {
     yield put(unlockUserSuccess(result))
     toast.success('Đã mở khóa tài khoản thành công!')
   } catch (error: any) {
-    const errorMsg =
-      error?.response?.data?.message ||
-      error?.response?.data?.detail ||
-      error?.message ||
-      'Không thể mở khóa tài khoản.'
+    const errorMsg = getErrorMessage(error, 'Không thể mở khóa tài khoản.')
     yield put(unlockUserFailure(errorMsg))
     toast.error(`Lỗi mở khóa tài khoản: ${errorMsg}`)
   }
@@ -137,13 +133,13 @@ function* handleInviteUser(action: PayloadAction<string>) {
   try {
     const result: InvitationResponse = yield call(adminUserAPI.inviteUser, id)
     yield put(inviteUserSuccess(result))
-    toast.success('Đã gửi email mời đặt lại mật khẩu cho tài khoản!')
+    if (result.invitation_sent === false) {
+      toast.warning('Đã tạo liên kết mời, nhưng máy chủ mail chưa gửi được email.')
+    } else {
+      toast.success('Đã gửi email mời đặt lại mật khẩu cho tài khoản!')
+    }
   } catch (error: any) {
-    const errorMsg =
-      error?.response?.data?.message ||
-      error?.response?.data?.detail ||
-      error?.message ||
-      'Không thể gửi lời mời kích hoạt.'
+    const errorMsg = getErrorMessage(error, 'Không thể gửi lời mời kích hoạt.')
     yield put(inviteUserFailure(errorMsg))
     toast.error(`Lỗi gửi lời mời: ${errorMsg}`)
   }
