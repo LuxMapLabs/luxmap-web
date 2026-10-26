@@ -25,8 +25,11 @@ import { ScheduleCase, WorkOrderAssignee } from '../../../types/workSchedule'
 import { FieldReportDetailModal } from './FieldReportDetailModal'
 import { EditScheduleModal } from './EditScheduleModal'
 import { CancelScheduleModal } from './CancelScheduleModal'
+import { ApproveCancellationModal } from './ApproveCancellationModal'
+import { RejectCancellationModal } from './RejectCancellationModal'
 import { checkScheduleModificationAllowed } from '../../../utils/work-schedule/scheduleRules'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
+import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
 import fieldBrokenFixtureImg from '../../../assets/images/field-broken-fixture.jpg'
 import fieldLuxmeterImg from '../../../assets/images/field-luxmeter-4lux.jpg'
@@ -55,6 +58,14 @@ interface CaseDetailModalProps {
     materialsNote?: string
   }) => Promise<void>
   onCancelSchedule?: (reason: string) => Promise<void>
+  onApproveCancellationReassign?: (params: {
+    newAssigneeId: string
+    scheduledDate: string
+    dueDate: string
+    note?: string
+  }) => Promise<void> | void
+  onApproveCancellationCancel?: (reason: string) => Promise<void> | void
+  onRejectCancellation?: (reason: string) => Promise<void> | void
 }
 
 const STEPPER_STEPS = [
@@ -77,6 +88,9 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   onSubmitSuperior,
   onEditSchedule,
   onCancelSchedule,
+  onApproveCancellationReassign,
+  onApproveCancellationCancel,
+  onRejectCancellation,
 }) => {
   // Dữ liệu chi tiết lệnh công tác từ máy chủ
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
@@ -102,23 +116,76 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
 
+  // State mở modal Duyệt / Từ chối yêu cầu xin hủy lịch của kỹ sư
+  const [isApproveCancellationOpen, setIsApproveCancellationOpen] = useState(false)
+  const [isRejectCancellationOpen, setIsRejectCancellationOpen] = useState(false)
+
+  // Danh sách cột đèn thực tế của lệnh (đặc biệt cho bước Khảo sát trên tuyến)
+  const [surveyPoles, setSurveyPoles] = useState<string[]>([])
+
   useEffect(() => {
     setIsInspectionApprovedLocal(false)
     if (caseItem) {
       const currentP = caseItem.phases[viewingPhaseIndex]
-      if (currentP?.report?.usedMaterialsNote) {
-        setEditedMaterialsNote(currentP.report.usedMaterialsNote)
+      const matNote =
+        (workOrderDetail && workOrderDetail.work_order_id === currentP?.workOrderId && workOrderDetail.materials_used) ||
+        currentP?.report?.usedMaterialsNote ||
+        ''
+      setEditedMaterialsNote(matNote)
+
+      if (currentP?.workOrderId) {
+        workScheduleAPI
+          .getWorkOrderPoles(currentP.workOrderId)
+          .then((res) => {
+            if (res.items && res.items.length > 0) {
+              const abnormal = res.items
+                .filter(
+                  (p) =>
+                    (p.fixture_status && p.fixture_status !== 'normal' && p.fixture_status !== 'unknown') ||
+                    (p.open_fault_count && p.open_fault_count > 0)
+                )
+                .map((p) => p.pole_id)
+                .filter(Boolean) as string[]
+              const all = res.items.map((p) => p.pole_id).filter(Boolean) as string[]
+              setSurveyPoles(abnormal.length > 0 ? abnormal : all)
+            } else {
+              setSurveyPoles([])
+            }
+          })
+          .catch(() => setSurveyPoles([]))
       } else {
-        setEditedMaterialsNote('')
+        setSurveyPoles([])
       }
     }
-  }, [caseItem, viewingPhaseIndex, isOpen])
+  }, [caseItem, viewingPhaseIndex, isOpen, workOrderDetail])
 
   if (!isOpen || !caseItem) return null
 
   const currentPhase = caseItem.phases[viewingPhaseIndex]
   const isActivePhase = viewingPhaseIndex === caseItem.currentPhaseIndex
-  const hasReport = currentPhase?.status === 'reported'
+  const isCurrentPhaseDetail = workOrderDetail?.work_order_id === currentPhase?.workOrderId
+  const hasReport =
+    currentPhase?.status === 'reported' ||
+    currentPhase?.rawStatus === 'done' ||
+    (isCurrentPhaseDetail && workOrderDetail?.wo_status === 'done')
+  const hasPhaseReport = Boolean(
+    currentPhase?.report ||
+    hasReport ||
+    currentPhase?.status === 'ended' ||
+    currentPhase?.rawStatus === 'verified' ||
+    (isCurrentPhaseDetail && (workOrderDetail?.report_note || workOrderDetail?.completed_at))
+  )
+  const effectiveReportNote =
+    (isCurrentPhaseDetail && workOrderDetail?.report_note) ||
+    currentPhase?.report?.summary ||
+    'Báo cáo kỹ thuật hiện trường'
+  const effectiveSubmittedAt =
+    (isCurrentPhaseDetail && workOrderDetail?.completed_at)
+      ? new Date(workOrderDetail.completed_at).toLocaleString('vi-VN')
+      : currentPhase?.report?.submittedAt
+  const effectiveSuggestedMaterials =
+    (isCurrentPhaseDetail && workOrderDetail?.materials_note) ||
+    currentPhase?.report?.suggestedMaterialsNote
 
   // Kiểm tra quy chế: cho phép sửa/hủy khi chưa hoàn tất (đồng bộ với Backend C#)
   const modificationCheck = checkScheduleModificationAllowed(
@@ -283,6 +350,87 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
           </div>
 
+          {/* ======================================================== */}
+          {/* BANNER CẢNH BÁO: KỸ SƯ YÊU CẦU XIN HỦY LỊCH */}
+          {/* ======================================================== */}
+          {currentPhase?.cancellationRequest?.status === 'pending' && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border-2 border-rose-300 shadow-sm flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-2 rounded-xl bg-rose-600 text-white shadow-xs shrink-0 mt-0.5 animate-pulse">
+                    <AlertTriangle className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+                        Cảnh báo khẩn
+                      </span>
+                      <h4 className="font-extrabold text-sm text-rose-950">
+                        Kỹ sư hiện trường yêu cầu xin hủy ca làm việc
+                      </h4>
+                    </div>
+                    <p className="text-xs text-rose-800/90 mt-1 leading-relaxed">
+                      Kỹ sư <strong className="text-rose-950">{currentPhase.assigneeName}</strong> đã gửi lý do xin từ chối / hủy lịch tác nghiệp
+                      {currentPhase.cancellationRequest.requestedAt && (
+                        <> lúc <strong>{new Date(currentPhase.cancellationRequest.requestedAt).toLocaleString('vi-VN')}</strong></>
+                      )}:
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trích dẫn lý do của kỹ sư */}
+              <div className="p-3 bg-white/90 rounded-xl border border-rose-200/80 text-xs text-slate-800 font-medium italic shadow-2xs">
+                "{currentPhase.cancellationRequest.reason}"
+              </div>
+
+              {/* Nút hành động của Quản lý */}
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-rose-200/60">
+                <button
+                  type="button"
+                  onClick={() => setIsRejectCancellationOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-rose-300 bg-white text-rose-700 hover:bg-rose-100/70 font-bold text-xs shadow-2xs transition active:scale-95 cursor-pointer"
+                  title="Bác bỏ yêu cầu và gửi phản hồi yêu cầu kỹ sư tiếp tục thực hiện"
+                >
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Không duyệt (Từ chối)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsApproveCancellationOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+                  title="Duyệt yêu cầu: Chọn Kỹ sư thay thế hoặc Hủy lịch"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Duyệt yêu cầu...</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Thông báo nếu yêu cầu xin hủy trước đó đã bị Quản lý từ chối */}
+          {currentPhase?.cancellationRequest?.status === 'rejected' && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2.5">
+              <span className="p-1 rounded-lg bg-slate-200 text-slate-700 shrink-0 mt-0.5">
+                <AlertTriangle className="w-4 h-4" />
+              </span>
+              <div className="flex-1">
+                <div className="font-bold text-slate-900 flex items-center gap-2">
+                  <span>Yêu cầu xin hủy lịch đã bị Quản lý từ chối</span>
+                  {currentPhase.cancellationRequest.rejectedAt && (
+                    <span className="text-[10px] text-slate-500 font-normal">
+                      ({new Date(currentPhase.cancellationRequest.rejectedAt).toLocaleString('vi-VN')})
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Lý do từ chối: <em className="text-slate-800 font-medium">"{currentPhase.cancellationRequest.rejectReason || 'Không chấp thuận yêu cầu xin hủy'}"</em>. Lịch công tác vẫn tiếp tục được thực hiện.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Thông báo sự vụ nếu đã kết thúc (Terminated / END / CANCELLED) */}
           {caseItem.isTerminated && (
             <div
@@ -416,13 +564,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     ...(caseItem.poleIds || []),
                   ])
                 )
-                // Fallback nếu là chuỗi test WO-TEST hoặc WO-0025
-                const displayPoles =
-                  effectivePoles.length > 0
-                    ? effectivePoles
-                    : (caseItem.code?.includes('TEST') || currentPhase.workOrderId?.includes('TEST') || currentPhase.workOrderId === 'WO-0025')
-                      ? ['POLE-0019', 'POLE-0032']
-                      : []
+                const displayPoles = effectivePoles
 
                 return (
                   <div className="p-3.5 bg-amber-50/70 border border-amber-200/90 rounded-2xl flex flex-col gap-2">
@@ -468,17 +610,17 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     <FileCheck className="w-4 h-4" />
                     Báo cáo nghiệm thu: {currentPhase.name}
                   </span>
-                  {currentPhase.report?.submittedAt && (
+                  {effectiveSubmittedAt && (
                     <span className="text-[11px] text-slate-500">
-                      Nộp lúc: {currentPhase.report.submittedAt}
+                      Nộp lúc: {effectiveSubmittedAt}
                     </span>
                   )}
                 </div>
 
-                {currentPhase.report ? (
+                {hasPhaseReport ? (
                   <div className="flex flex-col gap-3">
-                    <p className="text-xs text-slate-800 leading-relaxed">
-                      {currentPhase.report.summary}
+                    <p className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line">
+                      {effectiveReportNote}
                     </p>
 
                     {/* NÚT BẤM DUY NHẤT: XEM BÁO CÁO HIỆN TRƯỜNG CHI TIẾT */}
@@ -494,54 +636,72 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         <span className="tracking-tight">Xem Báo Cáo Hiện Trường Thực Địa (Ảnh & Video)</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
-                        <span>1 Video • 3 Ảnh • Lux</span>
+                        <span>Chi tiết hiện trường</span>
                         <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                       </div>
                     </button>
 
-                    {/* Thư viện thumbnails bằng chứng hiện trường: CHỈ PREVIEW TĨNH, KHÔNG CLICK */}
-                    <div className="grid grid-cols-3 gap-2 select-none">
-                      <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
-                        <img
-                          src={fieldSurveyNightImg}
-                          alt="Video Khảo Sát Đêm"
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-slate-950/30 flex items-center justify-center">
-                          <span className="w-7 h-7 rounded-full bg-white/90 text-blue-600 flex items-center justify-center shadow">
-                            <Play className="w-3.5 h-3.5 ml-0.5 fill-blue-600" />
+                    {/* Bằng chứng / Thông tin hiện trường */}
+                    {currentPhase.phaseType === 'survey' ? (
+                      <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+                          <span className="font-bold text-blue-950">
+                            Khảo sát video hành trình đêm trên tuyến:
+                          </span>
+                          <span className="font-extrabold text-blue-800 font-mono">
+                            {surveyPoles.length > 0 ? `${surveyPoles.length} cột ghi nhận` : 'Toàn tuyến'}
                           </span>
                         </div>
-                        <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
-                          Video đêm 00:45
+                        <span className="text-[11px] text-blue-700 font-semibold bg-blue-100 px-2 py-0.5 rounded-md">
+                          Video 1080P • AI Detector
                         </span>
                       </div>
+                    ) : (
+                      /* Thư viện thumbnails bằng chứng hiện trường: CHỈ PREVIEW TĨNH, KHÔNG CLICK */
+                      <div className="grid grid-cols-3 gap-2 select-none">
+                        <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
+                          <img
+                            src={fieldSurveyNightImg}
+                            alt="Video Hiện Trường"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-slate-950/30 flex items-center justify-center">
+                            <span className="w-7 h-7 rounded-full bg-white/90 text-blue-600 flex items-center justify-center shadow">
+                              <Play className="w-3.5 h-3.5 ml-0.5 fill-blue-600" />
+                            </span>
+                          </div>
+                          <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
+                            Video ghi nhận
+                          </span>
+                        </div>
 
-                      <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
-                        <img
-                          src={fieldBrokenFixtureImg}
-                          alt="Chao đèn cháy hỏng"
-                          className="w-full h-full object-cover"
-                        />
-                        <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
-                          Ảnh đui đèn hỏng
-                        </span>
-                      </div>
+                        <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
+                          <img
+                            src={fieldBrokenFixtureImg}
+                            alt="Thiết bị thực tế"
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
+                            Hiện trạng thiết bị
+                          </span>
+                        </div>
 
-                      <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
-                        <img
-                          src={fieldLuxmeterImg}
-                          alt="Đo Luxmeter"
-                          className="w-full h-full object-cover"
-                        />
-                        <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
-                          Đo đạt 4.2 Lux
-                        </span>
+                        <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
+                          <img
+                            src={fieldLuxmeterImg}
+                            alt="Đo kiểm tra"
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
+                            Đo kiểm thiết bị
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Detections AI phát hiện sự cố (nếu là Khảo sát) */}
-                    {currentPhase.report.aiDetections &&
+                    {currentPhase.report?.aiDetections &&
                       currentPhase.report.aiDetections.length > 0 && (
                         <div className="flex flex-col gap-1.5 mt-1">
                           <span className="text-[11px] font-bold text-slate-600">
@@ -566,7 +726,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       )}
 
                     {/* Đo độ rọi Luxmeter (nếu có) */}
-                    {currentPhase.report.luxMeasured && (
+                    {currentPhase.report?.luxMeasured && (
                       <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs flex items-center justify-between">
                         <span className="font-semibold text-slate-700">Độ rọi mặt đường đo được:</span>
                         <span className="font-black text-blue-800 font-mono bg-blue-100 px-2 py-0.5 rounded-md">
@@ -576,14 +736,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     )}
 
                     {/* Đề xuất vật tư từ Kỹ sư */}
-                    {currentPhase.report.suggestedMaterialsNote && (
+                    {effectiveSuggestedMaterials && (
                       <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl text-xs flex flex-col gap-1">
                         <span className="font-extrabold text-amber-900 flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-amber-700" />
-                          Đề xuất vật tư từ Kỹ sư kiểm tra:
+                          Đề xuất vật tư từ Kỹ sư:
                         </span>
                         <p className="text-slate-800 font-medium">
-                          {currentPhase.report.suggestedMaterialsNote}
+                          {effectiveSuggestedMaterials}
                         </p>
                       </div>
                     )}
@@ -707,15 +867,16 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          const surveyPoles =
-                            currentPhase.poleIds ||
+                          const polesForNext =
+                            (currentPhase.poleIds && currentPhase.poleIds.length > 0 && currentPhase.poleIds) ||
+                            (surveyPoles && surveyPoles.length > 0 && surveyPoles) ||
                             currentPhase.report?.aiDetections?.map((d) => d.poleId) ||
-                            ['POLE-0019', 'POLE-0032']
+                            []
                           onOpenCreateNextPhaseModal(
                             caseItem.code,
                             'inspection',
                             currentPhase.workOrderId,
-                            surveyPoles
+                            polesForNext
                           )
                         }}
                         className="flex items-center gap-1 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
@@ -977,6 +1138,46 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           caseCode={caseItem.code}
           workOrderId={currentPhase?.workOrderId || caseItem.code}
           onSubmit={onCancelSchedule}
+        />
+      )}
+
+      {/* Modal Duyệt Yêu Cầu Xin Hủy Lịch Của Kỹ Sư (Đổi kỹ sư, Dời ngày hoặc Hủy lịch) */}
+      {onApproveCancellationReassign && onApproveCancellationCancel && (
+        <ApproveCancellationModal
+          isOpen={isApproveCancellationOpen}
+          onClose={() => setIsApproveCancellationOpen(false)}
+          caseCode={caseItem.code}
+          workOrderId={currentPhase?.workOrderId || caseItem.code}
+          currentAssigneeName={currentPhase?.assigneeName || ''}
+          currentAssigneeId={currentPhase?.assigneeId || ''}
+          currentScheduledDate={currentPhase?.date || currentPhase?.dueDate}
+          currentDueDate={currentPhase?.dueDate || currentPhase?.date}
+          cancellationReason={currentPhase?.cancellationRequest?.reason || ''}
+          assignees={assignees}
+          onApproveReassign={async (params) => {
+            await onApproveCancellationReassign(params)
+            setIsApproveCancellationOpen(false)
+          }}
+          onApproveCancel={async (reason) => {
+            await onApproveCancellationCancel(reason)
+            setIsApproveCancellationOpen(false)
+          }}
+        />
+      )}
+
+      {/* Modal Từ Chối Yêu Cầu Xin Hủy Lịch (Nhập lý do gửi lại kỹ sư) */}
+      {onRejectCancellation && (
+        <RejectCancellationModal
+          isOpen={isRejectCancellationOpen}
+          onClose={() => setIsRejectCancellationOpen(false)}
+          caseCode={caseItem.code}
+          workOrderId={currentPhase?.workOrderId || caseItem.code}
+          currentAssigneeName={currentPhase?.assigneeName || ''}
+          cancellationReason={currentPhase?.cancellationRequest?.reason || ''}
+          onReject={async (reason) => {
+            await onRejectCancellation(reason)
+            setIsRejectCancellationOpen(false)
+          }}
         />
       )}
     </div>

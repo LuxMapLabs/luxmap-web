@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import type { RootState, AppDispatch } from '../../redux/store'
 import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
 import type { FaultItem } from '../../types/faults/faults'
@@ -13,6 +14,12 @@ import { FaultDetailModal } from './components/FaultDetailModal'
 
 export const ManagerDashboardPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
+  const navigate = useNavigate()
+
+  // Refs cuộn mượt đến các bảng/biểu đồ tương ứng khi click thẻ KPI
+  const chartsRef = useRef<HTMLDivElement>(null)
+  const faultsTableRef = useRef<HTMLDivElement>(null)
+  const warrantyTableRef = useRef<HTMLDivElement>(null)
 
   // Redux Global State (được quản lý và nạp bởi Redux-Saga)
   const { segmentsList, warrantyList, faultsList, loading } = useSelector(
@@ -26,6 +33,35 @@ export const ManagerDashboardPage: React.FC = () => {
 
   // Modal State
   const [selectedFault, setSelectedFault] = useState<FaultItem | null>(null)
+
+  // Handlers cuộn mượt khi click các thẻ KPI
+  const handleScrollToCharts = () => {
+    chartsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleScrollToFaults = (tab?: 'all' | 'blackout') => {
+    if (tab) setFaultTab(tab)
+    faultsTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleScrollToWarranty = () => {
+    warrantyTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // Handler khi click hàng sự cố "Chưa phân lịch" -> Trỏ sang tab Lịch làm việc & Mở popup Tạo sự vụ
+  const handleNavigateToCreateSchedule = (fault: FaultItem) => {
+    navigate('/work-schedule', {
+      state: {
+        openCreateModal: true,
+        initialTaskKind: 'inspection',
+        prefillFault: fault,
+        prefillSegmentId: fault.segment_id,
+        prefillPoleId: fault.pole_id,
+        prefillFaultId: fault.fault_id,
+        prefillNote: fault.note || fault.review_note || '',
+      },
+    })
+  }
 
   // Tải dữ liệu toàn diện qua Redux-Saga khi vào trang Dashboard
   useEffect(() => {
@@ -251,7 +287,7 @@ export const ManagerDashboardPage: React.FC = () => {
           loading={loading}
         />
 
-        {/* 2. Dải 4 Thẻ KPI */}
+        {/* 2. Dải 4 Thẻ KPI (Click để cuộn xuống bảng tương ứng) */}
         <DashboardKpiCards
           fixtureKpis={fixtureKpis}
           faultsCount={filteredFaults.length}
@@ -260,42 +296,53 @@ export const ManagerDashboardPage: React.FC = () => {
             expiringCount: warrantyKpis.expiringCount,
             expiredCount: warrantyKpis.expiredCount,
           }}
+          onClickNormal={handleScrollToCharts}
+          onClickPendingFaults={() => handleScrollToFaults('all')}
+          onClickSevereFaults={() => handleScrollToFaults('blackout')}
+          onClickWarranty={handleScrollToWarranty}
         />
 
         {/* 3. Hàng 2 Biểu đồ (Charts) */}
-        <DashboardCharts
-          barChartData={barChartData}
-          donutChartData={donutChartData}
-          selectedSegment={selectedSegment}
-          segmentNameMap={segmentNameMap}
-          totalPoles={fixtureKpis.totalPoles}
-        />
+        <div ref={chartsRef} id="dashboard-charts" className="scroll-mt-4">
+          <DashboardCharts
+            barChartData={barChartData}
+            donutChartData={donutChartData}
+            selectedSegment={selectedSegment}
+            segmentNameMap={segmentNameMap}
+            totalPoles={fixtureKpis.totalPoles}
+          />
+        </div>
 
         {/* 4. Hàng 2 Bảng Dữ Liệu Chi Tiết */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {/* Bảng Trái: Theo dõi bảo hành */}
-          <WarrantyTableCard
-            items={filteredWarrantyItems}
-            activeTab={warrantyTab}
-            onTabChange={setWarrantyTab}
-            segmentNameMap={segmentNameMap}
-            totalCount={warrantyKpis.items.length}
-            expiredCount={warrantyKpis.expiredCount}
-            expiringCount={warrantyKpis.expiringCount}
-          />
+          <div ref={warrantyTableRef} id="warranty-table-card" className="scroll-mt-4">
+            <WarrantyTableCard
+              items={filteredWarrantyItems}
+              activeTab={warrantyTab}
+              onTabChange={setWarrantyTab}
+              segmentNameMap={segmentNameMap}
+              totalCount={warrantyKpis.items.length}
+              expiredCount={warrantyKpis.expiredCount}
+              expiringCount={warrantyKpis.expiringCount}
+            />
+          </div>
 
           {/* Bảng Phải: Giám sát sự cố bóng đèn */}
-          <FaultsTableCard
-            faults={filteredFaults}
-            activeTab={faultTab}
-            onTabChange={setFaultTab}
-            segmentNameMap={segmentNameMap}
-            onSelectFault={setSelectedFault}
-            totalCount={segmentFaults.length}
-            blackoutCount={blackoutFaultsCount}
-            dimCount={dimFaultsCount}
-            offlineCount={offlineFaultsCount}
-          />
+          <div ref={faultsTableRef} id="faults-table-card" className="scroll-mt-4">
+            <FaultsTableCard
+              faults={filteredFaults}
+              activeTab={faultTab}
+              onTabChange={setFaultTab}
+              segmentNameMap={segmentNameMap}
+              onSelectFault={setSelectedFault}
+              onNavigateToCreateSchedule={handleNavigateToCreateSchedule}
+              totalCount={segmentFaults.length}
+              blackoutCount={blackoutFaultsCount}
+              dimCount={dimFaultsCount}
+              offlineCount={offlineFaultsCount}
+            />
+          </div>
         </div>
       </div>
 

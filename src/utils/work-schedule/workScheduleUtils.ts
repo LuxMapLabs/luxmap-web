@@ -169,6 +169,19 @@ export function mapWorkOrdersToScheduleCases(
       notes: raw.note || title,
       materialsNote: raw.materials_note || undefined,
       workOrderId,
+      cancellationRequest:
+        raw.cancellation_request_status && raw.cancellation_request_status !== 'none'
+          ? {
+              status: raw.cancellation_request_status as 'none' | 'pending' | 'rejected',
+              reason:
+                raw.cancellation_request_note ||
+                'Kỹ sư hiện trường xin hủy lịch vì sự cố phương tiện hoặc thiết bị.',
+              requestedAt: raw.cancellation_requested_at || raw.updated_at || undefined,
+              requestedBy: assigneeName,
+              rejectReason: raw.cancellation_reject_note || undefined,
+              rejectedAt: raw.cancellation_rejected_at || undefined,
+            }
+          : undefined,
       report:
         raw.report_note || woStatus === 'done' || woStatus === 'verified'
           ? {
@@ -189,6 +202,9 @@ export function mapWorkOrdersToScheduleCases(
   const result = Object.values(casesMap)
   result.forEach((c) => {
     c.currentPhaseIndex = Math.max(0, c.phases.length - 1)
+    c.hasPendingCancellationRequest = c.phases.some(
+      (p) => p.cancellationRequest?.status === 'pending'
+    )
   })
 
   return result

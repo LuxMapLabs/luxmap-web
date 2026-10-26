@@ -62,7 +62,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
       const initialPoles =
         defaultPoleIds && defaultPoleIds.length > 0
           ? [...defaultPoleIds]
-          : ['POLE-0019', 'POLE-0032']
+          : []
       setSelectedPoleIds(initialPoles)
       setSelectedFaultIds([])
     }

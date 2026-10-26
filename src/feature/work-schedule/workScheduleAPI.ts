@@ -14,6 +14,17 @@ import type {
   FollowUpWorkOrderRequest,
   StartWorkOrderRequest,
 } from '../../types/workorders/orders'
+import {
+  getMockDemoWorkOrders,
+  mergeWithMockDemoWorkOrders,
+  getMockDemoWorkOrderDetail,
+  updateMockCancellationStatus,
+  updateMockAssignee,
+  updateMockWorkOrderStatus,
+  patchMockWorkOrder,
+  clearMockCancellation,
+  MOCK_ASSIGNEES_DEMO,
+} from './workScheduleMockData'
 
 export interface GetWorkOrdersFilter {
   scheduled_from?: string
@@ -31,36 +42,79 @@ export const workScheduleAPI = {
    * Lấy danh sách lệnh công tác / lịch làm việc (hỗ trợ lọc theo khoảng ngày để vẽ calendar)
    */
   async getWorkOrders(filter?: GetWorkOrdersFilter): Promise<WorkOrderItemPagedResult> {
-    const params: Record<string, any> = {}
-    if (filter?.scheduled_from) params.scheduled_from = filter.scheduled_from
-    if (filter?.scheduled_to) params.scheduled_to = filter.scheduled_to
-    if (filter?.task_kind) params.task_kind = filter.task_kind
-    if (filter?.wo_status) params.wo_status = filter.wo_status
-    if (filter?.assigned_to) params.assigned_to = filter.assigned_to
-    if (filter?.segment_id) params.segment_id = filter.segment_id
-    if (filter?.commune_id?.length) params.commune_id = filter.commune_id
-    if (filter?.page) params.page = filter.page
+    try {
+      const params: Record<string, any> = {}
+      if (filter?.scheduled_from) params.scheduled_from = filter.scheduled_from
+      if (filter?.scheduled_to) params.scheduled_to = filter.scheduled_to
+      if (filter?.task_kind) params.task_kind = filter.task_kind
+      if (filter?.wo_status) params.wo_status = filter.wo_status
+      if (filter?.assigned_to) params.assigned_to = filter.assigned_to
+      if (filter?.segment_id) params.segment_id = filter.segment_id
+      if (filter?.commune_id?.length) params.commune_id = filter.commune_id
+      if (filter?.page) params.page = filter.page
 
-    const response = await apiClient.get<WorkOrderItemPagedResult>('/work-orders', { params })
-    return response.data
+      const response = await apiClient.get<WorkOrderItemPagedResult>('/work-orders', { params })
+      const backendItems = response.data?.items || []
+      // Hợp nhất dữ liệu backend với các ca mock demo phục vụ kiểm thử giao diện
+      const mergedItems = mergeWithMockDemoWorkOrders(backendItems)
+      return {
+        items: mergedItems,
+        total: Math.max(response.data?.total || 0, mergedItems.length),
+        page: response.data?.page || 1,
+        page_size: response.data?.page_size || 50,
+      }
+    } catch (err) {
+      console.warn('API /work-orders chưa sẵn sàng hoặc lỗi kết nối, nạp dữ liệu mock demo:', err)
+      const mockItems = getMockDemoWorkOrders()
+      return {
+        items: mockItems,
+        total: mockItems.length,
+        page: 1,
+        page_size: 50,
+      }
+    }
   },
 
   /**
    * Lấy chi tiết một lệnh công tác
    */
   async getWorkOrderDetail(id: string): Promise<WorkOrderDetail> {
-    const response = await apiClient.get<WorkOrderDetail>(`/work-orders/${id}`)
-    return response.data
+    const mockDetail = getMockDemoWorkOrderDetail(id)
+    if (mockDetail) {
+      return mockDetail
+    }
+    try {
+      const response = await apiClient.get<WorkOrderDetail>(`/work-orders/${id}`)
+      return response.data
+    } catch (err) {
+      if (mockDetail) return mockDetail
+      throw err
+    }
   },
 
   /**
    * Lấy danh sách kỹ sư hiện trường theo địa bàn xã
    */
   async getAssignees(communeId: string, page = 1): Promise<WorkOrderAssigneePagedResult> {
-    const response = await apiClient.get<WorkOrderAssigneePagedResult>('/work-orders/assignees', {
-      params: { commune_id: communeId, page },
-    })
-    return response.data
+    try {
+      const response = await apiClient.get<WorkOrderAssigneePagedResult>('/work-orders/assignees', {
+        params: { commune_id: communeId, page },
+      })
+      const items = response.data?.items || []
+      return {
+        items: items.length > 0 ? items : MOCK_ASSIGNEES_DEMO,
+        total: Math.max(response.data?.total || 0, MOCK_ASSIGNEES_DEMO.length),
+        page: 1,
+        page_size: 50,
+      }
+    } catch (err) {
+      return {
+        items: MOCK_ASSIGNEES_DEMO,
+        total: MOCK_ASSIGNEES_DEMO.length,
+        page: 1,
+        page_size: 50,
+      }
+    }
   },
 
   /**
@@ -75,16 +129,30 @@ export const workScheduleAPI = {
    * Cập nhật ngày hẹn, hạn chót hoặc tiêu đề
    */
   async patchWorkOrder(id: string, payload: PatchWorkOrderRequest): Promise<WorkOrderDetail> {
-    const response = await apiClient.patch<WorkOrderDetail>(`/work-orders/${id}`, payload)
-    return response.data
+    patchMockWorkOrder(id, payload)
+    try {
+      const response = await apiClient.patch<WorkOrderDetail>(`/work-orders/${id}`, payload)
+      return response.data
+    } catch (err) {
+      const mockDetail = getMockDemoWorkOrderDetail(id)
+      if (mockDetail) return mockDetail
+      throw err
+    }
   },
 
   /**
    * Gán / Đổi kỹ sư hiện trường phụ trách
    */
   async assignWorkOrder(id: string, payload: AssignWorkOrderRequest): Promise<WorkOrderDetail> {
-    const response = await apiClient.put<WorkOrderDetail>(`/work-orders/${id}/assignee`, payload)
-    return response.data
+    updateMockAssignee(id, payload.assigned_to || '')
+    try {
+      const response = await apiClient.put<WorkOrderDetail>(`/work-orders/${id}/assignee`, payload)
+      return response.data
+    } catch (err) {
+      const mockDetail = getMockDemoWorkOrderDetail(id)
+      if (mockDetail) return mockDetail
+      throw err
+    }
   },
 
   /**
@@ -126,8 +194,15 @@ export const workScheduleAPI = {
    * Quản lý không duyệt / Hủy lệnh (Tự động END có lưu vết)
    */
   async cancelWorkOrder(id: string, payload: ReviewWorkOrderRequest): Promise<WorkOrderDetail> {
-    const response = await apiClient.post<WorkOrderDetail>(`/work-orders/${id}/cancel`, payload)
-    return response.data
+    updateMockWorkOrderStatus(id, 'cancelled', payload.note || undefined)
+    try {
+      const response = await apiClient.post<WorkOrderDetail>(`/work-orders/${id}/cancel`, payload)
+      return response.data
+    } catch (err) {
+      const mockDetail = getMockDemoWorkOrderDetail(id)
+      if (mockDetail) return mockDetail
+      throw err
+    }
   },
 
   /**
@@ -198,5 +273,77 @@ export const workScheduleAPI = {
       reader.readAsDataURL(response.data)
     })
   },
+
+  /**
+   * Quản lý từ chối (bác bỏ) yêu cầu xin hủy lịch từ kỹ sư hiện trường
+   */
+  async rejectCancellation(id: string, rejectReason: string): Promise<WorkOrderDetail> {
+    updateMockCancellationStatus(id, 'rejected', rejectReason)
+    try {
+      const response = await apiClient.post<WorkOrderDetail>(`/work-orders/${id}/reject-cancellation`, {
+        reject_reason: rejectReason,
+      })
+      return response.data
+    } catch (err: any) {
+      console.warn('Backend endpoint /reject-cancellation chưa có, sử dụng cập nhật mock:', err)
+      const mockDetail = getMockDemoWorkOrderDetail(id)
+      if (mockDetail) return mockDetail
+      const current = await this.getWorkOrderDetail(id).catch(() => null)
+      return {
+        ...(current || {}),
+        work_order_id: id,
+        cancellation_request_status: 'rejected',
+        cancellation_reject_note: rejectReason,
+        cancellation_rejected_at: new Date().toISOString(),
+      } as WorkOrderDetail
+    }
+  },
+
+  /**
+   * Quản lý duyệt yêu cầu xin hủy và điều phối lại (Dời ngày làm việc hoặc Đổi kỹ sư)
+   */
+  async approveCancellationReassign(
+    id: string,
+    params: {
+      newAssigneeId?: string
+      scheduledDate?: string
+      dueDate?: string
+      note?: string
+    }
+  ): Promise<WorkOrderDetail> {
+    // Luôn xóa cờ xin hủy khi duyệt điều phối
+    clearMockCancellation(id)
+
+    if (params.scheduledDate || params.dueDate) {
+      patchMockWorkOrder(id, {
+        scheduled_date: params.scheduledDate,
+        due_date: params.dueDate || params.scheduledDate,
+      })
+    }
+    if (params.newAssigneeId) {
+      updateMockAssignee(id, params.newAssigneeId)
+    }
+
+    try {
+      if (params.scheduledDate || params.dueDate) {
+        await apiClient.patch(`/work-orders/${id}`, {
+          scheduled_date: params.scheduledDate,
+          due_date: params.dueDate || params.scheduledDate,
+        })
+      }
+      if (params.newAssigneeId) {
+        await apiClient.put(`/work-orders/${id}/assignee`, {
+          assigned_to: params.newAssigneeId,
+        })
+      }
+      const response = await apiClient.get<WorkOrderDetail>(`/work-orders/${id}`)
+      return response.data
+    } catch (err) {
+      const mockDetail = getMockDemoWorkOrderDetail(id)
+      if (mockDetail) return mockDetail
+      throw err
+    }
+  },
 }
+
 

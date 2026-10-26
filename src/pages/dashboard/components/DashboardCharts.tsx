@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import {
   ResponsiveContainer,
   BarChart,
@@ -34,6 +34,80 @@ interface DashboardChartsProps {
   totalPoles: number
 }
 
+// Custom Tooltip tự động lật sang trái khi chạm mép phải vùng cuộn để không bao giờ bị cắt viền
+const CustomBarTooltip = ({
+  active,
+  payload,
+  label,
+  coordinate,
+  scrollContainerRef,
+  barChartData,
+}: {
+  active?: boolean
+  payload?: any[]
+  label?: string
+  coordinate?: { x: number; y: number }
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>
+  barChartData: BarChartItem[]
+}) => {
+  if (!active || !payload || !payload.length) return null
+
+  const item = barChartData.find((d) => d.name === label)
+  const title = item?.fullName || String(label || '')
+
+  // Kiểm tra nếu tooltip gần mép phải của khung cuộn hiển thị thì lật sang trái cột
+  let shouldFlipLeft = false
+  if (coordinate && scrollContainerRef.current) {
+    const scrollLeft = scrollContainerRef.current.scrollLeft
+    const clientWidth = scrollContainerRef.current.clientWidth
+    const distanceToRight = scrollLeft + clientWidth - coordinate.x
+    // Nếu khoảng cách tới mép phải hiển thị nhỏ hơn 235px (độ rộng tooltip), lật sang trái
+    if (distanceToRight < 235) {
+      shouldFlipLeft = true
+    }
+  }
+
+  const labelMap: Record<string, { label: string; color: string }> = {
+    normal: { label: 'Đạt chuẩn (Bình thường)', color: '#10b981' },
+    dim: { label: 'Sáng yếu (Quang thông giảm)', color: '#f59e0b' },
+    out: { label: 'Mất sáng hoàn toàn (Tắt)', color: '#ef4444' },
+  }
+
+  return (
+    <div
+      style={{
+        transform: shouldFlipLeft ? 'translateX(calc(-100% - 25px))' : 'none',
+      }}
+      className="bg-white/95 backdrop-blur-xs border border-slate-200/90 rounded-xl p-3 shadow-xl text-xs min-w-[215px] pointer-events-none transition-transform duration-75"
+    >
+      <div className="font-extrabold text-slate-900 border-b border-slate-100 pb-1.5 mb-2 line-clamp-1">
+        {title}
+      </div>
+      <div className="space-y-1.5">
+        {payload.map((entry: any, index: number) => {
+          const key = String(entry.dataKey || entry.name)
+          const meta = labelMap[key] || { label: key, color: entry.color || '#64748b' }
+          return (
+            <div key={index} className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-slate-600 font-medium">
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: meta.color }}
+                />
+                <span className="truncate max-w-[140px]">{meta.label}</span>
+              </span>
+              <strong className="text-slate-900 font-mono shrink-0">
+                {entry.value}{' '}
+                <span className="font-sans font-normal text-[10px] text-slate-400">cột</span>
+              </strong>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({
   barChartData,
   donutChartData,
@@ -42,6 +116,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
   totalPoles,
 }) => {
   const [showDonutModal, setShowDonutModal] = useState<boolean>(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Độ rộng biểu đồ: Nếu nhiều hơn 7 tuyến thì mở rộng để cuộn ngang mượt mà (~65px mỗi cột)
   const isMultiSegments = barChartData.length > 7
@@ -85,14 +160,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
         </div>
 
         {/* Khung Biểu đồ Bar Chart có thanh cuộn ngang khi số tuyến nhiều */}
-        <div className="w-full overflow-x-auto custom-scrollbar pb-1">
+        <div ref={scrollContainerRef} className="w-full overflow-x-auto custom-scrollbar pb-1">
           <div style={{ minWidth: chartMinWidth, height: 270 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={barChartData}
                 margin={{
                   top: 10,
-                  right: 20,
+                  right: 25,
                   left: -15,
                   bottom: isMultiSegments ? 35 : 10,
                 }}
@@ -111,24 +186,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
                 />
                 <YAxis tick={{ fontSize: 11, fill: '#475569' }} />
                 <Tooltip
-                  labelFormatter={(label) => {
-                    const item = barChartData.find((d) => d.name === label)
-                    return item?.fullName || String(label)
-                  }}
-                  formatter={(value: any, name: any) => {
-                    const labelMap: Record<string, string> = {
-                      normal: 'Đạt chuẩn (Bình thường)',
-                      dim: 'Sáng yếu (Quang thông giảm)',
-                      out: 'Mất sáng hoàn toàn (Tắt)',
-                    }
-                    return [`${value} cột đèn`, labelMap[String(name)] || String(name)]
-                  }}
-                  contentStyle={{
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    fontSize: '12px',
-                  }}
+                  content={(props: any) => (
+                    <CustomBarTooltip
+                      {...props}
+                      scrollContainerRef={scrollContainerRef}
+                      barChartData={barChartData}
+                    />
+                  )}
+                  wrapperStyle={{ zIndex: 50, pointerEvents: 'none' }}
                 />
                 <Bar dataKey="normal" stackId="a" fill="#10b981" name="normal" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="dim" stackId="a" fill="#f59e0b" name="dim" radius={[0, 0, 0, 0]} />
