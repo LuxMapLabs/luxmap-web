@@ -188,11 +188,11 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
               <span className="text-[10px] text-slate-400 font-normal">(Tối đa 4KB)</span>
             </label>
             <textarea
-              rows={3}
+              rows={5}
               value={metadataJson}
               onChange={(e) => setMetadataJson(e.target.value)}
               placeholder={'{\n  "board": "ESP32-WROOM-32D",\n  "release_note": "Sửa lỗi kết nối MQTT khi mất sóng 4G"\n}'}
-              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono text-slate-800 outline-none transition"
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono text-slate-800 outline-none transition resize-y min-h-[110px] max-h-[260px] leading-relaxed custom-scrollbar"
             />
           </div>
 
