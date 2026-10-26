@@ -1,12 +1,5 @@
 import React, { useState } from 'react'
 import {
-  Cpu,
-  Layers,
-  Sparkles,
-  Camera,
-  Clock,
-  Compass,
-  Tag,
   Copy,
   Check,
   SearchCheck,
@@ -47,66 +40,6 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
     setTimeout(() => setCopiedHash(null), 2000)
   }
 
-  const renderComponentBadge = (component?: string | null) => {
-    switch (component) {
-      case 'node_firmware':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
-            <Cpu className="w-3.5 h-3.5 text-cyan-600" />
-            <span>Node Firmware (Tủ IoT)</span>
-          </span>
-        )
-      case 'lux_module_firmware':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <Layers className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Lux Sensor (BH1750)</span>
-          </span>
-        )
-      case 'cv_model':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-            <span>Mô hình AI (CV YOLO)</span>
-          </span>
-        )
-      case 'frame_extractor':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-            <Camera className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Bóc tách Video (Frames)</span>
-          </span>
-        )
-      case 'clock_algorithm':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3.5 h-3.5 text-amber-600" />
-            <span>Lịch Thiên Văn (Clock)</span>
-          </span>
-        )
-      case 'association_algorithm':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-            <Compass className="w-3.5 h-3.5 text-blue-600" />
-            <span>Ghép nối GIS (Association)</span>
-          </span>
-        )
-      case 'classification_algorithm':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
-            <Tag className="w-3.5 h-3.5 text-orange-600" />
-            <span>Phân loại Tài sản</span>
-          </span>
-        )
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-700">
-            <span>{component || 'Không xác định'}</span>
-          </span>
-        )
-    }
-  }
-
   return (
     <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
       <div className="overflow-x-auto custom-scrollbar">
@@ -139,10 +72,10 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-slate-800">
-                        Chưa có phiên bản nào phù hợp
+                        Chưa có phiên bản nào được ghi nhận
                       </h4>
                       <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        Các mô hình AI và thuật toán trắc đạc được tự động báo cáo khi khởi chạy Worker; các phiên bản Firmware hoặc thành phần mới có thể được đăng ký chủ động.
+                        Chưa có dữ liệu phiên bản nào trong hệ thống hoặc phù hợp với bộ lọc hiện tại.
                       </p>
                     </div>
                     {onOpenRegister && (
@@ -176,9 +109,11 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                       #{item.version_id}
                     </td>
 
-                    {/* Component Badge */}
+                    {/* Component Badge: Hiển thị nguyên gốc chuỗi từ Backend */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      {renderComponentBadge(item.component)}
+                      <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                        {item.component || 'N/A'}
+                      </span>
                     </td>
 
                     {/* Version */}

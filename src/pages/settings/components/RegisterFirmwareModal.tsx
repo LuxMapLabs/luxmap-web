@@ -1,22 +1,11 @@
 import React, { useState } from 'react'
-import { X, Layers, Hash, FileCode, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
+import { X, Cpu, Hash, FileCode, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
 import type { RegisterArtifactVersionRequest } from '../../../types/admin/artifact-versions'
 
-const COMPONENT_CHOICES = [
-  { group: 'Firmware & Thiết bị Hiện trường', items: [
-    { value: 'node_firmware', label: 'Node Firmware (Tủ điện IoT hiện trường)' },
-    { value: 'lux_module_firmware', label: 'Lux Sensor Firmware (Cảm biến BH1750 xe đo)' },
-  ]},
-  { group: 'Trí tuệ Nhân tạo & Xử lý Khung hình', items: [
-    { value: 'cv_model', label: 'Mô hình AI (CV YOLO Detection)' },
-    { value: 'frame_extractor', label: 'Bóc tách video (Frame Extractor)' },
-  ]},
-  { group: 'Thuật toán GIS & Phân loại', items: [
-    { value: 'clock_algorithm', label: 'Lịch thiên văn đóng cắt (Solar Clock)' },
-    { value: 'association_algorithm', label: 'Ghép nối không gian GIS (Spatial Association)' },
-    { value: 'classification_algorithm', label: 'Phân loại tài sản chiếu sáng (Classification)' },
-  ]}
-]
+const FIRMWARE_COMPONENTS = [
+  { value: 'node_firmware', label: 'node_firmware' },
+  { value: 'lux_module_firmware', label: 'lux_module_firmware' },
+] as const
 
 interface RegisterFirmwareModalProps {
   isOpen: boolean
@@ -33,9 +22,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [component, setComponent] = useState<string>('node_firmware')
-  const [customComponent, setCustomComponent] = useState<string>('')
-  const [isCustom, setIsCustom] = useState<boolean>(false)
+  const [component, setComponent] = useState<'node_firmware' | 'lux_module_firmware'>('node_firmware')
   const [version, setVersion] = useState('')
   const [artifactHash, setArtifactHash] = useState('')
   const [metadataJson, setMetadataJson] = useState('')
@@ -46,12 +33,6 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setLocalError(null)
-
-    const finalComponent = isCustom ? customComponent.trim() : component
-    if (!finalComponent) {
-      setLocalError('Vui lòng chọn hoặc nhập tên thành phần hệ thống!')
-      return
-    }
 
     const trimmedVersion = version.trim()
     if (!trimmedVersion) {
@@ -84,7 +65,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
     }
 
     onSubmit({
-      component: finalComponent,
+      component,
       version: trimmedVersion,
       artifact_hash: trimmedHash || null,
       metadata: parsedMetadata,
@@ -98,14 +79,14 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs">
-              <Layers className="w-5 h-5" />
+              <Cpu className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                Đăng Ký Phiên Bản Hệ Thống
+                Đăng Ký Phiên Bản Firmware
               </h2>
               <p className="text-xs text-slate-500">
-                Khai báo phiên bản Firmware, Mô hình AI hoặc Thuật toán LuxMap
+                Đăng ký trước mã băm SHA-256 và metadata cho Firmware thiết bị
               </p>
             </div>
           </div>
@@ -130,45 +111,36 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
 
           {/* 1. Loại thành phần */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-700 block">
-                Thành phần hệ thống (Component) <span className="text-rose-500">*</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setIsCustom(!isCustom)}
-                className="text-[11px] font-semibold text-indigo-600 hover:underline cursor-pointer"
-              >
-                {isCustom ? 'Chọn từ danh mục' : '+ Nhập tên khác'}
-              </button>
+            <label className="text-xs font-bold text-slate-700 block">
+              Thành phần Firmware (Component) <span className="text-rose-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {FIRMWARE_COMPONENTS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`p-3 rounded-2xl border text-xs font-mono font-bold cursor-pointer transition flex items-center gap-2.5 ${
+                    component === opt.value
+                      ? 'border-indigo-500 bg-indigo-50/50 text-indigo-900 ring-2 ring-indigo-500/10'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="component"
+                    value={opt.value}
+                    checked={component === opt.value}
+                    onChange={() => setComponent(opt.value)}
+                    className="hidden"
+                  />
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      component === opt.value ? 'bg-indigo-600 ring-2 ring-indigo-200' : 'bg-slate-300'
+                    }`}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              ))}
             </div>
-
-            {isCustom ? (
-              <input
-                type="text"
-                value={customComponent}
-                onChange={(e) => setCustomComponent(e.target.value)}
-                placeholder="Ví dụ: edge_gateway, telemetry_service..."
-                required
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono font-semibold text-slate-800 outline-none transition"
-              />
-            ) : (
-              <select
-                value={component}
-                onChange={(e) => setComponent(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-bold text-slate-800 outline-none transition cursor-pointer"
-              >
-                {COMPONENT_CHOICES.map((grp) => (
-                  <optgroup key={grp.group} label={grp.group}>
-                    {grp.items.map((it) => (
-                      <option key={it.value} value={it.value}>
-                        {it.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            )}
           </div>
 
           {/* 2. Phiên bản */}

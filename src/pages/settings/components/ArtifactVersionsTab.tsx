@@ -24,17 +24,6 @@ import { ArtifactVersionTable } from './ArtifactVersionTable'
 import { RegisterFirmwareModal } from './RegisterFirmwareModal'
 import { ArtifactUsageModal } from './ArtifactUsageModal'
 
-const COMPONENT_OPTIONS = [
-  { value: '', label: 'Tất cả thành phần' },
-  { value: 'node_firmware', label: 'Node Firmware (Tủ IoT)' },
-  { value: 'lux_module_firmware', label: 'Lux Sensor (BH1750 xe đo)' },
-  { value: 'cv_model', label: 'Mô hình AI (CV YOLO)' },
-  { value: 'frame_extractor', label: 'Bóc tách video (Frames)' },
-  { value: 'clock_algorithm', label: 'Lịch thiên văn (Clock)' },
-  { value: 'association_algorithm', label: 'Ghép nối GIS (Association)' },
-  { value: 'classification_algorithm', label: 'Phân loại tài sản (Classification)' },
-]
-
 export const ArtifactVersionsTab: React.FC = () => {
   const dispatch = useDispatch()
   const {
@@ -56,6 +45,15 @@ export const ArtifactVersionsTab: React.FC = () => {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Trích xuất động danh sách thành phần thực tế từ dữ liệu trả về của Backend, tuyệt đối không dùng mảng mock
+  const availableComponents = useMemo(() => {
+    const set = new Set<string>()
+    items.forEach((it) => {
+      if (it.component) set.add(it.component)
+    })
+    return Array.from(set).sort()
+  }, [items])
 
   const displayedItems = useMemo(() => {
     if (!searchQuery.trim()) return items
@@ -137,9 +135,10 @@ export const ArtifactVersionsTab: React.FC = () => {
               onChange={(e) => handleFilterChange(e.target.value)}
               className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
             >
-              {COMPONENT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
+              <option value="">Tất cả thành phần</option>
+              {availableComponents.map((comp) => (
+                <option key={comp} value={comp}>
+                  {comp}
                 </option>
               ))}
             </select>
