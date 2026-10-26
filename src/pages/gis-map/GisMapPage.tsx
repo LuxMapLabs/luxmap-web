@@ -1,7 +1,12 @@
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../../redux/store'
-import { toLngLatBounds, toBboxParam } from '../../utils/gis-map/mapUtils'
+import {
+  toLngLatBounds,
+  toBboxParam,
+  FIT_BOUNDS_GIS_PANORAMA,
+  FIT_BOUNDS_GIS_SEGMENT,
+} from '../../utils/gis-map/mapUtils'
 import * as maplibregl from 'maplibre-gl'
 
 import type { FixtureType, PowerSource, RoadClass, DataSource } from '../../types/common/enums'
@@ -309,11 +314,10 @@ export const GisMapPage: React.FC = () => {
       if (targetPoles.length > 0) {
         const bounds = new maplibregl.LngLatBounds()
         targetPoles.forEach((f: PoleFeature) => bounds.extend(f.geometry.coordinates))
-        map.fitBounds(bounds, {
-          padding: segId === 'all' ? 60 : 80,
-          duration: 800,
-          maxZoom: segId === 'all' ? 15.5 : 16.5,
-        })
+        map.fitBounds(
+          bounds,
+          segId === 'all' ? FIT_BOUNDS_GIS_PANORAMA : FIT_BOUNDS_GIS_SEGMENT
+        )
       }
     },
     [effectivePoles, mapRef]

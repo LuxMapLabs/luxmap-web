@@ -12,6 +12,8 @@ import {
   FileCheck2,
   MessageSquareWarning,
   LayoutDashboard,
+  Compass,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { User } from '../types/auth/web'
 import { canAccessTab } from '../utils/roleUtils'
@@ -43,7 +45,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isAssets = location.pathname.startsWith('/assets')
   const isReports = location.pathname.startsWith('/reports')
   const isCitizenReports = location.pathname.startsWith('/citizen-reports')
-  const isAdminPath = location.pathname.startsWith('/admin')
+  const isDashboardAdmin = location.pathname === '/admin/dashboard' || location.pathname === '/admin'
+  const isUsersAdmin = location.pathname === '/admin/system' || location.pathname.startsWith('/admin/users')
+  const isCommunesAdmin = location.pathname.startsWith('/admin/communes')
+  const isSettingsAdmin = location.pathname.startsWith('/admin/settings')
 
   // Lấy pendingCount từ store để gắn badge
   const pendingCount = useSelector(
@@ -118,11 +123,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab 1: GIS Map (Dành cho Manager) */}
+        {/* Tab 1: Bản đồ GIS Chiếu sáng (Dành cho Manager & Cấp trên Giám sát) */}
         {showGisMap && (
           <NavLink
             to="/gis-map"
-            title="Bản đồ chiếu sáng"
+            title="Bản đồ GIS"
             className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
               isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
             } ${
@@ -137,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             />
             {!isCollapsed && (
-              <span className="flex-1 tracking-tight whitespace-nowrap">Bản đồ chiếu sáng</span>
+              <span className="flex-1 tracking-tight whitespace-nowrap">Bản đồ GIS</span>
             )}
             {!isCollapsed && isGisMap && (
               <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
@@ -145,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab 2: Lịch làm việc (Dành cho Manager) */}
+        {/* Tab 2: Lịch làm việc / Phân công (Dành riêng cho Manager) */}
         {showWorkSchedule && (
           <NavLink
             to="/work-schedule"
@@ -172,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab 3: Quản lý tài sản (Dành cho Manager) */}
+        {/* Tab 3: Quản lý tài sản (Dành riêng cho Manager) */}
         {showAssets && (
           <NavLink
             to="/assets"
@@ -199,7 +204,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab 4: Báo cáo & Nghiệm thu (Chỉ dành riêng cho Superior) */}
+        {/* Tab Báo cáo & Nghiệm thu: CHỈ DÀNH CHO Cấp trên Giám sát (Superior) */}
         {showReports && (
           <NavLink
             to="/reports"
@@ -226,7 +231,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab Phản ánh người dân (Dành cho Manager và Superior) */}
+        {/* Tab 4: Phản ánh người dân (Chỉ dành cho Quản lý / Manager) */}
         {showCitizenReports && (
           <NavLink
             to="/citizen-reports"
@@ -264,28 +269,109 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </NavLink>
         )}
 
-        {/* Tab 5: Quản trị hệ thống (Chỉ dành cho Admin) */}
+                {/* Tab 4.5: Tổng quan quản trị hệ thống (Dành cho Admin) */}
         {showAdmin && (
           <NavLink
-            to="/admin/system"
-            title="Quản trị hệ thống"
+            to="/admin/dashboard"
+            title="Tổng quan hệ thống"
             className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
               isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
             } ${
-              isAdminPath
+              isDashboardAdmin
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+            }`}
+          >
+            <LayoutDashboard
+              className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
+                isDashboardAdmin ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+              }`}
+            />
+            {!isCollapsed && (
+              <span className="flex-1 tracking-tight whitespace-nowrap">Tổng quan hệ thống</span>
+            )}
+            {!isCollapsed && isDashboardAdmin && (
+              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
+            )}
+          </NavLink>
+        )}
+
+        {/* Tab 5: Quản lý người dùng (Dành cho Admin) */}
+        {showAdmin && (
+          <NavLink
+            to="/admin/system"
+            title="Quản lý tài khoản"
+            className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
+              isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
+            } ${
+              isUsersAdmin
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
             }`}
           >
             <ShieldCheck
               className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
-                isAdminPath ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+                isUsersAdmin ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
               }`}
             />
             {!isCollapsed && (
-              <span className="flex-1 tracking-tight whitespace-nowrap">Quản trị hệ thống</span>
+              <span className="flex-1 tracking-tight whitespace-nowrap">Quản lý tài khoản</span>
             )}
-            {!isCollapsed && isAdminPath && (
+            {!isCollapsed && isUsersAdmin && (
+              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
+            )}
+          </NavLink>
+        )}
+
+        {/* Tab 6: Quản lý địa bàn (Trang riêng dành cho Admin) */}
+        {showAdmin && (
+          <NavLink
+            to="/admin/communes"
+            title="Địa bàn & Khung BBox"
+            className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
+              isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
+            } ${
+              isCommunesAdmin
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+            }`}
+          >
+            <Compass
+              className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
+                isCommunesAdmin ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+              }`}
+            />
+            {!isCollapsed && (
+              <span className="flex-1 tracking-tight whitespace-nowrap">Địa bàn & Khung BBox</span>
+            )}
+            {!isCollapsed && isCommunesAdmin && (
+              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
+            )}
+          </NavLink>
+        )}
+
+        {/* Tab 7: Cấu hình hệ thống (Dành cho Admin) */}
+        {showAdmin && (
+          <NavLink
+            to="/admin/settings"
+            title="Cấu hình hệ thống"
+            className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
+              isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
+            } ${
+              isSettingsAdmin
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+            }`}
+          >
+            <SlidersHorizontal
+              className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
+                isSettingsAdmin ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+              }`}
+            />
+            {!isCollapsed && (
+              <span className="flex-1 tracking-tight whitespace-nowrap">Cấu hình hệ thống</span>
+            )}
+            {!isCollapsed && isSettingsAdmin && (
               <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
             )}
           </NavLink>

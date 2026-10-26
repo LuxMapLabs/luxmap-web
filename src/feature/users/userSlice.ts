@@ -7,7 +7,7 @@ import type {
   UpdateUserRequest,
   InvitationResponse,
 } from '../../types/admin/users'
-import type { UserQueryParams } from './adminUserAPI'
+import type { UserQueryParams } from './userAPI'
 
 export interface AdminUserState {
   users: UserAccountItem[]

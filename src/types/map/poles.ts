@@ -57,6 +57,7 @@ export interface PoleMapHistoryPoint {
     normalized_luminance?: number
     baseline_ratio?: number
     classified_as?: FixtureStatus
+    dim_threshold_ratio?: number
     peak_lux?: number
     reason_codes: string[]
 }

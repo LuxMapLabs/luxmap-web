@@ -17,21 +17,24 @@ import { GisMapPage } from './pages/gis-map/GisMapPage'
 import { ManagerDashboardPage } from './pages/dashboard/ManagerDashboardPage'
 import { WorkSchedulePage } from './pages/work-schedule/WorkSchedulePage'
 import { AssetManagementPage } from './pages/assets/AssetManagementPage'
-import { AdminManagementPage } from './pages/admin/AdminManagementPage'
+import { AdminManagementPage } from './pages/users/UserManagementPage'
+import { CommunesManagementPage } from './pages/communes/CommunesManagementPage'
+import { SystemSettingsPage } from './pages/settings/SystemSettingsPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
 import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
+import { AdminDashboardPage } from './pages/admin-dashboard/AdminDashboardPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
- * - Admin: chuyển sang /admin/system
+ * - Admin: chuyển sang /admin/dashboard
  * - Superior: chuyển sang /reports
  * - Manager: chuyển sang /dashboard
  */
 const RootRedirect: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
   if (isSystemAdmin(user?.role)) {
-    return <Navigate to="/admin/system" replace />
+    return <Navigate to="/admin/dashboard" replace />
   }
   if (isManagementAgency(user?.role)) {
     return <Navigate to="/reports" replace />
@@ -105,7 +108,11 @@ function App() {
 
             {/* Tuyến đường Quản trị: CHỈ CHO PHÉP Quản trị viên (Admin) */}
             <Route element={<ProtectedRoute allowedRoles={[UserRole.Admin]} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="/admin/system" element={<AdminManagementPage />} />
+              <Route path="/admin/communes" element={<CommunesManagementPage />} />
+              <Route path="/admin/settings" element={<SystemSettingsPage />} />
             </Route>
           </Route>
 

@@ -14,7 +14,14 @@ import {
 } from 'lucide-react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { GOOGLE_HYBRID_STYLE, DEFAULT_MAP_CENTER, applyMapBoundsLimits } from '../../../../../utils/gis-map/mapUtils'
+import {
+  GOOGLE_HYBRID_STYLE,
+  DEFAULT_MAP_CENTER,
+  applyMapBoundsLimits,
+  MAP_MAX_ZOOM,
+  FIT_BOUNDS_ASSET_ADD_INSTANT,
+  FIT_BOUNDS_ASSET_ADD_SMOOTH,
+} from '../../../../../utils/gis-map/mapUtils'
 import {
   snapPointToPolyline,
   parseLineStringWkt,
@@ -535,6 +542,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
       zoom: 14.5,
+      maxZoom: MAP_MAX_ZOOM,
       attributionControl: false,
     })
 
@@ -670,7 +678,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       if (segmentCoordsRef.current.length >= 2) {
         const bounds = new maplibregl.LngLatBounds()
         segmentCoordsRef.current.forEach((coord) => bounds.extend(coord))
-        map.fitBounds(bounds, { padding: 40, maxZoom: 18, duration: 0 })
+        map.fitBounds(bounds, FIT_BOUNDS_ASSET_ADD_INSTANT)
       }
     })
 
@@ -749,7 +757,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       if (segmentCoords.length >= 2) {
         const bounds = new maplibregl.LngLatBounds()
         segmentCoords.forEach((coord) => bounds.extend(coord))
-        map.fitBounds(bounds, { padding: 40, maxZoom: 18, duration: 600 })
+        map.fitBounds(bounds, FIT_BOUNDS_ASSET_ADD_SMOOTH)
       }
     }
 

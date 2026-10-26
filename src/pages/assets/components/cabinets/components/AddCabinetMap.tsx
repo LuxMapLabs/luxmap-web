@@ -9,6 +9,8 @@ import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
   applyMapBoundsLimits,
+  MAP_MAX_ZOOM,
+  FIT_BOUNDS_ASSET_ADD_INSTANT,
 } from '../../../../../utils/gis-map/mapUtils'
 
 export interface CabinetRowDraft {
@@ -123,7 +125,8 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
       style: GOOGLE_HYBRID_STYLE,
       center: initialCenter,
       zoom: 16,
-      maxZoom: 20,
+      maxZoom: MAP_MAX_ZOOM,
+      attributionControl: false,
     })
 
     mapRef.current = map
@@ -235,7 +238,7 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
         if (segmentCoordsRef.current.length >= 2) {
           const bounds = new maplibregl.LngLatBounds()
           segmentCoordsRef.current.forEach((pt) => bounds.extend(pt))
-          map.fitBounds(bounds, { padding: 40, maxZoom: 17 })
+          map.fitBounds(bounds, FIT_BOUNDS_ASSET_ADD_INSTANT)
         }
       }
 
@@ -400,7 +403,7 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
       if (segmentCoords.length >= 2) {
         const bounds = new maplibregl.LngLatBounds()
         segmentCoords.forEach((pt) => bounds.extend(pt))
-        mapRef.current.fitBounds(bounds, { padding: 40, maxZoom: 17 })
+        mapRef.current.fitBounds(bounds, FIT_BOUNDS_ASSET_ADD_INSTANT)
       }
     }
   }, [segmentCoords])

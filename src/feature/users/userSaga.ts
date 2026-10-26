@@ -1,7 +1,7 @@
 import { all, call, put, takeLatest } from 'redux-saga/effects'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
-import { adminUserAPI, type UserQueryParams } from './adminUserAPI'
+import { userAPI as adminUserAPI, type UserQueryParams } from './userAPI'
 import type {
   UserAccountItemPagedResult,
   UserAccountItem,
@@ -29,7 +29,7 @@ import {
   inviteUserSuccess,
   inviteUserFailure,
   type UpdateUserPayload,
-} from './adminUserSlice'
+} from './userSlice'
 
 /**
  * Worker saga tải danh sách người dùng

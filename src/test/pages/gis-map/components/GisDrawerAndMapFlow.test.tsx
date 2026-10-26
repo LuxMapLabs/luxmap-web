@@ -416,6 +416,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
             road_class: 'inter_commune',
             length_m: 1000,
             commune_id: 'commune_tl8',
+            commune_name: null,
             data_source: 'field',
             pole_count: 10,
             updated_at: null,
