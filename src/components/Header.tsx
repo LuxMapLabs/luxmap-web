@@ -17,6 +17,7 @@ import {
   FileDown,
   Compass,
   SlidersHorizontal,
+  Cpu,
 } from 'lucide-react'
 import { openExportModal } from '../feature/assets/assetSlice'
 import { User, UserRole } from '../types/auth/web'
@@ -58,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isCitizenReports = location.pathname.startsWith('/citizen-reports')
   const isReports = location.pathname.startsWith('/reports')
   const isCommunesAdmin = location.pathname.startsWith('/admin/communes')
+  const isFirmwareAdmin = location.pathname.startsWith('/admin/firmware')
   const isSettingsAdmin = location.pathname.startsWith('/admin/settings')
   const isAdminDashboard = location.pathname === '/admin/dashboard' || location.pathname === '/admin'
   const isUsersAdmin = location.pathname === '/admin/system' || location.pathname.startsWith('/admin/users')
@@ -149,6 +151,8 @@ export const Header: React.FC<HeaderProps> = ({
               <ClipboardCheck className="w-4.5 h-4.5" />
             ) : isCommunesAdmin ? (
               <Compass className="w-4.5 h-4.5" />
+            ) : isFirmwareAdmin ? (
+              <Cpu className="w-4.5 h-4.5" />
             ) : isSettingsAdmin ? (
               <SlidersHorizontal className="w-4.5 h-4.5" />
             ) : isAdminDashboard ? (
@@ -173,6 +177,8 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Báo cáo & Nghiệm thu'
                 : isCommunesAdmin
                 ? 'Quản lý Địa bàn & Khung Bản đồ (BBox)'
+                : isFirmwareAdmin
+                ? 'Firmware & Mô hình AI'
                 : isSettingsAdmin
                 ? 'Cấu hình hệ thống'
                 : isAdminDashboard
@@ -196,8 +202,10 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Tổng hợp số liệu vận hành & chất lượng chiếu sáng'
                 : isCommunesAdmin
                 ? 'Khai báo đơn vị hành chính xã/thị trấn và thiết lập khung bao bản đồ định vị'
+                : isFirmwareAdmin
+                ? 'Kiểm toán nguồn gốc dữ liệu thiết bị IoT và mô hình thuật toán LuxMap'
                 : isSettingsAdmin
-                ? 'Thiết lập tham số vận hành & sổ đăng ký phiên bản phần mềm, thuật toán'
+                ? 'Thiết lập ngưỡng phát hiện đèn mờ & thời gian cảnh báo mất kết nối IoT'
                 : isAdminDashboard
                 ? 'Giám sát hạ tầng máy chủ, tiến trình nền, lưu trữ & tổng quan vận hành'
                 : isUsersAdmin
