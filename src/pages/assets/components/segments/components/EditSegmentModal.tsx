@@ -30,6 +30,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   // Lấy danh sách cột thực tế từ Redux Store
   const allPoles = useSelector((state: RootState) => state.assets?.poles || [])
   const communes = useSelector((state: RootState) => state.adminCommunes?.communes || [])
+  const currentUser = useSelector((state: RootState) => state.auth?.user)
 
   // Lọc danh sách cột đèn thực tế thuộc tuyến đường này
   const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
@@ -65,6 +66,45 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   )
   const [lengthM, setLengthM] = useState<number>(segment.length_m || 1000)
   const [communeId, setCommuneId] = useState(segment.commune_id || 'COM-001')
+
+  // Tuyến đường đã có cột đèn thì khóa không cho phép đổi địa bàn
+  const poleCount = (segment.pole_count && segment.pole_count > 0) ? segment.pole_count : segmentPoles.length
+  const isCommuneLocked = poleCount > 0
+
+  const communeOptions = useMemo(() => {
+    let opts: { id: string; name: string; label: string }[] = []
+    if (communes && communes.length > 0) {
+      opts = communes.map((c) => ({
+        id: c.commune_id || '',
+        name: c.name || c.commune_id || '',
+        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
+      }))
+    } else if (currentUser?.communes && currentUser.communes.length > 0) {
+      opts = currentUser.communes.map((c) => ({
+        id: c.commune_id || '',
+        name: c.name || c.commune_id || '',
+        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
+      }))
+    } else if (currentUser?.commune_ids && currentUser.commune_ids.length > 0) {
+      opts = currentUser.commune_ids.map((id) => ({
+        id,
+        name: id,
+        label: `Địa bàn ${id}`,
+      }))
+    } else {
+      const fallbackId = segment.commune_id || 'COM-001'
+      opts = [{ id: fallbackId, name: fallbackId, label: `Địa bàn ${fallbackId}` }]
+    }
+
+    if (communeId && !opts.some((o) => o.id === communeId)) {
+      opts.unshift({
+        id: communeId,
+        name: segment.commune_name || communeId,
+        label: segment.commune_name ? `${segment.commune_name} (${communeId})` : `Địa bàn ${communeId}`,
+      })
+    }
+    return opts
+  }, [communes, currentUser, communeId, segment.commune_id, segment.commune_name])
 
   // Coordinate States initialized with extracted coordinates
   const [startLat, setStartLat] = useState<number>(initialStart[1])
@@ -194,6 +234,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="font-bold text-slate-700 dark:text-slate-300">Cấp đường quy hoạch:</label>
+
             <select
               value={roadClass}
               onChange={(e) => setRoadClass(e.target.value as RoadClass)}
@@ -202,6 +243,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
               <option value="inter_commune">Đường liên xã</option>
               <option value="inter_village">Đường liên ấp / thôn</option>
             </select>
+
           </div>
           <div className="space-y-1">
             <label className="font-bold text-slate-700 dark:text-slate-300">Chiều dài tuyến (mét):</label>
@@ -216,20 +258,35 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
 
         {/* Địa bàn Xã/Thị trấn */}
         <div className="space-y-1">
-          <label className="font-bold text-slate-700 dark:text-slate-300">
-            Địa bàn quản lý (Xã/Thị trấn Củ Chi):
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="font-bold text-slate-700 dark:text-slate-300">
+              Địa bàn quản lý (Xã/Thị trấn):
+            </label>
+            {isCommuneLocked && (
+              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-900/60">
+                🔒 Đã khóa (Có {poleCount} cột trên tuyến)
+              </span>
+            )}
+          </div>
           <select
             value={communeId}
+            disabled={isCommuneLocked}
             onChange={(e) => setCommuneId(e.target.value)}
-            className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+            className={`w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none ${
+              isCommuneLocked ? 'opacity-65 cursor-not-allowed bg-slate-100 dark:bg-slate-900/80' : 'cursor-pointer focus:ring-2 focus:ring-blue-500'
+            }`}
           >
-            {communes.map((c) => (
-                <option key={c.commune_id || ''} value={c.commune_id || ''}>
-                  {c.name || c.commune_id} ({c.commune_id})
-                </option>
-              ))}
+            {communeOptions.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
           </select>
+          {isCommuneLocked && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+              💡 Tuyến đường đã có cột đèn ({poleCount} cột), không thể thay đổi địa bàn quản lý để tránh sai lệch dữ liệu GIS.
+            </p>
+          )}
         </div>
 
         {/* Tọa độ Điểm đầu & Điểm cuối GPS */}
@@ -342,6 +399,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 originalStartCoord={originalStartRef.current}
                 originalEndCoord={originalEndRef.current}
                 editable={true}
+                communeId={communeId}
                 onStartCoordChange={handleStartCoordChange}
                 onEndCoordChange={handleEndCoordChange}
                 onRouteCoordsChange={handleRouteCoordsChange}

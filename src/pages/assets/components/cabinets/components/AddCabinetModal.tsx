@@ -51,6 +51,42 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
 
   // Map segments from Redux for real GIS line
   const mapSegments = useSelector((state: RootState) => state.map.segments)
+  const currentUser = useSelector((state: RootState) => state.auth.user)
+  const communes = useSelector((state: RootState) => state.adminCommunes.communes)
+  const defaultCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
+  const [selectedCommuneId, setSelectedCommuneId] = useState(defaultCommuneId)
+
+  // Xây dựng danh sách tùy chọn địa bàn cho dropdown
+  const communeOptions = useMemo(() => {
+    if (communes && communes.length > 0) {
+      return communes.map((c) => ({
+        id: c.commune_id || '',
+        name: c.name || c.commune_id || '',
+        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
+      }))
+    }
+    if (currentUser?.communes && currentUser.communes.length > 0) {
+      return currentUser.communes.map((c) => ({
+        id: c.commune_id || '',
+        name: c.name || c.commune_id || '',
+        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
+      }))
+    }
+    if (currentUser?.commune_ids && currentUser.commune_ids.length > 0) {
+      return currentUser.commune_ids.map((id) => ({
+        id,
+        name: id,
+        label: `Địa bàn ${id}`,
+      }))
+    }
+    return [{ id: defaultCommuneId, name: defaultCommuneId, label: `Địa bàn ${defaultCommuneId}` }]
+  }, [communes, currentUser, defaultCommuneId])
+
+  useEffect(() => {
+    if (currentUser?.commune_ids?.[0]) {
+      setSelectedCommuneId(currentUser.commune_ids[0])
+    }
+  }, [currentUser])
 
   // Top Section: Segment (Tùy chọn)
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
@@ -222,7 +258,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
     setErrorMsg(null)
 
     if (rows.length === 0) {
-      setErrorMsg('Vui lòng bấm "+ Thêm Tủ Điện" hoặc nhấp chuột lên bản đồ để thêm ít nhất một tủ điện!')
+      setErrorMsg('Vui lòng bấm "Thêm Tủ Điện" hoặc nhấp chuột lên bản đồ để thêm ít nhất một tủ điện!')
       return
     }
 
@@ -267,8 +303,8 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
         cabinet_id: autoId,
         external_ref: autoId,
         cabinet_name: trimmedName,
-        commune_id: currentSegment?.commune_id || 'COM-001',
-        commune_name: currentSegment?.commune_name || null,
+        commune_id: selectedCommuneId || currentSegment?.commune_id || defaultCommuneId,
+        commune_name: communes.find((c) => c.commune_id === selectedCommuneId)?.name || currentUser?.communes?.find((c) => c.commune_id === selectedCommuneId)?.name || currentSegment?.commune_name || null,
         data_source: 'field',
         location: {
           lat: parsedLat,
@@ -340,6 +376,25 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                   </div>
                 </div>
 
+                {/* 1.1 Địa bàn quản lý */}
+                <div className="space-y-1 pb-2 border-b border-purple-200/60 dark:border-purple-900/40">
+                  <div className="flex items-center gap-1.5 font-bold text-purple-950 dark:text-purple-200 text-xs">
+                    <MapPin className="w-4 h-4 text-purple-700 dark:text-purple-400" />
+                    <span>Địa bàn quản lý (Xã/Thị trấn):</span>
+                  </div>
+                  <select
+                    value={selectedCommuneId}
+                    onChange={(e) => setSelectedCommuneId(e.target.value)}
+                    className="w-full p-2 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-600 text-slate-900 dark:text-slate-100"
+                  >
+                    {communeOptions.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-1">
                   <select
                     value={selectedSegmentId}
@@ -380,7 +435,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                     className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
-                    <span>+ Thêm Tủ Điện</span>
+                    <span>Thêm Tủ Điện</span>
                   </button>
                 </div>
 
@@ -404,7 +459,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                                 <Zap className="w-7 h-7 text-purple-300 dark:text-purple-800 stroke-[1.5]" />
                                 <p className="font-medium text-xs">Chưa có tủ điện nào trong danh sách.</p>
                                 <p className="text-[11px] text-slate-400">
-                                  Bấm <strong className="text-purple-600 font-bold">"+ Thêm Tủ Điện"</strong> hoặc click trực tiếp lên bản đồ GIS bên phải.
+                                  Bấm <strong className="text-purple-600 font-bold">"Thêm Tủ Điện"</strong> hoặc click trực tiếp lên bản đồ GIS bên phải.
                                 </p>
                               </div>
                             </td>
@@ -501,6 +556,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                   existingCabinets={availableCabinets}
                   rows={rows}
                   selectedRowId={selectedRowId}
+                  communeId={selectedCommuneId}
                   onSelectRow={setSelectedRowId}
                   onUpdateCoords={handleMapUpdateCoords}
                   onMapClickAdd={handleMapClickAdd}

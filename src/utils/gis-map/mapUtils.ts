@@ -9,6 +9,7 @@ export const DEFAULT_MAP_CENTER: [number, number] = [106.4975, 10.9715]
 /** A complete commune frame as MapLibre bounds, or null when any edge is missing. Supports numbers and numeric strings with comma/dot. */
 export function toLngLatBounds(bbox?: any | null): [[number, number], [number, number]] | null {
   if (!bbox) return null
+  const target = bbox?.bbox && typeof bbox.bbox === 'object' ? bbox.bbox : bbox
   const parseCoord = (v: any): number | null => {
     if (typeof v === 'number' && Number.isFinite(v)) return v
     if (typeof v === 'string') {
@@ -19,10 +20,10 @@ export function toLngLatBounds(bbox?: any | null): [[number, number], [number, n
     return null
   }
 
-  const min_lng = parseCoord(bbox.min_lng)
-  const min_lat = parseCoord(bbox.min_lat)
-  const max_lng = parseCoord(bbox.max_lng)
-  const max_lat = parseCoord(bbox.max_lat)
+  const min_lng = parseCoord(target.min_lng)
+  const min_lat = parseCoord(target.min_lat)
+  const max_lng = parseCoord(target.max_lng)
+  const max_lat = parseCoord(target.max_lat)
 
   if (min_lng === null || min_lat === null || max_lng === null || max_lat === null) return null
   return [[min_lng, min_lat], [max_lng, max_lat]]
@@ -35,15 +36,109 @@ export function toBboxParam(bbox?: CommuneBbox | null): string | null {
 }
 
 /**
+ * Chuyển đổi Bbox thành GeoJSON Feature Polygon đóng kín (4 góc + đỉnh đóng)
+ * để render khung ranh giới trực quan của địa bàn trên bản đồ.
+ */
+export function toBboxPolygonGeoJSON(bbox?: any | null): GeoJSON.Feature<GeoJSON.Polygon> | null {
+  const bounds = toLngLatBounds(bbox)
+  if (!bounds) return null
+  const [[minLng, minLat], [maxLng, maxLat]] = bounds
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [minLng, minLat],
+          [maxLng, minLat],
+          [maxLng, maxLat],
+          [minLng, maxLat],
+          [minLng, minLat],
+        ],
+      ],
+    },
+  }
+}
+
+export interface ResolvedCommuneBounds {
+  bbox: CommuneBbox | null
+  center: [number, number] | null
+  bounds: [[number, number], [number, number]] | null
+}
+
+/**
+ * Trích xuất Bbox và tâm (Center) chính xác của địa bàn từ Redux State
+ */
+export function getCommuneBboxInfo(
+  communeId?: string | null,
+  userCommunes?: Array<{
+    commune_id?: string | null
+    bbox?: CommuneBbox | null
+    center?: { lng?: number | null; lat?: number | null } | null
+  }> | null,
+  adminCommunes?: Array<{
+    commune_id?: string | null
+    bbox?: CommuneBbox | null
+  }> | null,
+  fallbackMapBounds?: MapBounds | null
+): ResolvedCommuneBounds {
+  if (communeId) {
+    const foundUser = userCommunes?.find((c) => c.commune_id === communeId)
+    if (foundUser?.bbox) {
+      const bounds = toLngLatBounds(foundUser.bbox)
+      if (bounds) {
+        const center: [number, number] =
+          typeof foundUser.center?.lng === 'number' &&
+          typeof foundUser.center?.lat === 'number' &&
+          Number.isFinite(foundUser.center.lng) &&
+          Number.isFinite(foundUser.center.lat)
+            ? [foundUser.center.lng, foundUser.center.lat]
+            : [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2]
+        return { bbox: foundUser.bbox, center, bounds }
+      }
+    }
+    const foundAdmin = adminCommunes?.find((c) => c.commune_id === communeId)
+    if (foundAdmin?.bbox) {
+      const bounds = toLngLatBounds(foundAdmin.bbox)
+      if (bounds) {
+        const center: [number, number] = [
+          (bounds[0][0] + bounds[1][0]) / 2,
+          (bounds[0][1] + bounds[1][1]) / 2,
+        ]
+        return { bbox: foundAdmin.bbox, center, bounds }
+      }
+    }
+  }
+
+  // Fallback to user map_bounds if available
+  if (fallbackMapBounds?.bbox) {
+    const bounds = toLngLatBounds(fallbackMapBounds.bbox)
+    if (bounds) {
+      const center: [number, number] =
+        typeof fallbackMapBounds.center?.lng === 'number' &&
+        typeof fallbackMapBounds.center?.lat === 'number' &&
+        Number.isFinite(fallbackMapBounds.center.lng) &&
+        Number.isFinite(fallbackMapBounds.center.lat)
+          ? [fallbackMapBounds.center.lng, fallbackMapBounds.center.lat]
+          : [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2]
+      return { bbox: fallbackMapBounds.bbox, center, bounds }
+    }
+  }
+
+  return { bbox: null, center: null, bounds: null }
+}
+
+/**
  * Áp dụng giới hạn Bbox (maxBounds) và mức thu nhỏ tối đa (minZoom) từ Backend
  * để người dùng không zoom out hoặc kéo bản đồ ra ngoài địa bàn quản lý.
  */
 export function applyMapBoundsLimits(
   map: MapLibreMap,
-  mapBounds?: MapBounds | null,
+  mapBounds?: MapBounds | { bbox?: any } | CommuneBbox | null,
   options?: { padding?: number }
 ): void {
-  const bounds = toLngLatBounds(mapBounds?.bbox)
+  const bounds = toLngLatBounds(mapBounds)
   if (!bounds) return
   map.setMaxBounds(bounds)
   const camera = map.cameraForBounds(bounds, { padding: options?.padding ?? 20 })
