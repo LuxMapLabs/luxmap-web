@@ -31,7 +31,7 @@ function* handleFetchMapLayers(
 ) {
   try {
     // No explicit bbox: the account's communes (GET /auth/me map_bounds), not a hard-coded area.
-    const mapBounds: MapBounds | null | undefined = yield select((state: RootState) => state.auth.user?.mapBounds)
+    const mapBounds: MapBounds | null | undefined = yield select((state: RootState) => state.auth.user?.map_bounds)
     const bbox = action.payload?.bbox || toBboxParam(mapBounds?.bbox)
     if (!bbox) return
 

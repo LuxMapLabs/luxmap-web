@@ -116,7 +116,7 @@ function* handleFetchAssignees(action: PayloadAction<string | undefined>) {
     let communeId = action.payload
     if (!communeId) {
       const state: RootState = yield select()
-      communeId = state.auth.user?.administrativeUnitId || state.auth.user?.communeIds?.[0]
+      communeId = state.auth.user?.commune_ids?.[0]
     }
     if (!communeId) {
       yield put(fetchAssigneesSuccess([]))

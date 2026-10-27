@@ -61,7 +61,7 @@ export const ForbiddenPage: React.FC = () => {
         {user && (
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs">
             <span className="text-slate-500">Tài khoản:</span>
-            <span className="font-bold text-slate-800">{user.username || user.fullName}</span>
+            <span className="font-bold text-slate-800">{user.username || user.full_name}</span>
           </div>
         )}
       </header>

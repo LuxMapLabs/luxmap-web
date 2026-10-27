@@ -56,7 +56,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     }
   }, [originalLat, originalLng])
 
-  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.map_bounds)
 
   // Valid coordinate fallback prioritizing mapBounds.center from Backend
   const fallbackLat =

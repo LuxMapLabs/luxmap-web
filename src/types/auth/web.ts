@@ -2,6 +2,8 @@
  * Auto-generated Types for: auth/web
  * Sinh tự động từ endpoint Backend
  */
+import type { CurrentUserResponse } from './me'
+
 export interface WebAuthTokenResponse {
     accessToken?: string
     access_token?: string | null
@@ -26,20 +28,6 @@ export enum UserRole {
   Admin = 3,
 }
 
-export interface User {
-  id?: string
-  userId?: string
-  fullName: string
-  username?: string
-  email: string | null
-  phoneNumber?: string | null
-  role: UserRole
-  roleString?: string
-  administrativeUnitId?: string
-  communeIds?: string[]
-  mapBounds?: import('./me').MapBounds | null
-}
-
 export interface JwtPayloadClaims {
   sub: string
   role: string
@@ -51,7 +39,7 @@ export interface JwtPayloadClaims {
 }
 
 export interface AuthState {
-  user: User | null
+  user: CurrentUserResponse | null
   isAuthenticated: boolean
   accessToken?: string | null
   refreshToken?: string | null
@@ -96,14 +84,4 @@ export interface ApiResponse<T> {
     message: string
     details?: Record<string, string[]>
   } | null
-}
-
-export interface CurrentUserResponse {
-  user_id: string
-  username: string
-  email: string
-  full_name: string
-  role: string
-  commune_ids: string[]
-  map_bounds?: import('./me').MapBounds | null
 }

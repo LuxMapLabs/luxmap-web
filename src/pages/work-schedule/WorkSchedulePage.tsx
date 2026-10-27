@@ -42,7 +42,7 @@ export const WorkSchedulePage: React.FC = () => {
     viewingPhaseIndex,
   } = useSelector((state: RootState) => state.workSchedule)
   const currentUser = useSelector((state: RootState) => state.auth.user)
-  const activeCommuneId = currentUser?.administrativeUnitId || currentUser?.communeIds?.[0] || 'COM-001'
+  const activeCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
 
   // Tự động tải danh sách lịch làm việc và danh sách kỹ sư từ máy chủ theo tháng được chọn
   useEffect(() => {

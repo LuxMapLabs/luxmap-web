@@ -22,12 +22,13 @@ export const DefaultLayout: React.FC = () => {
   }
 
   const roleTitle = getRoleName(user?.role)
-  const initials = user?.fullName
-    ? user.fullName
+  const displayName = user?.full_name || user?.username || 'Người dùng'
+  const initials = displayName
+    ? displayName
         .trim()
         .split(/\s+/)
         .filter(Boolean)
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .slice(-2)
         .join('')
         .toUpperCase()
@@ -47,7 +48,7 @@ export const DefaultLayout: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <Header
           user={user}
-          userName={user?.fullName || 'Người dùng'}
+          userName={displayName}
           userRoleTitle={roleTitle}
           userInitials={initials}
           isAdminUser={isAdmin(user?.role)}

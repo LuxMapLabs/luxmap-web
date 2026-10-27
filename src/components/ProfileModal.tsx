@@ -10,13 +10,13 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react'
-import { User as UserType, UserRole } from '../types/auth/web'
-import { getRoleName } from '../utils/roleUtils'
+import type { CurrentUserResponse } from '../types/auth/me'
+import { getRoleName, isAdmin as checkIsAdmin, isManagementAgency, isMaintenanceEngineer, isFieldCrew } from '../utils/roleUtils'
 
 export interface ProfileModalProps {
   isOpen: boolean
   onClose: () => void
-  user: UserType | null
+  user: CurrentUserResponse | null
   onRefresh?: () => void
   isRefreshing?: boolean
 }
@@ -31,10 +31,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   if (!isOpen || !user) return null
 
   const roleName = getRoleName(user.role)
-  const isAdmin = user.role === UserRole.Admin
-  const isAgency = user.role === UserRole.ManagementAgency
-  const isEngineer = user.role === UserRole.MaintenanceEngineer
-  const isCrew = user.role === UserRole.FieldCrew
+  const isAdmin = checkIsAdmin(user.role)
+  const isAgency = isManagementAgency(user.role)
+  const isEngineer = isMaintenanceEngineer(user.role)
+  const isCrew = isFieldCrew(user.role)
 
   // Màu sắc badge vai trò
   let badgeColor = 'bg-blue-50 text-blue-700 border-blue-200'
@@ -53,18 +53,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     roleGlow = 'from-amber-600 to-orange-600'
   }
 
-  const initials = user.fullName
-    ? user.fullName
+  const displayName = user.full_name || user.username || 'Người dùng'
+  const initials = displayName
+    ? displayName
         .trim()
         .split(/\s+/)
         .filter(Boolean)
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .slice(-2)
         .join('')
         .toUpperCase()
     : 'U'
 
-  const hasAllCommunes = isAdmin || (user.communeIds && user.communeIds.includes('*'))
+  const hasAllCommunes = isAdmin || (user.commune_ids && user.commune_ids.includes('*'))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -94,7 +95,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <div className="space-y-1 min-w-0 pr-8">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-lg font-extrabold tracking-tight truncate">
-                  {user.fullName}
+                  {user.full_name || user.username}
                 </h3>
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -102,7 +103,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-white/80 font-medium">
-                @{user.username || user.userId} • ID: {user.userId || user.id}
+                @{user.username || user.user_id} • ID: {user.user_id}
               </p>
             </div>
           </div>
@@ -159,7 +160,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <span className="font-bold text-slate-900">
                   {hasAllCommunes
                     ? 'Toàn bộ địa bàn (Toàn hệ thống)'
-                    : `${user.communeIds?.length || 0} xã/phường được phân công`}
+                    : `${user.communes?.length || user.commune_ids?.length || 0} xã/phường được phân công`}
                 </span>
               </div>
 
@@ -171,8 +172,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               ) : (
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pt-1">
-                    {user.communeIds && user.communeIds.length > 0 ? (
-                      user.communeIds.map((cid, idx) => (
+                    {user.communes && user.communes.length > 0 ? (
+                      user.communes.map((commune, idx) => (
+                        <span
+                          key={commune.commune_id || idx}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-semibold shadow-2xs"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          <span>{commune.name || commune.commune_id}</span>
+                          {commune.name && commune.commune_id && (
+                            <span className="text-[10px] text-slate-400 font-normal">
+                              ({commune.commune_id})
+                            </span>
+                          )}
+                        </span>
+                      ))
+                    ) : user.commune_ids && user.commune_ids.length > 0 ? (
+                      user.commune_ids.map((cid, idx) => (
                         <span
                           key={idx}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-semibold shadow-2xs"

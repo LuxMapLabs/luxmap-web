@@ -20,12 +20,12 @@ import {
   Cpu,
 } from 'lucide-react'
 import { openExportModal } from '../feature/assets/assetSlice'
-import { User, UserRole } from '../types/auth/web'
-import { getRoleName } from '../utils/roleUtils'
+import type { CurrentUserResponse } from '../types/auth/me'
+import { getRoleName, isAdmin, isManagementAgency, isMaintenanceEngineer, isFieldCrew } from '../utils/roleUtils'
 import { ProfileModal } from './ProfileModal'
 
 export interface HeaderProps {
-  user?: User | null
+  user?: CurrentUserResponse | null
   userName?: string
   userRoleTitle?: string
   userInitials?: string
@@ -70,10 +70,10 @@ export const Header: React.FC<HeaderProps> = ({
   const profileMenuRef = useRef<HTMLDivElement>(null)
 
   // Tính toán thông tin hiển thị chính xác từ user (lấy từ GET /auth/me)
-  const effectiveName = user?.fullName || userName || 'Cán bộ kỹ thuật'
+  const effectiveName = user?.full_name || userName || 'Cán bộ kỹ thuật'
   const effectiveRole = userRoleTitle || (user ? getRoleName(user.role) : 'Cán bộ vận hành')
   const effectiveAdmin =
-    isAdminUser !== undefined ? isAdminUser : user?.role === UserRole.Admin
+    isAdminUser !== undefined ? isAdminUser : isAdmin(user?.role)
 
   const effectiveInitials =
     userInitials ||
@@ -118,18 +118,18 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Màu sắc badge vai trò
   let badgeClasses = 'bg-blue-50 text-blue-700 border-blue-200'
-  if (user?.role === UserRole.Admin) {
+  if (isAdmin(user?.role)) {
     badgeClasses = 'bg-purple-50 text-purple-700 border-purple-200'
-  } else if (user?.role === UserRole.ManagementAgency) {
+  } else if (isManagementAgency(user?.role)) {
     badgeClasses = 'bg-indigo-50 text-indigo-700 border-indigo-200'
-  } else if (user?.role === UserRole.MaintenanceEngineer) {
+  } else if (isMaintenanceEngineer(user?.role)) {
     badgeClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  } else if (user?.role === UserRole.FieldCrew) {
+  } else if (isFieldCrew(user?.role)) {
     badgeClasses = 'bg-amber-50 text-amber-800 border-amber-200'
   }
 
   const hasAllCommunes =
-    effectiveAdmin || (user?.communeIds && user.communeIds.includes('*'))
+    effectiveAdmin || (user?.commune_ids && user.commune_ids.includes('*'))
 
   return (
     <>
@@ -312,10 +312,23 @@ export const Header: React.FC<HeaderProps> = ({
 
                   <div className="mt-1.5 flex items-center justify-between text-[11px]">
                     <span className="text-slate-400 font-medium">Địa bàn GIS:</span>
-                    <span className="font-semibold text-slate-700 truncate max-w-[140px] text-right">
+                    <span
+                      className="font-semibold text-slate-700 truncate max-w-[160px] text-right"
+                      title={
+                        hasAllCommunes
+                          ? 'Toàn hệ thống'
+                          : user?.communes && user.communes.length > 0
+                          ? user.communes.map((c) => c.name || c.commune_id).join(', ')
+                          : `${user?.commune_ids?.length || 0} xã`
+                      }
+                    >
                       {hasAllCommunes
                         ? 'Toàn hệ thống'
-                        : `${user?.communeIds?.length || 0} xã`}
+                        : user?.communes && user.communes.length > 0
+                        ? user.communes.length === 1
+                          ? user.communes[0].name || user.communes[0].commune_id
+                          : `${user.communes[0].name || user.communes[0].commune_id} (+${user.communes.length - 1})`
+                        : `${user?.commune_ids?.length || 0} xã`}
                     </span>
                   </div>
                 </div>

@@ -66,8 +66,8 @@ export const AdminManagementPage: React.FC = () => {
     const otherUsers = users.filter((u) => {
       if (!currentUser) return true
       const matchId =
-        (currentUser.userId && u.user_id === currentUser.userId) ||
-        (currentUser.id && u.user_id === currentUser.id)
+        Boolean(currentUser.user_id && u.user_id === currentUser.user_id)
+
       const matchUsername =
         currentUser.username &&
         u.username?.toLowerCase() === currentUser.username.toLowerCase()
