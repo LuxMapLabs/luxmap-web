@@ -8,6 +8,8 @@ import {
 } from '../../../../../utils/gis-map/routeUtils'
 import { summarizeLineWkt, validateImportRow, type ValidationContext } from '../../../../../validations/assetImport.schema'
 import { EditSegmentModal } from '../../../../../pages/assets/components/segments/components/EditSegmentModal'
+import { AddSegmentModal } from '../../../../../pages/assets/components/segments/components/AddSegmentModal'
+import { SegmentsTab } from '../../../../../pages/assets/components/segments/SegmentsTab'
 import { EditPoleModal } from '../../../../../pages/assets/components/poles/components/EditPoleModal'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { PoleListItem } from '../../../../../types/assets/poles'
@@ -610,6 +612,97 @@ describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () =>
       expect(result.actionType).toBe('updated')
       expect(result.diffs).toBeDefined()
       expect(result.diffs.some((d) => d.label.includes('Hình học GIS') || d.label.includes('Chiều dài'))).toBe(true)
+    })
+
+    it('TC-12: EditSegmentModal khóa dropdown địa bàn khi tuyến đường đã có từ 1 cột đèn trở lên', () => {
+      const store = configureStore({
+        reducer: {
+          assets: assetReducer,
+          map: mapReducer,
+        },
+        preloadedState: {
+          assets: initialAssetState,
+        },
+      })
+
+      const segmentWithPoles = {
+        ...mockSegment,
+        pole_count: 5,
+      }
+
+      render(
+        <Provider store={store}>
+          <EditSegmentModal
+            isOpen={true}
+            segment={segmentWithPoles}
+            onClose={vi.fn()}
+            onSave={vi.fn()}
+          />
+        </Provider>
+      )
+
+      expect(screen.getByText(/🔒 Đã khóa \(Có 5 cột trên tuyến\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/không thể thay đổi địa bàn quản lý/i)).toBeInTheDocument()
+
+      const selects = screen.getAllByRole('combobox')
+      const communeSelect = selects[selects.length - 1]
+      expect(communeSelect).toBeDisabled()
+    })
+
+    it('TC-13: AddSegmentModal hiển thị dropdown select cho Địa bàn quản lý', () => {
+      const store = configureStore({
+        reducer: {
+          assets: assetReducer,
+          map: mapReducer,
+        },
+      })
+
+      render(
+        <Provider store={store}>
+          <AddSegmentModal
+            isOpen={true}
+            onClose={vi.fn()}
+            onAddSegment={vi.fn()}
+            existingCount={2}
+          />
+        </Provider>
+      )
+
+      expect(screen.getByText(/Địa bàn quản lý \(Xã\/Thị trấn\):/i)).toBeInTheDocument()
+      const selects = screen.getAllByRole('combobox')
+      expect(selects.length).toBeGreaterThanOrEqual(2)
+    })
+    it('TC-14: SegmentsTab hiển thị ConfirmDeleteAssetModal khi bấm xóa và gọi onDeleteSegment khi xác nhận', () => {
+      const store = configureStore({
+        reducer: {
+          assets: assetReducer,
+          map: mapReducer,
+        },
+      })
+      const mockDelete = vi.fn()
+
+      render(
+        <Provider store={store}>
+          <SegmentsTab
+            segments={[mockSegment]}
+            onAddSegment={vi.fn()}
+            onUpdateSegment={vi.fn()}
+            onDeleteSegment={mockDelete}
+            onOpenImport={vi.fn()}
+          />
+        </Provider>
+      )
+
+      const deleteBtn = screen.getByRole('button', { name: /Xóa/i })
+      fireEvent.click(deleteBtn)
+
+      expect(screen.getByText('Xác Nhận Xóa Tuyến Đường')).toBeInTheDocument()
+      expect(screen.getByText(/Bạn có chắc chắn muốn xóa tuyến đường/i)).toBeInTheDocument()
+
+      const confirmBtn = screen.getByRole('button', { name: /Xác nhận xóa/i })
+      fireEvent.click(confirmBtn)
+
+      expect(mockDelete).toHaveBeenCalledWith(mockSegment.segment_id)
     })
   })
 })

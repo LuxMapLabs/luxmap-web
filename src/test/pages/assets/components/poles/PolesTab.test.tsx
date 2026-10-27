@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import { configureStore } from '@reduxjs/toolkit'
+import rootReducer from '../../../../../redux/rootReducer'
+import { PolesTab } from '../../../../../pages/assets/components/poles/PolesTab'
 import { StatusBadge } from '../../../../../components/StatusBadge'
 import { PoleTable } from '../../../../../pages/assets/components/poles/components/PoleTable'
 import { PoleDetailModal } from '../../../../../pages/assets/components/poles/components/PoleDetailModal'
@@ -522,6 +526,36 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       expect(screen.getByText('Xã Tân An Hội')).toBeInTheDocument()
       // Cột 2 chưa có commune_name -> formatFriendlyCommuneName tự động map COM-005 sang "Xã Phú Hòa Đông"
       expect(screen.getByText('COM-005')).toBeInTheDocument()
+    })
+    it('bấm nút xóa trên PoleTable sẽ hiển thị ConfirmDeleteAssetModal và gọi onDeletePole khi xác nhận', () => {
+      const store = configureStore({ reducer: rootReducer })
+      const mockDelete = vi.fn()
+
+      render(
+        <Provider store={store}>
+          <PolesTab
+            poles={[mockPoleWithActiveWarranty]}
+            cabinets={[mockCabinet]}
+            segments={[mockSegment]}
+            onAddPole={vi.fn()}
+            onAddPoles={vi.fn()}
+            onUpdatePole={vi.fn()}
+            onDeletePole={mockDelete}
+            onOpenImport={vi.fn()}
+          />
+        </Provider>
+      )
+
+      const deleteBtn = screen.getByRole('button', { name: /Xóa/i })
+      fireEvent.click(deleteBtn)
+
+      expect(screen.getByText('Xác Nhận Xóa Cột Đèn')).toBeInTheDocument()
+      expect(screen.getByText(/Bạn có chắc chắn muốn xóa cột đèn/i)).toBeInTheDocument()
+
+      const confirmBtn = screen.getByRole('button', { name: /Xác nhận xóa/i })
+      fireEvent.click(confirmBtn)
+
+      expect(mockDelete).toHaveBeenCalledWith(mockPoleWithActiveWarranty.pole_id)
     })
   })
 })

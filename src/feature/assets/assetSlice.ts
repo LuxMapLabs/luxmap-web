@@ -154,6 +154,11 @@ const assetSlice = createSlice({
       state.isMutating = true
       state.mutationError = null
     },
+    deletePoleRequest: (state, action: PayloadAction<string>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
     createCabinetRequest: (state, action: PayloadAction<CreateCabinetRequest>) => {
       void action
       state.isMutating = true
@@ -165,6 +170,11 @@ const assetSlice = createSlice({
       state.mutationError = null
     },
     updateCabinetRequest: (state, action: PayloadAction<UpdateCabinetPayload>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    deleteCabinetRequest: (state, action: PayloadAction<string>) => {
       void action
       state.isMutating = true
       state.mutationError = null
@@ -195,6 +205,11 @@ const assetSlice = createSlice({
       state.mutationError = null
     },
     updateSegmentRequest: (state, action: PayloadAction<UpdateSegmentPayload>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    deleteSegmentRequest: (state, action: PayloadAction<string>) => {
       void action
       state.isMutating = true
       state.mutationError = null
@@ -291,15 +306,18 @@ export const {
   createPoleRequest,
   createPolesBulkRequest,
   updatePoleRequest,
+  deletePoleRequest,
   createCabinetRequest,
   createCabinetsBulkRequest,
   updateCabinetRequest,
+  deleteCabinetRequest,
   createFeederRequest,
   createFeedersBulkRequest,
   updateFeederRequest,
   deleteFeederRequest,
   createSegmentRequest,
   updateSegmentRequest,
+  deleteSegmentRequest,
   createFixtureRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,

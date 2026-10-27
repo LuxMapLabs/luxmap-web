@@ -222,7 +222,7 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                       <button
                         type="button"
                         onClick={() => onEditFixture(fixture)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition cursor-pointer"
                         title="Chỉnh sửa thông số"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -231,7 +231,7 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                         <button
                           type="button"
                           onClick={() => onRetireFixture(fixture)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 transition cursor-pointer"
                           title="Tháo dỡ bộ đèn"
                         >
                           <PackageMinus className="w-3.5 h-3.5" />

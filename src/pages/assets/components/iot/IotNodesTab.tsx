@@ -16,7 +16,6 @@ import { SetRelayModal } from './components/SetRelayModal'
 import { IssueCredentialModal } from './components/IssueCredentialModal'
 import { ConfirmDeleteIotNodeModal } from './components/ConfirmDeleteIotNodeModal'
 import { TablePagination } from '../common/TablePagination'
-import { toast } from 'sonner'
 
 export interface IotNodesTabProps {
   iotNodes: IotNodeItem[]
@@ -94,17 +93,16 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
     return filteredNodes.slice(start, start + pageSize)
   }, [filteredNodes, currentPage, pageSize])
 
+  const deleteTargetNode = useMemo(() => {
+    if (!deleteNodeId) return null
+    return iotNodes.find((n) => n.node_id === deleteNodeId) || null
+  }, [deleteNodeId, iotNodes])
+
+  const deleteNodeHasWiredRelays = useMemo(() => {
+    return Boolean(deleteTargetNode?.relays?.some((r) => !!r.feeder_id))
+  }, [deleteTargetNode])
+
   const handleDeleteWithCheck = (nodeId: string) => {
-    const target = iotNodes.find((n) => n.node_id === nodeId)
-    const hasWiredRelay = target?.relays?.some((r) => !!r.feeder_id)
-
-    if (hasWiredRelay) {
-      toast.error(
-        `Không thể xóa thiết bị IoT "${nodeId}" do vẫn còn rơ-le đang đấu nối mạch điện! Vui lòng ngắt kết nối các rơ-le trước.`
-      )
-      return
-    }
-
     setDeleteNodeId(nodeId)
   }
 
@@ -211,6 +209,7 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
       <ConfirmDeleteIotNodeModal
         isOpen={!!deleteNodeId}
         nodeId={deleteNodeId}
+        hasWiredRelays={deleteNodeHasWiredRelays}
         onClose={() => setDeleteNodeId(null)}
         onConfirm={(nodeId) => {
           onDeleteIotNode(nodeId)

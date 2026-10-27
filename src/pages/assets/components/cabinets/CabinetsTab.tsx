@@ -6,6 +6,7 @@ import { CabinetTable } from './components/CabinetTable'
 import { AddCabinetModal } from './components/AddCabinetModal'
 import { EditCabinetModal } from './components/EditCabinetModal'
 import { CabinetDetailModal } from './components/CabinetDetailModal'
+import { ConfirmDeleteAssetModal } from '../common/ConfirmDeleteAssetModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface CabinetsTabProps {
@@ -17,6 +18,7 @@ export interface CabinetsTabProps {
   onAddCabinet: (data: CabinetListItem) => void
   onAddCabinets: (dataList: CabinetListItem[]) => void
   onUpdateCabinet: (updated: CabinetListItem) => void
+  onDeleteCabinet?: (cabinetId: string) => void
   onOpenImport: () => void
 }
 
@@ -29,6 +31,7 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
   onAddCabinet,
   onAddCabinets,
   onUpdateCabinet,
+  onDeleteCabinet,
   onOpenImport,
 }) => {
   // Search & Filter state
@@ -44,6 +47,7 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
   const [isAddCabinetModalOpen, setIsAddCabinetModalOpen] = useState(false)
   const [detailCabinet, setDetailCabinet] = useState<CabinetListItem | null>(null)
   const [editCabinet, setEditCabinet] = useState<CabinetListItem | null>(null)
+  const [deleteCabinetItem, setDeleteCabinetItem] = useState<CabinetListItem | null>(null)
 
   // Filtered Cabinets
   const filteredCabinets = useMemo(() => {
@@ -175,6 +179,7 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
         flashingCabinetCode={flashingCabinetCode}
         onViewDetail={(cab) => setDetailCabinet(cab)}
         onEdit={(cab) => setEditCabinet(cab)}
+        onDelete={(cab) => setDeleteCabinetItem(cab)}
       />
 
       {/* Pagination Footer */}
@@ -217,6 +222,25 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
         availableCabinets={cabinets}
         onClose={() => setEditCabinet(null)}
         onSave={handleSaveCabinet}
+      />
+
+      <ConfirmDeleteAssetModal
+        isOpen={!!deleteCabinetItem}
+        assetTypeLabel="Tủ Điện"
+        assetId={deleteCabinetItem?.cabinet_id || null}
+        assetName={deleteCabinetItem?.cabinet_name || deleteCabinetItem?.cabinet_id || null}
+        warningMessage={
+          deleteCabinetItem
+            ? `Bạn có chắc chắn muốn xóa tủ điện "${deleteCabinetItem.cabinet_name || deleteCabinetItem.cabinet_id}" không? Nếu tủ đang cấp nguồn cho các mạch điện hoặc có thiết bị IoT gắn kèm, hệ thống sẽ từ chối xóa.`
+            : undefined
+        }
+        onClose={() => setDeleteCabinetItem(null)}
+        onConfirm={() => {
+          if (deleteCabinetItem?.cabinet_id && onDeleteCabinet) {
+            onDeleteCabinet(deleteCabinetItem.cabinet_id)
+            setDeleteCabinetItem(null)
+          }
+        }}
       />
     </>
   )

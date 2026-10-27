@@ -143,7 +143,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
     }
 
     if (rows.length === 0) {
-      setValidationError('Danh sách bóng đèn không được để trống! Vui lòng bấm "+ Thêm Bóng Mới".')
+      setValidationError('Danh sách bóng đèn không được để trống! Vui lòng bấm "Thêm Bộ Đèn Mới".')
       return
     }
 
@@ -300,7 +300,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                 className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
-                <span>+ Thêm Bộ Đèn Mới</span>
+                <span>Thêm Bộ Đèn Mới</span>
               </button>
             </div>
 
@@ -334,7 +334,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                                 onClick={handleAddRow}
                                 className="text-amber-600 dark:text-amber-400 font-bold underline cursor-pointer"
                               >
-                                + Thêm Bộ Đèn Mới
+                                Thêm Bộ Đèn Mới
                               </button>{' '}
                               để tạo bộ đèn.
                             </span>

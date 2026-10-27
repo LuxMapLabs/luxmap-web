@@ -210,7 +210,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     fireEvent.click(addBtn)
 
     expect(screen.getByText('Đăng Ký Thiết Bị IoT Mới')).toBeInTheDocument()
-    expect(screen.getByText('-- Chọn tủ điện gắn thiết bị --')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('-- Chọn tủ điện gắn thiết bị --')).toBeInTheDocument()
   })
 
   it('4. Modal Xem Chi Tiết Thiết Bị IoT hiển thị thông tin và danh sách rơ-le', () => {

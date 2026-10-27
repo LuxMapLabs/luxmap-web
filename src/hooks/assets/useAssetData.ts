@@ -6,14 +6,17 @@ import {
   fetchAssetsRequest,
   createPolesBulkRequest,
   updatePoleRequest,
+  deletePoleRequest,
   createCabinetsBulkRequest,
   updateCabinetRequest,
+  deleteCabinetRequest,
   createFeederRequest,
   createFeedersBulkRequest,
   updateFeederRequest,
   deleteFeederRequest,
   createSegmentRequest,
   updateSegmentRequest,
+  deleteSegmentRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
   createIotNodeRequest,
@@ -181,6 +184,10 @@ export function useAssetData() {
     dispatch(updatePoleRequest({ poleId: updated.pole_id, data: updateReq }))
   }
 
+  const handleDeletePole = async (poleId: string) => {
+    dispatch(deletePoleRequest(poleId))
+  }
+
   // --- Fixture Handlers (Redux-Saga First) ---
   const handleAddFixture = async (data: CreateFixtureRequest) => {
     await handleAddFixtures([data])
@@ -250,6 +257,10 @@ export function useAssetData() {
     dispatch(updateCabinetRequest({ cabinetId: updated.cabinet_id, data: updateReq }))
   }
 
+  const handleDeleteCabinet = async (cabinetId: string) => {
+    dispatch(deleteCabinetRequest(cabinetId))
+  }
+
   // --- Feeder Handlers (Redux-Saga First) ---
   const handleAddFeeder = async (data: CreateFeederRequest) => {
     dispatch(createFeederRequest(data))
@@ -304,6 +315,10 @@ export function useAssetData() {
     }
 
     dispatch(updateSegmentRequest({ segmentId: updated.segment_id, data: updateReq }))
+  }
+
+  const handleDeleteSegment = async (segmentId: string) => {
+    dispatch(deleteSegmentRequest(segmentId))
   }
 
   // --- IoT Node Handlers (Redux-Saga First) ---
@@ -370,6 +385,9 @@ export function useAssetData() {
     handleAddFeeders,
     handleUpdateFeeder,
     handleDeleteFeeder,
+    handleDeleteCabinet,
+    handleDeletePole,
+    handleDeleteSegment,
     handleAddSegment,
     handleUpdateSegment,
     handleAddIotNode,

@@ -15,6 +15,7 @@ import { PoleDetailModal } from './components/PoleDetailModal'
 import { PoleQrModal } from './components/PoleQrModal'
 import { BulkPoleQrPrintModal } from './components/BulkPoleQrPrintModal'
 import { CabinetDetailModal } from '../cabinets/components/CabinetDetailModal'
+import { ConfirmDeleteAssetModal } from '../common/ConfirmDeleteAssetModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface PolesTabProps {
@@ -27,6 +28,7 @@ export interface PolesTabProps {
   onAddPole: (data: PoleListItem) => void
   onAddPoles: (dataList: PoleListItem[]) => void
   onUpdatePole: (updated: PoleListItem) => void
+  onDeletePole?: (poleId: string) => void
   onOpenImport: () => void
   onViewCabinetDetail?: (cabinet: CabinetListItem) => void
   onSelectFixture?: (fixtureCode: string) => void
@@ -43,6 +45,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
   onAddPole,
   onAddPoles,
   onUpdatePole,
+  onDeletePole,
   onOpenImport,
   onViewCabinetDetail,
   onSelectFixture,
@@ -86,6 +89,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
   const [isAddPoleModalOpen, setIsAddPoleModalOpen] = useState(false)
   const [detailPole, setDetailPole] = useState<PoleListItem | null>(null)
   const [editPole, setEditPole] = useState<PoleListItem | null>(null)
+  const [deletePoleItem, setDeletePoleItem] = useState<PoleListItem | null>(null)
   const [qrPole, setQrPole] = useState<PoleListItem | null>(null)
   const [isBulkPrintModalOpen, setIsBulkPrintModalOpen] = useState(false)
   const [internalCabinetDetail, setInternalCabinetDetail] = useState<CabinetListItem | null>(null)
@@ -258,6 +262,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         flashingPoleCode={flashingPoleCode}
         onViewDetail={(pole) => setDetailPole(pole)}
         onEdit={(pole) => setEditPole(pole)}
+        onDelete={(pole) => setDeletePoleItem(pole)}
         onViewCabinetDetail={handleCabinetClick}
         onSelectFixture={onSelectFixture}
         onSelectCabinet={onSelectCabinet}
@@ -338,6 +343,25 @@ export const PolesTab: React.FC<PolesTabProps> = ({
       <CabinetDetailModal
         cabinet={internalCabinetDetail}
         onClose={() => setInternalCabinetDetail(null)}
+      />
+
+      <ConfirmDeleteAssetModal
+        isOpen={!!deletePoleItem}
+        assetTypeLabel="Cột Đèn"
+        assetId={deletePoleItem?.pole_id || null}
+        assetName={deletePoleItem?.external_ref || deletePoleItem?.pole_id || null}
+        warningMessage={
+          deletePoleItem
+            ? `Bạn có chắc chắn muốn xóa cột đèn "${deletePoleItem.external_ref || deletePoleItem.pole_id}" không? Nếu cột vẫn còn bóng đèn hoặc liên kết tới mạch điện, hệ thống sẽ từ chối xóa.`
+            : undefined
+        }
+        onClose={() => setDeletePoleItem(null)}
+        onConfirm={() => {
+          if (deletePoleItem?.pole_id && onDeletePole) {
+            onDeletePole(deletePoleItem.pole_id)
+            setDeletePoleItem(null)
+          }
+        }}
       />
     </>
   )

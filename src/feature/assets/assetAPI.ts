@@ -139,6 +139,14 @@ export const assetAPI = {
   },
 
   /**
+   * Xóa Cột điện
+   * DELETE /api/v1/assets/poles/{poleId}
+   */
+  deletePole: async (poleId: string): Promise<void> => {
+    await apiClient.delete(`/assets/poles/${encodeURIComponent(poleId)}`)
+  },
+
+  /**
    * Thêm mới Tủ điện
    * POST /api/v1/assets/cabinets
    */
@@ -161,6 +169,14 @@ export const assetAPI = {
   },
 
   /**
+   * Xóa Tủ điện
+   * DELETE /api/v1/assets/cabinets/{cabinetId}
+   */
+  deleteCabinet: async (cabinetId: string): Promise<void> => {
+    await apiClient.delete(`/assets/cabinets/${encodeURIComponent(cabinetId)}`)
+  },
+
+  /**
    * Thêm mới Tuyến đường
    * POST /api/v1/assets/segments
    */
@@ -174,6 +190,14 @@ export const assetAPI = {
    */
   updateSegment: async (segmentId: string, data: UpdateSegmentRequest): Promise<void> => {
     await apiClient.put(`/assets/segments/${encodeURIComponent(segmentId)}`, data)
+  },
+
+  /**
+   * Xóa Tuyến đường
+   * DELETE /api/v1/assets/segments/{segmentId}
+   */
+  deleteSegment: async (segmentId: string): Promise<void> => {
+    await apiClient.delete(`/assets/segments/${encodeURIComponent(segmentId)}`)
   },
 
   /**
