@@ -13,7 +13,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
-import { formatFriendlyCommuneName } from '../../../../../constants/communes'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 
 export interface IotNodeDetailModalProps {

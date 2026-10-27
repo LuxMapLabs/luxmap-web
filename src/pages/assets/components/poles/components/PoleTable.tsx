@@ -6,7 +6,7 @@ import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { FixtureStatus } from '../../../../../types/common/enums'
-import { formatFriendlyCommuneName } from '../../../../../constants/communes'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 import { PoleTableSkeleton } from './PoleTableSkeleton'
 
 export interface PoleTableProps {

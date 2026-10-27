@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { Eye, Edit2, Zap, CheckCircle, MapPin } from 'lucide-react'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
-import { formatFriendlyCommuneName } from '../../../../../constants/communes'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 import { CabinetTableSkeleton } from './CabinetTableSkeleton'
 
 export interface CabinetTableProps {

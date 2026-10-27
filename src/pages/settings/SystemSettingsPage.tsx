@@ -18,6 +18,8 @@ import {
   fetchSettingsRequest,
   updateSettingRequest,
 } from '../../feature/settings/settingsSlice'
+import { fetchUsersRequest } from '../../feature/users/userSlice'
+import { resolveUserDisplayName } from '../../utils/userUtils'
 
 /**
  * Format ngày giờ chính xác: DD/MM/YYYY HH:mm
@@ -49,6 +51,8 @@ interface DimCardProps {
 }
 
 const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
+  const users = useSelector((state: RootState) => state.adminUsers?.users || [])
+  const currentUser = useSelector((state: RootState) => state.auth?.user)
   const min = setting.min ?? 0.5
   const max = setting.max ?? 0.95
 
@@ -99,7 +103,7 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
       {/* Vạch màu nhận diện phân hệ (Amber / Golden Glow Top Accent) */}
       <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500" />
 
-      <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-between">
+      <div className="p-4 sm:p-5 space-y-3.5 flex-1 flex flex-col justify-between">
         <div>
           {/* 1. Header Card */}
           <div className="flex items-start justify-between gap-4 mb-3">
@@ -134,12 +138,12 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
             )}
           </div>
 
-          <p className="text-xs text-slate-500 leading-relaxed mb-4">
+          <p className="text-xs text-slate-500 leading-relaxed mb-3">
             Tỷ lệ công suất hoặc quang thông thực tế so với định mức danh định của đèn chiếu sáng trên tuyến.
           </p>
 
           {/* 2. Khối điều khiển Tham số (Control Island) */}
-          <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-amber-50/30 via-slate-50/80 to-slate-50/50 border border-amber-100/80 space-y-4 mb-4">
+          <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-br from-amber-50/30 via-slate-50/80 to-slate-50/50 border border-amber-100/80 space-y-3 mb-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
@@ -220,6 +224,41 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
               </div>
             </div>
 
+            {/* Phím mốc chọn nhanh phổ biến (Preset Quick Pills) */}
+            <div className="pt-2 border-t border-amber-100/60">
+              <span className="text-[10.5px] font-semibold text-slate-400 block mb-1.5">
+                Mốc chọn nhanh phổ biến:
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { label: '50% (Sâu)', val: 0.5 },
+                  { label: '60%', val: 0.6 },
+                  { label: '70%', val: 0.7 },
+                  { label: '80% (Chuẩn)', val: 0.8 },
+                  { label: '85%', val: 0.85 },
+                  { label: '90%', val: 0.9 },
+                  { label: '95% (Max)', val: 0.95 },
+                ].map((preset) => {
+                  const isSelected = Math.abs(value - preset.val) < 0.005
+                  return (
+                    <button
+                      key={preset.val}
+                      type="button"
+                      onClick={() => handleNumericChange(preset.val)}
+                      disabled={isUpdating}
+                      className={`px-2 py-1 rounded-lg text-[10.5px] font-mono font-semibold transition cursor-pointer border shadow-2xs ${
+                        isSelected
+                          ? 'bg-amber-500 text-white border-amber-500 ring-2 ring-amber-400/20'
+                          : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {error && (
               <p className="text-xs text-rose-600 flex items-center gap-1 font-medium pt-0.5">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -262,7 +301,7 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
               <span>•</span>
               <span className="flex items-center gap-1 text-slate-700 font-semibold">
                 <User className="w-3 h-3 text-slate-500" />
-                {setting.updated_by}
+                {resolveUserDisplayName(setting.updated_by, users, currentUser)}
               </span>
             </>
           )}
@@ -308,6 +347,8 @@ interface IotCardProps {
 }
 
 const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
+  const users = useSelector((state: RootState) => state.adminUsers?.users || [])
+  const currentUser = useSelector((state: RootState) => state.auth?.user)
   const min = setting.min ?? 5
   const max = setting.max ?? 1440
 
@@ -358,7 +399,7 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
       {/* Vạch màu nhận diện phân hệ (Electric Sapphire / Cyan Glow Top Accent) */}
       <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400" />
 
-      <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-between">
+      <div className="p-4 sm:p-5 space-y-3.5 flex-1 flex flex-col justify-between">
         <div>
           {/* 1. Header Card */}
           <div className="flex items-start justify-between gap-4 mb-3">
@@ -393,12 +434,12 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
             )}
           </div>
 
-          <p className="text-xs text-slate-500 leading-relaxed mb-4">
+          <p className="text-xs text-slate-500 leading-relaxed mb-3">
             Khoảng thời gian chờ tín hiệu nhịp tim (heartbeat) định kỳ từ trạm thu phát IoT tủ điều khiển.
           </p>
 
           {/* 2. Khối điều khiển Tham số (Control Island) */}
-          <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-blue-50/30 via-slate-50/80 to-slate-50/50 border border-blue-100/80 space-y-4 mb-4">
+          <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-br from-blue-50/30 via-slate-50/80 to-slate-50/50 border border-blue-100/80 space-y-3 mb-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
@@ -556,7 +597,7 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
               <span>•</span>
               <span className="flex items-center gap-1 text-slate-700 font-semibold">
                 <User className="w-3 h-3 text-slate-500" />
-                {setting.updated_by}
+                {resolveUserDisplayName(setting.updated_by, users, currentUser)}
               </span>
             </>
           )}
@@ -600,10 +641,14 @@ export const SystemSettingsPage: React.FC = () => {
   const { items, isLoading, isUpdating, error } = useSelector(
     (state: RootState) => state.settings
   )
+  const users = useSelector((state: RootState) => state.adminUsers?.users || [])
 
   useEffect(() => {
     dispatch(fetchSettingsRequest())
-  }, [dispatch])
+    if (users.length === 0) {
+      dispatch(fetchUsersRequest({ page: 1, page_size: 100 }))
+    }
+  }, [dispatch, users.length])
 
   const handleSaveSetting = (key: string, value: number, note: string) => {
     dispatch(

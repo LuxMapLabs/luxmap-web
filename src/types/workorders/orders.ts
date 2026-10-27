@@ -2,7 +2,7 @@
  * Auto-generated Types for: workorders/orders
  * Sinh tự động từ endpoint Backend
  */
-import type { AgendaFlag, DataSource, EvidenceKind, FaultStatus, FaultType, FixtureStatus, FixtureType, InspectionOutcome, Severity, TaskKind, WorkOrderStatus } from '../common/enums'
+import type { AgendaFlag, CancellationRequestStatus, DataSource, EvidenceKind, FaultStatus, FaultType, FixtureStatus, FixtureType, InspectionOutcome, Severity, TaskKind, WorkOrderStatus } from '../common/enums'
 
 export interface AgendaWorkOrder {
     work_order_id: string | null
@@ -15,6 +15,11 @@ export interface AgendaWorkOrder {
     case_id: string | null
     fault_ids: string[]
     wo_status?: WorkOrderStatus
+    cancellation_request_status?: CancellationRequestStatus
+    cancellation_request_note?: string | null
+    cancellation_requested_at?: string | null
+    cancellation_reject_note?: string | null
+    cancellation_rejected_at?: string | null
     assigned_to?: string | null
     priority_score?: number
     created_at?: string | null
@@ -28,6 +33,8 @@ export interface AgendaWorkOrder {
 
 export interface AssignWorkOrderRequest {
     assigned_to: string | null
+    due_date?: any
+    scheduled_date?: any
 }
 
 export interface CompleteWorkOrderRequest {
@@ -142,6 +149,14 @@ export interface PolePhotoReviewRequest {
     review_note?: string | null
 }
 
+export interface RejectCancellationRequest {
+    reject_reason?: string | null
+}
+
+export interface RequestCancellationRequest {
+    reason?: string | null
+}
+
 export interface ReviewWorkOrderRequest {
     note?: string | null
 }
@@ -189,6 +204,11 @@ export interface WorkOrderDetail {
     case_id: string | null
     fault_ids: string[]
     wo_status?: WorkOrderStatus
+    cancellation_request_status?: CancellationRequestStatus
+    cancellation_request_note?: string | null
+    cancellation_requested_at?: string | null
+    cancellation_reject_note?: string | null
+    cancellation_rejected_at?: string | null
     assigned_to?: string | null
     priority_score?: number
     created_at?: string | null
@@ -238,6 +258,11 @@ export interface WorkOrderItem {
     case_id: string | null
     fault_ids: string[]
     wo_status?: WorkOrderStatus
+    cancellation_request_status?: CancellationRequestStatus
+    cancellation_request_note?: string | null
+    cancellation_requested_at?: string | null
+    cancellation_reject_note?: string | null
+    cancellation_rejected_at?: string | null
     assigned_to?: string | null
     priority_score?: number
     created_at?: string | null

@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Compass,
   SlidersHorizontal,
+  Cpu,
 } from 'lucide-react'
 import { User } from '../types/auth/web'
 import { canAccessTab } from '../utils/roleUtils'
@@ -48,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isDashboardAdmin = location.pathname === '/admin/dashboard' || location.pathname === '/admin'
   const isUsersAdmin = location.pathname === '/admin/system' || location.pathname.startsWith('/admin/users')
   const isCommunesAdmin = location.pathname.startsWith('/admin/communes')
+  const isFirmwareAdmin = location.pathname.startsWith('/admin/firmware')
   const isSettingsAdmin = location.pathname.startsWith('/admin/settings')
 
   // Lấy pendingCount từ store để gắn badge
@@ -345,6 +347,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="flex-1 tracking-tight whitespace-nowrap">Địa bàn & Khung BBox</span>
             )}
             {!isCollapsed && isCommunesAdmin && (
+              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
+            )}
+          </NavLink>
+        )}
+
+        {/* Tab 6.5: Quản lý Firmware & AI (Dành cho Admin) */}
+        {showAdmin && (
+          <NavLink
+            to="/admin/firmware"
+            title="Firmware & AI"
+            className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
+              isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
+            } ${
+              isFirmwareAdmin
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+            }`}
+          >
+            <Cpu
+              className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
+                isFirmwareAdmin ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
+              }`}
+            />
+            {!isCollapsed && (
+              <span className="flex-1 tracking-tight whitespace-nowrap">Firmware & AI</span>
+            )}
+            {!isCollapsed && isFirmwareAdmin && (
               <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
             )}
           </NavLink>

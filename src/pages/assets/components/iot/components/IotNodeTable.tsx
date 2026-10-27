@@ -15,7 +15,7 @@ import {
 import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import { IotNodeTableSkeleton } from './IotNodeTableSkeleton'
-import { formatFriendlyCommuneName } from '../../../../../constants/communes'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
 export interface IotNodeTableProps {
   iotNodes: IotNodeItem[]

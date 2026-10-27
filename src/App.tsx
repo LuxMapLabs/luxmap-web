@@ -20,6 +20,7 @@ import { AssetManagementPage } from './pages/assets/AssetManagementPage'
 import { AdminManagementPage } from './pages/users/UserManagementPage'
 import { CommunesManagementPage } from './pages/communes/CommunesManagementPage'
 import { SystemSettingsPage } from './pages/settings/SystemSettingsPage'
+import { FirmwareManagementPage } from './pages/firmware/FirmwareManagementPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
 import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
@@ -112,6 +113,7 @@ function App() {
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="/admin/system" element={<AdminManagementPage />} />
               <Route path="/admin/communes" element={<CommunesManagementPage />} />
+              <Route path="/admin/firmware" element={<FirmwareManagementPage />} />
               <Route path="/admin/settings" element={<SystemSettingsPage />} />
             </Route>
           </Route>

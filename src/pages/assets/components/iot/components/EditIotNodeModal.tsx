@@ -3,7 +3,7 @@ import { X, Cpu, Zap, AlertCircle, Check } from 'lucide-react'
 import type { IotNodeItem, UpdateIotNodeRequest } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { DataSource } from '../../../../../types/common/enums'
-import { formatCommuneDisplayName } from '../../../../../constants/communes'
+import { formatCommuneDisplayName } from '../../../../../utils/assets/communeUtils'
 
 export interface EditIotNodeModalProps {
   isOpen: boolean

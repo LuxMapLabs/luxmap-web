@@ -27,7 +27,7 @@ export interface SegmentListItem {
     road_class: RoadClass
     length_m: number
     commune_id: string | null
-    commune_name?: string | null
+    commune_name: string | null
     data_source: DataSource
     pole_count: number
     updated_at: string | null

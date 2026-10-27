@@ -1,7 +1,7 @@
 import React from 'react'
 import { Eye, Edit2, Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
-import { formatFriendlyCommuneName } from '../../../../../constants/communes'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
 export interface FeederTableProps {
   feeders: FeederListItem[]

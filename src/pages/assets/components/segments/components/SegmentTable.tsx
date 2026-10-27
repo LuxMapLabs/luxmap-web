@@ -2,7 +2,7 @@ import React from 'react'
 import { Eye, Edit2, Database } from 'lucide-react'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import { SegmentTableSkeleton } from './SegmentTableSkeleton'
-import { formatFriendlyCommuneName } from '../../../../../constants/communes'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 import { getDataSourceDisplayName } from '../../../../../constants/enums'
 
 export interface SegmentTableProps {

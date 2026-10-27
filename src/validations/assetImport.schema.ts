@@ -7,7 +7,7 @@ import type { FeederListItem, CreateFeederRequest } from '../types/assets/feeder
 import type { SegmentListItem, CreateSegmentRequest } from '../types/assets/segments'
 import type { CreateFixtureRequest } from '../types/assets/fixtures'
 import type { ManagedFixture } from '../hooks/assets/useAssetData'
-import { formatCommuneDisplayName } from '../constants/communes'
+import { formatCommuneDisplayName } from '../utils/assets/communeUtils'
 
 /**
  * Interface cho các trường thay đổi khi so khớp bản ghi

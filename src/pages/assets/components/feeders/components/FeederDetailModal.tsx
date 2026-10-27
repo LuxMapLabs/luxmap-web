@@ -2,7 +2,7 @@ import React from 'react'
 import { X, Cable, Zap, MapPin, Calendar, User, Lightbulb } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { PoleListItem } from '../../../../../types/assets/poles'
-import { formatFriendlyCommuneName } from '../../../../../constants/communes'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
 export interface FeederDetailModalProps {
   isOpen: boolean

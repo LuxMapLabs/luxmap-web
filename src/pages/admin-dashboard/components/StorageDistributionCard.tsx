@@ -1,13 +1,13 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
 } from 'recharts'
-import { HardDrive, Database, Layers, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { HardDrive, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import type { StorageSummary } from '../../../types/admin/system'
-import { formatBytes } from '../utils/formatters'
+import { formatBytes } from '../../../utils/admin-dashboard/formatters'
 
 interface StorageDistributionCardProps {
   storage?: StorageSummary
@@ -19,189 +19,172 @@ export const StorageDistributionCard: React.FC<StorageDistributionCardProps> = (
   const diskFree = disk?.free_bytes ?? 0
   const diskUsed = diskTotal > diskFree ? diskTotal - diskFree : 0
   const usedRatio = diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : 0
+  const freeRatio = Math.max(0, 100 - usedRatio)
 
   const dbBytes = storage?.database_bytes ?? 0
   const buckets = storage?.buckets || []
   const s3Bytes = buckets.reduce((acc, b) => acc + (b.bytes ?? 0), 0)
-  const totalS3Files = buckets.reduce((acc, b) => acc + (b.object_count ?? 0), 0)
 
-  // Dữ liệu biểu đồ Donut: 100% từ storage.disk của Backend
-  const physicalDiskDonutData = [
+  // State cập nhật số liệu động tại tâm tròn (Khử 100% tooltip bay từ trái sang đè chữ)
+  const [hoveredSlice, setHoveredSlice] = useState<{
+    name: string
+    value: number
+    color: string
+    percent: number
+  } | null>(null)
+
+  const donutData = [
     {
-      name: 'Dung lượng khả dụng (Free Space)',
+      name: 'Khả dụng',
       value: diskFree,
-      color: '#10b981', // emerald-500
+      fill: 'url(#freeGrad)',
+      color: '#10b981',
+      percent: freeRatio,
     },
     {
-      name: 'Đã sử dụng (Used Space)',
+      name: 'Đã sử dụng',
       value: diskUsed,
-      color: '#3b82f6', // blue-500
+      fill: 'url(#usedGrad)',
+      color: '#3b82f6',
+      percent: usedRatio,
     },
   ]
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs flex flex-col justify-between h-full">
+    <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl border border-white/90 dark:border-slate-800 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between h-full transition-all duration-300 outline-none focus:outline-none select-none">
       <div>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <HardDrive className="w-4.5 h-4.5" />
+        {/* Minimal Header */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100/60 shadow-2xs">
+              <HardDrive className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Phân Bổ Tài Nguyên Lưu Trữ
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Bộ nhớ đĩa vật lý máy chủ, PostgreSQL và MinIO S3 Object Storage
-              </p>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Bộ nhớ máy chủ
+              </span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900 dark:text-white">
+                  {usedRatio}%
+                </span>
+                <span className="text-xs text-slate-400 font-mono">
+                  / {formatBytes(diskTotal, 0)}
+                </span>
+              </div>
             </div>
           </div>
 
           {disk?.low ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
               <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Sắp đầy đĩa</span>
+              <span>Sắp đầy</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200/60">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Bộ nhớ an toàn</span>
+              <span>An toàn</span>
             </span>
           )}
         </div>
 
-        {/* Donut Chart + Storage Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-          {/* Donut Chart */}
-          <div className="md:col-span-5 h-48 relative flex items-center justify-center">
-            {diskTotal > 0 ? (
-              <>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={physicalDiskDonutData}
-                      innerRadius={56}
-                      outerRadius={76}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {physicalDiskDonutData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+        {/* 3D Glass Donut Chart (Dynamic Center - 0 Tooltip Bay Đè Lên Tâm) */}
+        <div className="h-56 relative flex items-center justify-center my-2 outline-none focus:outline-none [&_*]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none">
+          {diskTotal > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <defs>
+                    <linearGradient id="freeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#06b6d4" />
+                    </linearGradient>
+                    <linearGradient id="usedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#3b82f6" />
+                      <stop offset="100%" stopColor="#6366f1" />
+                    </linearGradient>
+                  </defs>
+                  <Pie
+                    data={donutData}
+                    innerRadius={72}
+                    outerRadius={90}
+                    paddingAngle={5}
+                    dataKey="value"
+                    animationDuration={1200}
+                    stroke="none"
+                    onMouseLeave={() => setHoveredSlice(null)}
+                  >
+                    {donutData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.fill}
+                        className="cursor-pointer transition-opacity duration-200 hover:opacity-90"
+                        onMouseEnter={() =>
+                          setHoveredSlice({
+                            name: entry.name,
+                            value: entry.value,
+                            color: entry.color,
+                            percent: entry.percent,
+                          })
+                        }
+                      />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
 
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    Đã dùng
-                  </span>
-                  <span className="text-xl font-black font-mono text-slate-900 dark:text-white">
-                    {usedRatio}%
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    Tổng {formatBytes(diskTotal, 0)}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div className="text-center text-slate-400 text-xs">Đang tải dữ liệu lưu trữ...</div>
-            )}
-          </div>
-
-          {/* Breakdown List */}
-          <div className="md:col-span-7 space-y-2.5">
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-medium">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span>Dung lượng khả dụng:</span>
+              {/* Dynamic In-Place Center Text (Đổi số tại chỗ, sạch 100%, không bị đè) */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-all duration-200">
+                <span
+                  className="text-2xl sm:text-3xl font-black font-mono leading-none drop-shadow-xs transition-colors duration-200"
+                  style={{ color: hoveredSlice ? hoveredSlice.color : undefined }}
+                >
+                  {formatBytes(hoveredSlice ? hoveredSlice.value : diskFree, 1)}
                 </span>
-                <strong className="font-mono text-slate-900 dark:text-white">
-                  {formatBytes(diskFree)}
-                </strong>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-medium">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-                  <span>Đã sử dụng:</span>
-                </span>
-                <strong className="font-mono text-slate-900 dark:text-white">
-                  {formatBytes(diskUsed)}
-                </strong>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50">
-                <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold mb-0.5">
-                  <Database className="w-3.5 h-3.5" />
-                  <span>PostgreSQL</span>
-                </div>
-                <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
-                  {formatBytes(dbBytes)}
+                <span className="text-[11px] font-bold tracking-wider mt-1.5 uppercase transition-colors duration-200 text-slate-500 dark:text-slate-400">
+                  {hoveredSlice ? `${hoveredSlice.name} (${hoveredSlice.percent}%)` : 'Khả dụng'}
                 </span>
               </div>
+            </>
+          ) : (
+            <div className="text-center text-slate-400 text-xs">Đang nạp dữ liệu...</div>
+          )}
+        </div>
+      </div>
 
-              <div className="p-2.5 rounded-xl bg-violet-50/50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/50">
-                <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 text-[11px] font-bold mb-0.5">
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>MinIO ({totalS3Files} tệp)</span>
-                </div>
-                <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
-                  {formatBytes(s3Bytes)}
-                </span>
-              </div>
-            </div>
-          </div>
+      {/* 3 Minimal Bottom Chips */}
+      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+        <div
+          onMouseEnter={() =>
+            setHoveredSlice({
+              name: 'Khả dụng',
+              value: diskFree,
+              color: '#10b981',
+              percent: freeRatio,
+            })
+          }
+          onMouseLeave={() => setHoveredSlice(null)}
+          className="p-2.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 text-center border border-emerald-100/60 shadow-2xs cursor-pointer hover:bg-emerald-50 transition-colors"
+        >
+          <span className="text-[10px] text-slate-400 block font-medium">Trống</span>
+          <strong className="text-sm font-mono text-emerald-700 dark:text-emerald-300 font-bold block mt-0.5">
+            {formatBytes(diskFree, 0)}
+          </strong>
         </div>
 
-        {/* 2. Chi tiết phân rã MinIO S3 Buckets (Lấp đầy tự nhiên, 100% dữ liệu thực từ Backend) */}
-        <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800/80">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Phân vùng MinIO S3 Buckets ({buckets.length})
-            </span>
-            <span className="text-[10px] font-mono text-slate-400">
-              Tổng {totalS3Files} tệp • {formatBytes(s3Bytes)}
-            </span>
-          </div>
+        <div className="p-2.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 text-center border border-indigo-100/60 shadow-2xs">
+          <span className="text-[10px] text-slate-400 block font-medium">PostgreSQL</span>
+          <strong className="text-sm font-mono text-indigo-700 dark:text-indigo-300 font-bold block mt-0.5">
+            {formatBytes(dbBytes, 0)}
+          </strong>
+        </div>
 
-          <div className="space-y-1.5">
-            {buckets.length === 0 ? (
-              <div className="p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
-                Chưa phát sinh bucket lưu trữ ngoài.
-              </div>
-            ) : (
-              buckets.map((b, idx) => (
-                <div
-                  key={b.bucket || idx}
-                  className="flex items-center justify-between p-2 rounded-xl bg-slate-50/60 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 text-xs"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />
-                    <span className="font-mono font-semibold text-slate-700 dark:text-slate-300 truncate">
-                      {b.bucket || `bucket-${idx + 1}`}
-                    </span>
-                    <span className="text-[11px] text-slate-400 shrink-0 font-mono">
-                      ({b.object_count ?? 0} files)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {b.reconciliation?.orphan_count !== undefined && b.reconciliation.orphan_count > 0 && (
-                      <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">
-                        {b.reconciliation.orphan_count} orphan
-                      </span>
-                    )}
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">
-                      {formatBytes(b.bytes)}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+        <div className="p-2.5 rounded-2xl bg-violet-50/50 dark:bg-violet-950/20 text-center border border-violet-100/60 shadow-2xs">
+          <span className="text-[10px] text-slate-400 block font-medium">MinIO S3</span>
+          <strong className="text-sm font-mono text-violet-700 dark:text-violet-300 font-bold block mt-0.5">
+            {formatBytes(s3Bytes, 0)}
+          </strong>
         </div>
       </div>
     </div>

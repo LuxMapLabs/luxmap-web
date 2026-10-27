@@ -11,6 +11,7 @@ import workScheduleSaga from '../feature/work-schedule/workScheduleSaga'
 import dashboardSaga from '../feature/dashboard/dashboardSaga'
 import settingsSaga from '../feature/settings/settingsSaga'
 import adminSystemSaga from '../feature/adminSystem/adminSystemSaga'
+import adminArtifactVersionSaga from '../feature/adminArtifactVersions/artifactVersionSaga'
 
 export default function* rootSaga() {
     yield all([
@@ -26,5 +27,6 @@ export default function* rootSaga() {
         fork(dashboardSaga),
         fork(settingsSaga),
         fork(adminSystemSaga),
+        fork(adminArtifactVersionSaga),
     ])
 }

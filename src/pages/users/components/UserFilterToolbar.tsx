@@ -74,6 +74,7 @@ export const UserFilterToolbar: React.FC<UserFilterToolbarProps> = ({
           >
             <option value="">Tất cả trạng thái</option>
             <option value="active" className="dark:bg-slate-900">Đang hoạt động</option>
+            <option value="invited" className="dark:bg-slate-900">Chờ kích hoạt</option>
             <option value="locked" className="dark:bg-slate-900">Đã khóa</option>
           </select>
         </div>
@@ -91,5 +92,3 @@ export const UserFilterToolbar: React.FC<UserFilterToolbarProps> = ({
     </div>
   )
 }
-
-
