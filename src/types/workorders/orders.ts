@@ -227,11 +227,6 @@ export interface WorkOrderDetail {
     completed_at?: string | null
     closed_at?: string | null
     assignee_eligible?: boolean
-    cancellation_request_status?: 'none' | 'pending' | 'rejected' | null
-    cancellation_request_note?: string | null
-    cancellation_requested_at?: string | null
-    cancellation_reject_note?: string | null
-    cancellation_rejected_at?: string | null
     allowed_actions: string[]
     faults: WorkOrderFaultDetail[]
 }
@@ -269,11 +264,6 @@ export interface WorkOrderItem {
     updated_at?: string | null
     due_date?: string | null
     scheduled_date?: string | null
-    cancellation_request_status?: 'none' | 'pending' | 'rejected' | null
-    cancellation_request_note?: string | null
-    cancellation_requested_at?: string | null
-    cancellation_reject_note?: string | null
-    cancellation_rejected_at?: string | null
 }
 
 export interface WorkOrderItemPagedResult {
