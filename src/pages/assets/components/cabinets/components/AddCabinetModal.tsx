@@ -268,6 +268,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
         external_ref: autoId,
         cabinet_name: trimmedName,
         commune_id: currentSegment?.commune_id || 'COM-001',
+        commune_name: currentSegment?.commune_name || null,
         data_source: 'field',
         location: {
           lat: parsedLat,
