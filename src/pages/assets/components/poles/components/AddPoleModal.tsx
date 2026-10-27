@@ -987,6 +987,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
         cabinet_id: selectedCabinetId || null,
         cabinet_name: currentCabinet?.cabinet_name || null,
         commune_id: currentSegment?.commune_id || 'COM-001',
+        commune_name: currentSegment?.commune_name || null,
         data_source: 'field',
         near_sensitive_poi: !!row.near_sensitive_poi,
         location: {

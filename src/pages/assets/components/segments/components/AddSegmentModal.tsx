@@ -108,6 +108,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
       length_m: actualLen,
       pole_count: 0,
       commune_id: communeId,
+      commune_name: null,
       data_source: 'field',
       geom_wkt: geomWkt,
       updated_at: new Date().toISOString(),
