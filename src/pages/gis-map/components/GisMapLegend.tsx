@@ -80,10 +80,10 @@ const CabinetLegendIcon: React.FC<CabinetLegendIconProps> = ({
   isFault = false,
 }) => {
   const typeKey = isFault ? 'fault' : isRoot ? 'root' : 'norm'
-  let cHighlight = '#6ee7b7'
-  let cBody = '#059669'
-  let cDeep = '#047857'
-  let cShadow = '#064e3b'
+  let cHighlight = '#818cf8'
+  let cBody = '#4f46e5'
+  let cDeep = '#4338ca'
+  let cShadow = '#312e81'
 
   if (isFault) {
     cHighlight = '#fda4af'
@@ -137,15 +137,7 @@ const CabinetLegendIcon: React.FC<CabinetLegendIconProps> = ({
       <rect x="4.5" y="3.8" width="15" height="4.2" rx="2" fill={`url(#leg-cab-gloss-${typeKey})`} />
       <line x1="3.5" y1="9.5" x2="20.5" y2="9.5" stroke="rgba(255,255,255,0.4)" strokeWidth="0.9" />
       <line x1="3.5" y1="10.4" x2="20.5" y2="10.4" stroke="rgba(0,0,0,0.3)" strokeWidth="0.8" />
-      <circle
-        cx="6.8"
-        cy="6.2"
-        r="1.4"
-        fill={isFault ? '#fee2e2' : isRoot ? '#fef3c7' : '#d1fae5'}
-        stroke="rgba(0,0,0,0.25)"
-        strokeWidth="0.5"
-      />
-      <path
+            <path
         d="M12.5 11L8.5 15.5H11.8L10.5 20L15.5 14.5H12.2L13 11Z"
         fill="#ffffff"
         style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }}
@@ -239,10 +231,9 @@ export const GisMapLegend: React.FC = () => {
         {/* Cabinets */}
         <div className="flex items-center gap-2 col-span-2 pt-1.5 border-t border-slate-200">
           <div className="flex items-center gap-1.5 shrink-0">
-            <CabinetLegendIcon color="#059669" size={15} isRoot={false} />
-            <CabinetLegendIcon color="#e11d48" size={15} isRoot={false} isFault={true} />
-          </div>
-          <span className="font-medium text-slate-700 text-[11px]">Tủ điện điều khiển (Cấp điện / Ngắt)</span>
+            <CabinetLegendIcon color="#4f46e5" size={15} isRoot={false} />
+            </div>
+          <span className="font-medium text-slate-700 text-[11px]">Tủ điện điều khiển</span>
         </div>
 
         {/* Electrical Feeder lines & Topology */}

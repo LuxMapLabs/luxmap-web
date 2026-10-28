@@ -222,7 +222,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getByText('Đèn mờ')).toBeInTheDocument()
       expect(screen.getByText('Hỏng / Tắt')).toBeInTheDocument()
       expect(screen.getByText('Chưa quét')).toBeInTheDocument()
-      expect(screen.getByText('Tủ điện điều khiển (Cấp điện / Ngắt)')).toBeInTheDocument()
+      expect(screen.getByText('Tủ điện điều khiển')).toBeInTheDocument()
       expect(screen.getByText('Sơ đồ cấp nguồn (Trụ → Cột)')).toBeInTheDocument()
       expect(screen.getByText('Tuyến đường giao thông (Trục tim đường)')).toBeInTheDocument()
     })
@@ -395,6 +395,35 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.queryByText('Dòng điện 18.6A')).toBeNull()
     })
 
+    it('GisDrawerPanel render đúng giao diện Mạch điện khi selectedFeeder có giá trị', () => {
+      const mockFeeder = {
+        feeder_id: 'FDR-009',
+        feeder_name: 'Lộ 1 - Tủ A - Tỉnh Lộ 8',
+        external_ref: 'FDR-CAB-TL8-A',
+        cabinet_name: 'Tủ A',
+        segment_id: 'SEG-001',
+        pole_count: 24,
+      }
+
+      render(
+        <Provider store={store}>
+          <GisDrawerPanel
+            {...defaultDrawerProps}
+            selectedPole={null}
+            selectedCabinet={null}
+            selectedFeeder={mockFeeder}
+            feederStatusMap={{ 'FDR-009': 'active' }}
+          />
+        </Provider>
+      )
+
+      expect(screen.getAllByText('Lộ 1 - Tủ A - Tỉnh Lộ 8').length).toBeGreaterThan(0)
+      expect(screen.getByText('Điều khiển nguồn Mạch điện')).toBeInTheDocument()
+      expect(screen.getByText('Thông số Kỹ thuật Mạch điện')).toBeInTheDocument()
+      expect(screen.getByText('Tủ A')).toBeInTheDocument()
+      expect(screen.getAllByText('ĐANG CẤP ĐIỆN').length).toBeGreaterThan(0)
+    })
+
     it('validateImportRow chấp nhận dòng dữ liệu CSV có đủ 100% các cột bắt buộc', () => {
       const validRow = {
         external_ref: 'POL-FULL-01',
@@ -447,6 +476,85 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       // Mở lại
       fireEvent.click(expandBtn)
       expect(screen.getByText('Đạt chuẩn')).toBeInTheDocument()
+    })
+
+    it('GisDrawerPanel hiển thị danh sách Mạch điện của tủ, nút toggle switch từng mạch và không còn nút Aptomat đơn lẻ', () => {
+      const mockCabinet = {
+        cabinet_id: 'CAB-008',
+        external_ref: 'CAB-008',
+        cabinet_name: 'Tủ A - Tỉnh Lộ 8',
+        landmark_note: 'Gần UBND xã Phú Hòa Đông',
+        status: 'active',
+        feeder_ids: ['FDR-01', 'FDR-02'],
+        current_load_kw: 12.5,
+        voltage_v: 220,
+        power_factor: 0.95,
+      }
+
+      const mockConnectedPoles: PoleFeature[] = [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [106.4896, 10.9701] },
+          properties: {
+            pole_id: 'POL-001',
+            external_ref: 'POL-01',
+            segment_id: 'SEG-001',
+            cabinet_id: 'CAB-008',
+            feeder_id: 'FDR-01',
+            fixture_status: 'normal',
+          },
+        },
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [106.4897, 10.9702] },
+          properties: {
+            pole_id: 'POL-002',
+            external_ref: 'POL-02',
+            segment_id: 'SEG-001',
+            cabinet_id: 'CAB-008',
+            feeder_id: 'FDR-02',
+            fixture_status: 'normal',
+          },
+        },
+      ]
+
+      const handleToggleFeeder = vi.fn()
+
+      render(
+        <Provider store={store}>
+          <GisDrawerPanel
+            {...defaultDrawerProps}
+            selectedPole={null}
+            selectedCabinet={mockCabinet}
+            effectivePoles={mockConnectedPoles}
+            onToggleFeeder={handleToggleFeeder}
+            feederStatusMap={{ 'FDR-01': 'active', 'FDR-02': 'fault' }}
+          />
+        </Provider>
+      )
+
+      // 1. Subtitle Header không còn undefined
+      expect(screen.queryByText(/undefined/i)).toBeNull()
+      expect(screen.getByText(/CAB-008 · Gần UBND xã Phú Hòa Đông/)).toBeInTheDocument()
+
+      // 2. Không còn nút ngắt Aptomat đơn lẻ cũ
+      expect(screen.queryByText('Ngắt Aptomat (Tắt Đèn Lộ Này)')).toBeNull()
+      expect(screen.queryByText('Đóng Aptomat Cấp Điện')).toBeNull()
+
+      // 3. Hiển thị Section danh sách mạch điện
+      expect(screen.getByText(/Danh sách Mạch điện của Tủ/)).toBeInTheDocument()
+      expect(screen.getAllByText('FDR-01').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('FDR-02').length).toBeGreaterThanOrEqual(1)
+
+      // 4. Trạng thái từng mạch
+      expect(screen.getAllByText('Đang cấp điện').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getByText('Đã ngắt')).toBeInTheDocument()
+
+      // 5. Nút bấm toggle switch gọi onToggleFeeder khi click
+      const switchBtns = screen.getAllByRole('button', { name: /Bấm để/i })
+      expect(switchBtns.length).toBeGreaterThanOrEqual(2)
+      fireEvent.click(switchBtns[0])
+      expect(handleToggleFeeder).toHaveBeenCalledWith('FDR-01', expect.any(String))
     })
 
     it('validateImportRow chặn ngay và trả về invalid khi thiếu bất kỳ ô dữ liệu nào trong cột bắt buộc', () => {

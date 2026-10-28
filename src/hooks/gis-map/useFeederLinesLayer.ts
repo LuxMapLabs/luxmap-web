@@ -20,6 +20,7 @@ interface UseFeederLinesLayerProps {
   activeHoverSourceRef: React.MutableRefObject<'pole' | 'cabinet' | 'feeder' | 'road' | null>
   onSelectSegment: (segmentId: string) => void
   onSelectCabinet?: (cabData: any, coords: [number, number]) => void
+  onSelectFeeder?: (feederData: any) => void
 }
 
 export function useFeederLinesLayer({
@@ -35,6 +36,7 @@ export function useFeederLinesLayer({
   activeHoverSourceRef,
   onSelectSegment,
   onSelectCabinet,
+  onSelectFeeder,
 }: UseFeederLinesLayerProps) {
   const dispatch = useDispatch<AppDispatch>()
   const { cabinetTopologyEdges, allTopologyEdges, cabinets: mapCabinets } = useSelector((state: RootState) => state.map)
@@ -248,7 +250,22 @@ export function useFeederLinesLayer({
       const segId = p.segment_id || 'SEG-001'
 
       // BẮT BUỘC: Khi click vào đường dây điện chạy dọc theo tuyến đường, luôn mở Panel Tuyến đường (Segment), tuyệt đối không mở panel Feeder hay Cabinet.
-      onSelectSegment(segId)
+      const fId = p.feeder_id
+      if (onSelectFeeder && fId) {
+        const found = assetFeeders?.find((f: any) => f.feeder_id === fId || f.external_ref === fId)
+        onSelectFeeder({
+          ...p,
+          ...(found || {}),
+          feeder_id: fId,
+          feeder_name: found?.feeder_name || p.feeder_name || `Mạch ${fId}`,
+          external_ref: found?.external_ref || p.external_ref || fId,
+          cabinet_id: p.cabinet_id || found?.cabinet?.cabinet_id || p.from_id,
+          cabinet_name: p.cabinet_name || found?.cabinet?.cabinet_name,
+          segment_id: p.segment_id,
+        })
+      } else {
+        onSelectSegment(segId)
+      }
     }
 
     map.on('mousemove', 'feeder-lines-core', handleFeederMouseMove)
@@ -267,7 +284,7 @@ export function useFeederLinesLayer({
         map.off('click', 'feeder-lines-core', handleFeederClick)
       }
     }
-  }, [map, isMapLoaded, onSelectSegment, onSelectCabinet])
+  }, [map, isMapLoaded, onSelectSegment, onSelectCabinet, onSelectFeeder, assetFeeders])
 
   // 2. Fetch and render Cabinet Topology Edges via Redux Saga when a Cabinet is selected
   useEffect(() => {

@@ -55,6 +55,33 @@ export function useElectricalCascade({
 
   // Local state for Cabinet Trip/Restore (Simulation)
   const [cabinets, setCabinets] = useState<any[]>([])
+  // Local state for Feeder Circuit Trip/Restore (Simulation)
+  const [feederStatusMap, setFeederStatusMap] = useState<Record<string, "active" | "fault">>({})
+
+  // Toggle Feeder Circuit (Trip / Restore) - Controls all poles connected to this feeder
+  const handleToggleFeeder = (feederId: string, feederName?: string) => {
+    const currentStatus = feederStatusMap[feederId] || "active"
+    const nextStatus = currentStatus === "fault" ? "active" : "fault"
+
+    setFeederStatusMap((prev) => ({
+      ...prev,
+      [feederId]: nextStatus,
+    }))
+
+    const displayName = feederName || feederId
+
+    if (nextStatus === "fault") {
+      showToast.error(
+        "Đã ngắt Mạch điện!",
+        `Đã ngắt nguồn điện cho ${displayName}. Toàn bộ cụm cột đèn thuộc mạch này đã tắt.`
+      )
+    } else {
+      showToast.success(
+        "Đã đóng điện Mạch!",
+        `Đã cấp điện trở lại cho ${displayName}. Cụm cột đèn hoạt động bình thường.`
+      )
+    }
+  }
 
   // Đồng bộ cabinets từ Redux Store vào local simulation state
   useEffect(() => {
@@ -188,10 +215,10 @@ export function useElectricalCascade({
         p.cabinet_name ||
         (rawCabinetId ? `Tủ ${cabinetExternalRef || rawCabinetId}` : undefined)
 
-      const isCabFault = cabProps?.status === 'fault'
+      const isFeederFault = Boolean(feederId && feederStatusMap[feederId] === 'fault')
       const geom = f.geometry || { type: 'Point', coordinates: [106.6, 10.8] }
 
-      if (isCabFault) {
+      if (isFeederFault) {
         return {
           type: 'Feature',
           geometry: geom as any,
@@ -205,7 +232,7 @@ export function useElectricalCascade({
             cabinet_name: cabinetName,
             cabinet_external_ref: cabinetExternalRef,
             fixture_status: 'out',
-            power_loss_reason: `Mất điện do ${cabinetName || rawCabinetId} bị ngắt điện`,
+            power_loss_reason: `Mất điện do mạch ${feederName || feederExternalRef || feederId} bị ngắt điện`,
           },
         } as PoleFeature
       }
@@ -225,7 +252,7 @@ export function useElectricalCascade({
         },
       } as PoleFeature
     })
-  }, [rawPoles, cabinets, assetPoles, assetFeeders, assetCabinets])
+  }, [rawPoles, cabinets, assetPoles, assetFeeders, assetCabinets, feederStatusMap])
 
   // Calculate Dynamic Segments List & Info from rawSegments (API)
   const segmentsList = useMemo(() => {
@@ -233,8 +260,7 @@ export function useElectricalCascade({
       const p = (f.properties || {}) as any
       const segId = p.segment_id || `SEG-00${idx + 1}`
 
-      const segCabs = cabinets.filter((c) => c.properties?.segment_id === segId)
-      const isFault = segCabs.some((c) => c.properties?.status === 'fault')
+      const isFault = Boolean(p.has_active_segment_fault)
 
       const poleCount =
         effectivePoles.filter((pole: PoleFeature) => pole.properties?.segment_id === segId).length ||
@@ -392,6 +418,8 @@ export function useElectricalCascade({
     cabinets: filteredCabinets,
     allCabinets: cabinets,
     handleToggleCabinet,
+    feederStatusMap,
+    handleToggleFeeder,
     effectivePoles,
     segmentsList,
     segmentInfoMap,

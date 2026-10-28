@@ -52,25 +52,25 @@ interface CabinetTooltipParams {
 
 export function getCabinetTooltipHtml({ cabinet }: CabinetTooltipParams): string {
   const p = cabinet.properties || {}
-  const isFault = p.status === 'fault'
 
-  const roleBadge = '<span class="text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 px-1.5 py-0.5 rounded text-[10px]">Tủ Điều Khiển</span>'
-  const statusBadge = isFault
-    ? '<span class="text-rose-600 dark:text-rose-400 font-bold bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-1.5 py-0.5 rounded text-[10px]">Đã ngắt nguồn</span>'
-    : '<span class="text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded text-[10px]">Đang cấp điện</span>'
+
+  const roleBadge = '<span class="text-indigo-700 dark:text-indigo-300 font-bold bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.5 rounded text-[10px]">Tủ Điều Khiển</span>'
+
+
+
 
   const displayCabinetCode = p.external_ref || p.cabinet_code || p.cabinet_id
 
   return `
     <div class="bg-white/98 dark:bg-slate-900/98 text-slate-800 dark:text-slate-100 p-2.5 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 backdrop-blur-md min-w-52 font-sans">
       <div class="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800 gap-2">
-        <span class="font-mono font-bold text-xs text-purple-700 dark:text-purple-400">${displayCabinetCode}</span>
-        <div class="flex items-center gap-1">${roleBadge}${statusBadge}</div>
+        <span class="font-mono font-bold text-xs text-indigo-700 dark:text-indigo-400">${displayCabinetCode}</span>
+        <div class="flex items-center gap-1">${roleBadge}</div>
       </div>
       <div class="pt-1.5 space-y-0.5 text-[11px]">
         <div class="font-bold text-slate-900 dark:text-white">${p.cabinet_name}</div>
         <div class="text-slate-600 dark:text-slate-400 text-[10.5px]">📍 Atlas: <strong class="text-slate-800 dark:text-slate-200">${p.atlas || p.landmark_note || ''}</strong></div>
-        <div class="text-purple-600 dark:text-purple-400 font-semibold pt-0.5">
+        <div class="text-indigo-600 dark:text-indigo-400 font-semibold pt-0.5">
           Tuyến điện: ${p.feeder_external_ref || p.feeder_id || `FDR-${p.cabinet_id}`} • Quản lý: ${p.total_poles_managed || p.pole_count || 0} cột
         </div>
       </div>

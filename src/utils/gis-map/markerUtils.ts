@@ -16,10 +16,10 @@ export function getCabinetSvgString({
 }) {
   const idSuffix = uid || `${isRoot ? 'root' : isFault ? 'fault' : 'norm'}-${Math.floor(Math.random() * 10000)}`
 
-  let cHighlight = '#6ee7b7'
-  let cBody = '#059669'
-  let cDeep = '#047857'
-  let cShadow = '#064e3b'
+  let cHighlight = '#818cf8'
+  let cBody = '#4f46e5'
+  let cDeep = '#4338ca'
+  let cShadow = '#312e81'
 
   if (isFault) {
     cHighlight = '#fda4af'
@@ -66,10 +66,7 @@ export function getCabinetSvgString({
     <line x1="3.5" y1="9.5" x2="20.5" y2="9.5" stroke="rgba(255,255,255,0.4)" stroke-width="0.9" />
     <line x1="3.5" y1="10.4" x2="20.5" y2="10.4" stroke="rgba(0,0,0,0.3)" stroke-width="0.8" />
 
-    <!-- 4. SCADA Status Pilot LED Diode -->
-    <circle cx="6.8" cy="6.2" r="1.4" fill="${isFault ? '#fee2e2' : isRoot ? '#fef3c7' : '#d1fae5'}" stroke="rgba(0,0,0,0.25)" stroke-width="0.5" />
-    <circle cx="6.5" cy="5.9" r="0.5" fill="#ffffff" />
-
+    
     <!-- 5. Crisp White Embossed Electrical Lightning Bolt -->
     <path d="M12.5 11L8.5 15.5H11.8L10.5 20L15.5 14.5H12.2L13 11Z" fill="#ffffff" style="filter: drop-shadow(0 1px 1.5px rgba(0,0,0,0.35));" />
 
@@ -259,14 +256,11 @@ export function createCabinetMarkerElement({
   onLeave,
 }: CreateCabinetMarkerParams): HTMLDivElement {
   const p = cabinet.properties || {}
-  const isFault = p.status === 'fault'
   const size = 26
   const half = size / 2
 
-  const glowCol = isFault
-    ? 'rgba(244, 63, 94, 0.45)'
-    : 'rgba(16, 185, 129, 0.35)'
-  const isPulsing = isFault
+  const glowCol = 'rgba(79, 70, 229, 0.35)'
+  const isPulsing = false
 
   const el = document.createElement('div')
   el.className = 'select-none pointer-events-none'
@@ -294,7 +288,7 @@ export function createCabinetMarkerElement({
     
     <!-- 3D Cabinet SVG Body -->
     <div style="position: relative; z-index: 2; pointer-events: none;">
-      ${getCabinetSvgString({ size, isFault, uid: cabId })}
+      ${getCabinetSvgString({ size, isFault: false, uid: cabId })}
     </div>
   `
   el.appendChild(markerWrap)
