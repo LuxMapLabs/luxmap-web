@@ -28,6 +28,9 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
 }) => {
   const dispatch = useDispatch()
   const mapSegments = useSelector((state: RootState) => state.map.segments)
+  const currentUser = useSelector((state: RootState) => state.auth.user)
+  const communes = useSelector((state: RootState) => state.adminCommunes.communes)
+  const defaultCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
 
   // Fetch map layers nếu chưa có dữ liệu GIS
   useEffect(() => {
@@ -37,6 +40,42 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
   }, [mapSegments, dispatch])
 
   const [cabinetName, setCabinetName] = useState(() => cabinet.cabinet_name || '')
+  const [communeId, setCommuneId] = useState(() => cabinet.commune_id || defaultCommuneId)
+
+  const communeOptions = useMemo(() => {
+    let opts: { id: string; name: string; label: string }[] = []
+    if (communes && communes.length > 0) {
+      opts = communes.map((c) => ({
+        id: c.commune_id || '',
+        name: c.name || c.commune_id || '',
+        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
+      }))
+    } else if (currentUser?.communes && currentUser.communes.length > 0) {
+      opts = currentUser.communes.map((c) => ({
+        id: c.commune_id || '',
+        name: c.name || c.commune_id || '',
+        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
+      }))
+    } else if (currentUser?.commune_ids && currentUser.commune_ids.length > 0) {
+      opts = currentUser.commune_ids.map((id) => ({
+        id,
+        name: id,
+        label: `Địa bàn ${id}`,
+      }))
+    } else {
+      const fallbackId = cabinet.commune_id || 'COM-001'
+      opts = [{ id: fallbackId, name: fallbackId, label: `Địa bàn ${fallbackId}` }]
+    }
+
+    if (communeId && !opts.some((o) => o.id === communeId)) {
+      opts.unshift({
+        id: communeId,
+        name: cabinet.commune_name || communeId,
+        label: cabinet.commune_name ? `${cabinet.commune_name} (${communeId})` : `Địa bàn ${communeId}`,
+      })
+    }
+    return opts
+  }, [communes, currentUser, communeId, cabinet.commune_id, cabinet.commune_name])
   const [externalRef, setExternalRef] = useState(() => cabinet.external_ref || '')
   const [lat, setLat] = useState(() => (cabinet.location?.lat ? String(cabinet.location.lat) : '10.9701'))
   const [lng, setLng] = useState(() => (cabinet.location?.lng ? String(cabinet.location.lng) : '106.4896'))
@@ -52,6 +91,7 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
       if (cabinet.location?.lat) setLat(String(cabinet.location.lat))
       if (cabinet.location?.lng) setLng(String(cabinet.location.lng))
       setDataSource(cabinet.data_source || 'field')
+      setCommuneId(cabinet.commune_id || defaultCommuneId)
       setErrorMsg(null)
     }
   }, [cabinet])
@@ -116,10 +156,13 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
       nLng = parsedNLng
     }
 
+    const targetCommune = communes.find((c) => c.commune_id === communeId)
     const updated: CabinetListItem = {
       ...cabinet,
       cabinet_name: trimmedName,
       external_ref: trimmedRef || null,
+      commune_id: communeId || cabinet.commune_id || defaultCommuneId,
+      commune_name: targetCommune?.name || cabinet.commune_name || null,
       data_source: dataSource,
       location: {
         lat: nLat,
@@ -187,6 +230,25 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
                     placeholder="Nhập tên tủ điện (VD: Tủ A - Hương lộ 2)"
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-600 shadow-2xs"
                   />
+                </div>
+
+                {/* Địa bàn quản lý (Xã/Thị trấn) */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    <span>Địa bàn quản lý (Xã/Thị trấn):</span>
+                  </label>
+                  <select
+                    value={communeId}
+                    onChange={(e) => setCommuneId(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-600 shadow-2xs cursor-pointer"
+                  >
+                    {communeOptions.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Lọc nhanh tuyến đường trên bản đồ (tùy chọn) */}
@@ -323,6 +385,7 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
                 lng={parsedLng}
                 currentCabinetId={cabinet?.cabinet_id}
                 currentExternalRef={cabinet?.external_ref}
+                communeId={cabinet?.commune_id}
                 activeSegmentId={selectedSegmentId}
                 availableSegments={availableSegments}
                 segmentCoords={segmentCoords}

@@ -41,7 +41,7 @@ export function useElectricalCascade({
   } = useSelector((state: RootState) => state.assets)
 
   // Load map layers for the account's communes (the saga reads map_bounds from the profile); reload if that frame changes.
-  const boundsKey = useSelector((state: RootState) => toBboxParam(state.auth.user?.mapBounds?.bbox) ?? '')
+  const boundsKey = useSelector((state: RootState) => toBboxParam(state.auth.user?.map_bounds?.bbox) ?? '')
   useEffect(() => {
     dispatch(fetchMapLayersRequest())
   }, [dispatch, boundsKey])

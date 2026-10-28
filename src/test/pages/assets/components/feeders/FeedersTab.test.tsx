@@ -224,7 +224,35 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
     )
     expect(stateUpdating.isMutating).toBe(true)
 
+
     const stateDeleting = assetReducer(initialState, deleteFeederRequest('FDR-001'))
     expect(stateDeleting.isMutating).toBe(true)
   })
+
+  it('6. Hiển thị ConfirmDeleteAssetModal khi bấm nút xóa mạch điện thay vì dùng window.confirm', () => {
+    const mockDelete = vi.fn()
+    render(
+      <FeedersTab
+        feeders={mockFeeders}
+        cabinets={mockCabinets}
+        poles={mockPoles}
+        onAddFeeder={vi.fn()}
+        onUpdateFeeder={vi.fn()}
+        onDeleteFeeder={mockDelete}
+        onOpenImport={vi.fn()}
+      />
+    )
+
+    const deleteButtons = screen.getAllByTitle('Xóa mạch điện')
+    fireEvent.click(deleteButtons[0])
+
+    expect(screen.getByText('Xác Nhận Xóa Mạch Điện')).toBeInTheDocument()
+    expect(screen.getByText(/Bạn có chắc chắn muốn xóa mạch điện/i)).toBeInTheDocument()
+
+    const confirmBtn = screen.getByRole('button', { name: /Xác nhận xóa/i })
+    fireEvent.click(confirmBtn)
+
+    expect(mockDelete).toHaveBeenCalledWith('FDR-001')
+  })
 })
+

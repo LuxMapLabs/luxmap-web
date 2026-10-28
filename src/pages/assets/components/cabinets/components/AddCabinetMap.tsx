@@ -8,9 +8,11 @@ import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
-  applyMapBoundsLimits,
   MAP_MAX_ZOOM,
   FIT_BOUNDS_ASSET_ADD_INSTANT,
+  toLngLatBounds,
+  toBboxPolygonGeoJSON,
+  getCommuneBboxInfo,
 } from '../../../../../utils/gis-map/mapUtils'
 
 export interface CabinetRowDraft {
@@ -29,6 +31,7 @@ export interface AddCabinetMapProps {
   onSelectRow: (rowId: string) => void
   onUpdateCoords: (rowId: string, coords: { lat: number; lng: number }) => void
   onMapClickAdd?: (coords: { lat: number; lng: number }) => void
+  communeId?: string | null
 }
 
 export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
@@ -39,12 +42,19 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
   onSelectRow,
   onUpdateCoords,
   onMapClickAdd,
+  communeId,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map())
 
-  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const currentUser = useSelector((state: RootState) => state?.auth?.user)
+  const mapBounds = currentUser?.map_bounds
+  const adminCommunes = useSelector((state: RootState) => state?.adminCommunes?.communes)
+
+  const communeBoundsInfo = useMemo(() => {
+    return getCommuneBboxInfo(communeId, currentUser?.communes, adminCommunes, mapBounds)
+  }, [communeId, currentUser, adminCommunes, mapBounds])
   const mapSegments = useSelector((state: RootState) => state.map.segments)
 
   // GeoJSON toàn bộ các tuyến đường trên GIS
@@ -107,10 +117,12 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
     let isMounted = true
 
     let initialCenter: [number, number] =
-      typeof mapBounds?.center?.lng === 'number' &&
-      typeof mapBounds?.center?.lat === 'number' &&
-      Number.isFinite(mapBounds.center.lng) &&
-      Number.isFinite(mapBounds.center.lat)
+      communeBoundsInfo.center
+        ? communeBoundsInfo.center
+        : typeof mapBounds?.center?.lng === 'number' &&
+          typeof mapBounds?.center?.lat === 'number' &&
+          Number.isFinite(mapBounds.center.lng) &&
+          Number.isFinite(mapBounds.center.lat)
         ? [mapBounds.center.lng, mapBounds.center.lat]
         : DEFAULT_MAP_CENTER
 
@@ -163,7 +175,48 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
     map.on('load', () => {
       if (!isMounted) return
 
-      applyMapBoundsLimits(map, mapBounds)
+      const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
+      if (activeBounds) {
+        map.setMaxBounds(activeBounds)
+        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
+        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
+          map.setMinZoom(camera.zoom)
+        }
+      }
+
+      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      if (!map.getSource('commune-bbox-boundary')) {
+        map.addSource('commune-bbox-boundary', {
+          type: 'geojson',
+          data: bboxGeoJson || { type: 'FeatureCollection', features: [] },
+        })
+
+        map.addLayer({
+          id: 'commune-bbox-fill',
+          type: 'fill',
+          source: 'commune-bbox-boundary',
+          paint: {
+            'fill-color': '#0284c7',
+            'fill-opacity': 0.04,
+          },
+        })
+
+        map.addLayer({
+          id: 'commune-bbox-line',
+          type: 'line',
+          source: 'commune-bbox-boundary',
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 2,
+            'line-dasharray': [3, 2],
+            'line-opacity': 0.85,
+          },
+        })
+      }
+
+      if (segmentCoordsRef.current.length === 0 && rowsRef.current.length === 0 && activeBounds) {
+        map.fitBounds(activeBounds, { padding: 40, duration: 0 })
+      }
 
       setTimeout(() => {
         map.resize()
@@ -286,12 +339,36 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
     }
   }, [mapBounds])
 
-  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  // Cập nhật Bbox, giới hạn và khung viền khi communeBoundsInfo hoặc mapBounds thay đổi
   useEffect(() => {
-    if (mapRef.current) {
-      applyMapBoundsLimits(mapRef.current, mapBounds)
+    const map = mapRef.current
+    if (!map) return
+
+    const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
+    if (activeBounds) {
+      map.setMaxBounds(activeBounds)
+      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
+      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
+        map.setMinZoom(camera.zoom)
+      }
     }
-  }, [mapBounds])
+
+    const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
+    if (source) {
+      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      source.setData(bboxGeoJson || ({ type: 'FeatureCollection', features: [] } as any))
+    }
+
+    const hasPlacedRows = rows.some((r) => {
+      const latNum = parseFloat(r.lat)
+      const lngNum = parseFloat(r.lng)
+      return !isNaN(latNum) && !isNaN(lngNum) && latNum !== 0 && lngNum !== 0
+    })
+
+    if (!hasPlacedRows && segmentCoords.length === 0 && activeBounds) {
+      map.fitBounds(activeBounds, { padding: 40, duration: 600 })
+    }
+  }, [communeBoundsInfo, mapBounds, rows, segmentCoords])
 
   // Cập nhật Markers cho các hàng tủ trong rows
   useEffect(() => {

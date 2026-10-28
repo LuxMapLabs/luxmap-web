@@ -4,7 +4,8 @@
  * Khớp hoàn toàn với 4 vai trò của Backend: administrator, management_agency, maintenance_engineer, field_crew
  */
 
-import { UserRole, User, JwtPayloadClaims, CurrentUserResponse } from '../types/auth/web'
+import { UserRole, JwtPayloadClaims } from '../types/auth/web'
+import type { CurrentUserResponse } from '../types/auth/me'
 
 /**
  * Giải mã JWT Access Token phía client (Base64Url an toàn với UTF-8, zero-dependency)
@@ -101,109 +102,66 @@ export const normalizeRole = (role: any, fallbackFlags?: {
 /**
  * Tạo đối tượng User đầy đủ trực tiếp từ JWT Access Token
  */
-export const createUserFromToken = (accessToken: string, fallbackUsername?: string): User | null => {
+export const createUserFromToken = (accessToken: string, fallbackUsername?: string): CurrentUserResponse | null => {
   const claims = parseJwt<JwtPayloadClaims>(accessToken)
   if (!claims || !claims.sub) return null
 
-  const role = normalizeRole(claims.role)
-  const roleName = getRoleName(role)
   const userId = claims.sub
   const username = fallbackUsername || userId
   const communeIds = Array.isArray(claims.commune_ids) ? claims.commune_ids : []
 
-  // Tạo tên hiển thị đẹp từ username hoặc role
-  let fullName = username
-  if (username.startsWith('USR-') || username === userId) {
-    fullName = `${roleName} (${userId})`
-  }
-
   return {
-    id: userId,
-    userId: userId,
+    user_id: userId,
     username: username,
-    fullName: fullName,
+    full_name: username,
     email: username.includes('@') ? username : null,
-    phoneNumber: null,
-    role,
-    roleString: claims.role,
-    administrativeUnitId: communeIds[0] || '',
-    communeIds,
+    role: claims.role,
+    commune_ids: communeIds,
+    communes: [],
+    map_bounds: undefined,
   }
 }
 
 /**
- * Chuyển đổi trực tiếp CurrentUserResponse từ GET /api/v1/auth/me thành đối tượng User chuẩn
+ * Giữ nguyên CurrentUserResponse từ GET /api/v1/auth/me (API Types First)
  */
-export const mapCurrentUserToUser = (me: CurrentUserResponse): User => {
-  const role = normalizeRole(me.role)
-  const communeIds = Array.isArray(me.commune_ids) ? me.commune_ids : []
-  const userId = me.user_id || ''
-  const fullName = me.full_name?.trim() || me.username || 'Cán bộ kỹ thuật'
-
-  return {
-    id: userId,
-    userId: userId,
-    username: me.username,
-    fullName: fullName,
-    email: me.email || null,
-    phoneNumber: null,
-    role,
-    roleString: me.role,
-    administrativeUnitId: communeIds[0] || '',
-    communeIds,
-    mapBounds: me.map_bounds ?? null,
-  }
-}
+export const mapCurrentUserToUser = (me: CurrentUserResponse): CurrentUserResponse => me
 
 /**
- * Chuẩn hóa toàn bộ đối tượng User từ response Backend
+ * Chuẩn hóa đối tượng người dùng từ response Backend
  */
-export const normalizeUser = (raw: any): User => {
+export const normalizeUser = (raw: any): CurrentUserResponse => {
   if (!raw) {
     return {
-      id: '',
-      fullName: 'Người dùng',
+      user_id: '',
+      full_name: 'Người dùng',
+      username: 'user',
       email: null,
-      phoneNumber: null,
-      role: UserRole.MaintenanceEngineer,
-      administrativeUnitId: '',
+      role: 'maintenance_engineer',
+      commune_ids: [],
+      communes: [],
+      map_bounds: undefined,
     }
   }
 
-  // Nếu là CurrentUserResponse từ /auth/me
-  if (raw.user_id && raw.full_name !== undefined) {
-    return mapCurrentUserToUser(raw as CurrentUserResponse)
-  }
-
-  const role = normalizeRole(raw.role, {
-    isAdmin: raw.isAdmin,
-    isLeader: raw.isLeader,
-    isOfficer: raw.isOfficer,
-    isCitizen: raw.isCitizen,
-  })
-
-  const communeIds = Array.isArray(raw.communeIds || raw.commune_ids)
-    ? raw.communeIds || raw.commune_ids
+  const communeIds = Array.isArray(raw.commune_ids || raw.communeIds)
+    ? raw.commune_ids || raw.communeIds
     : []
+  const communes = Array.isArray(raw.communes) ? raw.communes : []
 
   return {
-    id: String(raw.id || raw.userId || raw.user_id || ''),
-    userId: String(raw.id || raw.userId || raw.user_id || ''),
-    fullName: String(raw.fullName || raw.full_name || raw.name || raw.username || 'Người dùng'),
-    username: raw.username,
+    user_id: String(raw.user_id || raw.userId || raw.id || ''),
+    username: raw.username || '',
+    full_name: String(raw.full_name || raw.fullName || raw.name || raw.username || 'Người dùng'),
     email: raw.email || null,
-    phoneNumber: raw.phoneNumber || raw.phone || null,
-    role,
-    roleString: raw.roleString || raw.role,
-    administrativeUnitId: String(raw.administrativeUnitId || communeIds[0] || ''),
-    communeIds,
+    role: String(raw.role || raw.roleString || ''),
+    commune_ids: communeIds,
+    communes,
+    map_bounds: raw.map_bounds || raw.mapBounds || undefined,
   }
 }
 
-/**
- * Trả về tên hiển thị tiếng Việt thân thiện của 4 Role
- */
-export const getRoleName = (role?: UserRole | string | number): string => {
+export const getRoleName = (role?: UserRole | string | number | null): string => {
   const normalized = normalizeRole(role)
   switch (normalized) {
     case UserRole.Admin:
@@ -223,7 +181,7 @@ export const getRoleName = (role?: UserRole | string | number): string => {
  * Kiểm tra xem người dùng có vai trò cụ thể hay không
  */
 export const hasRole = (
-  userRole: UserRole | string | number | undefined,
+  userRole: UserRole | string | number | null | undefined,
   targetRole: UserRole | string | number
 ): boolean => {
   if (userRole === undefined || userRole === null) return false
@@ -234,7 +192,7 @@ export const hasRole = (
  * Kiểm tra xem người dùng có một trong các vai trò được cho phép hay không
  */
 export const hasAnyRole = (
-  userRole: UserRole | string | number | undefined,
+  userRole: UserRole | string | number | null | undefined,
   allowedRoles: (UserRole | string | number)[]
 ): boolean => {
   if (userRole === undefined || userRole === null) return false
@@ -243,27 +201,27 @@ export const hasAnyRole = (
   return allowedRoles.some((r) => normalizeRole(r) === current)
 }
 
-export const isAdmin = (role?: UserRole | string | number): boolean => {
+export const isAdmin = (role?: UserRole | string | number | null): boolean => {
   return normalizeRole(role) === UserRole.Admin
 }
 
-export const isSystemAdmin = (role?: UserRole | string | number): boolean => {
+export const isSystemAdmin = (role?: UserRole | string | number | null): boolean => {
   return isAdmin(role)
 }
 
-export const isManager = (role?: UserRole | string | number): boolean => {
+export const isManager = (role?: UserRole | string | number | null): boolean => {
   return normalizeRole(role) === UserRole.MaintenanceEngineer
 }
 
-export const isManagementAgency = (role?: UserRole | string | number): boolean => {
+export const isManagementAgency = (role?: UserRole | string | number | null): boolean => {
   return normalizeRole(role) === UserRole.ManagementAgency
 }
 
-export const isMaintenanceEngineer = (role?: UserRole | string | number): boolean => {
+export const isMaintenanceEngineer = (role?: UserRole | string | number | null): boolean => {
   return normalizeRole(role) === UserRole.MaintenanceEngineer
 }
 
-export const isFieldCrew = (role?: UserRole | string | number): boolean => {
+export const isFieldCrew = (role?: UserRole | string | number | null): boolean => {
   return normalizeRole(role) === UserRole.FieldCrew
 }
 
@@ -276,7 +234,7 @@ export const isFieldCrew = (role?: UserRole | string | number): boolean => {
  */
 export const canAccessTab = (
   tabId: 'dashboard' | 'gis-map' | 'work-schedule' | 'assets' | 'admin-system' | 'reports' | 'citizen-reports',
-  role?: UserRole | string | number
+  role?: UserRole | string | number | null
 ): boolean => {
   if (isSystemAdmin(role)) {
     return tabId === 'admin-system'

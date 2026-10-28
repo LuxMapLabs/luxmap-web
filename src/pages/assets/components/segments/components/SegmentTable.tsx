@@ -1,5 +1,5 @@
 import React from 'react'
-import { Eye, Edit2, Database } from 'lucide-react'
+import { Eye, Edit2, Trash2, Database } from 'lucide-react'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import { SegmentTableSkeleton } from './SegmentTableSkeleton'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
@@ -10,6 +10,7 @@ export interface SegmentTableProps {
   isLoading?: boolean
   onViewDetail: (segment: SegmentListItem) => void
   onEdit: (segment: SegmentListItem) => void
+  onDelete?: (segment: SegmentListItem) => void
 }
 
 export const SegmentTable: React.FC<SegmentTableProps> = ({
@@ -17,6 +18,7 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
   isLoading = false,
   onViewDetail,
   onEdit,
+  onDelete,
 }) => {
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden">
@@ -84,23 +86,38 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
                       <span>{getDataSourceDisplayName(seg.data_source)}</span>
                     </span>
                   </td>
-                  <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => onViewDetail(seg)}
-                      className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-sky-300 font-bold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1 border border-transparent dark:border-sky-500/20"
-                    >
-                      <Eye className="w-3 h-3 text-sky-400" />
-                      <span>Chi tiết</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onEdit(seg)}
-                      className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg text-xs transition cursor-pointer inline-flex items-center gap-1 border border-transparent dark:border-slate-700"
-                    >
-                      <Edit2 className="w-3 h-3 text-slate-400" />
-                      <span>Sửa</span>
-                    </button>
+                  <td className="p-3.5 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onViewDetail(seg)}
+                        title="Xem chi tiết"
+                        aria-label="Chi tiết"
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onEdit(seg)}
+                        title="Chỉnh sửa tuyến đường"
+                        aria-label="Sửa"
+                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      {onDelete && (
+                        <button
+                          type="button"
+                          onClick={() => onDelete(seg)}
+                          title="Xóa tuyến đường"
+                          aria-label="Xóa"
+                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

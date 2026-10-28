@@ -4,6 +4,7 @@ import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { CreateIotNodeRequest, IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { DataSource } from '../../../../../types/common/enums'
 import { formatCommuneDisplayName } from '../../../../../utils/assets/communeUtils'
+import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
 
 export interface AddIotNodeModalProps {
   isOpen: boolean
@@ -99,31 +100,20 @@ export const AddIotNodeModal: React.FC<AddIotNodeModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               Tủ Điện Cấp Nguồn / Lắp Đặt <span className="text-rose-500">*</span>
             </label>
-            <select
+            <CabinetSearchSelect
+              cabinets={cabinets}
               value={cabinetId}
-              onChange={(e) => {
-                setCabinetId(e.target.value)
+              onChange={(newId) => {
+                setCabinetId(newId)
                 setErrorMsg(null)
               }}
-              required
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#1f3864] dark:focus:border-blue-500 transition"
-            >
-              <option value="">-- Chọn tủ điện gắn thiết bị --</option>
-              {cabinets.map((cab) => {
-                const isOccupied = occupiedCabinetIds.has(cab.cabinet_id)
-                return (
-                  <option
-                    key={cab.cabinet_id || cab.external_ref || Math.random().toString()}
-                    value={cab.cabinet_id || ''}
-                    disabled={isOccupied}
-                  >
-                    {cab.cabinet_name || cab.cabinet_id} ({cab.cabinet_id})
-                    {cab.commune_id ? ` - ${formatCommuneDisplayName(cab.commune_id)}` : ''}
-                    {isOccupied ? ' [ĐÃ CÓ THIẾT BỊ]' : ''}
-                  </option>
-                )
-              })}
-            </select>
+              placeholder="-- Chọn tủ điện gắn thiết bị --"
+              accentColor="emerald"
+              allowClear={true}
+              getId={(c) => c.cabinet_id || ''}
+              isOptionDisabled={(c) => Boolean(c.cabinet_id && occupiedCabinetIds.has(c.cabinet_id))}
+              getOptionBadge={(c) => (c.cabinet_id && occupiedCabinetIds.has(c.cabinet_id) ? '[ĐÃ CÓ THIẾT BỊ]' : null)}
+            />
             {selectedCabinet && (
               <div className="mt-1.5 p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
                 <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />

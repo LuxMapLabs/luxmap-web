@@ -103,7 +103,7 @@ export const GisMapPage: React.FC = () => {
 
   // Open on the account's commune center (GET /auth/me map_bounds.center) taken 100% directly from backend.
   // Restrict zoom-out (minZoom) to the entire commune panorama bbox (map_bounds.bbox) and restrict panning (maxBounds).
-  const mapBounds = useSelector((state: RootState) => state.auth.user?.mapBounds)
+  const mapBounds = useSelector((state: RootState) => state.auth.user?.map_bounds)
   const lastFramedBboxRef = useRef<string | null>(null)
   useEffect(() => {
     const bounds = toLngLatBounds(mapBounds?.bbox)

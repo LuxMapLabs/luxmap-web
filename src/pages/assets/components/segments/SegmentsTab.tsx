@@ -5,6 +5,7 @@ import { SegmentTable } from './components/SegmentTable'
 import { AddSegmentModal } from './components/AddSegmentModal'
 import { EditSegmentModal } from './components/EditSegmentModal'
 import { SegmentDetailModal } from './components/SegmentDetailModal'
+import { ConfirmDeleteAssetModal } from '../common/ConfirmDeleteAssetModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface SegmentsTabProps {
@@ -12,6 +13,7 @@ export interface SegmentsTabProps {
   isLoading?: boolean
   onAddSegment: (data: SegmentListItem) => void
   onUpdateSegment: (updated: SegmentListItem) => void
+  onDeleteSegment?: (segmentId: string) => void
   onOpenImport: () => void
 }
 
@@ -20,6 +22,7 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
   isLoading = false,
   onAddSegment,
   onUpdateSegment,
+  onDeleteSegment,
   onOpenImport,
 }) => {
   // Search & Filter state
@@ -32,6 +35,7 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
   const [isAddSegmentModalOpen, setIsAddSegmentModalOpen] = useState(false)
   const [detailSegment, setDetailSegment] = useState<SegmentListItem | null>(null)
   const [editSegment, setEditSegment] = useState<SegmentListItem | null>(null)
+  const [deleteSegmentItem, setDeleteSegmentItem] = useState<SegmentListItem | null>(null)
 
   // Filtered Segments
   const filteredSegments = useMemo(() => {
@@ -136,6 +140,7 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
         isLoading={isLoading}
         onViewDetail={(seg) => setDetailSegment(seg)}
         onEdit={(seg) => setEditSegment(seg)}
+        onDelete={(seg) => setDeleteSegmentItem(seg)}
       />
 
       {/* Pagination Footer */}
@@ -150,15 +155,17 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
       />
 
       {/* Modals for Segments */}
-      <AddSegmentModal
-        isOpen={isAddSegmentModalOpen}
-        onClose={() => setIsAddSegmentModalOpen(false)}
-        onAddSegment={(data) => {
-          onAddSegment(data)
-          setCurrentPage(1)
-        }}
-        existingCount={segments.length}
-      />
+      {isAddSegmentModalOpen && (
+        <AddSegmentModal
+          isOpen={isAddSegmentModalOpen}
+          onClose={() => setIsAddSegmentModalOpen(false)}
+          onAddSegment={(data) => {
+            onAddSegment(data)
+            setCurrentPage(1)
+          }}
+          existingCount={segments.length}
+        />
+      )}
 
       <SegmentDetailModal
         segment={detailSegment}
@@ -170,6 +177,25 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
         segment={editSegment}
         onClose={() => setEditSegment(null)}
         onSave={handleSaveSegment}
+      />
+
+      <ConfirmDeleteAssetModal
+        isOpen={!!deleteSegmentItem}
+        assetTypeLabel="Tuyến Đường"
+        assetId={deleteSegmentItem?.segment_id || null}
+        assetName={deleteSegmentItem?.segment_name || deleteSegmentItem?.segment_id || null}
+        warningMessage={
+          deleteSegmentItem
+            ? `Bạn có chắc chắn muốn xóa tuyến đường "${deleteSegmentItem.segment_name || deleteSegmentItem.segment_id}" không? Nếu trên tuyến vẫn còn cột đèn, sự cố hoặc vùng sự cố, hệ thống sẽ từ chối xóa.`
+            : undefined
+        }
+        onClose={() => setDeleteSegmentItem(null)}
+        onConfirm={() => {
+          if (deleteSegmentItem?.segment_id && onDeleteSegment) {
+            onDeleteSegment(deleteSegmentItem.segment_id)
+            setDeleteSegmentItem(null)
+          }
+        }}
       />
     </>
   )

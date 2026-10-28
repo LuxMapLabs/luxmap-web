@@ -29,15 +29,18 @@ import {
   createPoleRequest,
   createPolesBulkRequest,
   updatePoleRequest,
+  deletePoleRequest,
   createCabinetRequest,
   createCabinetsBulkRequest,
   updateCabinetRequest,
+  deleteCabinetRequest,
   createFeederRequest,
   createFeedersBulkRequest,
   updateFeederRequest,
   deleteFeederRequest,
   createSegmentRequest,
   updateSegmentRequest,
+  deleteSegmentRequest,
   createFixtureRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
@@ -60,9 +63,57 @@ import {
   type IssueIotNodeCredentialPayload,
 } from './assetSlice'
 
+const BACKEND_ERROR_TRANSLATIONS: Record<string, string> = {
+  'That road segment still has poles, faults or fault clusters pointing at it, so it cannot be deleted.':
+    'Tuyến đường này vẫn còn cột đèn, sự cố hoặc cụm sự cố liên kết, không thể xóa.',
+  'That cabinet still has feeders or a device pointing at it, so it cannot be deleted.':
+    'Tủ điện này vẫn còn mạch điện hoặc thiết bị IoT gắn kèm, không thể xóa.',
+  'That feeder still has poles wired to it, so it cannot be deleted.':
+    'Mạch điện này vẫn còn cột đèn đang đấu nối, không thể xóa.',
+  'That pole still has records pointing at it, so it cannot be deleted.':
+    'Cột đèn này vẫn còn dữ liệu liên kết (bóng đèn, sự cố hoặc lịch sử bảo trì), không thể xóa.',
+  'That device still has relays wired or commands recorded, so it cannot be deleted. Unwire its relays first.':
+    'Thiết bị IoT này vẫn còn rơ-le đang đấu nối hoặc lệnh điều khiển ghi nhận, không thể xóa. Vui lòng ngắt kết nối các rơ-le trước.',
+  'That feeder was just wired to another relay. Unwire it there first.':
+    'Mạch điện này đã được đấu nối vào rơ-le khác. Vui lòng ngắt kết nối trước.',
+}
+
+function translateErrorMessage(msg: string): string {
+  if (!msg) return msg
+  const trimmed = msg.trim()
+  if (BACKEND_ERROR_TRANSLATIONS[trimmed]) {
+    return BACKEND_ERROR_TRANSLATIONS[trimmed]
+  }
+
+  if (/road segment.*still has poles/i.test(trimmed)) {
+    return 'Tuyến đường này vẫn còn cột đèn, sự cố hoặc cụm sự cố liên kết, không thể xóa.'
+  }
+  if (/cabinet.*still has feeders|cabinet.*device pointing/i.test(trimmed)) {
+    return 'Tủ điện này vẫn còn mạch điện hoặc thiết bị IoT gắn kèm, không thể xóa.'
+  }
+  if (/feeder.*still has poles wired/i.test(trimmed)) {
+    return 'Mạch điện này vẫn còn cột đèn đang đấu nối, không thể xóa.'
+  }
+  if (/pole.*still has records/i.test(trimmed)) {
+    return 'Cột đèn này vẫn còn dữ liệu liên kết (bóng đèn, sự cố hoặc lịch sử bảo trì), không thể xóa.'
+  }
+  if (/device.*still has relays wired/i.test(trimmed)) {
+    return 'Thiết bị IoT này vẫn còn rơ-le đang đấu nối. Vui lòng ngắt kết nối các rơ-le trước khi xóa.'
+  }
+  if (/feeder was just wired to another relay/i.test(trimmed)) {
+    return 'Mạch điện này đã được đấu nối vào rơ-le khác. Vui lòng ngắt kết nối trước.'
+  }
+
+  return msg
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
-  const err = error as { response?: { data?: { message?: string } }; message?: string }
-  return err?.response?.data?.message || err?.message || fallback
+  const err = error as {
+    response?: { data?: { error?: { message?: string }; message?: string } }
+    message?: string
+  }
+  const rawMsg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || fallback
+  return translateErrorMessage(rawMsg)
 }
 
 /**
@@ -327,6 +378,36 @@ function* handleUpdateFeeder(action: PayloadAction<UpdateFeederPayload>) {
   }
 }
 
+function* handleDeletePole(action: PayloadAction<string>) {
+  try {
+    const poleId = action.payload
+    yield call(assetAPI.deletePole, poleId)
+
+    yield put(mutationSuccess())
+    toast.success(`Đã xóa cột đèn "${poleId}" thành công!`)
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể xóa cột đèn')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi khi xóa cột đèn: ${errorMsg}`)
+  }
+}
+
+function* handleDeleteCabinet(action: PayloadAction<string>) {
+  try {
+    const cabinetId = action.payload
+    yield call(assetAPI.deleteCabinet, cabinetId)
+
+    yield put(mutationSuccess())
+    toast.success(`Đã xóa tủ điện "${cabinetId}" thành công!`)
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể xóa tủ điện')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi khi xóa tủ điện: ${errorMsg}`)
+  }
+}
+
 function* handleDeleteFeeder(action: PayloadAction<string>) {
   try {
     const feederId = action.payload
@@ -339,6 +420,21 @@ function* handleDeleteFeeder(action: PayloadAction<string>) {
     const errorMsg = getErrorMessage(error, 'Không thể xóa mạch điện')
     yield put(mutationFailure(errorMsg))
     toast.error(`Lỗi khi xóa mạch điện: ${errorMsg}`)
+  }
+}
+
+function* handleDeleteSegment(action: PayloadAction<string>) {
+  try {
+    const segmentId = action.payload
+    yield call(assetAPI.deleteSegment, segmentId)
+
+    yield put(mutationSuccess())
+    toast.success(`Đã xóa tuyến đường "${segmentId}" thành công!`)
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể xóa tuyến đường')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi khi xóa tuyến đường: ${errorMsg}`)
   }
 }
 
@@ -508,15 +604,18 @@ export default function* assetSaga() {
   yield takeLatest(createPoleRequest.type, handleCreatePole)
   yield takeLatest(createPolesBulkRequest.type, handleCreatePolesBulk)
   yield takeLatest(updatePoleRequest.type, handleUpdatePole)
+  yield takeLatest(deletePoleRequest.type, handleDeletePole)
   yield takeLatest(createCabinetRequest.type, handleCreateCabinet)
   yield takeLatest(createCabinetsBulkRequest.type, handleCreateCabinetsBulk)
   yield takeLatest(updateCabinetRequest.type, handleUpdateCabinet)
+  yield takeLatest(deleteCabinetRequest.type, handleDeleteCabinet)
   yield takeLatest(createFeederRequest.type, handleCreateFeeder)
   yield takeLatest(createFeedersBulkRequest.type, handleCreateFeedersBulk)
   yield takeLatest(updateFeederRequest.type, handleUpdateFeeder)
   yield takeLatest(deleteFeederRequest.type, handleDeleteFeeder)
   yield takeLatest(createSegmentRequest.type, handleCreateSegment)
   yield takeLatest(updateSegmentRequest.type, handleUpdateSegment)
+  yield takeLatest(deleteSegmentRequest.type, handleDeleteSegment)
   yield takeLatest(createFixtureRequest.type, handleCreateFixture)
   yield takeLatest(createFixturesBulkRequest.type, handleCreateFixturesBulk)
   yield takeLatest(retireFixtureRequest.type, handleRetireFixture)

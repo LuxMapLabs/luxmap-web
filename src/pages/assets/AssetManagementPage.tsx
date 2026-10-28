@@ -84,6 +84,9 @@ export const AssetManagementPage: React.FC = () => {
     handleAddFeeder,
     handleUpdateFeeder,
     handleDeleteFeeder,
+    handleDeleteCabinet,
+    handleDeletePole,
+    handleDeleteSegment,
     handleAddSegment,
     handleUpdateSegment,
     handleAddIotNode,
@@ -323,6 +326,7 @@ export const AssetManagementPage: React.FC = () => {
             isLoading={isLoadingAssets}
             onAddSegment={handleAddSegment}
             onUpdateSegment={handleUpdateSegment}
+            onDeleteSegment={handleDeleteSegment}
             onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}
@@ -338,6 +342,7 @@ export const AssetManagementPage: React.FC = () => {
             onAddCabinet={handleAddCabinet}
             onAddCabinets={handleAddCabinets}
             onUpdateCabinet={handleUpdateCabinet}
+            onDeleteCabinet={handleDeleteCabinet}
             onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}
@@ -383,6 +388,7 @@ export const AssetManagementPage: React.FC = () => {
             onAddPole={handleAddPole}
             onAddPoles={handleAddPoles}
             onUpdatePole={handleUpdatePole}
+            onDeletePole={handleDeletePole}
             onOpenImport={() => setIsImportModalOpen(true)}
             onViewCabinetDetail={() => {
               setActiveCategory('cabinets')

@@ -7,6 +7,7 @@ import { FeederTable } from './components/FeederTable'
 import { AddFeederModal } from './components/AddFeederModal'
 import { EditFeederModal } from './components/EditFeederModal'
 import { FeederDetailModal } from './components/FeederDetailModal'
+import { ConfirmDeleteAssetModal } from '../common/ConfirmDeleteAssetModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface FeedersTabProps {
@@ -38,6 +39,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [detailFeeder, setDetailFeeder] = useState<FeederListItem | null>(null)
   const [editFeeder, setEditFeeder] = useState<FeederListItem | null>(null)
+  const [deleteFeederItem, setDeleteFeederItem] = useState<FeederListItem | null>(null)
 
   // Filtered Feeders
   const filteredFeeders = useMemo(() => {
@@ -111,7 +113,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
         isLoading={isLoading}
         onViewDetail={(feeder) => setDetailFeeder(feeder)}
         onEdit={(feeder) => setEditFeeder(feeder)}
-        onDelete={onDeleteFeeder}
+        onDelete={(feeder) => setDeleteFeederItem(feeder)}
       />
 
       {/* Pagination */}
@@ -148,6 +150,25 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
         feeder={detailFeeder}
         poles={poles}
         onClose={() => setDetailFeeder(null)}
+      />
+
+      <ConfirmDeleteAssetModal
+        isOpen={!!deleteFeederItem}
+        assetTypeLabel="Mạch Điện"
+        assetId={deleteFeederItem?.feeder_id || null}
+        assetName={deleteFeederItem?.feeder_name || deleteFeederItem?.feeder_id || null}
+        warningMessage={
+          deleteFeederItem
+            ? `Bạn có chắc chắn muốn xóa mạch điện "${deleteFeederItem.feeder_name || deleteFeederItem.feeder_id}" không? Nếu mạch vẫn đang cấp nguồn cho các cột đèn, hệ thống sẽ từ chối xóa.`
+            : undefined
+        }
+        onClose={() => setDeleteFeederItem(null)}
+        onConfirm={() => {
+          if (deleteFeederItem?.feeder_id) {
+            onDeleteFeeder(deleteFeederItem.feeder_id)
+            setDeleteFeederItem(null)
+          }
+        }}
       />
     </div>
   )

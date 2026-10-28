@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useSelector } from 'react-redux'
@@ -6,11 +6,14 @@ import type { RootState } from '../redux/rootReducer'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
-  applyMapBoundsLimits,
   MAP_MAX_ZOOM,
   FIT_BOUNDS_ROUTE_INSTANT,
   FIT_BOUNDS_ROUTE_SMOOTH,
+  toLngLatBounds,
+  toBboxPolygonGeoJSON,
+  getCommuneBboxInfo,
 } from '../utils/gis-map/mapUtils'
+import type { CommuneBbox } from '../types/admin/communes'
 import { projectPointOnSegment, calculateDistanceMeters } from '../utils/gis-map/routeUtils'
 import {
   ZoomIn,
@@ -47,6 +50,8 @@ export interface SegmentRouteMapProps {
   onEndCoordChange?: (coord: [number, number]) => void
   onRouteCoordsChange?: (coords: [number, number][]) => void
   poles?: SegmentPoleItem[]
+  communeId?: string | null
+  communeBbox?: CommuneBbox | null
 }
 
 interface HistorySnapshot {
@@ -100,6 +105,8 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   onEndCoordChange,
   onRouteCoordsChange,
   poles = [],
+  communeId,
+  communeBbox,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -109,7 +116,24 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const isDraggingRef = useRef<boolean>(false)
   const currentCoordsRef = useRef<[number, number][]>([...coordinates])
 
-  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const currentUser = useSelector((state: RootState) => state?.auth?.user)
+  const mapBounds = currentUser?.map_bounds
+  const userCommunes = currentUser?.communes
+  const adminCommunes = useSelector((state: RootState) => state?.adminCommunes?.communes)
+
+  const communeBoundsInfo = useMemo(() => {
+    if (communeBbox) {
+      const bounds = toLngLatBounds(communeBbox)
+      if (bounds) {
+        const center: [number, number] = [
+          (bounds[0][0] + bounds[1][0]) / 2,
+          (bounds[0][1] + bounds[1][1]) / 2,
+        ]
+        return { bbox: communeBbox, center, bounds }
+      }
+    }
+    return getCommuneBboxInfo(communeId, userCommunes, adminCommunes, mapBounds)
+  }, [communeBbox, communeId, userCommunes, adminCommunes, mapBounds])
 
   // Persistent reference to original DB route to protect from accidental deletion
   const initialDbRouteRef = useRef<[number, number][]>([])
@@ -769,10 +793,12 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     initialDbEndRef.current = hasEndCoord ? endCoord! : dedupedCoords.length > 1 ? dedupedCoords[dedupedCoords.length - 1] : null
 
     const fallbackCenter: [number, number] =
-      typeof mapBounds?.center?.lng === 'number' &&
-      typeof mapBounds?.center?.lat === 'number' &&
-      Number.isFinite(mapBounds.center.lng) &&
-      Number.isFinite(mapBounds.center.lat)
+      communeBoundsInfo.center
+        ? communeBoundsInfo.center
+        : typeof mapBounds?.center?.lng === 'number' &&
+          typeof mapBounds?.center?.lat === 'number' &&
+          Number.isFinite(mapBounds.center.lng) &&
+          Number.isFinite(mapBounds.center.lat)
         ? [mapBounds.center.lng, mapBounds.center.lat]
         : DEFAULT_MAP_CENTER
 
@@ -797,7 +823,50 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     mapRef.current = map
 
     map.on('load', () => {
-      applyMapBoundsLimits(map, mapBounds)
+      // 0. Apply bounds limits & add commune bbox boundary layer
+      const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
+      if (activeBounds) {
+        map.setMaxBounds(activeBounds)
+        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
+        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
+          map.setMinZoom(camera.zoom)
+        }
+      }
+
+      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      if (!map.getSource('commune-bbox-boundary')) {
+        map.addSource('commune-bbox-boundary', {
+          type: 'geojson',
+          data: bboxGeoJson || { type: 'FeatureCollection', features: [] },
+        })
+
+        map.addLayer({
+          id: 'commune-bbox-fill',
+          type: 'fill',
+          source: 'commune-bbox-boundary',
+          paint: {
+            'fill-color': '#0284c7',
+            'fill-opacity': 0.04,
+          },
+        })
+
+        map.addLayer({
+          id: 'commune-bbox-line',
+          type: 'line',
+          source: 'commune-bbox-boundary',
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 2,
+            'line-dasharray': [3, 2],
+            'line-opacity': 0.85,
+          },
+        })
+      }
+
+      // If no points drawn yet, fit directly to commune boundary
+      if (dedupedCoords.length === 0 && !hasStartCoord && validPoles.length === 0 && activeBounds) {
+        map.fitBounds(activeBounds, { padding: 40, duration: 0 })
+      }
       // 1. Add Road Route Line Source & Layers
       map.addSource('route-line', {
         type: 'geojson',
@@ -1122,12 +1191,32 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     mapBounds,
   ])
 
-  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  // Cập nhật Bbox, giới hạn và khung viền khi communeBoundsInfo hoặc mapBounds thay đổi
   useEffect(() => {
-    if (mapRef.current) {
-      applyMapBoundsLimits(mapRef.current, mapBounds)
+    const map = mapRef.current
+    if (!map) return
+
+    const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
+    if (activeBounds) {
+      map.setMaxBounds(activeBounds)
+      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
+      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
+        map.setMinZoom(camera.zoom)
+      }
     }
-  }, [mapBounds])
+
+    // Update boundary polygon source
+    const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
+    if (source) {
+      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      source.setData(bboxGeoJson || ({ type: 'FeatureCollection', features: [] } as any))
+    }
+
+    // Khi người dùng đổi địa bàn và chưa có mốc lộ trình nào: bay camera đến địa bàn mới
+    if (currentCoordsRef.current.length === 0 && activeBounds) {
+      map.fitBounds(activeBounds, { padding: 40, duration: 600 })
+    }
+  }, [communeBoundsInfo, mapBounds])
 
   // Sync cursor when editMode changes
   useEffect(() => {
@@ -1198,8 +1287,15 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const handleZoomOut = () => mapRef.current?.zoomOut({ duration: 250 })
   const handleFitBounds = () => {
     const bounds = getBounds()
-    if (mapRef.current && bounds) {
-      mapRef.current.fitBounds(bounds, FIT_BOUNDS_ROUTE_SMOOTH)
+    if (mapRef.current) {
+      if (bounds) {
+        mapRef.current.fitBounds(bounds, FIT_BOUNDS_ROUTE_SMOOTH)
+      } else if (communeBoundsInfo.bounds) {
+        mapRef.current.fitBounds(communeBoundsInfo.bounds, { padding: 40, duration: 600 })
+      } else if (mapBounds?.bbox) {
+        const b = toLngLatBounds(mapBounds.bbox)
+        if (b) mapRef.current.fitBounds(b, { padding: 40, duration: 600 })
+      }
     }
   }
 

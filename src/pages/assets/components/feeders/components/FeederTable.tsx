@@ -9,7 +9,7 @@ export interface FeederTableProps {
   flashingFeederId?: string
   onViewDetail: (feeder: FeederListItem) => void
   onEdit: (feeder: FeederListItem) => void
-  onDelete: (feederId: string) => void
+  onDelete: (feeder: FeederListItem) => void
 }
 
 export const FeederTable: React.FC<FeederTableProps> = ({
@@ -154,7 +154,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
                         type="button"
                         onClick={() => onViewDetail(feeder)}
                         title="Xem chi tiết & Cột đèn đấu nối"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -162,25 +162,16 @@ export const FeederTable: React.FC<FeederTableProps> = ({
                         type="button"
                         onClick={() => onEdit(feeder)}
                         title="Chỉnh sửa thông số mạch"
-                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (feeder.feeder_id) {
-                            if (
-                              window.confirm(
-                                `Bạn có chắc chắn muốn xóa mạch điện "${feeder.feeder_name || feeder.feeder_id}"? Thao tác này không thể hoàn tác.`
-                              )
-                            ) {
-                              onDelete(feeder.feeder_id)
-                            }
-                          }
-                        }}
+                        onClick={() => onDelete(feeder)}
                         title="Xóa mạch điện"
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 rounded-lg transition-colors"
+                        aria-label="Xóa"
+                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

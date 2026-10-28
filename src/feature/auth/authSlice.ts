@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { AuthState, User, LoginRequest } from '../../types/auth/web'
+import { AuthState, LoginRequest } from '../../types/auth/web'
+import type { CurrentUserResponse } from '../../types/auth/me'
 
 // Khi ứng dụng khởi chạy, mặc định loading = true để thực hiện Silent Refresh kiểm tra phiên cookie
 const initialState: AuthState = {
@@ -18,7 +19,7 @@ const authSlice = createSlice({
       state.loading = true
       state.error = null
     },
-    loginSuccess: (state, action: PayloadAction<{ user: User }>) => {
+    loginSuccess: (state, action: PayloadAction<{ user: CurrentUserResponse }>) => {
       state.loading = false
       state.isAuthenticated = true
       state.user = action.payload.user
@@ -41,7 +42,7 @@ const authSlice = createSlice({
       state.loading = true
       state.error = null
     },
-    checkAuthSuccess: (state, action: PayloadAction<{ user: User }>) => {
+    checkAuthSuccess: (state, action: PayloadAction<{ user: CurrentUserResponse }>) => {
       state.loading = false
       state.isAuthenticated = true
       state.user = action.payload.user
@@ -56,7 +57,7 @@ const authSlice = createSlice({
     refreshProfileRequest: (state) => {
       state.isRefreshingProfile = true
     },
-    refreshProfileSuccess: (state, action: PayloadAction<{ user: User }>) => {
+    refreshProfileSuccess: (state, action: PayloadAction<{ user: CurrentUserResponse }>) => {
       state.isRefreshingProfile = false
       state.user = action.payload.user
     },

@@ -4,6 +4,7 @@ import { X, Trash2, AlertTriangle } from 'lucide-react'
 export interface ConfirmDeleteIotNodeModalProps {
   isOpen: boolean
   nodeId: string | null
+  hasWiredRelays?: boolean
   onClose: () => void
   onConfirm: (nodeId: string) => void
 }
@@ -11,6 +12,7 @@ export interface ConfirmDeleteIotNodeModalProps {
 export const ConfirmDeleteIotNodeModal: React.FC<ConfirmDeleteIotNodeModalProps> = ({
   isOpen,
   nodeId,
+  hasWiredRelays = false,
   onClose,
   onConfirm,
 }) => {
@@ -57,6 +59,18 @@ export const ConfirmDeleteIotNodeModal: React.FC<ConfirmDeleteIotNodeModalProps>
             </div>
           </div>
 
+          {hasWiredRelays && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-800 dark:text-amber-200">
+                <p className="font-bold">Lưu ý rơ-le đang đấu nối:</p>
+                <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
+                  Thiết bị này đang có rơ-le đấu nối vào mạch điện. Máy chủ sẽ từ chối xóa nếu chưa ngắt kết nối các rơ-le này.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-end gap-2.5 pt-2">
             <button
               type="button"
@@ -82,3 +96,4 @@ export const ConfirmDeleteIotNodeModal: React.FC<ConfirmDeleteIotNodeModalProps>
     </div>
   )
 }
+export default ConfirmDeleteIotNodeModal

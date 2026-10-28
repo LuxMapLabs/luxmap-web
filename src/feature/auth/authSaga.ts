@@ -5,11 +5,12 @@ import authAPI from './authAPI'
 import {
   LoginRequest,
   WebAuthTokenResponse,
-  CurrentUserResponse,
-  User,
+
+
 } from '../../types/auth/web'
+import type { CurrentUserResponse } from '../../types/auth/me'
 import tokenStorage from '../../utils/tokenStorage'
-import { createUserFromToken, mapCurrentUserToUser } from '../../utils/roleUtils'
+import { createUserFromToken } from '../../utils/roleUtils'
 import {
   loginRequest,
   loginSuccess,
@@ -46,10 +47,10 @@ function* handleLogin(action: PayloadAction<LoginRequest>) {
     tokenStorage.setAccessToken(accessToken, !!rememberMe)
 
     // 3. Gọi trực tiếp API GET /api/v1/auth/me để lấy hồ sơ đầy đủ từ Database (Contract v1.5)
-    let user: User | null = null
+    let user: CurrentUserResponse | null = null
     try {
-      const meResponse: CurrentUserResponse = yield call(authAPI.getMe)
-      user = mapCurrentUserToUser(meResponse)
+      user = yield call(authAPI.getMe)
+
     } catch (meError) {
       console.warn('Không thể tải profile từ /auth/me, kích hoạt fallback từ JWT:', meError)
       user = createUserFromToken(accessToken, emailOrPhone.trim())
@@ -101,8 +102,8 @@ function* handleCheckAuth() {
     // 1. Nếu đã có token trong sessionStorage, kiểm tra trực tiếp qua GET /api/v1/auth/me
     if (existingToken) {
       try {
-        const meResponse: CurrentUserResponse = yield call(authAPI.getMe)
-        const user: User = mapCurrentUserToUser(meResponse)
+        const user: CurrentUserResponse = yield call(authAPI.getMe)
+
         yield put(checkAuthSuccess({ user }))
         return
       } catch (err: any) {
@@ -119,13 +120,13 @@ function* handleCheckAuth() {
 
       // Lấy hồ sơ người dùng từ Database qua GET /auth/me
       try {
-        const meResponse: CurrentUserResponse = yield call(authAPI.getMe)
-        const user: User = mapCurrentUserToUser(meResponse)
+        const user: CurrentUserResponse = yield call(authAPI.getMe)
+
         yield put(checkAuthSuccess({ user }))
         return
       } catch (meError) {
         console.warn('Lỗi khi gọi /auth/me sau refresh, fallback sang token:', meError)
-        const user: User | null = createUserFromToken(accessToken)
+        const user: CurrentUserResponse | null = createUserFromToken(accessToken)
         if (user) {
           yield put(checkAuthSuccess({ user }))
           return
@@ -145,8 +146,8 @@ function* handleCheckAuth() {
 // Saga xử lý làm mới hồ sơ cá nhân và phân quyền tại chỗ
 function* handleRefreshProfile() {
   try {
-    const meResponse: CurrentUserResponse = yield call(authAPI.getMe)
-    const user: User = mapCurrentUserToUser(meResponse)
+    const user: CurrentUserResponse = yield call(authAPI.getMe)
+
     yield put(refreshProfileSuccess({ user }))
     toast.success('Đã làm mới hồ sơ & phân quyền từ máy chủ!')
   } catch (error) {

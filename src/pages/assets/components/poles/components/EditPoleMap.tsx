@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers } from 'lucide-react'
@@ -9,8 +9,10 @@ import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
-  applyMapBoundsLimits,
   MAP_MAX_ZOOM,
+  toLngLatBounds,
+  toBboxPolygonGeoJSON,
+  getCommuneBboxInfo,
 } from '../../../../../utils/gis-map/mapUtils'
 import {
   resolveNonOverlappingRoutePoint,
@@ -23,6 +25,7 @@ export interface EditPoleMapProps {
   otherPolesGeoJSON: FeatureCollection
   currentCabinet?: CabinetListItem | null
   onChangeCoords: (coords: { lat: number; lng: number }) => void
+  communeId?: string | null
 }
 
 export const EditPoleMap: React.FC<EditPoleMapProps> = ({
@@ -32,6 +35,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   otherPolesGeoJSON,
   currentCabinet,
   onChangeCoords,
+  communeId,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -40,7 +44,13 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   const cabinetMarkerRef = useRef<maplibregl.Marker | null>(null)
   const existingPolePopupRef = useRef<maplibregl.Popup | null>(null)
 
-  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const currentUser = useSelector((state: RootState) => state?.auth?.user)
+  const mapBounds = currentUser?.map_bounds
+  const userCommunes = currentUser?.communes
+  const adminCommunes = useSelector((state: RootState) => state?.adminCommunes?.communes)
+  const communeBoundsInfo = useMemo(() => {
+    return getCommuneBboxInfo(communeId, userCommunes, adminCommunes, mapBounds)
+  }, [communeId, userCommunes, adminCommunes, mapBounds])
   const mapBoundsRef = useRef(mapBounds)
   mapBoundsRef.current = mapBounds
 
@@ -289,7 +299,44 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       }
 
       // Áp dụng giới hạn Bbox và minZoom từ Backend
-      applyMapBoundsLimits(map, mapBoundsRef.current)
+      const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
+      if (activeBounds) {
+        map.setMaxBounds(activeBounds)
+        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
+        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
+          map.setMinZoom(camera.zoom)
+        }
+      }
+
+      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      if (!map.getSource('commune-bbox-boundary')) {
+        map.addSource('commune-bbox-boundary', {
+          type: 'geojson',
+          data: bboxGeoJson || { type: 'FeatureCollection', features: [] },
+        })
+
+        map.addLayer({
+          id: 'commune-bbox-fill',
+          type: 'fill',
+          source: 'commune-bbox-boundary',
+          paint: {
+            'fill-color': '#0284c7',
+            'fill-opacity': 0.04,
+          },
+        })
+
+        map.addLayer({
+          id: 'commune-bbox-line',
+          type: 'line',
+          source: 'commune-bbox-boundary',
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 2,
+            'line-dasharray': [3, 2],
+            'line-opacity': 0.85,
+          },
+        })
+      }
 
       // Focus trực tiếp 100% vào cột đang sửa ở mức zoom 18 chi tiết (ngay tâm màn hình)
       if (isCoordValid) {
@@ -319,12 +366,26 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     }
   }, [])
 
-  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  // Cập nhật Bbox, giới hạn và khung viền khi communeBoundsInfo hoặc mapBounds thay đổi
   useEffect(() => {
-    if (mapRef.current) {
-      applyMapBoundsLimits(mapRef.current, mapBounds)
+    const map = mapRef.current
+    if (!map) return
+
+    const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
+    if (activeBounds) {
+      map.setMaxBounds(activeBounds)
+      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
+      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
+        map.setMinZoom(camera.zoom)
+      }
     }
-  }, [mapBounds])
+
+    const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
+    if (source) {
+      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      source.setData(bboxGeoJson || ({ type: 'FeatureCollection', features: [] } as any))
+    }
+  }, [communeBoundsInfo, mapBounds])
 
   // Tự động đồng bộ marker và focus camera (giữ nguyên 100% mức zoom của người dùng) khi lat / lng thay đổi
   useEffect(() => {

@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import { toBboxParam, toLngLatBounds, applyMapBoundsLimits } from '../../utils/gis-map/mapUtils'
+import {
+  toBboxParam,
+  toLngLatBounds,
+  applyMapBoundsLimits,
+  getCommuneBboxInfo,
+  toBboxPolygonGeoJSON,
+} from '../../utils/gis-map/mapUtils'
 import { mapCurrentUserToUser } from '../../utils/roleUtils'
-import type { CurrentUserResponse } from '../../types/auth/web'
+import type { CurrentUserResponse } from '../../types/auth/me'
 
 // The two surveyed communes as GET /auth/me returns them on the VPS (COMMUNE-BBOX, drift CB-5).
 const frame = { min_lng: 106.82473, min_lat: 10.79622, max_lng: 106.86508, max_lat: 10.85715 }
@@ -24,8 +30,24 @@ describe('map bounds from GET /auth/me', () => {
       role: 'superior', commune_ids: ['COM-001', 'COM-002'],
       map_bounds: { bbox: frame, center: { lng: 106.844905, lat: 10.826685 } },
     }
-    expect(mapCurrentUserToUser(me).mapBounds?.bbox).toEqual(frame)
-    expect(mapCurrentUserToUser({ ...me, map_bounds: undefined }).mapBounds).toBeNull()
+    expect(mapCurrentUserToUser(me).map_bounds?.bbox).toEqual(frame)
+    expect(mapCurrentUserToUser({ ...me, map_bounds: undefined }).map_bounds).toBeUndefined()
+  })
+
+  it('maps communes array from GET /auth/me correctly to User', () => {
+    const me: CurrentUserResponse = {
+      user_id: 'USR-0002', username: 'agency', email: 'agency@example.invalid', full_name: 'Cấp giám sát',
+      role: 'superior', commune_ids: ['COM-001', 'COM-002'],
+      communes: [
+        { commune_id: 'COM-001', name: 'Xã Tân An Hội', bbox: frame, center: { lng: 106.84, lat: 10.82 } },
+        { commune_id: 'COM-002', name: 'Xã Phước Hiệp', bbox: frame, center: { lng: 106.85, lat: 10.83 } },
+      ],
+      map_bounds: { bbox: frame, center: { lng: 106.844905, lat: 10.826685 } },
+    }
+    const user = mapCurrentUserToUser(me)
+    expect(user.communes).toHaveLength(2)
+    expect(user.communes?.[0].name).toBe('Xã Tân An Hội')
+    expect(user.communes?.[1].name).toBe('Xã Phước Hiệp')
   })
 
   it('opens map at backend center and restricts minZoom to panorama bbox', () => {
@@ -87,4 +109,38 @@ describe('map bounds from GET /auth/me', () => {
     expect(mockMap.setMaxBounds).not.toHaveBeenCalled()
     expect(mockMap.setMinZoom).not.toHaveBeenCalled()
   })
+  it('toBboxPolygonGeoJSON converts bbox to a closed 5-vertex GeoJSON Polygon', () => {
+    const poly = toBboxPolygonGeoJSON(frame)
+    expect(poly).not.toBeNull()
+    expect(poly?.geometry.type).toBe('Polygon')
+    expect(poly?.geometry.coordinates[0]).toHaveLength(5)
+    // First and last vertex must match
+    expect(poly?.geometry.coordinates[0][0]).toEqual([106.82473, 10.79622])
+    expect(poly?.geometry.coordinates[0][4]).toEqual([106.82473, 10.79622])
+  })
+
+  it('getCommuneBboxInfo resolves bbox, center and bounds for chosen commune', () => {
+    const userCommunes = [
+      {
+        commune_id: 'COM-001',
+        name: 'Xã Tân An Hội',
+        bbox: { min_lng: 106.5, min_lat: 10.9, max_lng: 106.6, max_lat: 11.0 },
+        center: { lng: 106.55, lat: 10.95 },
+      },
+    ]
+
+    const info = getCommuneBboxInfo('COM-001', userCommunes, null, null)
+    expect(info.bbox).toEqual({ min_lng: 106.5, min_lat: 10.9, max_lng: 106.6, max_lat: 11.0 })
+    expect(info.center).toEqual([106.55, 10.95])
+    expect(info.bounds).toEqual([[106.5, 10.9], [106.6, 11.0]])
+
+    // Fallback when commune not found
+    const fallback = getCommuneBboxInfo('NON-EXISTENT', userCommunes, null, {
+      bbox: frame,
+      center: { lng: 106.844905, lat: 10.826685 },
+    })
+    expect(fallback.bbox).toEqual(frame)
+    expect(fallback.center).toEqual([106.844905, 10.826685])
+  })
+
 })

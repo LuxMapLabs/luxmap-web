@@ -17,10 +17,12 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
-  applyMapBoundsLimits,
   MAP_MAX_ZOOM,
   FIT_BOUNDS_ASSET_ADD_INSTANT,
   FIT_BOUNDS_ASSET_ADD_SMOOTH,
+  toLngLatBounds,
+  toBboxPolygonGeoJSON,
+  getCommuneBboxInfo,
 } from '../../../../../utils/gis-map/mapUtils'
 import {
   snapPointToPolyline,
@@ -89,7 +91,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const [selectedFeederId, setSelectedFeederId] = useState('')
 
   // Map Bounds từ Backend để giới hạn không gian địa bàn
-  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const currentUser = useSelector((state: RootState) => state?.auth?.user)
+  const mapBounds = currentUser?.map_bounds
+  const userCommunes = currentUser?.communes
+  const adminCommunes = useSelector((state: RootState) => state?.adminCommunes?.communes)
 
   // Danh sách mạch điện từ Redux store
   const allFeeders = useSelector((state: RootState) => state.assets.feeders)
@@ -100,6 +105,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
   // Current active metadata
   const currentSegment = segmentList.find((s) => s.segment_id === selectedSegmentId)
+  const activeCommuneId = currentSegment?.commune_id || currentUser?.commune_ids?.[0]
+  const communeBoundsInfo = useMemo(() => {
+    return getCommuneBboxInfo(activeCommuneId, userCommunes, adminCommunes, mapBounds)
+  }, [activeCommuneId, userCommunes, adminCommunes, mapBounds])
 
   // Merged existing poles belonging to the currently selected segment (allPoles + mapPoles)
   const existingPolesOnSegment = useMemo(() => {
@@ -530,10 +539,12 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     if (!isOpen || !mapContainerRef.current) return
 
     const initialCenter: [number, number] =
-      typeof mapBounds?.center?.lng === 'number' &&
-      typeof mapBounds?.center?.lat === 'number' &&
-      Number.isFinite(mapBounds.center.lng) &&
-      Number.isFinite(mapBounds.center.lat)
+      communeBoundsInfo.center
+        ? communeBoundsInfo.center
+        : typeof mapBounds?.center?.lng === 'number' &&
+          typeof mapBounds?.center?.lat === 'number' &&
+          Number.isFinite(mapBounds.center.lng) &&
+          Number.isFinite(mapBounds.center.lat)
         ? [mapBounds.center.lng, mapBounds.center.lat]
         : DEFAULT_MAP_CENTER
 
@@ -559,7 +570,48 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     }
 
     map.on('load', () => {
-      applyMapBoundsLimits(map, mapBounds)
+      const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
+      if (activeBounds) {
+        map.setMaxBounds(activeBounds)
+        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
+        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
+          map.setMinZoom(camera.zoom)
+        }
+      }
+
+      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      if (!map.getSource('commune-bbox-boundary')) {
+        map.addSource('commune-bbox-boundary', {
+          type: 'geojson',
+          data: bboxGeoJson || { type: 'FeatureCollection', features: [] },
+        })
+
+        map.addLayer({
+          id: 'commune-bbox-fill',
+          type: 'fill',
+          source: 'commune-bbox-boundary',
+          paint: {
+            'fill-color': '#0284c7',
+            'fill-opacity': 0.04,
+          },
+        })
+
+        map.addLayer({
+          id: 'commune-bbox-line',
+          type: 'line',
+          source: 'commune-bbox-boundary',
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 2,
+            'line-dasharray': [3, 2],
+            'line-opacity': 0.85,
+          },
+        })
+      }
+
+      if (!selectedSegmentId && rowsRef.current.length === 0 && activeBounds) {
+        map.fitBounds(activeBounds, { padding: 40, duration: 0 })
+      }
       setTimeout(() => {
         map.resize()
       }, 100)
@@ -707,12 +759,30 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     }
   }, [isOpen, addPoleAtPoint, mapBounds])
 
-  // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
+  // Cập nhật Bbox, giới hạn và khung viền khi communeBoundsInfo hoặc mapBounds thay đổi
   useEffect(() => {
-    if (mapRef.current) {
-      applyMapBoundsLimits(mapRef.current, mapBounds)
+    const map = mapRef.current
+    if (!map) return
+
+    const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
+    if (activeBounds) {
+      map.setMaxBounds(activeBounds)
+      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
+      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
+        map.setMinZoom(camera.zoom)
+      }
     }
-  }, [mapBounds])
+
+    const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
+    if (source) {
+      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      source.setData(bboxGeoJson || ({ type: 'FeatureCollection', features: [] } as any))
+    }
+
+    if (!selectedSegmentId && rows.length === 0 && activeBounds) {
+      map.fitBounds(activeBounds, { padding: 40, duration: 600 })
+    }
+  }, [communeBoundsInfo, mapBounds, selectedSegmentId, rows.length])
 
   // Synchronize existing poles GeoJSON data when selected segment or allPoles changes
   useEffect(() => {
@@ -939,7 +1009,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     }
 
     if (rows.length === 0) {
-      setErrorMsg('Vui lòng bấm "+ Thêm Cột Mới" hoặc click trên bản đồ để khai báo ít nhất một cột đèn!')
+      setErrorMsg('Vui lòng bấm "Thêm Cột" hoặc click trên bản đồ để khai báo ít nhất một cột đèn!')
       return
     }
 
@@ -1193,7 +1263,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer shrink-0"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
-                    <span>+ Thêm Cột</span>
+                    <span>Thêm Cột</span>
                   </button>
                 </div>
 
@@ -1220,7 +1290,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                                 onClick={handleAddRow}
                                 className="text-emerald-600 dark:text-emerald-400 font-bold underline cursor-pointer"
                               >
-                                + Thêm Cột
+                                Thêm Cột
                               </button>{' '}
                               để cắm mốc.
                             </td>

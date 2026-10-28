@@ -39,7 +39,7 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
 }) => {
   // Lấy danh sách layer tuyến đường PostGIS và mapBounds từ Redux store
   const mapSegments = useSelector((state: RootState) => state?.map?.segments ?? [])
-  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.mapBounds)
+  const mapBounds = useSelector((state: RootState) => state?.auth?.user?.map_bounds)
 
   const fallbackLat =
     typeof mapBounds?.center?.lat === 'number' && Number.isFinite(mapBounds.center.lat)
@@ -611,6 +611,7 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
               lng={lng}
               segmentCoords={segmentCoords}
               otherPolesGeoJSON={otherPolesGeoJSON}
+              communeId={pole.commune_id}
               currentCabinet={currentCabinet}
               onChangeCoords={({ lat: newLat, lng: newLng }) => {
                 setLat(newLat)

@@ -1,11 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import { useSelector } from 'react-redux'
 import { createPortal } from 'react-dom'
 import { X, Route, CheckCircle2, AlertCircle } from 'lucide-react'
 import { SegmentRouteMap } from '../../../../../components/SegmentRouteMap'
 import { calculateRouteLengthMeters } from '../../../../../utils/gis-map/routeUtils'
 import type { RootState } from '../../../../../redux/rootReducer'
-import { fetchCommunesRequest } from '../../../../../feature/communes/communeSlice'
 import type { RoadClass } from '../../../../../types/common/enums'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 
@@ -22,14 +21,9 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
   onAddSegment,
   existingCount,
 }) => {
-  const dispatch = useDispatch()
-  const communes = useSelector((state: RootState) => state.adminCommunes.communes)
-
-  useEffect(() => {
-    if (communes.length === 0) {
-      dispatch(fetchCommunesRequest())
-    }
-  }, [dispatch, communes.length])
+  const communes = useSelector((state: RootState) => state.adminCommunes?.communes || [])
+  const currentUser = useSelector((state: RootState) => state.auth?.user)
+  const defaultCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
 
   const nextCode = `SEG-${String(existingCount + 1).padStart(3, '0')}`
 
@@ -37,13 +31,39 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
   const [segmentName, setSegmentName] = useState('')
   const [roadClass, setRoadClass] = useState<RoadClass>('inter_commune')
   const [lengthM, setLengthM] = useState('0')
-  const [communeId, setCommuneId] = useState('')
+  const [communeId, setCommuneId] = useState(defaultCommuneId)
+
+  // Xây dựng danh sách tùy chọn địa bàn cho dropdown
+  const communeOptions = useMemo(() => {
+    if (communes && communes.length > 0) {
+      return communes.map((c) => ({
+        id: c.commune_id || '',
+        name: c.name || c.commune_id || '',
+        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
+      }))
+    }
+    if (currentUser?.communes && currentUser.communes.length > 0) {
+      return currentUser.communes.map((c) => ({
+        id: c.commune_id || '',
+        name: c.name || c.commune_id || '',
+        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
+      }))
+    }
+    if (currentUser?.commune_ids && currentUser.commune_ids.length > 0) {
+      return currentUser.commune_ids.map((id) => ({
+        id,
+        name: id,
+        label: `Địa bàn ${id}`,
+      }))
+    }
+    return [{ id: defaultCommuneId, name: defaultCommuneId, label: `Địa bàn ${defaultCommuneId}` }]
+  }, [communes, currentUser, defaultCommuneId])
 
   useEffect(() => {
-    if (communes.length > 0 && !communeId) {
-      setCommuneId(communes[0]?.commune_id || '')
+    if (communeOptions.length > 0 && (!communeId || !communeOptions.some((o) => o.id === communeId))) {
+      setCommuneId(communeOptions[0].id)
     }
-  }, [communes, communeId])
+  }, [communeOptions, communeId])
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -107,8 +127,8 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
       road_class: roadClass,
       length_m: actualLen,
       pole_count: 0,
-      commune_id: communeId,
-      commune_name: null,
+      commune_id: communeId || defaultCommuneId,
+      commune_name: communes.find((c) => c.commune_id === communeId)?.name || null,
       data_source: 'field',
       geom_wkt: geomWkt,
       updated_at: new Date().toISOString(),
@@ -187,11 +207,11 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                 <select
                   value={communeId}
                   onChange={(e) => setCommuneId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  {communes.map((c) => (
-                    <option key={c.commune_id || ''} value={c.commune_id || ''}>
-                      {c.name || c.commune_id} ({c.commune_id})
+                  {communeOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
@@ -241,6 +261,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                   editable={true}
                   defaultEditMode="append"
                   hideTerminalPins={true}
+                  communeId={communeId}
                   onRouteCoordsChange={handleRouteCoordsChange}
                 />
               </div>

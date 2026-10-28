@@ -553,7 +553,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       expect(screen.queryByText(/Ngày vận hành/i)).toBeNull()
 
       // Bấm nút thêm tủ điện trực tiếp mà không cần chọn tuyến đường
-      const addRowBtn = screen.getByRole('button', { name: /\+ Thêm Tủ Điện/i })
+      const addRowBtn = screen.getByRole('button', { name: /Thêm Tủ Điện/i })
       fireEvent.click(addRowBtn)
 
       // Hàng tủ điện được tạo thành công với tên mặc định Tủ điện A
@@ -562,6 +562,35 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       expect(screen.getByPlaceholderText('Lng')).toHaveValue('106.489600')
       // Không bị báo lỗi bắt buộc chọn tuyến đường
       expect(screen.queryByText(/Vui lòng chọn Tuyến đường áp dụng/i)).toBeNull()
+    })
+    it('bấm nút xóa trên bảng CabinetTable sẽ hiển thị ConfirmDeleteAssetModal và gọi onDeleteCabinet khi xác nhận', () => {
+      const store = configureStore({ reducer: rootReducer })
+      const mockDelete = vi.fn()
+
+      render(
+        <Provider store={store}>
+          <CabinetsTab
+            cabinets={[mockCabinetWithGeo]}
+            segments={[mockSegment]}
+            onAddCabinet={vi.fn()}
+            onAddCabinets={vi.fn()}
+            onUpdateCabinet={vi.fn()}
+            onDeleteCabinet={mockDelete}
+            onOpenImport={vi.fn()}
+          />
+        </Provider>
+      )
+
+      const deleteBtn = screen.getByRole('button', { name: /Xóa/i })
+      fireEvent.click(deleteBtn)
+
+      expect(screen.getByText('Xác Nhận Xóa Tủ Điện')).toBeInTheDocument()
+      expect(screen.getByText(/Bạn có chắc chắn muốn xóa tủ điện/i)).toBeInTheDocument()
+
+      const confirmBtn = screen.getByRole('button', { name: /Xác nhận xóa/i })
+      fireEvent.click(confirmBtn)
+
+      expect(mockDelete).toHaveBeenCalledWith('cab_001')
     })
   })
 })

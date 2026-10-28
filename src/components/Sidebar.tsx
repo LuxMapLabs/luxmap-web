@@ -16,14 +16,14 @@ import {
   SlidersHorizontal,
   Cpu,
 } from 'lucide-react'
-import { User } from '../types/auth/web'
+import type { CurrentUserResponse } from '../types/auth/me'
 import { canAccessTab } from '../utils/roleUtils'
 import type { RootState } from '../redux/rootReducer'
 
 export interface SidebarProps {
   brandTitle?: string
   brandSubtitle?: string
-  user?: User | null
+  user?: CurrentUserResponse | null
   isAdminUser?: boolean
   isCollapsed?: boolean
   onToggleCollapse?: () => void

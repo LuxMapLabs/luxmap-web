@@ -14,6 +14,8 @@ export interface CabinetSearchSelectProps {
   accentColor?: 'emerald' | 'amber' | 'indigo' | 'blue'
   className?: string
   getId?: (cab: CabinetListItem) => string
+  isOptionDisabled?: (cab: CabinetListItem) => boolean
+  getOptionBadge?: (cab: CabinetListItem) => string | null
 }
 
 const removeVietnameseTones = (str: string): string => {
@@ -38,6 +40,8 @@ export const CabinetSearchSelect: React.FC<CabinetSearchSelectProps> = ({
   accentColor = 'indigo',
   className = '',
   getId = (c) => c.cabinet_id || c.external_ref || '',
+  isOptionDisabled,
+  getOptionBadge,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -283,27 +287,42 @@ export const CabinetSearchSelect: React.FC<CabinetSearchSelectProps> = ({
                 const isSelected = selectedCabinet && getId(selectedCabinet) === cabId
                 const displayName = cab.cabinet_name || cab.external_ref || cab.cabinet_id || 'Tủ điện'
                 const refCode = cab.external_ref || cab.cabinet_id
+                const isDisabled = isOptionDisabled ? isOptionDisabled(cab) : false
+                const badgeText = getOptionBadge ? getOptionBadge(cab) : null
 
                 return (
                   <div
                     key={cabId || Math.random().toString()}
-                    onClick={() => handleSelect(cab)}
-                    className={`w-full p-2 rounded-xl flex items-center justify-between gap-2 text-left cursor-pointer transition-colors duration-100 ${
-                      isSelected
+                    onClick={() => {
+                      if (!isDisabled) {
+                        handleSelect(cab)
+                      }
+                    }}
+                    className={`w-full p-2 rounded-xl flex items-center justify-between gap-2 text-left transition-colors duration-100 ${
+                      isDisabled
+                        ? 'opacity-40 cursor-not-allowed bg-slate-50/50 dark:bg-slate-900/50 text-slate-400'
+                        : isSelected
                         ? colorMap.itemActive
-                        : 'hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300'
+                        : 'cursor-pointer hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Zap
                         className={`w-3.5 h-3.5 shrink-0 ${
-                          isSelected ? colorMap.icon : 'text-slate-400'
+                          isSelected ? colorMap.icon : isDisabled ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400'
                         }`}
                       />
                       <div className="flex flex-col min-w-0">
-                        <span className="font-semibold text-slate-900 dark:text-slate-100 truncate text-xs">
-                          {displayName}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100 truncate text-xs">
+                            {displayName}
+                          </span>
+                          {badgeText && (
+                            <span className="px-1.5 py-0.5 bg-rose-100/80 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 text-[9px] font-bold rounded">
+                              {badgeText}
+                            </span>
+                          )}
+                        </div>
                         {refCode && (
                           <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate">
                             Mã: {refCode}
