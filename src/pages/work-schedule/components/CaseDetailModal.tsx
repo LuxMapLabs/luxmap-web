@@ -17,6 +17,8 @@ import {
   RotateCcw,
   Edit3,
   Trash2,
+  UserCheck,
+  AlertCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
@@ -195,6 +197,13 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
     currentPhase?.rawStatus
   )
   const canModify = modificationCheck.canModify
+
+  // Trạng thái kỹ thuật thực tế đồng bộ 100% với Backend (wo_status)
+  const effectiveRawStatus = String(
+    (isCurrentPhaseDetail && workOrderDetail?.wo_status) ||
+    currentPhase?.rawStatus ||
+    ''
+  ).toLowerCase()
 
   // Kiểm tra bước hiện tại đã được duyệt hay chưa
   const isCurrentlyApproved = isInspectionApprovedLocal && currentPhase?.phaseType === 'inspection'
@@ -526,25 +535,36 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     Trạng thái bước này
                   </div>
                   <div className="text-xs font-bold mt-1">
-                    {currentPhase.rawStatus === 'cancelled' ? (
+                    {effectiveRawStatus === 'cancelled' ? (
                       <span className="text-rose-600 font-bold flex items-center gap-1">
                         <X className="w-3.5 h-3.5 stroke-[3] text-rose-600" />
                         Đã hủy
                       </span>
-                    ) : currentPhase.status === 'ended' ? (
-                      <span className="text-slate-600 font-bold flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-600" />
-                        Đã kết thúc
-                      </span>
-                    ) : isCurrentlyApproved ? (
+                    ) : effectiveRawStatus === 'verified' || currentPhase.status === 'ended' || isCurrentlyApproved ? (
                       <span className="text-emerald-600 font-extrabold flex items-center gap-1">
                         <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        Đã duyệt
+                        Đã duyệt nghiệm thu
                       </span>
-                    ) : currentPhase.status === 'reported' ? (
-                      <span className="text-blue-600">Đã có báo cáo (Chờ Quản lý duyệt)</span>
+                    ) : effectiveRawStatus === 'done' || currentPhase.status === 'reported' ? (
+                      <span className="text-blue-600 font-bold flex items-center gap-1">
+                        <FileCheck className="w-3.5 h-3.5 text-blue-600" />
+                        Đã có báo cáo (Chờ Quản lý duyệt)
+                      </span>
+                    ) : effectiveRawStatus === 'in_progress' ? (
+                      <span className="text-amber-600 font-bold flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        Đang thực hiện
+                      </span>
+                    ) : effectiveRawStatus === 'assigned' || Boolean(currentPhase.assigneeId) ? (
+                      <span className="text-sky-600 font-bold flex items-center gap-1">
+                        <UserCheck className="w-3.5 h-3.5 text-sky-600" />
+                        Đã giao việc (Chờ tiếp nhận)
+                      </span>
                     ) : (
-                      <span className="text-amber-600">Đang thực hiện</span>
+                      <span className="text-slate-500 font-bold flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+                        Chưa phân công
+                      </span>
                     )}
                   </div>
                 </div>
