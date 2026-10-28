@@ -157,11 +157,13 @@ export const GisMapPage: React.FC = () => {
   const [selectedPole, setSelectedPole] = useState<PoleFeature | null>(null)
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null)
   const [selectedCabinet, setSelectedCabinet] = useState<any | null>(null)
+  const [selectedFeeder, setSelectedFeeder] = useState<any | null>(null)
 
   // 4. Hook quản lý logic điện học cascade & danh mục phân tuyến
   const {
     cabinets,
-    handleToggleCabinet,
+    feederStatusMap,
+    handleToggleFeeder,
     effectivePoles,
     segmentsList,
     segmentInfoMap,
@@ -217,6 +219,7 @@ export const GisMapPage: React.FC = () => {
     (f: PoleFeature) => {
       setSelectedPole(f)
       setSelectedCabinet(null)
+      setSelectedFeeder(null)
       setSelectedSegmentId(f.properties?.segment_id || null)
 
       if (mapRef.current) {
@@ -236,6 +239,7 @@ export const GisMapPage: React.FC = () => {
       const p = cabinetData.properties || cabinetData
       setSelectedCabinet(p)
       setSelectedPole(null)
+      setSelectedFeeder(null)
       if (p.segment_id) {
         setSelectedSegmentId(p.segment_id)
       }
@@ -251,10 +255,19 @@ export const GisMapPage: React.FC = () => {
   )
 
   // 7. Chọn tuyến cáp (Click trực tiếp lên đường dây)
+  const handleSelectFeeder = useCallback((feederData: any) => {
+    setSelectedFeeder(feederData)
+    setSelectedPole(null)
+    setSelectedCabinet(null)
+    setSelectedSegmentId(null)
+  }, [])
+
+  // 7. Chọn tuyến cáp (Click trực tiếp lên đường dây)
   const handleSelectSegmentLine = useCallback((segId: string) => {
     setSelectedSegmentId(segId)
     setSelectedPole(null)
     setSelectedCabinet(null)
+    setSelectedFeeder(null)
   }, [])
 
   // 8. Hook quản lý lớp đường dây cáp điện GeoJSON
@@ -272,6 +285,7 @@ export const GisMapPage: React.FC = () => {
     activeHoverSourceRef,
     onSelectSegment: handleSelectSegmentLine,
     onSelectCabinet: handleSelectCabinet,
+    onSelectFeeder: handleSelectFeeder,
   })
 
   // 9. Hook quản lý Marker Cột đèn & Tủ điện + Phân cấp Zoom (LOD)
@@ -296,6 +310,7 @@ export const GisMapPage: React.FC = () => {
       setSelectedSegmentId(null)
       setSelectedPole(null)
       setSelectedCabinet(null)
+      setSelectedFeeder(null)
 
       if (segId === 'all' || !fromSearch) {
         setSearchInput('')
@@ -395,7 +410,7 @@ export const GisMapPage: React.FC = () => {
     setIsSearchFocused(false)
   }, [])
 
-  const isPanelOpen = Boolean(selectedPole || selectedSegmentId || selectedCabinet)
+  const isPanelOpen = Boolean(selectedPole || selectedSegmentId || selectedCabinet || selectedFeeder)
 
   return (
     <div className="flex-1 flex h-full w-full overflow-hidden bg-slate-50 dark:bg-slate-950 relative select-none">
@@ -437,9 +452,12 @@ export const GisMapPage: React.FC = () => {
           handleSelectPole={handleSelectPole}
           selectedCabinet={selectedCabinet}
           setSelectedCabinet={setSelectedCabinet}
+          selectedFeeder={selectedFeeder}
+          setSelectedFeeder={setSelectedFeeder}
           cabinets={cabinets}
           effectivePoles={effectivePoles}
-          onToggleCabinet={(cabId) => handleToggleCabinet(cabId, setSelectedCabinet)}
+                    feederStatusMap={feederStatusMap}
+          onToggleFeeder={handleToggleFeeder}
         />
       )}
     </div>
