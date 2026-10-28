@@ -10,7 +10,6 @@ import {
   Maximize2,
   ChevronDown,
   ChevronUp,
-  Power,
   MapPin,
   ShieldCheck,
   CameraOff,
@@ -33,9 +32,12 @@ export interface GisDrawerPanelProps {
   handleSelectPole: (f: PoleFeature) => void
   selectedCabinet?: any
   setSelectedCabinet?: (c: any) => void
-  onToggleCabinet?: (cabinetId: string) => void
+  selectedFeeder?: any
+  setSelectedFeeder?: (f: any) => void
   cabinets?: any[]
   effectivePoles?: PoleFeature[]
+  feederStatusMap?: Record<string, 'active' | 'fault'>
+  onToggleFeeder?: (feederId: string, feederName?: string) => void
 }
 
 const FAULT_TYPE_LABELS: Record<FaultType, string> = {
@@ -82,8 +84,11 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   handleSelectPole,
   selectedCabinet,
   setSelectedCabinet,
-  onToggleCabinet,
+  selectedFeeder,
+  setSelectedFeeder,
   effectivePoles: propsEffectivePoles = [],
+  feederStatusMap,
+  onToggleFeeder,
 }) => {
   // Lightbox Modal state
   const [lightboxImage, setLightboxImage] = useState<{
@@ -95,6 +100,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   const poleId = selectedPole?.properties?.pole_id || ''
   const dispatch = useDispatch<AppDispatch>()
   const { poleDetail } = useSelector((state: RootState) => state.map)
+  const { feeders: assetFeeders } = useSelector((state: RootState) => state.assets)
 
   const effectiveFixtureStatus =
     poleDetail?.current_status?.fixture_status || selectedPole?.properties?.fixture_status || 'unknown'
@@ -184,6 +190,43 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     )
   }, [cabinetTopologyEdges, selectedCabinet, propsEffectivePoles])
 
+  // Danh sách các mạch điện (Feeders) thuộc tủ này
+  const cabinetFeeders = useMemo(() => {
+    if (!selectedCabinet) return []
+
+    // 1. Tìm các feeder từ assetFeeders liên kết với tủ này
+    const matched = (assetFeeders || []).filter(
+      (f) =>
+        (f.cabinet?.cabinet_id && f.cabinet.cabinet_id === selectedCabinet.cabinet_id) ||
+        (selectedCabinet.feeder_ids && selectedCabinet.feeder_ids.includes(f.feeder_id)) ||
+        (selectedCabinet.external_ref && f.cabinet?.cabinet_name?.includes(selectedCabinet.external_ref))
+    )
+    if (matched.length > 0) return matched
+
+    // 2. Fallback nếu tủ có danh sách feeder_ids hoặc mô phỏng mạch điện của tủ
+    const ids =
+      selectedCabinet.feeder_ids && selectedCabinet.feeder_ids.length > 0
+        ? selectedCabinet.feeder_ids
+        : [`FDR-${selectedCabinet.external_ref || selectedCabinet.cabinet_id || '01'}-1`, `FDR-${selectedCabinet.external_ref || selectedCabinet.cabinet_id || '01'}-2`]
+
+    return ids.map((fId: string, idx: number) => ({
+      feeder_id: fId,
+      external_ref: fId,
+      feeder_name: `Mạch ${idx + 1} - Lộ chiếu sáng ${idx + 1}`,
+      commune_id: selectedCabinet.commune_id,
+      commune_name: selectedCabinet.commune_name,
+      has_geometry: false,
+      pole_count: Math.ceil(cabinetConnectedPoles.length / ids.length) || 0,
+      cabinet: {
+        cabinet_id: selectedCabinet.cabinet_id,
+        cabinet_name: selectedCabinet.cabinet_name,
+        location: selectedCabinet.location,
+        cabinet_source: 'field' as any,
+      },
+      updated_at: null,
+    }))
+  }, [selectedCabinet, assetFeeders, cabinetConnectedPoles.length])
+
   return (
     <>
       <aside className="w-97.5 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
@@ -202,7 +245,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                     : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                   : selectedCabinet
-                  ? selectedCabinet.status === 'fault'
+                  ? 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300'
+                  : selectedFeeder
+                  ? feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
                     ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
                     : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                   : activeSegmentDetail.hasActiveSegmentFault
@@ -221,8 +266,16 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               ) : selectedCabinet ? (
                 <img
                   src={cabinetSvg}
-                  className={`w-4.5 h-4.5 shrink-0 ${selectedCabinet.status === 'fault' ? 'filter hue-rotate-180' : ''}`}
+                  className="w-4.5 h-4.5 shrink-0"
                   alt="Tủ điện"
+                />
+              ) : selectedFeeder ? (
+                <Zap
+                  className={`w-4 h-4 ${
+                    feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : 'text-emerald-600 dark:text-emerald-400'
+                  }`}
                 />
               ) : (
                 <Radio className={`w-4 h-4 ${activeSegmentDetail.hasActiveSegmentFault ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
@@ -233,57 +286,66 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
                 <span>
                   {selectedPole
-                    ? (selectedPole.properties?.external_ref || selectedPole.properties?.pole_id)
+                    ? selectedPole.properties?.external_ref || selectedPole.properties?.pole_id
                     : selectedCabinet
-                    ? (selectedCabinet.external_ref || selectedCabinet.cabinet_name)
+                    ? selectedCabinet.cabinet_name || selectedCabinet.external_ref || selectedCabinet.cabinet_id
+                    : selectedFeeder
+                    ? selectedFeeder.feeder_name || selectedFeeder.external_ref || selectedFeeder.feeder_id
                     : activeSegmentDetail.name}
                 </span>
-
-                {selectedPole?.properties?.near_sensitive_poi && (
-                  <span
-                    className="w-3.5 h-3.5 rounded-full bg-violet-600 text-white flex items-center justify-center text-[8px] font-bold shrink-0"
-                    title="Gần trường học"
-                  >
-                    !
-                  </span>
-                )}
-
-                {/* Single Concise Status Badge */}
-                {selectedPole ? (
-                  maintenanceStatus === 'repairing' ? (
-                    <span className="text-[10.5px] bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-semibold px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                      Đèn mờ / Sụt áp
-                    </span>
-                  ) : maintenanceStatus === 'fault' ? (
-                    <span className="text-[10.5px] bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-semibold px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800">
-                      Hỏng / Tắt
-                    </span>
-                  ) : maintenanceStatus === 'unknown' ? (
-                    <span className="text-[10.5px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700">
-                      Chưa quét
-                    </span>
-                  ) : (
-                    <span className="text-[10.5px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                      Đạt chuẩn
-                    </span>
-                  )
-                ) : selectedCabinet ? (
+                {selectedFeeder && (
                   <span
                     className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
-                      selectedCabinet.status === 'fault'
+                      feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
                         ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
                         : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                     }`}
                   >
-                    {selectedCabinet.status === 'fault' ? 'Đã ngắt nguồn' : 'Đang cấp điện'}
+                    {feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
+                      ? 'Đã ngắt nguồn'
+                      : 'Đang cấp điện'}
                   </span>
-                ) : null}
+                )}
+                {selectedPole && (
+                  <span
+                    className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
+                      effectiveFixtureStatus === 'out'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                        : effectiveFixtureStatus === 'dim'
+                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                        : effectiveFixtureStatus === 'unknown'
+                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                    }`}
+                  >
+                    {effectiveFixtureStatus === 'out'
+                      ? 'Đèn tắt'
+                      : effectiveFixtureStatus === 'dim'
+                      ? 'Đèn mờ'
+                      : effectiveFixtureStatus === 'unknown'
+                      ? 'Chưa quét'
+                      : 'Đạt chuẩn'}
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400">
                 {selectedPole
                   ? activeSegmentDetail.name
                   : selectedCabinet
-                  ? `${selectedCabinet.cabinet_code} · ${selectedCabinet.landmark_note}`
+                  ? [
+                      selectedCabinet.external_ref || selectedCabinet.cabinet_name || selectedCabinet.cabinet_id,
+                      selectedCabinet.landmark_note || selectedCabinet.atlas
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : selectedFeeder
+                  ? [
+                      selectedFeeder.external_ref || selectedFeeder.feeder_id,
+                      selectedFeeder.cabinet_name ? `Tủ: ${selectedFeeder.cabinet_name}` : null,
+                      selectedFeeder.segment_id ? `Tuyến: ${selectedFeeder.segment_id}` : null
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
                   : `${activeSegmentDetail.id} · ${activeSegmentDetail.name}`}
               </div>
             </div>
@@ -295,6 +357,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               setSelectedPole(null)
               setSelectedSegmentId(null)
               if (setSelectedCabinet) setSelectedCabinet(null)
+              if (setSelectedFeeder) setSelectedFeeder(null)
             }}
             className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
             title="Đóng"
@@ -620,26 +683,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <span className="flex items-center gap-1.5">
                     <img
                       src={cabinetSvg}
-                      className={`w-4 h-4 shrink-0 ${selectedCabinet.status === 'fault' ? 'filter hue-rotate-180' : ''}`}
+                      className="w-4 h-4 shrink-0"
                       alt="Tủ điện"
                     />
                     <span>Thông số Tủ Điện Điều Khiển</span>
                   </span>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                      selectedCabinet.status === 'fault'
-                        ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                        : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                    }`}
-                  >
-                    {selectedCabinet.status === 'fault' ? 'Đã ngắt nguồn' : 'Đang cấp điện'}
-                  </span>
+                  
                 </div>
 
                 <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                   <div className="flex justify-between">
                     <span>Mã hiệu quản lý:</span>
-                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.external_ref || selectedCabinet.cabinet_code || selectedCabinet.cabinet_id}</strong>
+                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.external_ref || selectedCabinet.cabinet_name || selectedCabinet.cabinet_id}</strong>
                   </div>
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1 font-medium">
@@ -655,9 +710,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <strong className="text-blue-700 dark:text-blue-400 font-bold">{selectedCabinet.segment_name}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tuyến điện (Lộ cấp nguồn):</span>
+                    <span>Số lượng mạch điện (Feeders):</span>
                     <strong className="text-purple-700 dark:text-purple-400 font-bold font-mono">
-                      {selectedCabinet.feeder_external_ref || selectedCabinet.feeder_id || `FDR-${selectedCabinet.external_ref || selectedCabinet.cabinet_id}`}
+                      {cabinetFeeders.length} mạch nguồn
                     </strong>
                   </div>
                   <div className="flex justify-between">
@@ -682,25 +737,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Breaker Simulation Action Button */}
-                {onToggleCabinet && (
-                  <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/60">
-                    <button
-                      onClick={() => onToggleCabinet(selectedCabinet.cabinet_id)}
-                      className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all ${
-                        selectedCabinet.status === 'fault'
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                          : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
-                      }`}
-                    >
-                      <Power className="w-3.5 h-3.5" />
-                      <span>
-                        {selectedCabinet.status === 'fault' ? 'Đóng Aptomat Cấp Điện' : 'Ngắt Aptomat (Tắt Đèn Lộ Này)'}
-                      </span>
-                    </button>
-                  </div>
-                )}
-              </div>
+                </div>
 
               {/* Electrical Specs Card */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
@@ -728,61 +765,264 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
                 </div>
 
-                {selectedCabinet.fault_reason && (
-                  <div className="p-2 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 rounded-lg text-[11px] text-rose-800 dark:text-rose-300 space-y-0.5">
-                    <span className="font-bold flex items-center gap-1 text-rose-700 dark:text-rose-400">
-                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Cảnh báo bảo vệ Rơ-le:
-                    </span>
-                    <p className="text-[10.5px] leading-relaxed">{selectedCabinet.fault_reason}</p>
-                    <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold pt-0.5">➔ Toàn bộ {cabinetConnectedPoles.length} cột đèn do tủ này quản lý bị ngắt điện.</p>
-                  </div>
-                )}
+                
               </div>
 
-              {/* Connected Poles on this Cabinet Section / Route */}
-              {selectedCabinet && (
+              {/* Feeder Circuits Section with Individual On/Off Controls */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2.5">
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                    <span className="truncate">Danh sách Mạch điện của Tủ ({cabinetFeeders.length} mạch)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0 font-normal">
+                    Điều khiển theo cụm
+                  </span>
+                </div>
+
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                      {`Dàn đèn tủ phụ trách (${selectedCabinet.external_ref || selectedCabinet.cabinet_code || selectedCabinet.cabinet_id})`}
-                    </p>
-                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded ${selectedCabinet.status === 'fault' ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}`}>
-                      {selectedCabinet.status === 'fault' ? 'Mất điện' : `${cabinetConnectedPoles.length} đèn đang sáng`}
-                    </span>
-                  </div>
-                  <div className="space-y-1 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
-                    {cabinetConnectedPoles.map((f: PoleFeature, index: number) => {
-                        const isOff = selectedCabinet.status === 'fault'
-                        const lampLabel = f.properties.lamp_code || `Đèn số ${index + 1}`
-                        return (
-                          <div
-                            key={f.properties.pole_id}
-                            onClick={() => handleSelectPole(f)}
-                            className="p-2 bg-slate-50 dark:bg-slate-800/60 hover:bg-blue-50/80 dark:hover:bg-slate-700/60 rounded-lg cursor-pointer flex items-center justify-between border border-slate-100 dark:border-slate-700/60 hover:border-blue-200 dark:hover:border-blue-700/50 transition group"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold font-mono text-slate-800 dark:text-slate-200 text-xs group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
-                                {f.properties.external_ref || f.properties.pole_id}
-                              </span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                {lampLabel}
+                  {cabinetFeeders.map((feeder: any, idx: number) => {
+                    const fId = feeder.feeder_id || feeder.external_ref || `fdr-${idx}`
+                    const isFault = feederStatusMap?.[fId] === 'fault'
+                    const feederPoles = cabinetConnectedPoles.filter(
+                      (p) => p.properties.feeder_id === fId || (idx === 0 && !p.properties.feeder_id)
+                    )
+                    const poleCount = feederPoles.length || feeder.pole_count || 0
+                    const fName = feeder.feeder_name || `Mạch ${idx + 1}`
+                    const fCode = feeder.external_ref || fId
+
+                    return (
+                      <div
+                        key={fId}
+                        className={`p-2.5 rounded-xl border transition-all ${
+                          isFault
+                            ? 'bg-rose-50/50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60'
+                            : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-700/60 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${isFault ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+                              <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate">
+                                {fName}
                               </span>
                             </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[10.5px] text-slate-500 dark:text-slate-400">
+                              <span className="font-mono font-medium text-slate-600 dark:text-slate-300">
+                                {fCode}
+                              </span>
+                              <span>•</span>
+                              <span>{poleCount} cột đèn</span>
+                            </div>
+                          </div>
+
+                          {/* Toggle Switch */}
+                          <div className="flex items-center gap-2 shrink-0">
                             <span
-                              className={`text-[9.5px] px-2 py-0.5 rounded font-bold ${
-                                isOff
-                                  ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
-                                  : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                              className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
+                                isFault
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
+                                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
                               }`}
                             >
-                              {isOff ? 'TẮT (Mất nguồn)' : 'SÁNG (220V)'}
+                              {isFault ? 'Đã ngắt' : 'Đang cấp điện'}
                             </span>
+
+                            {onToggleFeeder && (
+                              <button
+                                type="button"
+                                onClick={() => onToggleFeeder(fId, fName)}
+                                className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                                  !isFault ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                                }`}
+                                title={!isFault ? `Bấm để ngắt điện ${fName}` : `Bấm để cấp điện ${fName}`}
+                              >
+                                <span
+                                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition-transform ${
+                                    !isFault ? 'translate-x-5.5' : 'translate-x-1'
+                                  }`}
+                                />
+                              </button>
+                            )}
                           </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              </div>
+          ) : selectedFeeder ? (
+            <div className="space-y-4 text-xs">
+              {/* 1. Feeder Control Card with Toggle Switch */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-3">
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    <span>Điều khiển nguồn Mạch điện</span>
+                  </span>
+                  <span
+                    className={`text-[9.5px] font-bold px-2 py-0.5 rounded ${
+                      feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                    }`}
+                  >
+                    {feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
+                      ? 'ĐÃ NGẮT NGUỒN'
+                      : 'ĐANG CẤP ĐIỆN'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="space-y-0.5 min-w-0 flex-1 pr-2">
+                    <div className="font-bold text-slate-900 dark:text-white text-xs truncate">
+                      {selectedFeeder.feeder_name || selectedFeeder.external_ref || selectedFeeder.feeder_id}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Đóng/ngắt điện toàn bộ cột đèn thuộc mạch này
+                    </div>
+                  </div>
+                  {onToggleFeeder && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onToggleFeeder(
+                          selectedFeeder.feeder_id || selectedFeeder.external_ref,
+                          selectedFeeder.feeder_name || selectedFeeder.external_ref
                         )
-                      })}
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer shrink-0 ${
+                        feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] !== 'fault'
+                          ? 'bg-emerald-600'
+                          : 'bg-slate-300 dark:bg-slate-700'
+                      }`}
+                      title={
+                        feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] !== 'fault'
+                          ? 'Bấm để ngắt điện mạch'
+                          : 'Bấm để cấp điện mạch'
+                      }
+                    >
+                      <span
+                        className={`inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-md transition-transform ${
+                          feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] !== 'fault'
+                            ? 'translate-x-5.5'
+                            : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Feeder Specifications Card */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2.5">
+                <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Thông số Kỹ thuật Mạch điện</span>
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
+                  <div className="flex justify-between">
+                    <span>Mã hiệu mạch:</span>
+                    <strong className="text-slate-900 dark:text-white font-mono">
+                      {selectedFeeder.external_ref || selectedFeeder.feeder_id}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tủ cấp nguồn:</span>
+                    <strong className="text-indigo-700 dark:text-indigo-400 font-bold">
+                      {selectedFeeder.cabinet_name || selectedFeeder.cabinet_id || selectedFeeder.from_id || 'Chưa gán'}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tuyến đường:</span>
+                    <strong className="text-blue-700 dark:text-blue-400 font-semibold">
+                      {selectedFeeder.segment_name || activeSegmentDetail.name || selectedFeeder.segment_id}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Số cột đèn quản lý:</span>
+                    <strong className="text-slate-900 dark:text-white font-mono">
+                      {propsEffectivePoles.filter(
+                        (p) =>
+                          p.properties.feeder_id === selectedFeeder.feeder_id ||
+                          p.properties.feeder_id === selectedFeeder.external_ref
+                      ).length || selectedFeeder.pole_count || 0} cột đèn
+                    </strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Điện áp định mức:</span>
+                    <strong className="text-slate-900 dark:text-white font-mono">
+                      {feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault' ? '0 V (Mất nguồn)' : '220 V'}
+                    </strong>
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* 3. Poles on this Feeder Card */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                    Danh sách Cột đèn thuộc Mạch ({selectedFeeder.external_ref || selectedFeeder.feeder_id})
+                  </p>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
+                        ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                        : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                    }`}
+                  >
+                    {feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
+                      ? 'Tất cả đèn đang tắt'
+                      : 'Đang cấp điện chiếu sáng'}
+                  </span>
+                </div>
+
+                <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar pr-0.5">
+                  {propsEffectivePoles
+                    .filter(
+                      (p) =>
+                        p.properties.feeder_id === selectedFeeder.feeder_id ||
+                        p.properties.feeder_id === selectedFeeder.external_ref
+                    )
+                    .map((f: PoleFeature, index: number) => {
+                      const isFeederOff =
+                        feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
+                      const lampLabel = f.properties.lamp_code || `Đèn số ${index + 1}`
+
+                      return (
+                        <div
+                          key={f.properties.pole_id}
+                          onClick={() => handleSelectPole(f)}
+                          className="p-2 bg-slate-50 dark:bg-slate-800/60 hover:bg-blue-50/80 dark:hover:bg-slate-700/60 rounded-lg cursor-pointer flex items-center justify-between border border-slate-100 dark:border-slate-700/60 hover:border-blue-200 dark:hover:border-blue-700/50 transition group"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold font-mono text-slate-800 dark:text-slate-200 text-xs group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
+                              {f.properties.external_ref || f.properties.pole_id}
+                            </span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                              {lampLabel}
+                            </span>
+                          </div>
+                          <span
+                            className={`text-[9.5px] px-2 py-0.5 rounded font-bold ${
+                              isFeederOff
+                                ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                                : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                            }`}
+                          >
+                            {isFeederOff ? 'TẮT (Mất nguồn)' : 'SÁNG (220V)'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-4 text-xs">
