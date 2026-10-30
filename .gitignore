@@ -36,8 +36,8 @@ desktop.ini
 .env.*
 !.env.example
 
+# AI Agent & Local Docs
 docs
-
-.agent
-
+.agents
 pipeline
+skills-lock.json

@@ -1,89 +1,56 @@
-# 📜 QUY ĐỊNH PHÁT TRIỂN DỰ ÁN LUXMAP WEB APP
+# LUXMAP-WEB FRONTEND RULES
 
-Quy định này áp dụng cho toàn bộ lập trình viên Frontend tham gia phát triển mã nguồn của dự án **LuxMap Web App**. Tất cả các hành động trước khi commit và push lên GitHub đều phải tuân thủ nghiêm ngặt quy trình dưới đây.
-
----
-
-## 🔄 1. Git Workflow, Quản lý Thư viện & Quy trình Commit/Push
-
-Trước khi đẩy bất kỳ thay đổi nào lên Remote Repository, bạn bắt buộc phải thực hiện theo các bước sau:
-
-### Bước 1: Quản lý Thư viện & Thống nhất Môi trường (`npm ci` vs `npm i`)
-- **Phiên bản chuẩn**: Thống nhất sử dụng **Node.js v20 LTS** (hoặc v18+) và **npm v9+**.
-- **Khi pull code về máy**: Luôn chạy lệnh:
-  ```bash
-  npm ci
-  ```
-  *(Lệnh `npm ci` đọc trực tiếp từ `package-lock.json`, cài đặt chuẩn xác 100% môi trường và TUYỆT ĐỐI KHÔNG làm thay đổi file `package-lock.json`).*
-- **Khi cài thêm thư viện mới**:
-  - Chạy `npm i <tên-thư-viện>` (hoặc `npm i -D <tên-thư-viện>` nếu là devDependency).
-  - **Bắt buộc commit cả 2 file `package.json` và `package-lock.json`** lên Git để đồng bộ cho toàn bộ thành viên trong nhóm.
-- **Nếu `package-lock.json` bị sửa ngoài ý muốn (Modified `M`) khi chỉ pull code**:
-  - Chạy `git restore package-lock.json` để hoàn tác, không commit file lock nếu không cài thêm package mới.
-
-### Bước 2: Chạy build kiểm tra lỗi cục bộ (Local Build Check)
-Chạy lệnh build ngay tại thư mục dự án:
-```bash
-npm run build
-```
-- **Yêu cầu bắt buộc**: Bản build phải hoàn thành thành công 100%, không được chứa bất kỳ lỗi TypeScript, compile-time hay lỗi cú pháp nào.
-- Nếu build thất bại, phải sửa sạch lỗi trước khi tiếp tục.
-
-### Bước 3: Tạo nhánh chức năng mới (Feature Branch)
-Để tránh ảnh hưởng trực tiếp đến các nhánh chính (`main`, `dev`), hãy tạo một nhánh làm việc riêng theo mã task trong TaskList:
-```bash
-# Ví dụ: từ nhánh làm việc hiện tại, chuyển sang nhánh mới
-git checkout -b feature/FW-07-asset-map
-```
-
-### Bước 4: Đồng bộ mã nguồn từ nhánh `dev`
-Pull phiên bản mới nhất từ nhánh `dev` của dự án về nhánh làm việc hiện tại của bạn:
-```bash
-git pull origin dev
-```
-
-### Bước 5: Xử lý xung đột (Conflict Handling)
-Nếu quá trình pull xảy ra xung đột (conflict):
-1. Mở IDE đối chiếu cẩn thận giữa phần code mới của bạn và phần code của các thành viên khác.
-2. Giữ lại đầy đủ logic nghiệp vụ chính xác của cả hai bên.
-3. Chạy lại `npm run build` để kiểm tra sau khi giải quyết conflict.
-
-### Bước 6: Commit và Push lên GitHub
-Khi build đã thành công và conflict được xử lý sạch sẽ:
-```bash
-git add .
-git commit -m "feat(FW-07): hoàn thành bản đồ tài sản GIS lớp cột và feeder"
-git push origin feature/FW-07-asset-map
-```
+## 1. Tech Stack & Directory Structure
+- **Stack**: React 18 + TypeScript 5 + Vite 5 | Redux Toolkit + **Redux-Saga** | TailwindCSS v4 + Lucide + Sonner | React Hook Form + Zod v4 | React Router v7 | MapLibre GL | Axios (`src/config/apiClient.ts`).
+- **Structure (`src/`)**:
+  - `types/`: 100% Auto-generated Backend DTOs & Enums (`npm run gen`). **READ-ONLY**.
+  - `feature/<module>/`: Quản lý State & API theo chuẩn 3 files: `<module>API.ts`, `<module>Slice.ts`, `<module>Saga.ts`.
+  - `redux/`: Root Store (`store.ts`, `rootReducer.ts`, `rootSaga.ts`).
+  - `pages/<page>/` & `components/`: Màn hình chính, sub-components cục bộ và shared UI components.
+  - `hooks/` & `utils/`: Custom hooks và hàm tiện ích thuần túy theo domain.
+  - `test/`: Tập trung toàn bộ Unit/Integration Tests (`npx vitest run`).
 
 ---
 
-## 🌐 2. Quy chuẩn Gọi API & Base URL (`/api/v1`)
+## 2. Architecture Skeleton
 
-1. **Cấu hình Base URL**: Cung cấp Host URL gốc trong file `.env` (ví dụ: `VITE_API_URL=http://localhost:5000`).
-2. **Tiền tố `/api/v1` mặc định**: Hệ thống `apiClient` (`src/config/apiClient.ts`) đã tự động cấu hình gắn `/api/v1` vào Base URL (`http://localhost:5000/api/v1`).
-3. **Đường dẫn trong API Files**: Khi định nghĩa các hàm gọi API trong `src/feature/[module]/*API.ts`, chỉ cần viết endpoint ngắn gọn:
-   - ✅ **Đúng**: `apiClient.post('/auth/login', payload)`
-   - ✅ **Đúng**: `apiClient.get('/poles')`
-   - ✅ **Đúng**: `apiClient.post('/work-orders', data)`
-   - ❌ **Không cần lặp lại**: `apiClient.post('/api/v1/auth/login', payload)`
+### 2.1. Routes & RBAC (`src/App.tsx`)
+Phân quyền qua `UserRole`: `Admin (3)`, `MaintenanceEngineer / Manager (1)`, `ManagementAgency / Superior (0)`, `FieldCrew (2)`:
+- **Public**: `/login`, `/r/:code` & `/report` (Báo cáo QR người dân - không gọi `checkAuth`), `/forbidden`.
+- **Manager (`MaintenanceEngineer`)**: `/dashboard`, `/gis-map`, `/work-schedule`, `/assets` (Tuyến, Tủ, Mạch, Cột, Đèn, IoT), `/citizen-reports`.
+- **Superior (`ManagementAgency`)**: `/reports`, `/gis-map`.
+- **Admin (`Admin`)**: `/admin/dashboard`, `/admin/system` (Users), `/admin/communes` (Địa bàn & BBox), `/admin/firmware`, `/admin/settings`.
 
----
-
-## 📁 3. Quy chuẩn Cấu trúc Thư mục Dự án
-
-- `src/feature/[module]/`: Chứa Redux Slice, Saga và API thực tế cho từng module nghiệp vụ.
-- `src/pages/[page]/`: Chứa các trang UI kết nối Redux thực tế cho từng chức năng.
-- `src/components/common/`: Chứa các UI Components tái sử dụng dùng chung chính thức khi triển khai các task.
+### 2.2. State, API & Types Principle
+- **Store**: Mọi state toàn cục đăng ký tại `src/redux/rootReducer.ts` và `src/redux/rootSaga.ts`. Khi làm module nào, mở trực tiếp `src/feature/<module>/` để xem Slice/Actions/Saga của module đó.
+- **API Client (`src/config/apiClient.ts`)**: Đã gắn sẵn tiền tố `/api/v1`, HttpOnly Cookie & Token Interceptor, tự unwrap `response.data.data`. Trong `*API.ts` chỉ truyền path sau `/api/v1` (VD: `apiClient.get('/assets/poles')`, không lặp lại `/api/v1`).
+- **Types (`src/types/`)**: Toàn bộ DTO và Enum nghiệp vụ nằm sẵn trong `src/types/` (chia theo domain: `common/`, `auth/`, `assets/`, `map/`, `workorders/`, `citizen/`, `faults/`, `admin/`). Bắt buộc mở `src/types/` tra cứu và import trực tiếp.
 
 ---
 
-## 💻 4. Nguyên tắc Code (Karpathy Coding Guidelines)
+## 3. Core Engineering Rules & Anti-Patterns
 
-1. **Đơn giản tối đa (Simplicity First)**: Code ngắn gọn, trực diện nhất có thể để giải quyết đúng yêu cầu task giao. Không tự vẽ thêm tính năng ngoài đặc tả, không viết các tầng trừu tượng dư thừa (over-engineering).
-2. **Thay đổi chính xác (Surgical Changes)**: Chỉ chỉnh sửa hoặc viết code liên quan trực tiếp đến module được phân công. Không tự ý format hay refactor lại code của người khác nếu đang hoạt động ổn định.
-3. **Chuẩn hóa 4 trạng thái UI**: Mọi trang/component gọi API đều phải xử lý đầy đủ 4 trạng thái:
-   - 🔄 **Loading** (Đang tải dữ liệu)
-   - ✅ **Has-Data** (Có dữ liệu)
-   - 📭 **Empty** (Dữ liệu rỗng)
-   - ❌ **Error** (Bị lỗi kết nối)
+### 3.1. Chu trình Dữ liệu Chuẩn (4-Tier Redux-Saga Flow)
+`UI Component/Hook` --(`dispatch(actionRequest)`)--> `Slice` (bật loading) --> `Saga` (gọi `*API.ts` qua `apiClient`, xử lý `try/catch`, bắn `toast`) --(`put(Success/Failure)`)--> `Store` --(`useSelector`)--> `UI Re-render` (đảm bảo đủ 4 trạng thái: `Loading`, `Has-Data`, `Empty`, `Error`).
+
+### 3.2. Những Điều TUYỆT ĐỐI CẤM (Strict Anti-Patterns)
+1. **CẤM gọi API ngoài Redux-Saga**: Không dùng `fetch`, `axios`, `apiClient`, hay `createAsyncThunk` trực tiếp trong Component, Hook, hay `useEffect`.
+2. **CẤM vi phạm API-Types-First**:
+   - Không tự viết lại interface đã có trong `src/types/`, không dùng `as any`.
+   - Không kế thừa/bọc type thừa (`extends`, `&`, `Omit`).
+   - Không nhét state thuần UI (`isOpen`, `activeTab`) hoặc trường của thực thể khác vào DTO Backend (dữ liệu liên kết phải lookup bằng `.find()` từ Store).
+3. **CẤM Mock Data & Fake Fallbacks**:
+   - Không tạo dữ liệu giả hoặc fallback chuỗi bịa đặt trong `||`, `??` (như `'POLE-0001'`, `'Tuyến A'`).
+   - Quy tắc fallback: Trong logic code dùng `''`; khi hiển thị UI thiếu dữ liệu dùng `'-'`.
+4. **CẤM chạm vào Backend & Phá cấu trúc**:
+   - Repo `../luxmap_backend` là **100% READ-ONLY**.
+   - Không dùng `window.confirm` / `window.alert` (phải dùng Custom Modal).
+   - Chỉ sửa đúng phạm vi task (Surgical Changes), không over-engineering.
+
+---
+
+## 4. Workflow Instructions for AI
+Khi nhận task mới, thực hiện đúng thứ tự:
+1. **Lập Plan (Tiếng Việt)**: Khảo sát code, trình bày phương án (Mục tiêu, File tác động, Types & Store sử dụng) và **chờ User duyệt trước khi code**.
+2. **Kiểm tra Types & Store**: Đọc `src/types/<domain>/` và `src/feature/<domain>/` liên quan trước khi viết logic. Nếu Backend mới đổi schema, chạy `npm run gen`.
+3. **Triển khai & Xác minh**: Giữ nguyên cấu trúc thư mục; kiểm tra lỗi tĩnh bằng `npx tsc --noEmit` và `npm run build` (không tự mở trình duyệt test).
