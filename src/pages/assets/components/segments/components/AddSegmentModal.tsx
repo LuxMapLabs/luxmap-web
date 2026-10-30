@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import { createPortal } from 'react-dom'
 import { X, Route, CheckCircle2, AlertCircle } from 'lucide-react'
@@ -23,7 +23,12 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
 }) => {
   const communes = useSelector((state: RootState) => state.adminCommunes?.communes || [])
   const currentUser = useSelector((state: RootState) => state.auth?.user)
-  const defaultCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
+  const managerCommuneId =
+    currentUser?.communes?.[0]?.commune_id || currentUser?.commune_ids?.[0] || ''
+  const managerCommuneName =
+    currentUser?.communes?.[0]?.name ||
+    communes.find((c) => c.commune_id === managerCommuneId)?.name ||
+    null
 
   const nextCode = `SEG-${String(existingCount + 1).padStart(3, '0')}`
 
@@ -31,39 +36,6 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
   const [segmentName, setSegmentName] = useState('')
   const [roadClass, setRoadClass] = useState<RoadClass>('inter_commune')
   const [lengthM, setLengthM] = useState('0')
-  const [communeId, setCommuneId] = useState(defaultCommuneId)
-
-  // Xây dựng danh sách tùy chọn địa bàn cho dropdown
-  const communeOptions = useMemo(() => {
-    if (communes && communes.length > 0) {
-      return communes.map((c) => ({
-        id: c.commune_id || '',
-        name: c.name || c.commune_id || '',
-        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
-      }))
-    }
-    if (currentUser?.communes && currentUser.communes.length > 0) {
-      return currentUser.communes.map((c) => ({
-        id: c.commune_id || '',
-        name: c.name || c.commune_id || '',
-        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
-      }))
-    }
-    if (currentUser?.commune_ids && currentUser.commune_ids.length > 0) {
-      return currentUser.commune_ids.map((id) => ({
-        id,
-        name: id,
-        label: `Địa bàn ${id}`,
-      }))
-    }
-    return [{ id: defaultCommuneId, name: defaultCommuneId, label: `Địa bàn ${defaultCommuneId}` }]
-  }, [communes, currentUser, defaultCommuneId])
-
-  useEffect(() => {
-    if (communeOptions.length > 0 && (!communeId || !communeOptions.some((o) => o.id === communeId))) {
-      setCommuneId(communeOptions[0].id)
-    }
-  }, [communeOptions, communeId])
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -127,8 +99,8 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
       road_class: roadClass,
       length_m: actualLen,
       pole_count: 0,
-      commune_id: communeId || defaultCommuneId,
-      commune_name: communes.find((c) => c.commune_id === communeId)?.name || null,
+      commune_id: managerCommuneId || null,
+      commune_name: managerCommuneName,
       data_source: 'field',
       geom_wkt: geomWkt,
       updated_at: new Date().toISOString(),
@@ -179,7 +151,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                   required
                   value={segmentName}
                   onChange={(e) => setSegmentName(e.target.value)}
-                  placeholder="VD: Tuyến D - Đường Bờ Kênh Củ Chi..."
+                  placeholder="VD: Tuyến D - Đường Bờ Kênh..."
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-600"
                 />
               </div>
@@ -196,24 +168,6 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                 >
                   <option value="inter_commune">Đường liên xã (Trục chính)</option>
                   <option value="inter_village">Đường liên thôn / liên ấp</option>
-                </select>
-              </div>
-
-              {/* Địa bàn quản lý */}
-              <div className="space-y-1">
-                <label className="block font-bold text-slate-700 dark:text-slate-300">
-                  Địa bàn quản lý (Xã/Thị trấn):
-                </label>
-                <select
-                  value={communeId}
-                  onChange={(e) => setCommuneId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  {communeOptions.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
                 </select>
               </div>
 
@@ -244,12 +198,12 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
               </div>
 
               {/* Validation Error Alert Box */}
-              {submitError && (
+              {submitError ? (
                 <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-center gap-2.5 text-rose-700 dark:text-rose-300 text-xs font-semibold animate-in fade-in slide-in-from-bottom-1">
                   <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                   <span>{submitError}</span>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* CỘT PHẢI: BẢN ĐỒ VẼ LỘ TRÌNH (60% width trên md) */}
@@ -261,7 +215,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                   editable={true}
                   defaultEditMode="append"
                   hideTerminalPins={true}
-                  communeId={communeId}
+                  communeId={managerCommuneId}
                   onRouteCoordsChange={handleRouteCoordsChange}
                 />
               </div>

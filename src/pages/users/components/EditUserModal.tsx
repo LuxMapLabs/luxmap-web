@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
-import { X, Save, Shield, Mail, User, Check, MapPin, Globe } from 'lucide-react'
+import { X, Save, Shield, Mail, User, MapPin, Globe } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
 import type { UserAccountItem, UpdateUserRequest } from '../../../types/admin/users'
 import type { UserRole } from '../../../types/common/enums'
@@ -25,7 +25,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('field_engineer')
-  const [selectedCommunes, setSelectedCommunes] = useState<string[]>([])
+  const [selectedCommune, setSelectedCommune] = useState<string>('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -34,21 +34,19 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       setFullName(user.full_name || '')
       const userRole = (user.role as UserRole) || 'field_engineer'
       setRole(userRole)
-      const initialCommunes =
+      const initialCommune =
         userRole === 'system_admin'
-          ? []
-          : (user.commune_ids || []).filter((id) => Boolean(id))
-      setSelectedCommunes(initialCommunes)
+          ? ''
+          : (user.commune_ids || []).find((id) => Boolean(id) && id !== '*' && id !== 'all') || ''
+      setSelectedCommune(initialCommune)
       setErrors({})
     }
   }, [user])
 
   if (!isOpen || !user) return null
 
-  const handleToggleCommune = (code: string) => {
-    setSelectedCommunes((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
-    )
+  const handleSelectCommune = (code: string) => {
+    setSelectedCommune(code)
     if (errors.communes) {
       setErrors((prev) => ({ ...prev, communes: '' }))
     }
@@ -57,7 +55,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const handleRoleChange = (newRole: UserRole) => {
     setRole(newRole)
     if (newRole === 'system_admin') {
-      setSelectedCommunes([])
+      setSelectedCommune('')
     }
     if (errors.communes) {
       setErrors((prev) => ({ ...prev, communes: '' }))
@@ -77,8 +75,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       newErrors.fullName = 'Họ và tên không được để trống'
     }
 
-    if (role !== 'system_admin' && selectedCommunes.length === 0) {
-      newErrors.communes = 'Vui lòng chọn ít nhất 1 địa bàn quản lý cho vai trò này'
+    if (role !== 'system_admin' && !selectedCommune) {
+      newErrors.communes = 'Vui lòng chọn 1 địa bàn quản lý cho vai trò này'
     }
 
     setErrors(newErrors)
@@ -93,9 +91,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       email: email.trim(),
       full_name: fullName.trim(),
       role,
-      commune_ids: role === 'system_admin' ? [] : selectedCommunes,
+      commune_ids: role === 'system_admin' ? [] : [selectedCommune],
     })
   }
+
+  const selectedCommuneObj = communes.find((c) => c.commune_id === selectedCommune)
+  const selectedCommuneLabel = selectedCommuneObj
+    ? selectedCommuneObj.name || selectedCommuneObj.commune_id || '-'
+    : ''
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -154,7 +157,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                   : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500/20 focus:border-indigo-500'
               }`}
             />
-            {errors.fullName && <p className="text-rose-500 mt-1 text-[11px]">{errors.fullName}</p>}
+            {errors.fullName ? (
+              <p className="text-rose-500 mt-1 text-[11px]">{errors.fullName}</p>
+            ) : null}
           </div>
 
           {/* Email */}
@@ -176,7 +181,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 }`}
               />
             </div>
-            {errors.email && <p className="text-rose-500 mt-1 text-[11px]">{errors.email}</p>}
+            {errors.email ? (
+              <p className="text-rose-500 mt-1 text-[11px]">{errors.email}</p>
+            ) : null}
           </div>
 
           {/* Role */}
@@ -223,14 +230,20 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                   <span>Phạm vi địa bàn quản lý</span>
                   <span className="text-rose-500">*</span>
                 </label>
-                <span className="text-[10px] text-slate-400">
-                  Đã chọn: {selectedCommunes.length} xã/thị trấn
-                </span>
+                {selectedCommuneLabel ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold border border-indigo-200/80 dark:border-indigo-800 max-w-[180px] truncate">
+                    {selectedCommuneLabel}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400">Chưa chọn địa bàn</span>
+                )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
-                Chọn các xã/thị trấn mà tài khoản này phụ trách quản lý (tối thiểu 1 địa bàn)
+                Chọn 1 xã/phường duy nhất mà tài khoản này phụ trách quản lý
               </p>
               <div
+                role="radiogroup"
+                aria-label="Phạm vi địa bàn quản lý"
                 className={`max-h-36 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-800/50 border rounded-xl grid grid-cols-2 gap-1.5 ${
                   errors.communes
                     ? 'border-rose-400 dark:border-rose-500'
@@ -244,26 +257,40 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 ) : (
                   communes.map((c) => {
                     const code = c.commune_id || ''
-                    const isChecked = selectedCommunes.includes(code)
+                    const isSelected = selectedCommune === code
                     return (
                       <button
                         key={code}
                         type="button"
-                        onClick={() => handleToggleCommune(code)}
-                        className={`px-2 py-1.5 rounded-lg text-left flex items-center justify-between transition cursor-pointer text-[11px] ${
-                          isChecked
-                            ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800'
-                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 hover:bg-slate-100'
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => handleSelectCommune(code)}
+                        className={`px-2.5 py-2 rounded-xl text-left flex items-center justify-between gap-2 transition cursor-pointer text-[11px] ${
+                          isSelected
+                            ? 'bg-indigo-50/90 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-300 dark:border-indigo-700 shadow-2xs'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/80'
                         }`}
                       >
-                        <span className="truncate">{c.name || code}</span>
-                        {isChecked && <Check className="w-3 h-3 text-indigo-600 shrink-0 ml-1" />}
+                        <span className="truncate">{c.name || code || '-'}</span>
+                        <span
+                          className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 transition ${
+                            isSelected
+                              ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-600 dark:bg-indigo-500'
+                              : 'border-slate-300 dark:border-slate-600 bg-transparent'
+                          }`}
+                        >
+                          {isSelected ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                          ) : null}
+                        </span>
                       </button>
                     )
                   })
                 )}
               </div>
-              {errors.communes && <p className="text-rose-500 mt-1 text-[11px]">{errors.communes}</p>}
+              {errors.communes ? (
+                <p className="text-rose-500 mt-1 text-[11px]">{errors.communes}</p>
+              ) : null}
             </div>
           )}
 

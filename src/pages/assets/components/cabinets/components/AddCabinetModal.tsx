@@ -53,40 +53,8 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
   const mapSegments = useSelector((state: RootState) => state.map.segments)
   const currentUser = useSelector((state: RootState) => state.auth.user)
   const communes = useSelector((state: RootState) => state.adminCommunes.communes)
-  const defaultCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
-  const [selectedCommuneId, setSelectedCommuneId] = useState(defaultCommuneId)
-
-  // Xây dựng danh sách tùy chọn địa bàn cho dropdown
-  const communeOptions = useMemo(() => {
-    if (communes && communes.length > 0) {
-      return communes.map((c) => ({
-        id: c.commune_id || '',
-        name: c.name || c.commune_id || '',
-        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
-      }))
-    }
-    if (currentUser?.communes && currentUser.communes.length > 0) {
-      return currentUser.communes.map((c) => ({
-        id: c.commune_id || '',
-        name: c.name || c.commune_id || '',
-        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
-      }))
-    }
-    if (currentUser?.commune_ids && currentUser.commune_ids.length > 0) {
-      return currentUser.commune_ids.map((id) => ({
-        id,
-        name: id,
-        label: `Địa bàn ${id}`,
-      }))
-    }
-    return [{ id: defaultCommuneId, name: defaultCommuneId, label: `Địa bàn ${defaultCommuneId}` }]
-  }, [communes, currentUser, defaultCommuneId])
-
-  useEffect(() => {
-    if (currentUser?.commune_ids?.[0]) {
-      setSelectedCommuneId(currentUser.commune_ids[0])
-    }
-  }, [currentUser])
+  const managerCommuneId =
+    currentUser?.communes?.[0]?.commune_id || currentUser?.commune_ids?.[0] || ''
 
   // Top Section: Segment (Tùy chọn)
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
@@ -98,6 +66,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
 
   const currentSegment = segmentList.find((s) => s.segment_id === selectedSegmentId)
   const resolvedSegmentName = currentSegment?.segment_name || ''
+  const activeCommuneId = currentSegment?.commune_id || managerCommuneId
 
   // Fetch map layers if empty
   useEffect(() => {
@@ -264,6 +233,11 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
 
     const idSet = new Set<string>()
     const cabinetsToSave: CabinetListItem[] = []
+    const resolvedCommuneName =
+      currentSegment?.commune_name ||
+      currentUser?.communes?.find((c) => c.commune_id === activeCommuneId)?.name ||
+      communes.find((c) => c.commune_id === activeCommuneId)?.name ||
+      null
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
@@ -303,8 +277,8 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
         cabinet_id: autoId,
         external_ref: autoId,
         cabinet_name: trimmedName,
-        commune_id: selectedCommuneId || currentSegment?.commune_id || defaultCommuneId,
-        commune_name: communes.find((c) => c.commune_id === selectedCommuneId)?.name || currentUser?.communes?.find((c) => c.commune_id === selectedCommuneId)?.name || currentSegment?.commune_name || null,
+        commune_id: activeCommuneId || null,
+        commune_name: resolvedCommuneName,
         data_source: 'field',
         location: {
           lat: parsedLat,
@@ -355,12 +329,12 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
         </div>
 
         {/* Global Error Banner */}
-        {errorMsg && (
+        {errorMsg ? (
           <div className="px-5 py-2.5 bg-rose-50 dark:bg-rose-950/60 border-b border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-2 shrink-0 animate-in fade-in">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
             <span>{errorMsg}</span>
           </div>
-        )}
+        ) : null}
 
         {/* Modal 2-Column Split Body */}
         <form onSubmit={handleFinalSubmit} className="flex-1 overflow-hidden flex flex-col">
@@ -374,25 +348,6 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                     <Route className="w-4 h-4 text-purple-700 dark:text-purple-400 drop-shadow-2xs" />
                     <span>1. Lọc nhanh tuyến đường trên bản đồ (tùy chọn):</span>
                   </div>
-                </div>
-
-                {/* 1.1 Địa bàn quản lý */}
-                <div className="space-y-1 pb-2 border-b border-purple-200/60 dark:border-purple-900/40">
-                  <div className="flex items-center gap-1.5 font-bold text-purple-950 dark:text-purple-200 text-xs">
-                    <MapPin className="w-4 h-4 text-purple-700 dark:text-purple-400" />
-                    <span>Địa bàn quản lý (Xã/Thị trấn):</span>
-                  </div>
-                  <select
-                    value={selectedCommuneId}
-                    onChange={(e) => setSelectedCommuneId(e.target.value)}
-                    className="w-full p-2 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-xl font-bold text-xs cursor-pointer shadow-2xs transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-600 text-slate-900 dark:text-slate-100"
-                  >
-                    {communeOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className="space-y-1">
@@ -543,11 +498,11 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                   <MapPin className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   <span>Vị Trí Tủ Điện Trên Bản Đồ Vệ Tinh (GIS)</span>
                 </span>
-                {selectedRowId && (
+                {selectedRowId ? (
                   <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 animate-pulse">
-                    Đang chọn: {rows.find((r) => r.rowId === selectedRowId)?.cabinet_name || 'Tủ'}
+                    Đang chọn: {rows.find((r) => r.rowId === selectedRowId)?.cabinet_name || '-'}
                   </span>
-                )}
+                ) : null}
               </div>
 
               <div className="flex-1 rounded-2xl overflow-hidden border border-purple-200 dark:border-purple-900/60 shadow-inner flex flex-col min-h-[380px]">
@@ -556,7 +511,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                   existingCabinets={availableCabinets}
                   rows={rows}
                   selectedRowId={selectedRowId}
-                  communeId={selectedCommuneId}
+                  communeId={activeCommuneId}
                   onSelectRow={setSelectedRowId}
                   onUpdateCoords={handleMapUpdateCoords}
                   onMapClickAdd={handleMapClickAdd}
