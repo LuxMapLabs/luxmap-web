@@ -84,25 +84,53 @@ interface FeederTooltipParams {
 }
 
 export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): string {
-  const isLineFault = p.status === 'fault'
-  const cabName = p.cabinet_external_ref || p.cabinet_name || p.cabinet_code || p.cabinet_id || p.from_id || 'Tủ điện'
+  const isLineFault = p.status === 'fault' || p.power_state === 'off'
+  const isLineActive = !isLineFault && (p.status === 'active' || p.power_state === 'on')
+
+  let statusBg = 'bg-slate-400'
+  let statusText = 'Chưa xác định nguồn'
+  let headerTitleColor = 'text-slate-700 dark:text-slate-300'
+  let badgeClasses = 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+
+  if (isLineFault) {
+    statusBg = 'bg-rose-500'
+    statusText = 'Đã ngắt nguồn'
+    headerTitleColor = 'text-rose-700 dark:text-rose-400'
+    badgeClasses = 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800'
+  } else if (isLineActive) {
+    statusBg = 'bg-emerald-500'
+    statusText = 'Đang cấp điện'
+    headerTitleColor = 'text-emerald-700 dark:text-emerald-400'
+    badgeClasses = 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800'
+  }
+
+  // Tủ cấp nguồn: Tuyệt đối không dùng mã cột (POLE-xxx) làm tên tủ điện
+  let cabName = p.cabinet_external_ref || p.cabinet_name || p.cabinet_code
+  if (!cabName && p.cabinet_id && !p.cabinet_id.startsWith('POLE')) {
+    cabName = p.cabinet_id
+  }
+  if (!cabName && p.from_id && p.from_id.startsWith('CAB')) {
+    cabName = p.from_id
+  }
+  if (!cabName) {
+    cabName = 'Chưa liên kết tủ'
+  }
+
   const feederDisplay = p.external_ref || p.feeder_name || p.feeder_id || 'FDR-001'
   const segName = p.segment_name || p.segment_id || 'Tuyến đường'
   const branch = p.branch != null ? `Nhánh ${p.branch}` : undefined
   const order = p.order != null ? `Cạnh thứ ${p.order}` : undefined
   const fromId = p.from_id
   const toPoleId = p.to_pole_id
-  const statusBg = isLineFault ? 'bg-rose-500' : 'bg-emerald-500'
-  const statusText = isLineFault ? 'Đã ngắt nguồn' : 'Đang cấp điện'
 
   return `
     <div class="bg-white/98 dark:bg-slate-900/98 text-slate-800 dark:text-slate-100 p-3 rounded-2xl shadow-xl border border-slate-200/90 dark:border-slate-700 backdrop-blur-md min-w-60 font-sans">
       <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800 gap-2">
-        <span class="font-bold text-xs ${isLineFault ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'} flex items-center gap-1.5 truncate">
+        <span class="font-bold text-xs ${headerTitleColor} flex items-center gap-1.5 truncate">
           <span class="w-2 h-2 rounded-full ${statusBg} ${isLineFault ? 'animate-pulse' : ''} shrink-0"></span>
           Tuyến điện ${feederDisplay}
         </span>
-        <span class="${isLineFault ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800' : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800'} px-2 py-0.5 rounded-full font-bold text-[10px] shrink-0">
+        <span class="${badgeClasses} px-2 py-0.5 rounded-full font-bold text-[10px] shrink-0 border">
           ${statusText}
         </span>
       </div>

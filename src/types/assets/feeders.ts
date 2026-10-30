@@ -2,7 +2,7 @@
  * Auto-generated Types for: assets/feeders
  * Sinh tự động từ endpoint Backend
  */
-import type { TopologySource } from '../common/enums'
+import type { FeederControlMode, FeederPowerState, TopologySource } from '../common/enums'
 import type { AssetLocation } from '../common/base'
 import type { TopologyPole } from './segments'
 
@@ -22,6 +22,13 @@ export interface FeederCabinet {
     cabinet_source: TopologySource
 }
 
+export interface FeederControlSnapshot {
+    node_id?: string | null
+    relay_no?: number
+    control_mode?: FeederControlMode
+    mode_reported_at?: string | null
+}
+
 export interface FeederDetail {
     feeder: FeederListItem
     geom_wkt?: string | null
@@ -29,6 +36,8 @@ export interface FeederDetail {
 }
 
 export interface FeederListItem {
+    control?: FeederControlSnapshot
+    power_state?: FeederPowerState
     feeder_id: string | null
     external_ref?: string | null
     feeder_name: string | null

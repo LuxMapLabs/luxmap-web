@@ -73,4 +73,26 @@ describe('Feeder Lines Two-Color State & Tooltip Test Suite (Task 12)', () => {
     expect(html).toContain('Nhánh 2 • Cạnh thứ 3')
     expect(html).not.toContain('Nguồn dữ liệu:')
   })
+
+  it('TC-04: Trạng thái nguồn chưa xác định (unknown) hiển thị màu trung tính xám và không dùng POLE làm tên tủ', () => {
+    const featureProps = {
+      feeder_id: 'FDR-009',
+      status: 'unknown',
+      power_state: 'unknown',
+      from_id: 'POLE-0026',
+      to_pole_id: 'POLE-0056',
+      branch: 1,
+      order: 2,
+      segment_name: 'SEG-002',
+    }
+
+    const html = getFeederTooltipHtml({ featureProps })
+
+    expect(html).toContain('Chưa xác định nguồn')
+    expect(html).toContain('bg-slate-400')
+    expect(html).not.toContain('Đang cấp điện')
+    expect(html).not.toContain('bg-emerald-500')
+    expect(html).not.toContain('Tủ cấp nguồn: <strong class="text-slate-900 dark:text-white font-semibold">POLE-0026')
+    expect(html).toContain('Tủ cấp nguồn: <strong class="text-slate-900 dark:text-white font-semibold">Chưa liên kết tủ')
+  })
 })

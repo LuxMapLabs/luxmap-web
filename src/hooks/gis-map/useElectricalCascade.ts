@@ -39,6 +39,7 @@ export function useElectricalCascade({
     cabinets: assetCabinets,
     feeders: assetFeeders,
   } = useSelector((state: RootState) => state.assets)
+  const activeFeederModes = useSelector((state: RootState) => state.lighting?.activeFeederModes || {})
 
   // Load map layers for the account's communes (the saga reads map_bounds from the profile); reload if that frame changes.
   const boundsKey = useSelector((state: RootState) => toBboxParam(state.auth.user?.map_bounds?.bbox) ?? '')
@@ -215,7 +216,10 @@ export function useElectricalCascade({
         p.cabinet_name ||
         (rawCabinetId ? `Tủ ${cabinetExternalRef || rawCabinetId}` : undefined)
 
-      const isFeederFault = Boolean(feederId && feederStatusMap[feederId] === 'fault')
+      const isFeederFault = Boolean(
+        feederId && (feederStatusMap[feederId] === 'fault' || activeFeederModes[feederId] === 'off')
+      )
+      const isFeederForcedOn = Boolean(feederId && activeFeederModes[feederId] === 'on')
       const geom = f.geometry || { type: 'Point', coordinates: [106.6, 10.8] }
 
       if (isFeederFault) {
@@ -233,6 +237,24 @@ export function useElectricalCascade({
             cabinet_external_ref: cabinetExternalRef,
             fixture_status: 'out',
             power_loss_reason: `Mất điện do mạch ${feederName || feederExternalRef || feederId} bị ngắt điện`,
+          },
+        } as PoleFeature
+      }
+
+      if (isFeederForcedOn) {
+        return {
+          type: 'Feature',
+          geometry: geom as any,
+          properties: {
+            ...p,
+            external_ref: externalRef,
+            feeder_id: feederId,
+            feeder_external_ref: feederExternalRef,
+            feeder_name: feederName,
+            cabinet_id: rawCabinetId,
+            cabinet_name: cabinetName,
+            cabinet_external_ref: cabinetExternalRef,
+            fixture_status: p.fixture_status === 'out' ? 'normal' : p.fixture_status || 'normal',
           },
         } as PoleFeature
       }

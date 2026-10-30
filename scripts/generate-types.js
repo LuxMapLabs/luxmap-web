@@ -24,10 +24,13 @@ if (fs.existsSync(envPath)) {
     }
 }
 
-const baseUrl = process.env.VITE_API_URL || process.env.API_URL || 'http://localhost:5141'
-const swaggerUrl = baseUrl.endsWith('.json') ? baseUrl : `${baseUrl.replace(/\/$/, '')}/swagger/v1/swagger.json`
+// Hỗ trợ truyền đường dẫn file local hoặc URL tùy chỉnh qua CLI
+// Ví dụ: npm run gen -- ./swagger.json hoặc npm run gen --remote
+const cliArg = process.argv.slice(2).find(arg => !arg.startsWith('--'))
+const isRemoteFlag = process.argv.includes('--remote')
 
-console.log('🚀 [1/3] Đang lấy Swagger Schema từ: ' + swaggerUrl + '...')
+const schemaSource = cliArg || (isRemoteFlag ? (process.env.REMOTE_API_URL || process.env.VITE_API_URL) : (process.env.VITE_API_URL || process.env.API_URL || 'http://localhost:5141'))
+const isLocalFile = fs.existsSync(schemaSource) && fs.statSync(schemaSource).isFile()
 
 function fetchJson(url) {
     return new Promise((resolve, reject) => {
@@ -50,6 +53,22 @@ function fetchJson(url) {
             reject(new Error(`Không thể kết nối tới Backend tại ${url}. Hãy chắc chắn Backend đang chạy! (${err.message})`))
         })
     })
+}
+
+async function loadSwaggerSchema() {
+    if (isLocalFile) {
+        console.log('🚀 [1/3] Đang đọc Swagger Schema từ file local: ' + schemaSource + '...')
+        try {
+            const raw = fs.readFileSync(schemaSource, 'utf-8')
+            return JSON.parse(raw)
+        } catch (e) {
+            throw new Error(`Không thể đọc file JSON tại ${schemaSource}: ${e.message}`)
+        }
+    }
+
+    const swaggerUrl = schemaSource.endsWith('.json') ? schemaSource : `${schemaSource.replace(/\/$/, '')}/swagger/v1/swagger.json`
+    console.log('🚀 [1/3] Đang lấy Swagger Schema từ: ' + swaggerUrl + '...')
+    return fetchJson(swaggerUrl)
 }
 
 function openApiTypeToTs(prop) {
@@ -98,6 +117,20 @@ function generateInterface(name, schema) {
     if (schema.enum) {
         const enumValues = schema.enum.map(v => typeof v === 'string' ? `'${v}'` : v).join(' | ')
         return `export type ${name} = ${enumValues}\n`
+    }
+
+    if (schema.type === 'string') {
+        return `export type ${name} = string\n`
+    }
+    if (schema.type === 'integer' || schema.type === 'number') {
+        return `export type ${name} = number\n`
+    }
+    if (schema.type === 'boolean') {
+        return `export type ${name} = boolean\n`
+    }
+    if (schema.type === 'array') {
+        const itemType = openApiTypeToTs(schema.items)
+        return `export type ${name} = ${itemType}[]\n`
     }
 
     let code = `export interface ${name} {\n`
@@ -162,7 +195,7 @@ function routeEndpoint(epPath, op) {
 
 async function run() {
     try {
-        const swagger = await fetchJson(swaggerUrl)
+        const swagger = await loadSwaggerSchema()
         const schemas = swagger.components?.schemas || {}
         const paths = swagger.paths || {}
 
@@ -279,17 +312,54 @@ async function run() {
         console.log(`  ✓ Đã lọc bỏ ${skippedMobileCount} API Mobile`)
         console.log(`  ✓ Đã giữ lại ${acceptedWebCount} API Web / Dùng chung`)
 
-        // 3. Dọn dẹp thư mục src/types/ (Xóa các file phẳng cũ để thay bằng folder mới)
+        // 3. Dọn dẹp thư mục src/types/ (Xóa các file cũ, file thừa không còn trong Swagger)
         console.log('🧹 [3/3] Dọn dẹp các file cũ và tạo cây thư mục types con...')
 
-        // Xóa các file type phẳng cũ ở root src/types/
-        if (fs.existsSync(typesDir)) {
-            const oldFlatFiles = ['assets.ts', 'poles.ts', 'segments.ts', 'auth.ts', 'luxreadings.ts', 'iotnodes.ts', 'workorders.ts', 'common.ts']
-            for (const f of oldFlatFiles) {
-                const fullP = path.resolve(typesDir, f)
-                if (fs.existsSync(fullP)) {
-                    fs.unlinkSync(fullP)
+        // Tập hợp danh sách các file tương đối dự kiến được sinh ra
+        const expectedFiles = new Set([
+            'common/enums.ts',
+            'common/base.ts',
+            ...Object.keys(fileTargetSchemas).map(k => `${k}.ts`)
+        ])
+
+        // Danh sách file bảo lưu (các helper UI state đặc thù, không do swagger trực tiếp sinh)
+        const preservedFiles = new Set([
+            'workSchedule.ts',
+            'reports/report.ts'
+        ])
+
+        let deletedCount = 0
+        function cleanupObsoleteFiles(dir, relativePrefix = '') {
+            if (!fs.existsSync(dir)) return
+            const entries = fs.readdirSync(dir, { withFileTypes: true })
+            for (const entry of entries) {
+                const fullPath = path.resolve(dir, entry.name)
+                const relPath = path.join(relativePrefix, entry.name).replace(/\\/g, '/')
+
+                if (entry.isDirectory()) {
+                    cleanupObsoleteFiles(fullPath, relPath)
+                    // Xóa thư mục rỗng sau khi dọn file
+                    const remaining = fs.readdirSync(fullPath)
+                    if (remaining.length === 0) {
+                        fs.rmdirSync(fullPath)
+                        console.log(`  🗑️  Đã xóa thư mục rỗng: src/types/${relPath}`)
+                    }
+                } else if (entry.isFile() && entry.name.endsWith('.ts')) {
+                    if (!expectedFiles.has(relPath) && !preservedFiles.has(relPath)) {
+                        fs.unlinkSync(fullPath)
+                        deletedCount++
+                        console.log(`  🗑️  Đã xóa file cũ không còn trong Swagger: src/types/${relPath}`)
+                    }
                 }
+            }
+        }
+
+        if (fs.existsSync(typesDir)) {
+            cleanupObsoleteFiles(typesDir)
+            if (deletedCount === 0) {
+                console.log('  ✓ Không có file cũ mồ côi nào cần xóa.')
+            } else {
+                console.log(`  ✓ Đã dọn dẹp ${deletedCount} file cũ mồ côi.`)
             }
         } else {
             fs.mkdirSync(typesDir, { recursive: true })
@@ -375,6 +445,12 @@ async function run() {
                 }
             }
 
+            // Đảm bảo auth/web import CurrentUserResponse từ auth/me
+            if (fileKey === 'auth/web') {
+                if (!neededImports['auth/me']) neededImports['auth/me'] = new Set()
+                neededImports['auth/me'].add('CurrentUserResponse')
+            }
+
             // Ghi các câu lệnh import
             for (const [otherKey, names] of Object.entries(neededImports)) {
                 const relPath = getRelativeImport(fileKey, otherKey)
@@ -400,14 +476,12 @@ async function run() {
                 fileContent += `export interface WebAuthTokenResponse {\n    accessToken?: string\n    access_token?: string | null\n    tokenType?: string\n    token_type?: string | null\n    expiresIn?: number\n    expires_in?: number\n}\n\n`
                 fileContent += `export interface WebLoginRequest {\n    username?: string | null\n    password?: string | null\n    rememberMe?: boolean\n    remember_me?: boolean\n    emailOrPhone?: string\n}\n\n`
                 fileContent += `export enum UserRole {\n  ManagementAgency = 0,\n  MaintenanceEngineer = 1,\n  FieldCrew = 2,\n  Admin = 3,\n}\n`
-                fileContent += `\nexport interface User {\n  id?: string\n  userId?: string\n  fullName: string\n  username?: string\n  email: string | null\n  phoneNumber?: string | null\n  role: UserRole\n  roleString?: string\n  administrativeUnitId?: string\n  communeIds?: string[]\n  mapBounds?: import('./me').MapBounds | null\n}\n`
                 fileContent += `\nexport interface JwtPayloadClaims {\n  sub: string\n  role: string\n  commune_ids: string[]\n  exp: number\n  iat: number\n  iss?: string\n  aud?: string\n}\n`
-                fileContent += `\nexport interface AuthState {\n  user: User | null\n  isAuthenticated: boolean\n  accessToken?: string | null\n  refreshToken?: string | null\n  loading: boolean\n  isRefreshingProfile?: boolean\n  error: string | null\n}\n`
+                fileContent += `\nexport interface AuthState {\n  user: CurrentUserResponse | null\n  isAuthenticated: boolean\n  accessToken?: string | null\n  refreshToken?: string | null\n  loading: boolean\n  isRefreshingProfile?: boolean\n  error: string | null\n}\n`
                 fileContent += `\nexport interface LoginRequest {\n  emailOrPhone: string\n  password: string\n  rememberMe?: boolean\n  username?: string\n  remember_me?: boolean\n}\n`
                 fileContent += `\nexport interface RegisterRequest {\n  username?: string | null\n  fullName?: string\n  full_name?: string | null\n  email?: string | null\n  phoneNumber?: string | null\n  password?: string | null\n  administrativeUnitId?: string\n  role?: UserRole\n}\n`
                 fileContent += `\nexport interface RegisterResponse {\n  user_id?: string | null\n  username?: string | null\n  email?: string | null\n  full_name?: string | null\n  role?: string | null\n  commune_ids?: string | null[]\n  message?: string | null\n}\n`
                 fileContent += `\nexport interface ApiResponse<T> {\n  data: T | null\n  error?: {\n    code: string\n    message: string\n    details?: Record<string, string[]>\n  } | null\n}\n`
-                fileContent += `\nexport interface CurrentUserResponse {\n  user_id: string\n  username: string\n  email: string\n  full_name: string\n  role: string\n  commune_ids: string[]\n  map_bounds?: import('./me').MapBounds | null\n}\n`
             }
 
             const outPath = path.resolve(targetDir, `${fileName}.ts`)

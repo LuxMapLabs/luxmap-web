@@ -23,6 +23,8 @@ export type FaultType = 'lamp_out' | 'lamp_dim' | 'segment_outage' | 'node_offli
 
 export type FeederControlMode = 'on' | 'off' | 'auto'
 
+export type FeederPowerState = 'unknown' | 'on' | 'off'
+
 export type FixtureStatus = 'normal' | 'dim' | 'out' | 'unknown'
 
 export type FixtureType = 'led_road_lamp'
