@@ -29,8 +29,12 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
 }) => {
   // Lấy danh sách cột thực tế từ Redux Store
   const allPoles = useSelector((state: RootState) => state.assets?.poles || [])
-  const communes = useSelector((state: RootState) => state.adminCommunes?.communes || [])
   const currentUser = useSelector((state: RootState) => state.auth?.user)
+  const activeCommuneId =
+    segment.commune_id ||
+    currentUser?.communes?.[0]?.commune_id ||
+    currentUser?.commune_ids?.[0] ||
+    ''
 
   // Lọc danh sách cột đèn thực tế thuộc tuyến đường này
   const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
@@ -65,46 +69,6 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
     (segment.road_class as RoadClass) || 'inter_commune'
   )
   const [lengthM, setLengthM] = useState<number>(segment.length_m || 1000)
-  const [communeId, setCommuneId] = useState(segment.commune_id || 'COM-001')
-
-  // Tuyến đường đã có cột đèn thì khóa không cho phép đổi địa bàn
-  const poleCount = (segment.pole_count && segment.pole_count > 0) ? segment.pole_count : segmentPoles.length
-  const isCommuneLocked = poleCount > 0
-
-  const communeOptions = useMemo(() => {
-    let opts: { id: string; name: string; label: string }[] = []
-    if (communes && communes.length > 0) {
-      opts = communes.map((c) => ({
-        id: c.commune_id || '',
-        name: c.name || c.commune_id || '',
-        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
-      }))
-    } else if (currentUser?.communes && currentUser.communes.length > 0) {
-      opts = currentUser.communes.map((c) => ({
-        id: c.commune_id || '',
-        name: c.name || c.commune_id || '',
-        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
-      }))
-    } else if (currentUser?.commune_ids && currentUser.commune_ids.length > 0) {
-      opts = currentUser.commune_ids.map((id) => ({
-        id,
-        name: id,
-        label: `Địa bàn ${id}`,
-      }))
-    } else {
-      const fallbackId = segment.commune_id || 'COM-001'
-      opts = [{ id: fallbackId, name: fallbackId, label: `Địa bàn ${fallbackId}` }]
-    }
-
-    if (communeId && !opts.some((o) => o.id === communeId)) {
-      opts.unshift({
-        id: communeId,
-        name: segment.commune_name || communeId,
-        label: segment.commune_name ? `${segment.commune_name} (${communeId})` : `Địa bàn ${communeId}`,
-      })
-    }
-    return opts
-  }, [communes, currentUser, communeId, segment.commune_id, segment.commune_name])
 
   // Coordinate States initialized with extracted coordinates
   const [startLat, setStartLat] = useState<number>(initialStart[1])
@@ -185,7 +149,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
       segment_name: segmentName.trim() || segment.segment_id,
       road_class: roadClass,
       length_m: lengthM,
-      commune_id: communeId,
+      commune_id: activeCommuneId || null,
       geom_wkt: geomWkt,
       updated_at: new Date().toISOString(),
     } as SegmentListItem)
@@ -220,173 +184,139 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
           {/* CỘT TRÁI (40% width trên md) */}
           <div className="md:col-span-5 p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
             {/* Tên tuyến đường */}
-        <div className="space-y-1">
-          <label className="font-bold text-slate-700 dark:text-slate-300">Tên tuyến đường:</label>
-          <input
-            type="text"
-            value={segmentName}
-            onChange={(e) => setSegmentName(e.target.value)}
-            className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        {/* Cấp đường & Chiều dài */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="font-bold text-slate-700 dark:text-slate-300">Cấp đường quy hoạch:</label>
-
-            <select
-              value={roadClass}
-              onChange={(e) => setRoadClass(e.target.value as RoadClass)}
-              className="w-full p-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
-            >
-              <option value="inter_commune">Đường liên xã</option>
-              <option value="inter_village">Đường liên ấp / thôn</option>
-            </select>
-
-          </div>
-          <div className="space-y-1">
-            <label className="font-bold text-slate-700 dark:text-slate-300">Chiều dài tuyến (mét):</label>
-            <input
-              type="number"
-              value={lengthM}
-              onChange={(e) => setLengthM(Number(e.target.value))}
-              className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Địa bàn Xã/Thị trấn */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <label className="font-bold text-slate-700 dark:text-slate-300">
-              Địa bàn quản lý (Xã/Thị trấn):
-            </label>
-            {isCommuneLocked && (
-              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-900/60">
-                🔒 Đã khóa (Có {poleCount} cột trên tuyến)
-              </span>
-            )}
-          </div>
-          <select
-            value={communeId}
-            disabled={isCommuneLocked}
-            onChange={(e) => setCommuneId(e.target.value)}
-            className={`w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none ${
-              isCommuneLocked ? 'opacity-65 cursor-not-allowed bg-slate-100 dark:bg-slate-900/80' : 'cursor-pointer focus:ring-2 focus:ring-blue-500'
-            }`}
-          >
-            {communeOptions.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          {isCommuneLocked && (
-            <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">
-              💡 Tuyến đường đã có cột đèn ({poleCount} cột), không thể thay đổi địa bàn quản lý để tránh sai lệch dữ liệu GIS.
-            </p>
-          )}
-        </div>
-
-        {/* Tọa độ Điểm đầu & Điểm cuối GPS */}
-        <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
-          <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-blue-500" />
-              <span>Tọa độ Điểm Đầu & Điểm Cuối Tuyến (WGS84):</span>
+            <div className="space-y-1">
+              <label className="font-bold text-slate-700 dark:text-slate-300">Tên tuyến đường:</label>
+              <input
+                type="text"
+                value={segmentName}
+                onChange={(e) => setSegmentName(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+              />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2.5 text-[11px]">
-            {/* Điểm đầu */}
-            <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900/60 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <div className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span>🟢 Điểm đầu (Start GPS):</span>
-                </div>
-                {originalStartRef.current && (
-                  <button
-                    type="button"
-                    onClick={handleResetStart}
-                    title="Khôi phục điểm đầu ban đầu"
-                    className="text-[10px] text-slate-400 hover:text-amber-500 flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                    <span>Đặt lại</span>
-                  </button>
-                )}
+            {/* Cấp đường & Chiều dài */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-slate-300">Cấp đường quy hoạch:</label>
+
+                <select
+                  value={roadClass}
+                  onChange={(e) => setRoadClass(e.target.value as RoadClass)}
+                  className="w-full p-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+                >
+                  <option value="inter_commune">Đường liên xã</option>
+                  <option value="inter_village">Đường liên ấp / thôn</option>
+                </select>
               </div>
-              <div className="grid grid-cols-2 gap-1.5 font-mono">
-                <div>
-                  <label className="text-[9px] text-slate-400 font-medium block">Vĩ độ (Lat)</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={startLat}
-                    onChange={(e) => handleStartLatChange(parseFloat(e.target.value) || 0)}
-                    className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-emerald-500 text-[11px]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] text-slate-400 font-medium block">Kinh độ (Lng)</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={startLng}
-                    onChange={(e) => handleStartLngChange(parseFloat(e.target.value) || 0)}
-                    className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-emerald-500 text-[11px]"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-slate-300">Chiều dài tuyến (mét):</label>
+                <input
+                  type="number"
+                  value={lengthM}
+                  onChange={(e) => setLengthM(Number(e.target.value))}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none"
+                />
               </div>
             </div>
 
-            {/* Điểm cuối */}
-            <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/60 shadow-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <div className="text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                  <span>🔴 Điểm cuối (End GPS):</span>
+            {/* Tọa độ Điểm đầu & Điểm cuối GPS */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+              <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Tọa độ Điểm Đầu & Điểm Cuối Tuyến (WGS84):</span>
                 </div>
-                {originalEndRef.current && (
-                  <button
-                    type="button"
-                    onClick={handleResetEnd}
-                    title="Khôi phục điểm cuối ban đầu"
-                    className="text-[10px] text-slate-400 hover:text-amber-500 flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                    <span>Đặt lại</span>
-                  </button>
-                )}
               </div>
-              <div className="grid grid-cols-2 gap-1.5 font-mono">
-                <div>
-                  <label className="text-[9px] text-slate-400 font-medium block">Vĩ độ (Lat)</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={endLat}
-                    onChange={(e) => handleEndLatChange(parseFloat(e.target.value) || 0)}
-                    className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-rose-500 text-[11px]"
-                  />
+
+              <div className="grid grid-cols-2 gap-2.5 text-[11px]">
+                {/* Điểm đầu */}
+                <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900/60 shadow-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span>🟢 Điểm đầu (Start GPS):</span>
+                    </div>
+                    {originalStartRef.current ? (
+                      <button
+                        type="button"
+                        onClick={handleResetStart}
+                        title="Khôi phục điểm đầu ban đầu"
+                        className="text-[10px] text-slate-400 hover:text-amber-500 flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <RotateCcw className="w-2.5 h-2.5" />
+                        <span>Đặt lại</span>
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 font-mono">
+                    <div>
+                      <label className="text-[9px] text-slate-400 font-medium block">Vĩ độ (Lat)</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={startLat}
+                        onChange={(e) => handleStartLatChange(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-emerald-500 text-[11px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-slate-400 font-medium block">Kinh độ (Lng)</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={startLng}
+                        onChange={(e) => handleStartLngChange(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-emerald-500 text-[11px]"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[9px] text-slate-400 font-medium block">Kinh độ (Lng)</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={endLng}
-                    onChange={(e) => handleEndLngChange(parseFloat(e.target.value) || 0)}
-                    className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-rose-500 text-[11px]"
-                  />
+
+                {/* Điểm cuối */}
+                <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/60 shadow-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                      <span>🔴 Điểm cuối (End GPS):</span>
+                    </div>
+                    {originalEndRef.current ? (
+                      <button
+                        type="button"
+                        onClick={handleResetEnd}
+                        title="Khôi phục điểm cuối ban đầu"
+                        className="text-[10px] text-slate-400 hover:text-amber-500 flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <RotateCcw className="w-2.5 h-2.5" />
+                        <span>Đặt lại</span>
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 font-mono">
+                    <div>
+                      <label className="text-[9px] text-slate-400 font-medium block">Vĩ độ (Lat)</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={endLat}
+                        onChange={(e) => handleEndLatChange(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-rose-500 text-[11px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-slate-400 font-medium block">Kinh độ (Lng)</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={endLng}
+                        onChange={(e) => handleEndLngChange(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-rose-500 text-[11px]"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          </div>
-        </div>
 
           {/* CỘT PHẢI: BẢN ĐỒ TUYẾN ĐƯỜNG THỰC ĐỊA (60% width trên md) */}
           <div className="md:col-span-7 p-4 bg-slate-950 flex flex-col justify-between min-h-[480px] relative">
@@ -399,7 +329,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 originalStartCoord={originalStartRef.current}
                 originalEndCoord={originalEndRef.current}
                 editable={true}
-                communeId={communeId}
+                communeId={activeCommuneId}
                 onStartCoordChange={handleStartCoordChange}
                 onEndCoordChange={handleEndCoordChange}
                 onRouteCoordsChange={handleRouteCoordsChange}

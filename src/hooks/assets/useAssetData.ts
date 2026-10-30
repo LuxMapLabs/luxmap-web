@@ -46,6 +46,10 @@ export type ManagedFixture = ActiveFixture & {
 
 export function useAssetData() {
   const dispatch = useDispatch()
+  const currentUser = useSelector((state: RootState) => state.auth.user)
+  const userCommuneId =
+    currentUser?.communes?.[0]?.commune_id || currentUser?.commune_ids?.[0] || ''
+
   const {
     poles: backendPoles,
     cabinets: backendCabinets,
@@ -138,7 +142,7 @@ export function useAssetData() {
         external_ref: item.external_ref || item.pole_id || null,
         segment_id: item.segment_id || null,
         feeder_id: item.feeder_id || null,
-        commune_id: item.commune_id || null,
+        commune_id: item.commune_id || userCommuneId || null,
         geom_wkt: item.location ? `POINT(${item.location.lng} ${item.location.lat})` : null,
         near_sensitive_poi: !!item.near_sensitive_poi,
         data_source: item.data_source || 'field',
@@ -230,8 +234,8 @@ export function useAssetData() {
 
     const bulkPayload: CreateCabinetRequest[] = newCabinetsList.map((item) => ({
       external_ref: item.external_ref || item.cabinet_id || null,
-      cabinet_name: item.cabinet_name || item.cabinet_id || 'Tủ điện mới',
-      commune_id: item.commune_id || 'COM-001',
+      cabinet_name: item.cabinet_name || item.cabinet_id || null,
+      commune_id: item.commune_id || userCommuneId || null,
       geom_wkt: item.location ? `POINT(${item.location.lng} ${item.location.lat})` : null,
       data_source: item.data_source || 'field',
     }))
@@ -282,14 +286,14 @@ export function useAssetData() {
   const handleAddSegment = async (data: SegmentListItem) => {
     const createReq: CreateSegmentRequest = {
       external_ref: data.external_ref || data.segment_id || null,
-      segment_name: data.segment_name || 'Tuyến đường mới',
+      segment_name: data.segment_name || null,
       road_class: data.road_class || 'inter_commune',
       length_m: Number(data.length_m) || 0,
-      commune_id: data.commune_id || 'COM-001',
+      commune_id: data.commune_id || userCommuneId || null,
       geom_wkt:
         'geom_wkt' in data && typeof data.geom_wkt === 'string'
           ? data.geom_wkt
-          : 'LINESTRING(106.5 10.9, 106.51 10.91)',
+          : null,
       data_source: data.data_source || 'field',
     }
 

@@ -29,8 +29,11 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
   const dispatch = useDispatch()
   const mapSegments = useSelector((state: RootState) => state.map.segments)
   const currentUser = useSelector((state: RootState) => state.auth.user)
-  const communes = useSelector((state: RootState) => state.adminCommunes.communes)
-  const defaultCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
+  const activeCommuneId =
+    cabinet.commune_id ||
+    currentUser?.communes?.[0]?.commune_id ||
+    currentUser?.commune_ids?.[0] ||
+    ''
 
   // Fetch map layers nếu chưa có dữ liệu GIS
   useEffect(() => {
@@ -40,42 +43,6 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
   }, [mapSegments, dispatch])
 
   const [cabinetName, setCabinetName] = useState(() => cabinet.cabinet_name || '')
-  const [communeId, setCommuneId] = useState(() => cabinet.commune_id || defaultCommuneId)
-
-  const communeOptions = useMemo(() => {
-    let opts: { id: string; name: string; label: string }[] = []
-    if (communes && communes.length > 0) {
-      opts = communes.map((c) => ({
-        id: c.commune_id || '',
-        name: c.name || c.commune_id || '',
-        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
-      }))
-    } else if (currentUser?.communes && currentUser.communes.length > 0) {
-      opts = currentUser.communes.map((c) => ({
-        id: c.commune_id || '',
-        name: c.name || c.commune_id || '',
-        label: c.name ? `${c.name} (${c.commune_id})` : c.commune_id || '',
-      }))
-    } else if (currentUser?.commune_ids && currentUser.commune_ids.length > 0) {
-      opts = currentUser.commune_ids.map((id) => ({
-        id,
-        name: id,
-        label: `Địa bàn ${id}`,
-      }))
-    } else {
-      const fallbackId = cabinet.commune_id || 'COM-001'
-      opts = [{ id: fallbackId, name: fallbackId, label: `Địa bàn ${fallbackId}` }]
-    }
-
-    if (communeId && !opts.some((o) => o.id === communeId)) {
-      opts.unshift({
-        id: communeId,
-        name: cabinet.commune_name || communeId,
-        label: cabinet.commune_name ? `${cabinet.commune_name} (${communeId})` : `Địa bàn ${communeId}`,
-      })
-    }
-    return opts
-  }, [communes, currentUser, communeId, cabinet.commune_id, cabinet.commune_name])
   const [externalRef, setExternalRef] = useState(() => cabinet.external_ref || '')
   const [lat, setLat] = useState(() => (cabinet.location?.lat ? String(cabinet.location.lat) : '10.9701'))
   const [lng, setLng] = useState(() => (cabinet.location?.lng ? String(cabinet.location.lng) : '106.4896'))
@@ -91,7 +58,6 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
       if (cabinet.location?.lat) setLat(String(cabinet.location.lat))
       if (cabinet.location?.lng) setLng(String(cabinet.location.lng))
       setDataSource(cabinet.data_source || 'field')
-      setCommuneId(cabinet.commune_id || defaultCommuneId)
       setErrorMsg(null)
     }
   }, [cabinet])
@@ -156,13 +122,12 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
       nLng = parsedNLng
     }
 
-    const targetCommune = communes.find((c) => c.commune_id === communeId)
     const updated: CabinetListItem = {
       ...cabinet,
       cabinet_name: trimmedName,
       external_ref: trimmedRef || null,
-      commune_id: communeId || cabinet.commune_id || defaultCommuneId,
-      commune_name: targetCommune?.name || cabinet.commune_name || null,
+      commune_id: activeCommuneId || null,
+      commune_name: cabinet.commune_name || currentUser?.communes?.[0]?.name || null,
       data_source: dataSource,
       location: {
         lat: nLat,
@@ -187,10 +152,10 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
             </div>
             <div>
               <h3 className="font-bold text-white text-base">
-                Chỉnh Sửa Tủ Điện: {cabinet.external_ref || cabinet.cabinet_id}
+                Chỉnh Sửa Tủ Điện: {cabinet.external_ref || cabinet.cabinet_id || '-'}
               </h3>
               <p className="text-xs text-slate-300 dark:text-slate-400">
-                Mã hệ thống: {cabinet.cabinet_id || 'Chưa gán'} • Địa bàn: {cabinet.commune_id || 'Củ Chi'}
+                Mã hệ thống: {cabinet.cabinet_id || '-'} • Địa bàn: {cabinet.commune_name || cabinet.commune_id || '-'}
               </p>
             </div>
           </div>
@@ -204,12 +169,12 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
         </div>
 
         {/* Error Notification */}
-        {errorMsg && (
+        {errorMsg ? (
           <div className="mx-6 mt-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0 animate-in fade-in">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
             <span>{errorMsg}</span>
           </div>
-        )}
+        ) : null}
 
         {/* Main Content - 2 Columns (Form trái + Map phải) */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
@@ -230,25 +195,6 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
                     placeholder="Nhập tên tủ điện (VD: Tủ A - Hương lộ 2)"
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-600 shadow-2xs"
                   />
-                </div>
-
-                {/* Địa bàn quản lý (Xã/Thị trấn) */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                    <span>Địa bàn quản lý (Xã/Thị trấn):</span>
-                  </label>
-                  <select
-                    value={communeId}
-                    onChange={(e) => setCommuneId(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-600 shadow-2xs cursor-pointer"
-                  >
-                    {communeOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 {/* Lọc nhanh tuyến đường trên bản đồ (tùy chọn) */}
@@ -340,7 +286,7 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
                   <div className="flex justify-between">
                     <strong>Mã tủ điện nội bộ:</strong>
                     <span className="font-mono font-bold text-slate-800 dark:text-slate-100">
-                      {cabinet.cabinet_id || 'Chưa cấp'}
+                      {cabinet.cabinet_id || '-'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -385,7 +331,7 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
                 lng={parsedLng}
                 currentCabinetId={cabinet?.cabinet_id}
                 currentExternalRef={cabinet?.external_ref}
-                communeId={cabinet?.commune_id}
+                communeId={activeCommuneId}
                 activeSegmentId={selectedSegmentId}
                 availableSegments={availableSegments}
                 segmentCoords={segmentCoords}
