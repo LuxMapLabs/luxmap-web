@@ -8,6 +8,7 @@ import { FixtureTable } from './components/FixtureTable'
 import { AddFixtureModal } from './components/AddFixtureModal'
 import { EditFixtureModal } from './components/EditFixtureModal'
 import { RetireFixtureModal } from './components/RetireFixtureModal'
+import { FixtureDetailModal } from './components/FixtureDetailModal'
 import { TablePagination } from '../common/TablePagination'
 
 export interface FixturesTabProps {
@@ -48,6 +49,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingFixture, setEditingFixture] = useState<ManagedFixture | null>(null)
   const [retiringFixture, setRetiringFixture] = useState<ManagedFixture | null>(null)
+  const [viewingFixture, setViewingFixture] = useState<ManagedFixture | null>(null)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -208,6 +210,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
         poles={poles}
         flashingFixtureCode={flashingFixtureCode}
         isLoading={isLoading}
+        onViewDetail={(f) => setViewingFixture(f)}
         onEditFixture={(f) => setEditingFixture(f)}
         onRetireFixture={(f) => setRetiringFixture(f)}
         onSelectPole={onSelectPole}
@@ -225,6 +228,18 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
       />
 
       {/* Modals */}
+      <FixtureDetailModal
+        isOpen={Boolean(viewingFixture)}
+        fixture={viewingFixture}
+        poles={poles}
+        segments={segments}
+        onClose={() => setViewingFixture(null)}
+        onEdit={(f) => {
+          setViewingFixture(null)
+          setEditingFixture(f)
+        }}
+      />
+
       <AddFixtureModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

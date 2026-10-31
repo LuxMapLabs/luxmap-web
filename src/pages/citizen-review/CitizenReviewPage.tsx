@@ -153,16 +153,19 @@ export const CitizenReviewPage: React.FC = () => {
   const handleAccept = (data: AcceptCitizenReportRequest) => {
     if (!selectedReportId) return
     dispatch(acceptReportRequest({ reportId: selectedReportId, data }))
+    dispatch(clearReportDetail())
   }
 
   const handleMerge = (data: MergeCitizenReportRequest) => {
     if (!selectedReportId) return
     dispatch(mergeReportRequest({ reportId: selectedReportId, data }))
+    dispatch(clearReportDetail())
   }
 
   const handleReject = (data: RejectCitizenReportRequest) => {
     if (!selectedReportId) return
     dispatch(rejectReportRequest({ reportId: selectedReportId, data }))
+    dispatch(clearReportDetail())
   }
 
   return (

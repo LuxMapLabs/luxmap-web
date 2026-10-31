@@ -383,4 +383,44 @@ describe('CitizenReviewPage Component Integration Tests (UI & Review Workflow)',
     // Sau khi dispatch clearReportDetail, state selectedReportId về null
     expect(store.getState().citizenReports.selectedReportId).toBeNull()
   })
+
+  // 6. Ẩn nút Chấp thuận, chỉ hiện Gộp sự cố và Từ chối khi cột điện ĐÃ CÓ sự cố chưa xử lý xong
+  it("6. should show only Gộp sự cố and Từ chối (hide Chấp thuận) when pole has an active unresolved fault", () => {
+    const detailWithActiveFault = {
+      ...mockReportDetailPending,
+      allowed_actions: ['merge', 'reject', 'accept'],
+      open_faults: [
+        {
+          fault_id: 'FLT-2026-001',
+          fault_type: 'lamp_out' as const,
+          fault_status: 'confirmed' as const,
+          severity: 'high' as const,
+          source_channel: 'citizen' as const,
+          detected_at: '2026-10-14T00:00:00Z',
+        },
+      ],
+    }
+
+    const store = createTestStore({
+      citizenReportsOverride: {
+        selectedReportId: 'rep-001',
+        selectedDetail: detailWithActiveFault,
+      },
+    })
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <CitizenReviewPage />
+        </MemoryRouter>
+      </Provider>
+    )
+
+    // Nút Gộp sự cố và Từ chối PHẢI hiển thị
+    expect(screen.getByRole('button', { name: /Gộp sự cố/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Từ chối/i })).toBeInTheDocument()
+
+    // Nút Chấp thuận PHẢI BỊ ẨN (không được tạo thêm fault trùng lặp)
+    expect(screen.queryByRole('button', { name: /Chấp thuận/i })).not.toBeInTheDocument()
+  })
 })

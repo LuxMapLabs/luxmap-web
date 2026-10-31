@@ -210,7 +210,7 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
   const createHandleElement = (key: HandleKey) => {
     const wrapper = document.createElement('div')
     wrapper.className = `bbox-handle-wrapper bbox-handle-${key}`
-    wrapper.style.zIndex = '50'
+    wrapper.style.zIndex = '5'
 
     const inner = document.createElement('div')
     const isCorner = key === 'nw' || key === 'ne' || key === 'se' || key === 'sw'
@@ -943,7 +943,7 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
       className="relative w-full h-full min-h-[380px] rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-sm bg-slate-900 select-none flex flex-col"
     >
       {/* Thanh công cụ phía trên bản đồ */}
-      <div className="absolute top-3 left-3 right-3 z-20 flex flex-col gap-2 pointer-events-none">
+      <div className="absolute top-3 left-3 right-3 z-30 flex flex-col gap-2 pointer-events-none">
         {/* Hàng 1: Bên trái là Thanh Search (khi Thêm mới) hoặc Kích thước (khi Sửa/Chi tiết); Bên phải là Nút Vẽ hoặc Nút tick Di chuyển khung */}
         {isCreateMode && !readOnly ? (
           <>
@@ -979,7 +979,7 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
 
                 {/* Danh sách gợi ý Xã / Phường / Thị trấn */}
                 {isSearchOpen && searchQuery.trim().length >= 2 && (
-                  <div className="absolute top-full left-0 right-0 mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-xl max-h-48 overflow-y-auto p-1 z-30">
+                  <div className="absolute top-full left-0 right-0 mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-xl max-h-48 overflow-y-auto p-1 z-40">
                     {isSearching && (
                       <div className="px-2.5 py-1.5 text-[10.5px] text-slate-500 dark:text-slate-400">
                         Đang tìm xã/phường...

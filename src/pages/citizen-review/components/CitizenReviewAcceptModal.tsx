@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { CheckCircle2, X, Loader2 } from 'lucide-react'
 import type { FaultType, Severity } from '../../../types/common/enums'
 import type { AcceptCitizenReportRequest } from '../../../types/citizen-reports/citizen-reports'
@@ -42,6 +43,15 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
   const [severity, setSeverity] = useState<Severity>('medium')
   const [note, setNote] = useState<string>('')
 
+  // Đồng bộ lại faultType khi modal mở hoặc danh sách acceptableFaultTypes thay đổi
+  useEffect(() => {
+    if (isOpen && acceptableFaultTypes.length > 0) {
+      if (!acceptableFaultTypes.includes(faultType)) {
+        setFaultType(acceptableFaultTypes[0])
+      }
+    }
+  }, [isOpen, acceptableFaultTypes, faultType])
+
   if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -54,8 +64,8 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
     })
   }
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
       <div
         className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
@@ -167,6 +177,9 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
+
+export default CitizenReviewAcceptModal

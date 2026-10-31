@@ -6,6 +6,7 @@ import { PoleTable } from '../../../../../pages/assets/components/poles/componen
 import { AddFixtureModal } from '../../../../../pages/assets/components/fixtures/components/AddFixtureModal'
 import { EditFixtureModal } from '../../../../../pages/assets/components/fixtures/components/EditFixtureModal'
 import { RetireFixtureModal } from '../../../../../pages/assets/components/fixtures/components/RetireFixtureModal'
+import { FixtureDetailModal } from '../../../../../pages/assets/components/fixtures/components/FixtureDetailModal'
 import { validateImportRow } from '../../../../../validations/assetImport.schema'
 import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../../types/assets/poles'
@@ -341,6 +342,48 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
     expect(onConfirmMock).toHaveBeenCalledWith('FIX-POLE-0001', expect.objectContaining({
       removed_date: expect.any(String),
     }))
+    expect(onCloseMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("11. FixtureTable hiển thị nút xem chi tiết và kích hoạt onViewDetail khi bấm", () => {
+    const onViewDetailMock = vi.fn()
+    render(
+      <FixtureTable
+        fixtures={mockFixtures}
+        poles={mockPoles}
+        onViewDetail={onViewDetailMock}
+        onEditFixture={vi.fn()}
+      />
+    )
+    const detailBtns = screen.getAllByTitle("Xem chi tiết bộ đèn")
+    expect(detailBtns.length).toBeGreaterThan(0)
+    fireEvent.click(detailBtns[0])
+    expect(onViewDetailMock).toHaveBeenCalledWith(mockFixtures[0])
+  })
+
+  it("12. FixtureDetailModal hiển thị đầy đủ thông số kỹ thuật, số bóng, vị trí lắp đặt và bảo hành", () => {
+    const onCloseMock = vi.fn()
+    const onEditMock = vi.fn()
+    render(
+      <FixtureDetailModal
+        isOpen={true}
+        fixture={mockFixtures[0]}
+        poles={mockPoles}
+        onClose={onCloseMock}
+        onEdit={onEditMock}
+      />
+    )
+    expect(screen.getByText("FIX-POLE-0001")).toBeInTheDocument()
+    expect(screen.getByText("Đang hoạt động")).toBeInTheDocument()
+    expect(screen.getByText("Đèn LED Chiếu Sáng Đường Phố")).toBeInTheDocument()
+    expect(screen.getByText("2 bóng")).toBeInTheDocument()
+    expect(screen.getByText("200 W")).toBeInTheDocument()
+    expect(screen.getByText("POLE-0001")).toBeInTheDocument()
+    const editBtn = screen.getByText("Chỉnh sửa thông số")
+    fireEvent.click(editBtn)
+    expect(onEditMock).toHaveBeenCalledWith(mockFixtures[0])
+    const closeBtn = screen.getByText("Đóng")
+    fireEvent.click(closeBtn)
     expect(onCloseMock).toHaveBeenCalledTimes(1)
   })
 })

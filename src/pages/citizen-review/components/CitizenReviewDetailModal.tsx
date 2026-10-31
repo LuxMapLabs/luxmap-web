@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import {
   X,
   MapPin,
@@ -77,6 +78,15 @@ const renderKindBadge = (kind: CitizenReportKind) => {
         </span>
       )
   }
+}
+
+const FAULT_STATUS_LABELS: Record<string, string> = {
+  detected: 'Mới phát hiện',
+  confirmed: 'Đã xác nhận',
+  in_progress: 'Đang xử lý',
+  resolved: 'Đã sửa xong',
+  verified: 'Đã nghiệm thu',
+  rejected: 'Đã từ chối',
 }
 
 /**
@@ -165,6 +175,16 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose, isAcceptModalOpen, isMergeModalOpen, isRejectModalOpen])
 
+  // Kiểm tra ngầm trạng thái của Fault trên cột điện:
+  // Nếu cột đã có fault và fault chưa xử lý xong (khác 'verified' và 'rejected'),
+  // thì CHỈ cho phép Gộp sự cố hoặc Từ chối, ẩn nút Chấp thuận để tránh tạo trùng lặp.
+  const hasActiveUnresolvedFault = useMemo(() => {
+    if (!detail?.open_faults || detail.open_faults.length === 0) return false
+    return detail.open_faults.some(
+      (f) => f.fault_status !== 'verified' && f.fault_status !== 'rejected'
+    )
+  }, [detail?.open_faults])
+
   if (!isOpen) return null
 
   // Thu thập toàn bộ ảnh từ các submissions
@@ -176,11 +196,29 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
     Array.isArray(detail?.allowed_actions) &&
     detail.allowed_actions.length > 0
 
-  return (
+
+  // Nút "Chấp thuận" (tạo Fault mới): chỉ hiển thị khi cột CHƯA có fault hoặc fault cũ đã xử lý xong
+  const canAccept =
+    canReview &&
+    !hasActiveUnresolvedFault &&
+    (!detail?.allowed_actions || detail.allowed_actions.includes('accept'))
+
+  // Nút "Gộp sự cố": chỉ hiển thị khi cột ĐANG CÓ fault chưa xử lý xong
+  const canMerge =
+    canReview &&
+    hasActiveUnresolvedFault &&
+    (!detail?.allowed_actions || detail.allowed_actions.includes('merge'))
+
+  // Nút "Từ chối": luôn khả dụng cho phản ánh chờ duyệt
+  const canReject =
+    canReview &&
+    (!detail?.allowed_actions || detail.allowed_actions.includes('reject'))
+
+  return createPortal(
     <>
       {/* Backdrop nền mờ */}
       <div
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+        className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
         onClick={onClose}
       >
         {/* Card Modal Căn Giữa (Single column layout) */}
@@ -368,7 +406,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                             </span>
                           </div>
                           <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-[10px] font-bold uppercase">
-                            {f.fault_status}
+                            {FAULT_STATUS_LABELS[f.fault_status] || f.fault_status}
                           </span>
                         </div>
                       ))}
@@ -411,18 +449,20 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
             {canReview && (
               <div className="flex items-center gap-2">
                 {/* Nút Từ chối */}
-                <button
-                  type="button"
-                  onClick={() => setIsRejectModalOpen(true)}
-                  disabled={isSubmittingDecision}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/80 text-rose-700 dark:text-rose-300 font-bold text-xs transition cursor-pointer disabled:opacity-50"
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  <span>Từ chối</span>
-                </button>
+                {canReject && (
+                  <button
+                    type="button"
+                    onClick={() => setIsRejectModalOpen(true)}
+                    disabled={isSubmittingDecision}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/80 text-rose-700 dark:text-rose-300 font-bold text-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Từ chối</span>
+                  </button>
+                )}
 
-                {/* Nút Gộp (chỉ hiện khi có open_faults) */}
-                {detail?.open_faults && detail.open_faults.length > 0 && (
+                {/* Nút Gộp sự cố: Chỉ hiện khi cột ĐANG CÓ fault chưa xử lý xong */}
+                {canMerge && (
                   <button
                     type="button"
                     onClick={() => setIsMergeModalOpen(true)}
@@ -434,16 +474,18 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                   </button>
                 )}
 
-                {/* Nút Chấp thuận */}
-                <button
-                  type="button"
-                  onClick={() => setIsAcceptModalOpen(true)}
-                  disabled={isSubmittingDecision}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm cursor-pointer disabled:opacity-50"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Chấp thuận</span>
-                </button>
+                {/* Nút Chấp thuận: Chỉ hiện khi cột CHƯA CÓ fault hoặc fault cũ ĐÃ XỬ LÝ XONG */}
+                {canAccept && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAcceptModalOpen(true)}
+                    disabled={isSubmittingDecision}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Chấp thuận</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -462,6 +504,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
             onSubmit={(data) => {
               onAccept(data)
               setIsAcceptModalOpen(false)
+              onClose()
             }}
           />
 
@@ -474,6 +517,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
             onSubmit={(data) => {
               onMerge(data)
               setIsMergeModalOpen(false)
+              onClose()
             }}
           />
 
@@ -485,11 +529,13 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
             onSubmit={(data) => {
               onReject(data)
               setIsRejectModalOpen(false)
+              onClose()
             }}
           />
         </>
       )}
-    </>
+    </>,
+    document.body
   )
 }
 

@@ -82,6 +82,22 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
       updated_at: '2026-10-20T10:00:00Z',
     },
     {
+      feeder_id: 'FDR-001-B',
+      external_ref: 'FDR-CAB-TL8-A2',
+      feeder_name: 'Lộ 2 - Tủ A - Tỉnh Lộ 8',
+      commune_id: 'COM-001',
+      commune_name: 'Xã Phú Hòa Đông',
+      has_geometry: true,
+      pole_count: 3,
+      cabinet: {
+        cabinet_id: 'CAB-001',
+        cabinet_name: 'Tủ A - Tỉnh Lộ 8',
+        location: { lat: 10.9701, lng: 106.4896 },
+        cabinet_source: 'verified',
+      },
+      updated_at: '2026-10-20T10:00:00Z',
+    },
+    {
       feeder_id: 'FDR-002',
       external_ref: 'FDR-CAB-TL8-B',
       feeder_name: 'Lộ 1 - Tủ B - Tỉnh Lộ 8',
@@ -284,10 +300,16 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     expect(screen.getByText('Đang cấu hình Rơ-le #2')).toBeInTheDocument()
     expect(screen.getByText(/Mạch Điện Xuất Tuyến Thuộc Tủ/)).toBeInTheDocument()
 
+    // Kiểm tra mạch FDR-001 đã đấu nối rơ-le #1 thì bị khóa [🔒 Đã đấu nối]
+    const selectEl = screen.getByRole('combobox') as HTMLSelectElement
+    const wiredOption = Array.from(selectEl.options).find(o => o.value === 'FDR-001')
+    expect(wiredOption?.disabled).toBe(true)
+
     const submitBtn = screen.getByText('Lưu Rơ-le Này')
     fireEvent.click(submitBtn)
 
-    expect(handleSave).toHaveBeenCalledWith('IOT-NODE-001', 2, 'FDR-001')
+    // Rơ-le #2 tự động chọn mạch còn trống tiếp theo (FDR-001-B) và không cho nối trùng vào FDR-001
+    expect(handleSave).toHaveBeenCalledWith('IOT-NODE-001', 2, 'FDR-001-B')
   })
 
   it('7. Hiển thị modal xác nhận xóa tùy chỉnh (ConfirmDeleteIotNodeModal) thay vì window.confirm', () => {
