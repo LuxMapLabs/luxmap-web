@@ -8,6 +8,7 @@ export interface SetRelayModalProps {
   isOpen: boolean
   node: IotNodeItem | null
   feeders: FeederListItem[]
+  allNodes?: IotNodeItem[]
   onClose: () => void
   onSave: (nodeId: string, relayNo: number, feederId: string | null) => void
 }
@@ -16,6 +17,7 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
   isOpen,
   node,
   feeders,
+  allNodes,
   onClose,
   onSave,
 }) => {
@@ -62,6 +64,81 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
     )
   }, [feeders, activeNode?.cabinet_id])
 
+  // Hàm kiểm tra tình trạng đấu nối của một mạch điện:
+  // 1. Không cho đấu nối trùng: Rơ-le khác trên cùng thiết bị này đã dùng mạch chưa?
+  // 2. Không cho chọn mạch đã đấu nối vào thiết bị IoT khác
+  const getFeederWiringInfo = useCallback(
+    (feederId: string, currentEditingRelayNo: number | null) => {
+      if (!feederId) return { isWired: false, isCurrentRelay: false, reason: '' }
+
+      // 1. Kiểm tra trên chính node hiện tại (các rơ-le khác trên cùng thiết bị này)
+      const relayOnCurrentNode = (activeNode?.relays || []).find((r) => r.feeder_id === feederId)
+      if (relayOnCurrentNode) {
+        const isCurrent =
+          currentEditingRelayNo !== null && relayOnCurrentNode.relay_no === currentEditingRelayNo
+        return {
+          isWired: true,
+          wiredNodeId: activeNode?.node_id || undefined,
+          wiredRelayNo: relayOnCurrentNode.relay_no,
+          isCurrentRelay: isCurrent,
+          reason: isCurrent
+            ? ''
+            : `Đã đấu nối vào Rơ-le #${relayOnCurrentNode.relay_no} của thiết bị này`,
+        }
+      }
+
+      // 2. Kiểm tra trên danh sách allNodes (các thiết bị IoT khác trong hệ thống)
+      if (allNodes && allNodes.length > 0) {
+        for (const otherNode of allNodes) {
+          if (otherNode.node_id === activeNode?.node_id) continue
+          const matchingRelay = (otherNode.relays || []).find((r) => r.feeder_id === feederId)
+          if (matchingRelay) {
+            return {
+              isWired: true,
+              wiredNodeId: otherNode.node_id || undefined,
+              wiredRelayNo: matchingRelay.relay_no,
+              isCurrentRelay: false,
+              reason: `Đã đấu nối vào thiết bị ${otherNode.node_id} (Rơ-le #${matchingRelay.relay_no})`,
+            }
+          }
+        }
+      }
+
+      // 3. Kiểm tra thông tin snapshot control trên Feeder (từ Backend API)
+      const targetFeeder = feeders.find((f) => f.feeder_id === feederId)
+      if (targetFeeder?.control?.node_id) {
+        const isCurrent =
+          targetFeeder.control.node_id === activeNode?.node_id &&
+          currentEditingRelayNo !== null &&
+          targetFeeder.control.relay_no === currentEditingRelayNo
+
+        if (!isCurrent) {
+          return {
+            isWired: true,
+            wiredNodeId: targetFeeder.control.node_id,
+            wiredRelayNo: targetFeeder.control.relay_no,
+            isCurrentRelay: false,
+            reason:
+              targetFeeder.control.node_id === activeNode?.node_id
+                ? `Đã đấu nối vào Rơ-le #${targetFeeder.control.relay_no || 1} của thiết bị này`
+                : `Đã đấu nối vào thiết bị ${targetFeeder.control.node_id}`,
+          }
+        }
+      }
+
+      return { isWired: false, isCurrentRelay: false, reason: '' }
+    },
+    [activeNode?.node_id, activeNode?.relays, allNodes, feeders]
+  )
+
+  // Danh sách mạch còn trống (chưa đấu nối vào bất kỳ rơ-le / node nào)
+  const availableUnwiredFeeders = useMemo(() => {
+    return cabinetFeeders.filter((f) => {
+      const info = getFeederWiringInfo(f.feeder_id || '', null)
+      return !info.isWired
+    })
+  }, [cabinetFeeders, getFeederWiringInfo])
+
   // Tính số rơ-le kế tiếp khả dụng (tối đa 32)
   const nextAvailableRelayNo = useMemo(() => {
     if (!activeNode?.relays || activeNode.relays.length === 0) return 1
@@ -76,7 +153,7 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
     setIsAddingNew(false)
     setEditingRelayNo(relay.relay_no)
     setRelayNo(relay.relay_no)
-    setSelectedFeederId(relay.feeder_id || cabinetFeeders[0]?.feeder_id || '')
+    setSelectedFeederId(relay.feeder_id || '')
     setErrorMsg(null)
   }
 
@@ -85,7 +162,12 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
     setEditingRelayNo(null)
     setIsAddingNew(true)
     setRelayNo(nextAvailableRelayNo)
-    setSelectedFeederId(cabinetFeeders[0]?.feeder_id || '')
+    // Tự động chọn mạch đầu tiên CHƯA đấu nối
+    const firstAvailable = cabinetFeeders.find((f) => {
+      const info = getFeederWiringInfo(f.feeder_id || '', null)
+      return !info.isWired
+    })
+    setSelectedFeederId(firstAvailable?.feeder_id || '')
     setErrorMsg(null)
   }
 
@@ -139,6 +221,17 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
     }
 
     const finalFeederId = selectedFeederId.trim()
+    const currentRelayNoForCheck = isAddingNew ? null : editingRelayNo
+    const wiring = getFeederWiringInfo(finalFeederId, currentRelayNoForCheck)
+
+    // Chặn nghiêm ngặt việc đấu nối trùng mạch
+    if (wiring.isWired && !wiring.isCurrentRelay) {
+      setErrorMsg(
+        `Mạch điện "${finalFeederId}" ${wiring.reason.toLowerCase()}. Mỗi mạch điện chỉ được phép đấu nối với 1 rơ-le duy nhất!`
+      )
+      return
+    }
+
     onSave(activeNode.node_id, relayNo, finalFeederId)
 
     // Optimistic update ngay trên UI modal
@@ -229,8 +322,13 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddNewRelay}
-                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                  title="Thêm một đầu rơ-le mới cho thiết bị"
+                  disabled={availableUnwiredFeeders.length === 0}
+                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title={
+                    availableUnwiredFeeders.length === 0
+                      ? `Tất cả ${cabinetFeeders.length} mạch của tủ này đã được đấu nối rơ-le`
+                      : 'Thêm một đầu rơ-le mới cho thiết bị'
+                  }
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Thêm Rơ-le</span>
@@ -304,7 +402,7 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
             ) : null}
           </div>
 
-          {/* Phần 2: Form Cấu Hình / Đấu Nối Rơ-le - Tinh gọn không còn radio ngắt nối thừa thãi */}
+          {/* Phần 2: Form Cấu Hình / Đấu Nối Rơ-le */}
           {isFormOpen && (
             <form onSubmit={handleSubmit} className="p-4 bg-indigo-50/40 dark:bg-slate-800/60 rounded-xl border border-indigo-200 dark:border-indigo-900/50 space-y-3 animate-in fade-in duration-200">
               <div className="flex items-center justify-between border-b border-indigo-100 dark:border-slate-700/60 pb-2">
@@ -320,6 +418,21 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
                   Rơ-le số 1..32
                 </span>
               </div>
+
+              {/* Cảnh báo nếu tủ đã hết sạch mạch trống khi muốn thêm rơ-le mới */}
+              {isAddingNew && availableUnwiredFeeders.length === 0 && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                  <div>
+                    <strong className="block font-semibold">
+                      Tất cả mạch của tủ {activeNode.cabinet_id} đều đã được đấu nối rơ-le!
+                    </strong>
+                    <span className="text-[11px] text-amber-700 dark:text-amber-400">
+                      Tủ này có {cabinetFeeders.length} mạch xuất tuyến và toàn bộ đã có rơ-le điều khiển. Mỗi mạch chỉ được đấu nối với 1 rơ-le duy nhất.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Nhập số thứ tự rơ-le */}
               <div>
@@ -348,18 +461,29 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
                     value={selectedFeederId}
                     onChange={(e) => setSelectedFeederId(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-primary transition"
+                    disabled={isAddingNew && availableUnwiredFeeders.length === 0}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 disabled:bg-slate-100 dark:disabled:bg-slate-900 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-primary transition"
                   >
                     <option value="">-- Chọn mạch điện xuất tuyến --</option>
-                    {cabinetFeeders.map((f) => (
-                      <option
-                        key={f.feeder_id || f.external_ref || Math.random().toString()}
-                        value={f.feeder_id || ''}
-                      >
-                        {f.feeder_name || f.feeder_id} ({f.feeder_id})
-                        {f.external_ref ? ` - Mã: ${f.external_ref}` : ''}
-                      </option>
-                    ))}
+                    {cabinetFeeders.map((f) => {
+                      const fid = f.feeder_id || ''
+                      const currentRelayNoForCheck = isAddingNew ? null : editingRelayNo
+                      const wiring = getFeederWiringInfo(fid, currentRelayNoForCheck)
+                      const isDisabled = wiring.isWired && !wiring.isCurrentRelay
+
+                      return (
+                        <option
+                          key={fid || f.external_ref || Math.random().toString()}
+                          value={fid}
+                          disabled={isDisabled}
+                          className={isDisabled ? 'text-slate-400 bg-slate-100 dark:bg-slate-800' : ''}
+                        >
+                          {f.feeder_name || fid} ({fid})
+                          {f.external_ref ? ` - Mã: ${f.external_ref}` : ''}
+                          {isDisabled ? ` [🔒 ${wiring.reason}]` : ''}
+                        </option>
+                      )
+                    })}
                   </select>
                 ) : (
                   <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
@@ -382,8 +506,8 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={cabinetFeeders.length === 0}
-                  className="px-4 py-1.5 bg-primary hover:bg-primary/90 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                  disabled={cabinetFeeders.length === 0 || (isAddingNew && availableUnwiredFeeders.length === 0)}
+                  className="px-4 py-1.5 bg-primary hover:bg-primary/90 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5"
                 >
                   <Check className="w-4 h-4" />
                   <span>{isAddingNew ? 'Lưu Rơ-le Này' : 'Cập Nhật Mạch'}</span>
@@ -407,3 +531,4 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
     </div>
   )
 }
+export default SetRelayModal

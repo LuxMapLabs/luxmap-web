@@ -195,6 +195,7 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
         isOpen={!!selectedRelayNodeId}
         node={activeRelayNode}
         feeders={feeders}
+        allNodes={iotNodes}
         onClose={() => setSelectedRelayNodeId(null)}
         onSave={onSetRelay}
       />
