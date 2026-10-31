@@ -45,6 +45,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
       external_ref: 'CAB-TL8-A',
       cabinet_name: 'Tủ A - Tỉnh Lộ 8',
       commune_id: 'COM-001',
+      commune_name: 'Xã Phú Hòa Đông',
       data_source: 'field',
       location: { lat: 10.9701, lng: 106.4896 },
       feeder_ids: ['FDR-001'],
@@ -55,6 +56,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
       external_ref: 'CAB-TL8-B',
       cabinet_name: 'Tủ B - Tỉnh Lộ 8',
       commune_id: 'COM-002',
+      commune_name: 'Xã Tân An Hội',
       data_source: 'field',
       location: { lat: 10.973, lng: 106.495 },
       feeder_ids: ['FDR-002'],
@@ -68,6 +70,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
       external_ref: 'FDR-CAB-TL8-A',
       feeder_name: 'Lộ 1 - Tủ A - Tỉnh Lộ 8',
       commune_id: 'COM-001',
+      commune_name: 'Xã Phú Hòa Đông',
       has_geometry: true,
       pole_count: 5,
       cabinet: {
@@ -83,6 +86,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
       external_ref: 'FDR-CAB-TL8-B',
       feeder_name: 'Lộ 1 - Tủ B - Tỉnh Lộ 8',
       commune_id: 'COM-002',
+      commune_name: 'Xã Tân An Hội',
       has_geometry: false,
       pole_count: 0,
       cabinet: {

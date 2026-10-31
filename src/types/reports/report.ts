@@ -30,3 +30,4 @@ export interface SuperiorReportItem {
   reportNote?: string
   evidencePhotos?: ReportEvidencePhoto[]
 }
+

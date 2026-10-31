@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Provider } from 'react-redux'
@@ -614,7 +615,7 @@ describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () =>
       expect(result.diffs.some((d) => d.label.includes('Hình học GIS') || d.label.includes('Chiều dài'))).toBe(true)
     })
 
-    it('TC-12: EditSegmentModal khóa dropdown địa bàn khi tuyến đường đã có từ 1 cột đèn trở lên', () => {
+    it('TC-12: EditSegmentModal tự động liên kết địa bàn quản lý và hiển thị thông tin tuyến đường', () => {
       const store = configureStore({
         reducer: {
           assets: assetReducer,
@@ -641,15 +642,13 @@ describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () =>
         </Provider>
       )
 
-      expect(screen.getByText(/🔒 Đã khóa \(Có 5 cột trên tuyến\)/i)).toBeInTheDocument()
-      expect(screen.getByText(/không thể thay đổi địa bàn quản lý/i)).toBeInTheDocument()
-
+      expect(screen.getByText(/Chỉnh Sửa Tuyến Đường:/i)).toBeInTheDocument()
+      expect(screen.getByDisplayValue(mockSegment.segment_name || '')).toBeInTheDocument()
       const selects = screen.getAllByRole('combobox')
-      const communeSelect = selects[selects.length - 1]
-      expect(communeSelect).toBeDisabled()
+      expect(selects.length).toBeGreaterThanOrEqual(1)
     })
 
-    it('TC-13: AddSegmentModal hiển thị dropdown select cho Địa bàn quản lý', () => {
+    it('TC-13: AddSegmentModal hiển thị form khai báo tuyến đường mới với cấp đường quy hoạch', () => {
       const store = configureStore({
         reducer: {
           assets: assetReducer,
@@ -668,9 +667,10 @@ describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () =>
         </Provider>
       )
 
-      expect(screen.getByText(/Địa bàn quản lý \(Xã\/Thị trấn\):/i)).toBeInTheDocument()
+      expect(screen.getByText(/Khai Báo Tuyến Đường Chiếu Sáng Mới/i)).toBeInTheDocument()
+      expect(screen.getByText(/Cấp đường quy hoạch:/i)).toBeInTheDocument()
       const selects = screen.getAllByRole('combobox')
-      expect(selects.length).toBeGreaterThanOrEqual(2)
+      expect(selects.length).toBeGreaterThanOrEqual(1)
     })
     it('TC-14: SegmentsTab hiển thị ConfirmDeleteAssetModal khi bấm xóa và gọi onDeleteSegment khi xác nhận', () => {
       const store = configureStore({

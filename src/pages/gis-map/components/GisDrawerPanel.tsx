@@ -13,6 +13,10 @@ import {
   MapPin,
   ShieldCheck,
   CameraOff,
+  Sun,
+  Moon,
+  Clock,
+  History,
 } from 'lucide-react'
 
 import type { SegmentInfo, PoleFeature } from '../GisMapPage'
@@ -20,8 +24,9 @@ import cabinetSvg from '../../../assets/icons/cabinet.svg'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../../../redux/store'
 import { fetchPoleDetailRequest, clearPoleDetail } from '../../../feature/map/mapSlice'
+import { previewLightingRequest, openHistoryModal } from '../../../feature/lighting/lightingSlice'
 import { StatusBadge } from '../../../components/StatusBadge'
-import type { FaultType, Severity, FaultStatus } from '../../../types/common/enums'
+import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
 
 export interface GisDrawerPanelProps {
@@ -88,7 +93,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   setSelectedFeeder,
   effectivePoles: propsEffectivePoles = [],
   feederStatusMap,
-  onToggleFeeder,
+  onToggleFeeder: _onToggleFeeder,
 }) => {
   // Lightbox Modal state
   const [lightboxImage, setLightboxImage] = useState<{
@@ -101,6 +106,16 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   const dispatch = useDispatch<AppDispatch>()
   const { poleDetail } = useSelector((state: RootState) => state.map)
   const { feeders: assetFeeders } = useSelector((state: RootState) => state.assets)
+  const activeFeederModes = useSelector((state: RootState) => state.lighting?.activeFeederModes || {})
+
+  const handleControlFeederMode = (feederId: string, mode: FeederControlMode) => {
+    dispatch(
+      previewLightingRequest({
+        params: { feeder_id: feederId },
+        target: { kind: 'feeder', id: feederId, requestedMode: mode },
+      })
+    )
+  }
 
   const effectiveFixtureStatus =
     poleDetail?.current_status?.fixture_status || selectedPole?.properties?.fixture_status || 'unknown'
@@ -194,7 +209,36 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   const cabinetFeeders = useMemo(() => {
     if (!selectedCabinet) return []
 
-    // 1. Tìm các feeder từ assetFeeders liên kết với tủ này
+    // 1. Ưu tiên đọc trực tiếp từ selectedCabinet.feeders (CabinetFeederState[] từ GET /map/cabinets)
+    const beFeeders: any[] = selectedCabinet.feeders || []
+    if (beFeeders.length > 0) {
+      return beFeeders.map((fState, idx) => {
+        const fId = fState.feeder_id || `fdr-${idx}`
+        const assetMatch = (assetFeeders || []).find((af) => af.feeder_id === fId)
+        const feederPoles = cabinetConnectedPoles.filter(
+          (p) => p.properties.feeder_id === fId || (idx === 0 && !p.properties.feeder_id)
+        )
+        return {
+          feeder_id: fId,
+          external_ref: assetMatch?.external_ref || fId,
+          feeder_name: assetMatch?.feeder_name || `Mạch ${idx + 1} - Lộ ${idx + 1}`,
+          relay_no: fState.relay_no ?? assetMatch?.control?.relay_no,
+          control_mode: fState.control_mode ?? assetMatch?.control?.control_mode,
+          power_state: fState.power_state ?? assetMatch?.power_state,
+          mode_reported_at: fState.mode_reported_at ?? assetMatch?.control?.mode_reported_at,
+          pole_count: feederPoles.length || assetMatch?.pole_count || 0,
+          cabinet: {
+            cabinet_id: selectedCabinet.cabinet_id,
+            cabinet_name: selectedCabinet.cabinet_name,
+            location: selectedCabinet.location,
+            cabinet_source: 'field' as any,
+          },
+          updated_at: null,
+        }
+      })
+    }
+
+    // 2. Fallback tìm các feeder từ assetFeeders liên kết với tủ này
     const matched = (assetFeeders || []).filter(
       (f) =>
         (f.cabinet?.cabinet_id && f.cabinet.cabinet_id === selectedCabinet.cabinet_id) ||
@@ -203,7 +247,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     )
     if (matched.length > 0) return matched
 
-    // 2. Fallback nếu tủ có danh sách feeder_ids hoặc mô phỏng mạch điện của tủ
+    // 3. Fallback nếu tủ có danh sách feeder_ids hoặc mô phỏng mạch điện của tủ
     const ids =
       selectedCabinet.feeder_ids && selectedCabinet.feeder_ids.length > 0
         ? selectedCabinet.feeder_ids
@@ -225,7 +269,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       },
       updated_at: null,
     }))
-  }, [selectedCabinet, assetFeeders, cabinetConnectedPoles.length])
+  }, [selectedCabinet, assetFeeders, cabinetConnectedPoles])
 
   return (
     <>
@@ -746,7 +790,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <Radio className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     <span>Hệ thống IoT Giám sát từ xa</span>
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                  <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">
                     {selectedCabinet.iot_gateway_id || selectedCabinet.iot_node_id}
                   </span>
                 </div>
@@ -775,15 +819,45 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
                     <span className="truncate">Danh sách Mạch điện của Tủ ({cabinetFeeders.length} mạch)</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0 font-normal">
-                    Điều khiển theo cụm
-                  </span>
+                  {(() => {
+                    const firstFeeder = cabinetFeeders[0] || (selectedCabinet.feeders || [])[0]
+                    const firstFeederId = firstFeeder?.feeder_id || selectedCabinet.feeder_ids?.[0]
+                    const fName = firstFeeder?.feeder_name || firstFeederId
+                    const cabCode = selectedCabinet.cabinet_code || selectedCabinet.external_ref || selectedCabinet.cabinet_id
+                    return (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          dispatch(
+                            openHistoryModal({
+                              feederId: firstFeederId || undefined,
+                              cabinetId: selectedCabinet.cabinet_id,
+                              title: `Mạch ${fName || firstFeederId || ''} • Tủ ${cabCode || ''}`,
+                            })
+                          )
+                        }
+                        className="p-1 rounded-md text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition cursor-pointer"
+                        title={`Xem lịch sử lệnh điều khiển (Mạch ${fName || firstFeederId || ''})`}
+                        aria-label="Xem lịch sử lệnh điều khiển"
+                      >
+                        <History className="w-3.5 h-3.5" />
+                      </button>
+                    )
+                  })()}
                 </div>
 
                 <div className="space-y-2">
                   {cabinetFeeders.map((feeder: any, idx: number) => {
                     const fId = feeder.feeder_id || feeder.external_ref || `fdr-${idx}`
-                    const isFault = feederStatusMap?.[fId] === 'fault'
+                    const cabFeeder = (selectedCabinet?.feeders || []).find((cf: any) => cf.feeder_id === fId)
+                    const assetFeeder = (assetFeeders || []).find((af: any) => af.feeder_id === fId)
+                    const realBackendMode: FeederControlMode | undefined =
+                      cabFeeder?.control_mode ||
+                      assetFeeder?.control?.control_mode ||
+                      feeder.control?.control_mode ||
+                      feeder.control_mode
+
+                    const currentMode: FeederControlMode | undefined = realBackendMode
                     const feederPoles = cabinetConnectedPoles.filter(
                       (p) => p.properties.feeder_id === fId || (idx === 0 && !p.properties.feeder_id)
                     )
@@ -795,15 +869,25 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div
                         key={fId}
                         className={`p-2.5 rounded-xl border transition-all ${
-                          isFault
+                          currentMode === 'off'
                             ? 'bg-rose-50/50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60'
+                            : currentMode === 'on'
+                            ? 'bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60'
                             : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-700/60 shadow-2xs'
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <span className={`w-2 h-2 rounded-full shrink-0 ${isFault ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${
+                                  currentMode === 'on'
+                                    ? 'bg-emerald-500 animate-pulse'
+                                    : currentMode === 'off'
+                                    ? 'bg-rose-500'
+                                    : 'bg-indigo-500'
+                                }`}
+                              />
                               <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate">
                                 {fName}
                               </span>
@@ -817,34 +901,49 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                             </div>
                           </div>
 
-                          {/* Toggle Switch */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
-                                isFault
-                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
-                                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                          {/* 3-State Segmented Control: ON / OFF / AUTO */}
+                          <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleControlFeederMode(fId, 'on')}
+                              className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                                currentMode === 'on'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'
                               }`}
+                              title="Bật nguồn cưỡng bức ngay lập tức"
                             >
-                              {isFault ? 'Đã ngắt' : 'Đang cấp điện'}
-                            </span>
+                              <Sun className="w-3 h-3" />
+                              <span>Bật</span>
+                            </button>
 
-                            {onToggleFeeder && (
-                              <button
-                                type="button"
-                                onClick={() => onToggleFeeder(fId, fName)}
-                                className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
-                                  !isFault ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
-                                }`}
-                                title={!isFault ? `Bấm để ngắt điện ${fName}` : `Bấm để cấp điện ${fName}`}
-                              >
-                                <span
-                                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition-transform ${
-                                    !isFault ? 'translate-x-5.5' : 'translate-x-1'
-                                  }`}
-                                />
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleControlFeederMode(fId, 'off')}
+                              className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                                currentMode === 'off'
+                                  ? 'bg-rose-600 text-white shadow-xs'
+                                  : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'
+                              }`}
+                              title="Ngắt nguồn cưỡng bức (Tắt)"
+                            >
+                              <Moon className="w-3 h-3" />
+                              <span>Tắt</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleControlFeederMode(fId, 'auto')}
+                              className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                                currentMode === 'auto'
+                                  ? 'bg-indigo-600 text-white shadow-xs'
+                                  : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600'
+                              }`}
+                              title="Chạy tự động theo lịch hẹn giờ"
+                            >
+                              <Clock className="w-3 h-3" />
+                              <span>Auto</span>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -856,64 +955,115 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               </div>
           ) : selectedFeeder ? (
             <div className="space-y-4 text-xs">
-              {/* 1. Feeder Control Card with Toggle Switch */}
+              {/* 1. Feeder Control Card with 3-Mode Tri-State Buttons */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-3">
                 <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                    <span>Điều khiển nguồn Mạch điện</span>
+                    <span>Điều khiển nguồn Mạch điện (IoT)</span>
                   </span>
-                  <span
-                    className={`text-[9.5px] font-bold px-2 py-0.5 rounded ${
-                      feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
-                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
-                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
-                    }`}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selId = selectedFeeder.feeder_id || selectedFeeder.external_ref
+                      dispatch(
+                        openHistoryModal({
+                          feederId: selId,
+                          cabinetId: selectedFeeder.cabinet_id,
+                          title: `Mạch ${selectedFeeder.feeder_name || selId}`,
+                        })
+                      )
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition cursor-pointer"
+                    title="Xem nhật ký phát lệnh của mạch này"
                   >
-                    {feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
-                      ? 'ĐÃ NGẮT NGUỒN'
-                      : 'ĐANG CẤP ĐIỆN'}
-                  </span>
+                    <History className="w-3 h-3" />
+                    Lịch sử lệnh
+                  </button>
+                  {(() => {
+                    const selId = selectedFeeder.feeder_id || selectedFeeder.external_ref
+                    const mode: FeederControlMode = activeFeederModes[selId] || (feederStatusMap?.[selId] === 'fault' ? 'off' : 'auto')
+                    return (
+                      <span
+                        className={`text-[9.5px] font-bold px-2 py-0.5 rounded ${
+                          mode === 'on'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                            : mode === 'off'
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
+                            : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300'
+                        }`}
+                      >
+                        {mode === 'on' ? 'ĐANG BẬT (ON)' : mode === 'off' ? 'ĐÃ NGẮT (OFF)' : 'TỰ ĐỘNG (AUTO)'}
+                      </span>
+                    )
+                  })()}
                 </div>
 
-                <div className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
-                  <div className="space-y-0.5 min-w-0 flex-1 pr-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/60 gap-3">
+                  <div className="space-y-0.5 min-w-0 flex-1">
                     <div className="font-bold text-slate-900 dark:text-white text-xs truncate">
                       {selectedFeeder.feeder_name || selectedFeeder.external_ref || selectedFeeder.feeder_id}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Đóng/ngắt điện toàn bộ cột đèn thuộc mạch này
+                      Chuyển đổi trạng thái nguồn rơ-le điều khiển mạch
                     </div>
                   </div>
-                  {onToggleFeeder && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onToggleFeeder(
-                          selectedFeeder.feeder_id || selectedFeeder.external_ref,
-                          selectedFeeder.feeder_name || selectedFeeder.external_ref
-                        )
-                      }
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer shrink-0 ${
-                        feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] !== 'fault'
-                          ? 'bg-emerald-600'
-                          : 'bg-slate-300 dark:bg-slate-700'
-                      }`}
-                      title={
-                        feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] !== 'fault'
-                          ? 'Bấm để ngắt điện mạch'
-                          : 'Bấm để cấp điện mạch'
-                      }
-                    >
-                      <span
-                        className={`inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-md transition-transform ${
-                          feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] !== 'fault'
-                            ? 'translate-x-5.5'
-                            : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  )}
+
+                  {/* 3-Mode Tri-State Control Buttons */}
+                  {(() => {
+                    const selId = selectedFeeder.feeder_id || selectedFeeder.external_ref
+                    const assetFeeder = (assetFeeders || []).find((af: any) => af.feeder_id === selId)
+                    const realBackendMode: FeederControlMode | undefined =
+                      selectedFeeder.control?.control_mode ||
+                      selectedFeeder.control_mode ||
+                      assetFeeder?.control?.control_mode
+                    const currentMode: FeederControlMode | undefined = realBackendMode
+                    return (
+                      <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleControlFeederMode(selId, 'on')}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                            currentMode === 'on'
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'
+                          }`}
+                          title="Bật nguồn cưỡng bức ngay lập tức"
+                        >
+                          <Sun className="w-3.5 h-3.5" />
+                          <span>Bật</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleControlFeederMode(selId, 'off')}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                            currentMode === 'off'
+                              ? 'bg-rose-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'
+                          }`}
+                          title="Ngắt nguồn cưỡng bức (Tắt)"
+                        >
+                          <Moon className="w-3.5 h-3.5" />
+                          <span>Tắt</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleControlFeederMode(selId, 'auto')}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                            currentMode === 'auto'
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600'
+                          }`}
+                          title="Chạy tự động theo lịch hẹn giờ"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Auto</span>
+                        </button>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
 

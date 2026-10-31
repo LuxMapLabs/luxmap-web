@@ -259,7 +259,7 @@ export function useFeederLinesLayer({
           feeder_id: fId,
           feeder_name: found?.feeder_name || p.feeder_name || `Mạch ${fId}`,
           external_ref: found?.external_ref || p.external_ref || fId,
-          cabinet_id: p.cabinet_id || found?.cabinet?.cabinet_id || p.from_id,
+          cabinet_id: p.cabinet_id || found?.cabinet?.cabinet_id || (p.from_id?.startsWith('CAB') ? p.from_id : undefined),
           cabinet_name: p.cabinet_name || found?.cabinet?.cabinet_name,
           segment_id: p.segment_id,
         })
@@ -351,9 +351,12 @@ export function useFeederLinesLayer({
       cabinetStatusMap.set(selectedCabinet.cabinet_id, selectedCabinet.status || 'active')
     }
 
-    // Bản đồ Feeder -> Cabinet và Feeder status
+    // Bản đồ Feeder -> Cabinet, Feeder status, power_state và control_mode
     const feederToCabinetMap = new Map<string, string>()
     const feederStatusMap = new Map<string, string>()
+    const feederPowerStateMap = new Map<string, string>()
+    const feederControlModeMap = new Map<string, string>()
+
     if (assetFeeders && assetFeeders.length > 0) {
       assetFeeders.forEach((fdr: any) => {
         if (fdr.feeder_id) {
@@ -362,9 +365,24 @@ export function useFeederLinesLayer({
           } else if (fdr.cabinet_id) {
             feederToCabinetMap.set(fdr.feeder_id, fdr.cabinet_id)
           }
+          if (fdr.power_state) {
+            feederPowerStateMap.set(fdr.feeder_id, fdr.power_state)
+          }
+          if (fdr.control?.control_mode) {
+            feederControlModeMap.set(fdr.feeder_id, fdr.control.control_mode)
+          }
           if (fdr.status) {
             feederStatusMap.set(fdr.feeder_id, fdr.status)
           }
+        }
+      })
+    }
+
+    if (selectedCabinet?.feeders && Array.isArray(selectedCabinet.feeders)) {
+      selectedCabinet.feeders.forEach((cf: any) => {
+        if (cf.feeder_id) {
+          if (cf.power_state) feederPowerStateMap.set(cf.feeder_id, cf.power_state)
+          if (cf.control_mode) feederControlModeMap.set(cf.feeder_id, cf.control_mode)
         }
       })
     }
@@ -380,25 +398,60 @@ export function useFeederLinesLayer({
         (feederId ? feederToCabinetMap.get(feederId) : null) ||
         (p.order === 1 ? p.from_id : null)
 
+      const linkedCabinetName =
+        p.cabinet_name ||
+        (selectedCabinet?.cabinet_id === linkedCabinetId ? selectedCabinet.cabinet_name : null) ||
+        (linkedCabinetId ? `Tủ ${linkedCabinetId}` : undefined)
+
       const cabinetStatus = linkedCabinetId ? cabinetStatusMap.get(linkedCabinetId) : null
       const feederStatus = feederId ? feederStatusMap.get(feederId) : null
+
+      const backendMode = feederId ? feederControlModeMap.get(feederId) : null
+      const powerState = feederId ? feederPowerStateMap.get(feederId) : null
 
       const isFault =
         p.status === 'fault' ||
         feederStatus === 'fault' ||
         cabinetStatus === 'fault' ||
+        powerState === 'off' ||
         (selectedCabinet?.cabinet_id &&
           (selectedCabinet.cabinet_id === linkedCabinetId ||
             selectedCabinet.cabinet_id === p.cabinet_id) &&
           selectedCabinet.status === 'fault')
 
+      // Tuân thủ 100% dữ liệu thực từ API: CHỈ sáng xanh khi powerState thực sự là 'on'
+      const isPoweredOn = !isFault && powerState === 'on'
+      const isUnknownPower = !isFault && !isPoweredOn
+
+      let lineColor = '#94a3b8'
+      let glowColor = '#64748b'
+      let lineStatus = 'unknown'
+
+      if (isFault) {
+        lineColor = '#ef4444'
+        glowColor = '#dc2626'
+        lineStatus = 'fault'
+      } else if (isPoweredOn) {
+        lineColor = '#10b981'
+        glowColor = '#059669'
+        lineStatus = 'active'
+      } else if (isUnknownPower) {
+        lineColor = '#94a3b8' // Xám trung tính khi power_state là unknown
+        glowColor = '#64748b'
+        lineStatus = 'unknown'
+      }
+
       return {
         ...feat,
         properties: {
           ...p,
-          status: isFault ? 'fault' : 'active',
-          color: isFault ? '#ef4444' : '#10b981',
-          glow_color: isFault ? '#dc2626' : '#059669',
+          cabinet_id: linkedCabinetId,
+          cabinet_name: linkedCabinetName,
+          power_state: powerState,
+          control_mode: backendMode,
+          status: lineStatus,
+          color: lineColor,
+          glow_color: glowColor,
         },
       }
     })

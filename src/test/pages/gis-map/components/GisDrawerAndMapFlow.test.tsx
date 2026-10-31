@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Provider } from 'react-redux'
@@ -71,6 +72,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       cabinet_name: 'Tủ điện Tỉnh Lộ 8',
       commune_id: 'commune_tl8',
       feeder_ids: ['F-01', 'F-02'],
+      feeders: [],
     },
   }
 
@@ -149,7 +151,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
     handleSelectPole: vi.fn(),
     selectedCabinet: null,
     setSelectedCabinet: vi.fn(),
-    onToggleCabinet: vi.fn(),
+    onToggleFeeder: vi.fn(),
     cabinets: [],
     effectivePoles: [],
   }
@@ -418,10 +420,10 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       )
 
       expect(screen.getAllByText('Lộ 1 - Tủ A - Tỉnh Lộ 8').length).toBeGreaterThan(0)
-      expect(screen.getByText('Điều khiển nguồn Mạch điện')).toBeInTheDocument()
+      expect(screen.getByText(/Điều khiển nguồn Mạch điện/i)).toBeInTheDocument()
       expect(screen.getByText('Thông số Kỹ thuật Mạch điện')).toBeInTheDocument()
       expect(screen.getByText('Tủ A')).toBeInTheDocument()
-      expect(screen.getAllByText('ĐANG CẤP ĐIỆN').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/ĐANG BẬT|TỰ ĐỘNG|ĐANG CẤP ĐIỆN/i).length).toBeGreaterThan(0)
     })
 
     it('validateImportRow chấp nhận dòng dữ liệu CSV có đủ 100% các cột bắt buộc', () => {
@@ -546,15 +548,10 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getAllByText('FDR-01').length).toBeGreaterThanOrEqual(1)
       expect(screen.getAllByText('FDR-02').length).toBeGreaterThanOrEqual(1)
 
-      // 4. Trạng thái từng mạch
-      expect(screen.getAllByText('Đang cấp điện').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getByText('Đã ngắt')).toBeInTheDocument()
-
-      // 5. Nút bấm toggle switch gọi onToggleFeeder khi click
-      const switchBtns = screen.getAllByRole('button', { name: /Bấm để/i })
-      expect(switchBtns.length).toBeGreaterThanOrEqual(2)
-      fireEvent.click(switchBtns[0])
-      expect(handleToggleFeeder).toHaveBeenCalledWith('FDR-01', expect.any(String))
+      // 4. Cụm nút điều khiển 3 chế độ (Bật / Tắt / Auto) cho từng mạch
+      expect(screen.getAllByRole('button', { name: /Bật/i }).length).toBeGreaterThanOrEqual(2)
+      expect(screen.getAllByRole('button', { name: /Tắt/i }).length).toBeGreaterThanOrEqual(2)
+      expect(screen.getAllByRole('button', { name: /Auto/i }).length).toBeGreaterThanOrEqual(2)
     })
 
     it('validateImportRow chặn ngay và trả về invalid khi thiếu bất kỳ ô dữ liệu nào trong cột bắt buộc', () => {
