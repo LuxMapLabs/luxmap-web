@@ -1,5 +1,5 @@
 import React from 'react'
-import { Edit2, Archive, CheckCircle2, AlertCircle, Boxes, Lightbulb, PackageMinus } from 'lucide-react'
+import { Edit2, Archive, CheckCircle2, AlertCircle, Boxes, Lightbulb, PackageMinus, Eye } from 'lucide-react'
 import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import { FixtureTableSkeleton } from './FixtureTableSkeleton'
@@ -9,6 +9,7 @@ interface FixtureTableProps {
   poles: PoleListItem[]
   flashingFixtureCode?: string
   isLoading?: boolean
+  onViewDetail?: (fixture: ManagedFixture) => void
   onEditFixture: (fixture: ManagedFixture) => void
   onRetireFixture?: (fixture: ManagedFixture) => void
   onSelectPole?: (poleCode: string) => void
@@ -19,6 +20,7 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
   poles,
   flashingFixtureCode,
   isLoading = false,
+  onViewDetail,
   onEditFixture,
   onRetireFixture,
   onSelectPole,
@@ -219,6 +221,16 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                   {/* Thao tác */}
                   <td className="py-2.5 px-3.5 text-center">
                     <div className="flex items-center justify-center gap-1">
+                      {onViewDetail && (
+                        <button
+                          type="button"
+                          onClick={() => onViewDetail(fixture)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 transition cursor-pointer"
+                          title="Xem chi tiết bộ đèn"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => onEditFixture(fixture)}

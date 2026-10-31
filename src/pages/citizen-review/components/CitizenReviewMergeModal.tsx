@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { GitMerge, X, Loader2, AlertCircle } from 'lucide-react'
 import type { CitizenReportOpenFault, MergeCitizenReportRequest } from '../../../types/citizen-reports/citizen-reports'
 
@@ -24,6 +25,15 @@ export const CitizenReviewMergeModal: React.FC<CitizenReviewMergeModalProps> = (
   )
   const [note, setNote] = useState<string>('')
 
+  // Đồng bộ lại selectedFaultId khi modal mở hoặc danh sách openFaults thay đổi
+  useEffect(() => {
+    if (isOpen && openFaults.length > 0) {
+      if (!selectedFaultId || !openFaults.some((f) => f.fault_id === selectedFaultId)) {
+        setSelectedFaultId(openFaults[0].fault_id || '')
+      }
+    }
+  }, [isOpen, openFaults, selectedFaultId])
+
   if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -37,8 +47,8 @@ export const CitizenReviewMergeModal: React.FC<CitizenReviewMergeModalProps> = (
     })
   }
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
       <div
         className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
@@ -156,6 +166,9 @@ export const CitizenReviewMergeModal: React.FC<CitizenReviewMergeModalProps> = (
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
+
+export default CitizenReviewMergeModal

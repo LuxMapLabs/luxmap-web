@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Compass, AlertCircle, RotateCcw, Trash2, CheckCircle2 } from 'lucide-react'
 import type { CommuneItem, CommuneBbox } from '../../../types/admin/communes'
 import { CommuneBboxMap } from './CommuneBboxMap'
@@ -159,8 +160,8 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
     setResetBboxKey((prev) => prev + 1)
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-950/70">
@@ -387,7 +388,8 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 export default CommuneFormModal
