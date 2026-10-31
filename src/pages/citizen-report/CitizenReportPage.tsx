@@ -489,7 +489,6 @@ export const CitizenReportPage: React.FC = () => {
               type="file"
               ref={fileInputRef}
               accept="image/jpeg,image/jpg,image/png,image/*"
-              capture="environment"
               multiple
               onChange={handleMediaChange}
               className="hidden"
