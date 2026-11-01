@@ -113,6 +113,15 @@ export const cabinetImportSchema = z
     }
   )
 
+export const feederImportSchema = z.object({
+  external_ref: z.string().min(1, 'Mã mạch điện (external_ref) không được để trống'),
+  feeder_name: z.string().min(1, 'Tên mạch điện (feeder_name) không được để trống'),
+  commune_id: z.string().min(1, 'Mã xã/phường (commune_id) không được để trống'),
+  cabinet_external_ref: z.string().min(1, 'Mã tủ điện liên kết (cabinet_external_ref) không được để trống'),
+})
+
+export type FeederImportRow = z.infer<typeof feederImportSchema>
+
 export const poleImportSchema = z.object({
   external_ref: z.string().min(1, 'Mã cột điện (external_ref) không được để trống'),
   commune_id: z.string().min(1, 'Mã xã/phường (commune_id) không được để trống'),
@@ -259,6 +268,12 @@ export const REQUIRED_COLUMNS_BY_CATEGORY: Record<string, { key: string; label: 
     { key: 'commune_id', label: 'commune_id' },
     { key: 'geom_wkt', label: 'geom_wkt' },
     { key: 'data_source', label: 'data_source' },
+  ],
+  feeders: [
+    { key: 'external_ref', label: 'external_ref' },
+    { key: 'feeder_name', label: 'feeder_name' },
+    { key: 'commune_id', label: 'commune_id' },
+    { key: 'cabinet_external_ref', label: 'cabinet_external_ref' },
   ],
   poles: [
     { key: 'external_ref', label: 'external_ref' },
@@ -709,6 +724,115 @@ export function validateImportRow(
       externalRef: poleRef,
       actionType,
       data: fixtureDto,
+      diffs,
+    }
+  }
+
+  // ----------------------------------------------------
+  // CASE E: FEEDERS (Mạch điện xuất tuyến)
+  // Ràng buộc bắt buộc: Tủ điện (cabinet_external_ref) PHẢI tồn tại trong GIS!
+  // ----------------------------------------------------
+  if (category === 'feeders') {
+    const parseResult = feederImportSchema.safeParse(rowObj)
+    if (!parseResult.success) {
+      const firstError = parseResult.error.issues[0]?.message || 'Lỗi định dạng dữ liệu mạch điện'
+      return {
+        category: 'feeders',
+        externalRef: rowObj.external_ref || `FDR-ROW-${rowIndex + 1}`,
+        actionType: 'invalid',
+        errorMsg: firstError,
+        data: {
+          external_ref: rowObj.external_ref || null,
+          feeder_name: rowObj.feeder_name || null,
+          commune_id: rowObj.commune_id || null,
+          cabinet_id: rowObj.cabinet_external_ref || null,
+        },
+        diffs: [],
+      }
+    }
+
+    const data = parseResult.data
+    const cabRef = data.cabinet_external_ref.trim().toLowerCase()
+
+    // Ràng buộc cha: Tìm Tủ điện trong hệ thống GIS theo cabinet_external_ref hoặc cabinet_id
+    const parentCabinet = cabinets.find(
+      (c) =>
+        (c.external_ref && c.external_ref.toLowerCase() === cabRef) ||
+        (c.cabinet_id && c.cabinet_id.toLowerCase() === cabRef)
+    )
+
+    if (!parentCabinet) {
+      return {
+        category: 'feeders',
+        externalRef: data.external_ref,
+        actionType: 'invalid',
+        errorMsg: `Tủ điện [${data.cabinet_external_ref}] chưa tồn tại trong hệ thống GIS. Cần nạp Tủ điện trước khi nạp Mạch điện!`,
+        data: {
+          external_ref: data.external_ref,
+          feeder_name: data.feeder_name,
+          commune_id: data.commune_id,
+          cabinet_id: data.cabinet_external_ref,
+        },
+        diffs: [],
+      }
+    }
+
+    // Đã có tủ điện hợp lệ -> Kiểm tra xem Mạch điện đã tồn tại trong GIS chưa
+    const existingFeeder = feeders.find(
+      (f) =>
+        (f.external_ref && f.external_ref.toLowerCase() === data.external_ref.toLowerCase()) ||
+        (f.feeder_id && f.feeder_id.toLowerCase() === data.external_ref.toLowerCase())
+    )
+
+    let actionType: 'new' | 'updated' | 'unchanged' = 'new'
+    const diffs: FieldDiff[] = []
+
+    if (!existingFeeder) {
+      actionType = 'new'
+      diffs.push({
+        label: 'Mạch điện mới',
+        oldVal: 'Chưa có trên GIS',
+        newVal: `${data.feeder_name} (${parentCabinet.cabinet_name || parentCabinet.external_ref})`,
+      })
+    } else {
+      if (existingFeeder.feeder_name !== data.feeder_name) {
+        diffs.push({
+          label: 'Tên lộ/mạch',
+          oldVal: existingFeeder.feeder_name || 'Chưa đặt tên',
+          newVal: data.feeder_name,
+        })
+      }
+      if (existingFeeder.commune_id && existingFeeder.commune_id !== data.commune_id) {
+        diffs.push({
+          label: 'Xã/phường',
+          oldVal: formatCommuneDisplayName(existingFeeder.commune_id),
+          newVal: formatCommuneDisplayName(data.commune_id),
+        })
+      }
+      const existingCabId = existingFeeder.cabinet?.cabinet_id
+      if (existingCabId && parentCabinet.cabinet_id && existingCabId !== parentCabinet.cabinet_id) {
+        diffs.push({
+          label: 'Trạm tủ điện',
+          oldVal: existingFeeder.cabinet?.cabinet_name || existingCabId,
+          newVal: parentCabinet.cabinet_name || parentCabinet.external_ref || parentCabinet.cabinet_id,
+        })
+      }
+
+      actionType = diffs.length > 0 ? 'updated' : 'unchanged'
+    }
+
+    const feederDto: CreateFeederRequest = {
+      external_ref: data.external_ref,
+      feeder_name: data.feeder_name,
+      commune_id: data.commune_id,
+      cabinet_id: parentCabinet.cabinet_id || parentCabinet.external_ref || null,
+    }
+
+    return {
+      category: 'feeders',
+      externalRef: data.external_ref,
+      actionType,
+      data: feederDto,
       diffs,
     }
   }

@@ -78,6 +78,15 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     templateUrl: '/templates/poles.csv',
     description: 'Nạp danh mục Cột đèn & Bộ đèn. Hệ thống tự động phát hiện bản ghi Mới, Cập nhật thông số và ẩn các bản ghi không thay đổi.',
   },
+  feeders: {
+    id: 'feeders' as ImportAssetCategory,
+    label: 'Mạch điện',
+    title: 'Mạch Điện Xuất Tuyến',
+    icon: <Zap className="w-5 h-5 text-amber-500" />,
+    templateFileName: 'feeders.csv',
+    templateUrl: '/templates/feeders.csv',
+    description: 'Nạp danh mục Mạch điện xuất tuyến (Feeder) thuộc các trạm Tủ điện theo chuẩn Backend.',
+  },
   cabinets: {
     id: 'cabinets' as ImportAssetCategory,
     label: 'Tủ điện',
@@ -732,7 +741,6 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                     </>
                                   )
                                 }
-
                                 if (item.category === 'cabinets') {
                                   return (
                                     <>
