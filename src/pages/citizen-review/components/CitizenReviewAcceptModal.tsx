@@ -65,7 +65,7 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-100000 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
       <div
         className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}

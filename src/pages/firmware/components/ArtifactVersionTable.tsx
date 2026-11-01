@@ -195,7 +195,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
   onViewUsage,
   onOpenRegister,
 }) => {
-  const [copiedHash, setCopiedHash] = useState<string | null>(null)
+  const [copiedRowId, setCopiedRowId] = useState<number | string | null>(null)
   const [copiedJson, setCopiedJson] = useState(false)
   const [metadataTab, setMetadataTab] = useState<'table' | 'json'>('table')
   const [viewMetadata, setViewMetadata] = useState<{
@@ -205,16 +205,16 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
     data: any
   } | null>(null)
 
-  const handleCopy = (hash: string) => {
+  const handleCopy = (rowId: number | string, hash: string) => {
     navigator.clipboard.writeText(hash)
-    setCopiedHash(hash)
-    setTimeout(() => setCopiedHash(null), 2000)
+    setCopiedRowId(rowId)
+    setTimeout(() => setCopiedRowId(null), 3500)
   }
 
   const handleCopyJson = (data: any) => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2))
     setCopiedJson(true)
-    setTimeout(() => setCopiedJson(false), 2000)
+    setTimeout(() => setCopiedJson(false), 3000)
   }
 
   return (
@@ -269,7 +269,8 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                 </td>
               </tr>
             ) : (
-              items.map((item) => {
+              items.map((item, index) => {
+                const rowId = item.version_id ?? index
                 const hasHash = Boolean(item.artifact_hash)
                 const hasMetadata =
                   item.metadata &&
@@ -327,11 +328,11 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                           </code>
                           <button
                             type="button"
-                            onClick={() => handleCopy(item.artifact_hash!)}
-                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
-                            title="Sao chép toàn bộ mã SHA-256"
+                            onClick={() => handleCopy(rowId, item.artifact_hash!)}
+                            className={`p-1 rounded-md transition cursor-pointer ${copiedRowId === rowId ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                            title={copiedRowId === rowId ? "Đã sao chép mã SHA-256!" : "Sao chép toàn bộ mã SHA-256"}
                           >
-                            {copiedHash === item.artifact_hash ? (
+                            {copiedRowId === rowId ? (
                               <Check className="w-3.5 h-3.5 text-emerald-600" />
                             ) : (
                               <Copy className="w-3.5 h-3.5" />
