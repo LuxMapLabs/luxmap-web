@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FeedersTab } from '../../../../../pages/assets/components/feeders/FeedersTab'
 import { FeederDetailModal } from '../../../../../pages/assets/components/feeders/components/FeederDetailModal'
+import { validateImportRow } from '../../../../../validations/assetImport.schema'
 import assetReducer, {
   createFeederRequest,
   updateFeederRequest,
@@ -259,5 +260,45 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
 
     expect(mockDelete).toHaveBeenCalledWith('FDR-001')
   })
-})
+  it('7. validateImportRow với category feeders liên kết đúng tủ điện cha đã có trong GIS', () => {
+    const csvRow = {
+      external_ref: 'FDR-CAB-TL8-A',
+      feeder_name: 'Lộ 1 - Tủ A - Tỉnh Lộ 8',
+      commune_id: 'COM-001',
+      cabinet_external_ref: 'CAB-TL8-A',
+    }
 
+    const context = {
+      poles: mockPoles,
+      cabinets: mockCabinets,
+      segments: [],
+      feeders: [],
+    }
+
+    const review = validateImportRow('feeders', csvRow, context, 0)
+    expect(review.category).toBe('feeders')
+    expect(review.actionType).toBe('new')
+    expect(review.externalRef).toBe('FDR-CAB-TL8-A')
+    expect(review.data.cabinet_id).toBe('CAB-001')
+  })
+
+  it('8. validateImportRow với category feeders báo lỗi vi phạm ràng buộc khi tủ điện chưa có trên GIS', () => {
+    const csvRow = {
+      external_ref: 'FDR-CAB-UNKNOWN',
+      feeder_name: 'Lộ chưa rõ',
+      commune_id: 'COM-001',
+      cabinet_external_ref: 'CAB-NON-EXISTENT',
+    }
+
+    const context = {
+      poles: mockPoles,
+      cabinets: mockCabinets,
+      segments: [],
+      feeders: [],
+    }
+
+    const review = validateImportRow('feeders', csvRow, context, 0)
+    expect(review.actionType).toBe('invalid')
+    expect(review.errorMsg).toContain('Tủ điện [CAB-NON-EXISTENT] chưa tồn tại trong hệ thống GIS')
+  })
+})
