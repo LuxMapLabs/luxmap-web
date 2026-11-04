@@ -8,7 +8,7 @@ import type { ActiveFixture } from './fixtures'
 
 export interface CreatePoleRequest {
     external_ref?: string | null
-    segment_id: string | null
+    segment_id?: string | null
     feeder_id?: string | null
     commune_id: string | null
     geom_wkt: string | null

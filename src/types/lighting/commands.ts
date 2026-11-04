@@ -50,5 +50,6 @@ export interface LightingRequestResult {
     excluded: LightingExclusion[]
     affected_segment_ids: string[]
     uncontrollable_pole_count: number
+    unassigned_segment_pole_count: number
 }
 
