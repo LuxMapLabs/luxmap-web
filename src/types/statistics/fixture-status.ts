@@ -14,6 +14,7 @@ export interface FixtureStatusRow {
     out: number
     unknown: number
     never_surveyed: number
+    unassigned_segment_pole_count: number
 }
 
 export interface FixtureStatusStatistics {

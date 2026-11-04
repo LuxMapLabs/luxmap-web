@@ -18,6 +18,7 @@ export interface LightingPreview {
     excluded: LightingExclusion[]
     affected_segment_ids: string[]
     uncontrollable_pole_count: number
+    unassigned_segment_pole_count: number
 }
 
 export interface LightingTarget {

@@ -271,6 +271,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
     const context = {
       poles: mockPoles,
       cabinets: mockCabinets,
+      fixtures: [],
       segments: [],
       feeders: [],
     }
@@ -279,7 +280,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
     expect(review.category).toBe('feeders')
     expect(review.actionType).toBe('new')
     expect(review.externalRef).toBe('FDR-CAB-TL8-A')
-    expect(review.data.cabinet_id).toBe('CAB-001')
+    expect((review.data as { cabinet_id?: string | null }).cabinet_id).toBe('CAB-001')
   })
 
   it('8. validateImportRow với category feeders báo lỗi vi phạm ràng buộc khi tủ điện chưa có trên GIS', () => {
@@ -293,6 +294,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
     const context = {
       poles: mockPoles,
       cabinets: mockCabinets,
+      fixtures: [],
       segments: [],
       feeders: [],
     }
