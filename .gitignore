@@ -39,5 +39,6 @@ desktop.ini
 # AI Agent & Local Docs
 docs
 .agents
+.agent/
 pipeline
 skills-lock.json
