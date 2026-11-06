@@ -290,7 +290,7 @@ export const ManagerDashboardPage: React.FC = () => {
         {/* 2. Dải 4 Thẻ KPI (Click để cuộn xuống bảng tương ứng) */}
         <DashboardKpiCards
           fixtureKpis={fixtureKpis}
-          faultsCount={filteredFaults.length}
+          faultsCount={segmentFaults.length}
           warrantyKpis={{
             itemsCount: warrantyKpis.items.length,
             expiringCount: warrantyKpis.expiringCount,

@@ -24,14 +24,15 @@ import { SystemSettingsPage } from './pages/settings/SystemSettingsPage'
 import { FirmwareManagementPage } from './pages/firmware/FirmwareManagementPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
+import { SuperiorDashboardPage } from './pages/superior-dashboard/SuperiorDashboardPage'
 import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
 import { AdminDashboardPage } from './pages/admin-dashboard/AdminDashboardPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
  * - Admin: chuyển sang /admin/dashboard
- * - Superior: chuyển sang /reports
- * - Manager: chuyển sang /dashboard
+ * - Superior: chuyển sang /dashboard (Tổng quan cấp trên)
+ * - Manager: chuyển sang /dashboard (Tổng quan quản lý)
  */
 const RootRedirect: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
@@ -39,12 +40,23 @@ const RootRedirect: React.FC = () => {
     return <Navigate to="/admin/dashboard" replace />
   }
   if (isManagementAgency(user?.role)) {
-    return <Navigate to="/reports" replace />
+    return <Navigate to="/dashboard" replace />
   }
   if (isManager(user?.role)) {
     return <Navigate to="/dashboard" replace />
   }
   return <Navigate to="/gis-map" replace />
+}
+
+/**
+ * Hiển thị Dashboard phù hợp theo vai trò (Manager Dashboard vs Superior Dashboard)
+ */
+const DashboardRoute: React.FC = () => {
+  const { user } = useSelector((state: RootState) => state.auth)
+  if (isManagementAgency(user?.role)) {
+    return <SuperiorDashboardPage />
+  }
+  return <ManagerDashboardPage />
 }
 
 function App() {
@@ -95,9 +107,17 @@ function App() {
               <Route path="/gis-map" element={<GisMapPage />} />
             </Route>
 
-            {/* Tuyến dành riêng cho Cán bộ Quản lý (Manager): Bảng điều khiển (Dashboard), Lịch làm việc, Quản lý tài sản & Phản ánh người dân */}
+            {/* Tuyến Bảng điều khiển (Tổng quan): Dành cho cả Cán bộ Quản lý (Manager) & Cấp trên Giám sát (Superior) */}
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]} />
+              }
+            >
+              <Route path="/dashboard" element={<DashboardRoute />} />
+            </Route>
+
+            {/* Tuyến dành riêng cho Cán bộ Quản lý (Manager): Lịch làm việc, Quản lý tài sản & Phản ánh người dân */}
             <Route element={<ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]} />}>
-              <Route path="/dashboard" element={<ManagerDashboardPage />} />
               <Route path="/work-schedule" element={<WorkSchedulePage />} />
               <Route path="/assets" element={<AssetManagementPage />} />
               <Route path="/citizen-reports" element={<CitizenReviewPage />} />
