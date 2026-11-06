@@ -135,6 +135,7 @@ export interface PolePhotoItem {
     status_reason?: 'applied' | 'classification_preserved' | 'not_newer' | 'rejected'
     thumbnail_url?: string | null
     original_url?: string | null
+    video?: PolePhotoVideoItem
 }
 
 export interface PolePhotoItemPagedResult {
@@ -147,6 +148,25 @@ export interface PolePhotoItemPagedResult {
 export interface PolePhotoReviewRequest {
     final_cv_state: 'on' | 'off'
     review_note?: string | null
+}
+
+export interface PolePhotoVideoItem {
+    duration_ms?: number
+    byte_count?: number
+    sha256?: string | null
+    sampled_frames?: number
+    on_frames?: number
+    off_frames?: number
+    daylight_frames?: number
+    confidence_min?: number
+    confidence_median?: number
+    confidence_max?: number
+    median_luma?: number
+    hdr?: boolean
+    reason_code?: string | null
+    viewed_by?: string | null
+    viewed_at?: string | null
+    video_url?: string | null
 }
 
 export interface RejectCancellationRequest {

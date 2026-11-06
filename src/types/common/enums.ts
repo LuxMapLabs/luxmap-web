@@ -15,6 +15,8 @@ export type CitizenReportStatus = 'pending' | 'accepted' | 'merged' | 'rejected'
 
 export type DataSource = 'field' | 'public_imagery' | 'calibration_rig' | 'simulated'
 
+export type DayNightClassification = 'day' | 'night' | 'unknown'
+
 export type EvidenceKind = 'before' | 'after' | 'observation'
 
 export type FaultStatus = 'detected' | 'confirmed' | 'rejected' | 'in_progress' | 'resolved' | 'verified'

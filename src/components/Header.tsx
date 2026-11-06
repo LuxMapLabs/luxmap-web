@@ -166,7 +166,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex flex-col">
             <h1 className="text-sm font-bold text-slate-900 leading-tight">
               {isDashboard
-                ? 'Bảng điều khiển Quản lý'
+                ? isManagementAgency(user?.role)
+                  ? 'Tổng quan Giám sát Cấp trên'
+                  : 'Bảng điều khiển Quản lý'
                 : isWorkSchedule
                 ? 'Lịch làm việc'
                 : isAssets
@@ -191,7 +193,9 @@ export const Header: React.FC<HeaderProps> = ({
             </h1>
             <p className="text-[11px] text-slate-500 font-medium leading-none mt-0.5 hidden sm:block">
               {isDashboard
-                ? 'Giám sát chỉ số vận hành, sự cố & tình trạng bảo hành bóng đèn'
+                ? isManagementAgency(user?.role)
+                  ? 'Giám sát chỉ số vận hành, tuân thủ SLA và dự toán bảo hành'
+                  : 'Giám sát chỉ số vận hành, sự cố & tình trạng bảo hành bóng đèn'
                 : isWorkSchedule
                 ? 'Lập lịch khảo sát, kiểm tra & điều phối sửa chữa'
                 : isAssets

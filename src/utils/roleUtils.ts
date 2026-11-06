@@ -240,7 +240,7 @@ export const canAccessTab = (
     return tabId === 'admin-system'
   }
   if (isManagementAgency(role)) {
-    return tabId === 'reports' || tabId === 'gis-map'
+    return tabId === 'dashboard' || tabId === 'reports' || tabId === 'gis-map'
   }
   if (isManager(role)) {
     return (
