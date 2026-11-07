@@ -139,7 +139,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
                 {/* Đỉnh trên: Bắc (max_lat) */}
                 <div className="flex justify-center">
                   <div className="w-48 px-3 py-2 bg-white rounded-lg border border-slate-200/90 text-center shadow-2xs">
-                    <span className="text-[10px] text-slate-400 font-sans block mb-0.5">Vĩ độ Bắc (max_lat)</span>
+                    <span className="text-[11px] text-slate-500 font-sans block mb-0.5">Vĩ độ Bắc (max_lat)</span>
                     <strong className="font-mono text-xs font-semibold text-slate-800">{commune.bbox.max_lat}</strong>
                   </div>
                 </div>
@@ -147,7 +147,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
                 {/* Hàng giữa: Tây (min_lng) <---> Tâm BBox <---> Đông (max_lng) */}
                 <div className="flex items-center justify-between gap-2.5">
                   <div className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-200/90 text-center shadow-2xs">
-                    <span className="text-[10px] text-slate-400 font-sans block mb-0.5">Kinh độ Tây (min_lng)</span>
+                    <span className="text-[11px] text-slate-500 font-sans block mb-0.5">Kinh độ Tây (min_lng)</span>
                     <strong className="font-mono text-xs font-semibold text-slate-800">{commune.bbox.min_lng}</strong>
                   </div>
 
@@ -163,7 +163,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
                   </div>
 
                   <div className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-200/90 text-center shadow-2xs">
-                    <span className="text-[10px] text-slate-400 font-sans block mb-0.5">Kinh độ Đông (max_lng)</span>
+                    <span className="text-[11px] text-slate-500 font-sans block mb-0.5">Kinh độ Đông (max_lng)</span>
                     <strong className="font-mono text-xs font-semibold text-slate-800">{commune.bbox.max_lng}</strong>
                   </div>
                 </div>
@@ -171,7 +171,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
                 {/* Đáy dưới: Nam (min_lat) */}
                 <div className="flex justify-center">
                   <div className="w-48 px-3 py-2 bg-white rounded-lg border border-slate-200/90 text-center shadow-2xs">
-                    <span className="text-[10px] text-slate-400 font-sans block mb-0.5">Vĩ độ Nam (min_lat)</span>
+                    <span className="text-[11px] text-slate-500 font-sans block mb-0.5">Vĩ độ Nam (min_lat)</span>
                     <strong className="font-mono text-xs font-semibold text-slate-800">{commune.bbox.min_lat}</strong>
                   </div>
                 </div>

@@ -1111,6 +1111,18 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
         }`}
       />
 
+      {/* Skeleton khi bản đồ chưa tải xong */}
+      {!isMapLoaded && (
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900 animate-pulse pointer-events-none"
+          role="status"
+          aria-label="Đang tải bản đồ"
+        >
+          <Compass className="w-8 h-8 text-slate-500 mb-2" />
+          <span className="text-xs font-medium text-slate-400">Đang tải bản đồ...</span>
+        </div>
+      )}
+
       {/* Trạng thái chưa có BBox trong chế độ xem chi tiết */}
       {readOnly && !activeBbox && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 text-center z-10">

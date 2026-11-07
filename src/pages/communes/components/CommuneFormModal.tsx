@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Compass, AlertCircle, RotateCcw, Trash2, CheckCircle2 } from 'lucide-react'
 import type { CommuneItem, CommuneBbox } from '../../../types/admin/communes'
@@ -75,6 +75,15 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
     const heightKm = (Math.abs(maxLat - minLat) * 111.32).toFixed(2)
     return `${widthKm} km × ${heightKm} km`
   }, [bbox, hasBbox])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, isSubmitting, onClose])
 
   if (!isOpen) return null
 
@@ -341,7 +350,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
             <div className="p-2.5 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl text-[11px] text-blue-900 dark:text-blue-300 flex items-start gap-2 shadow-2xs">
               <span className="text-sm shrink-0">💡</span>
               <p className="leading-snug">
-                Nắm kéo <strong>4 chốt góc vuông</strong> hoặc <strong>4 nhãn hướng (Bắc, Nam, Tây, Đông)</strong> để co giãn khung; tick <strong>&quot;Di chuyển khung&quot;</strong> trên bản đồ để dời toàn bộ vị trí BBox.
+                Kéo các <strong>góc</strong> hoặc các <strong>cạnh (Bắc, Nam, Tây, Đông)</strong> để chỉnh khung; tick <strong>&quot;Di chuyển khung&quot;</strong> trên bản đồ để dời cả khung.
               </p>
             </div>
           </div>
@@ -384,7 +393,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
             disabled={isSubmitting}
             className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
           >
-            {isSubmitting ? 'Đang lưu...' : isEdit ? 'Lưu Thay Đổi' : 'Thêm Địa Bàn'}
+            {isSubmitting ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Thêm địa bàn'}
           </button>
         </div>
       </div>
