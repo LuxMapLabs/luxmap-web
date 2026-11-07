@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
-import { Eye, Edit2, Trash2, Zap, CheckCircle, MapPin } from 'lucide-react'
+import { RowActions } from '../../common/RowActions'
+import { Trash2, Zap, CheckCircle, MapPin } from 'lucide-react'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 import { CabinetTableSkeleton } from './CabinetTableSkeleton'
@@ -104,37 +105,13 @@ export const CabinetTable: React.FC<CabinetTableProps> = ({
                     </span>
                   </td>
                   <td className="p-3.5 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onViewDetail(cab)}
-                        title="Xem chi tiết"
-                        aria-label="Chi tiết"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onEdit(cab)}
-                        title="Chỉnh sửa tủ điện"
-                        aria-label="Sửa"
-                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      {onDelete && (
-                        <button
-                          type="button"
-                          onClick={() => onDelete(cab)}
-                          title="Xóa tủ điện"
-                          aria-label="Xóa"
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    <RowActions
+                      viewLabel="Xem chi tiết tủ điện"
+                      editLabel="Chỉnh sửa tủ điện"
+                      onView={() => onViewDetail(cab)}
+                      onEdit={() => onEdit(cab)}
+                      menuItems={onDelete ? [{ key: 'delete', label: 'Xóa tủ điện', icon: <Trash2 />, danger: true, onClick: () => onDelete?.(cab) }] : []}
+                    />
                   </td>
                 </tr>
               )

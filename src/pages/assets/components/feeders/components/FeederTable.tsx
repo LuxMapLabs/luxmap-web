@@ -1,5 +1,6 @@
 import React from 'react'
-import { Eye, Edit2, Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
+import { RowActions } from '../../common/RowActions'
+import { Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
@@ -149,33 +150,13 @@ export const FeederTable: React.FC<FeederTableProps> = ({
 
                   {/* Thao Tác */}
                   <td className="py-3.5 px-4 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onViewDetail(feeder)}
-                        title="Xem chi tiết & Cột đèn đấu nối"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onEdit(feeder)}
-                        title="Chỉnh sửa thông số mạch"
-                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(feeder)}
-                        title="Xóa mạch điện"
-                        aria-label="Xóa"
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <RowActions
+                      viewLabel="Xem chi tiết mạch điện"
+                      editLabel="Chỉnh sửa mạch điện"
+                      onView={() => onViewDetail(feeder)}
+                      onEdit={() => onEdit(feeder)}
+                      menuItems={[{ key: 'delete', label: 'Xóa mạch điện', icon: <Trash2 />, danger: true, onClick: () => onDelete(feeder) }]}
+                    />
                   </td>
                 </tr>
               )

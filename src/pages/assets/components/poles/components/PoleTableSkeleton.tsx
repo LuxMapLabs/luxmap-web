@@ -9,6 +9,10 @@ export const PoleTableSkeleton: React.FC<PoleTableSkeletonProps> = ({ rowCount =
     <>
       {Array.from({ length: rowCount }).map((_, index) => (
         <tr key={index} className="animate-pulse">
+          {/* Chọn */}
+          <td className="p-3.5 w-10">
+            <div className="h-4 w-4 bg-slate-200 dark:bg-slate-800 rounded" />
+          </td>
           {/* Mã cột */}
           <td className="p-3.5">
             <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />

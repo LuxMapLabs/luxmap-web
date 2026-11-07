@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { Button } from '../../../../components/Button'
 import { Search, Plus, Upload, Filter } from 'lucide-react'
 import type { SegmentListItem } from '../../../../types/assets/segments'
 import { SegmentTable } from './components/SegmentTable'
@@ -113,24 +114,22 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={onOpenImport}
-            className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-100 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            leftIcon={<Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />}
             title="Nhập dữ liệu tài sản từ file CSV"
           >
-            <Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />
-            <span>Import Dữ Liệu</span>
-          </button>
+            Import dữ liệu
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => setIsAddSegmentModalOpen(true)}
-            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-sm border border-indigo-400/30 transition flex items-center gap-1.5 cursor-pointer"
+            leftIcon={<Plus className="w-4 h-4" />}
           >
-            <Plus className="w-4 h-4" />
-            <span>Thêm Tuyến Đường</span>
-          </button>
+            Thêm tuyến đường
+          </Button>
         </div>
       </div>
 

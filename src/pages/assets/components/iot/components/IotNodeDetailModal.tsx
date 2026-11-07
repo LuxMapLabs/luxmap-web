@@ -114,7 +114,7 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
                 <span>Khu Vực Quản Lý</span>
               </div>
               <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                {formatFriendlyCommuneName(undefined, node.commune_id, 'Chưa gán địa bàn')}
+                {formatFriendlyCommuneName(selectedCabinet?.commune_name, node.commune_id, 'Chưa gán địa bàn')}
               </div>
               {false && (
                 <div className="text-[11px] font-mono text-slate-400">

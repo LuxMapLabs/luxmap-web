@@ -1154,7 +1154,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                       </option>
                       {segmentList.map((seg) => (
                         <option key={seg.segment_id || ''} value={seg.segment_id || ''} className="text-slate-900 dark:text-slate-100">
-                          {seg.segment_name} ({seg.segment_id} • {seg.pole_count || 0} cột)
+                          {seg.segment_name} ({seg.external_ref || seg.segment_id} • {seg.pole_count || 0} cột)
                         </option>
                       ))}
                     </select>

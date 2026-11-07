@@ -1,5 +1,6 @@
 import React from 'react'
-import { Eye, Edit2, Trash2, Database } from 'lucide-react'
+import { RowActions } from '../../common/RowActions'
+import { Trash2, Database } from 'lucide-react'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import { SegmentTableSkeleton } from './SegmentTableSkeleton'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
@@ -49,7 +50,7 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
               segments.map((seg) => (
                 <tr key={seg.external_ref || seg.segment_id || Math.random()} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition">
                   <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
-                    {seg.external_ref}
+                    {seg.external_ref || seg.segment_id}
                   </td>
                   <td className="p-3.5 font-bold text-slate-900 dark:text-white max-w-60 truncate">
                     {seg.segment_name}
@@ -87,37 +88,13 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
                     </span>
                   </td>
                   <td className="p-3.5 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onViewDetail(seg)}
-                        title="Xem chi tiết"
-                        aria-label="Chi tiết"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onEdit(seg)}
-                        title="Chỉnh sửa tuyến đường"
-                        aria-label="Sửa"
-                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      {onDelete && (
-                        <button
-                          type="button"
-                          onClick={() => onDelete(seg)}
-                          title="Xóa tuyến đường"
-                          aria-label="Xóa"
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    <RowActions
+                      viewLabel="Xem chi tiết tuyến đường"
+                      editLabel="Chỉnh sửa tuyến đường"
+                      onView={() => onViewDetail(seg)}
+                      onEdit={() => onEdit(seg)}
+                      menuItems={onDelete ? [{ key: 'delete', label: 'Xóa tuyến đường', icon: <Trash2 />, danger: true, onClick: () => onDelete?.(seg) }] : []}
+                    />
                   </td>
                 </tr>
               ))

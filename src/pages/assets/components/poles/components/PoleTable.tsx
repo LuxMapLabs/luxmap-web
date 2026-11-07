@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
-import { Eye, Edit2, Trash2, Zap, Bookmark, Lightbulb, MapPin } from 'lucide-react'
+import { RowActions } from '../../common/RowActions'
+import { Trash2, Zap, Bookmark, Lightbulb, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { StatusBadge } from '../../../../../components/StatusBadge'
 import type { PoleListItem } from '../../../../../types/assets/poles'
@@ -22,6 +23,10 @@ export interface PoleTableProps {
   onViewCabinetDetail: (cabinet: CabinetListItem) => void
   onSelectFixture?: (fixtureCode: string) => void
   onSelectCabinet?: (cabinetCode: string) => void
+  /** Các pole_id đang được chọn để in tem QR */
+  selectedPoleIds?: Set<string>
+  onToggleSelect?: (pole: PoleListItem) => void
+  onTogglePage?: (checked: boolean) => void
 }
 
 export const PoleTable: React.FC<PoleTableProps> = ({
@@ -37,7 +42,16 @@ export const PoleTable: React.FC<PoleTableProps> = ({
   onViewCabinetDetail,
   onSelectFixture,
   onSelectCabinet,
+  selectedPoleIds,
+  onToggleSelect,
+  onTogglePage,
 }) => {
+  const selectablePoles = poles.filter((p) => Boolean(p.pole_id))
+  const isPoleSelected = (p: PoleListItem) => Boolean(p.pole_id && selectedPoleIds?.has(p.pole_id))
+  const selectedOnPage = selectablePoles.filter(isPoleSelected).length
+  const allOnPageSelected = selectablePoles.length > 0 && selectedOnPage === selectablePoles.length
+  const someOnPageSelected = selectedOnPage > 0 && !allOnPageSelected
+
   // Scroll to active flashing pole row smoothly
   useEffect(() => {
     if (flashingPoleCode) {
@@ -57,6 +71,20 @@ export const PoleTable: React.FC<PoleTableProps> = ({
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
             <tr>
+              <th className="p-3.5 w-10">
+                <input
+                  type="checkbox"
+                  aria-label="Chọn tất cả cột đèn trong trang này để in tem QR"
+                  title="Chọn tất cả cột trong trang này"
+                  checked={allOnPageSelected}
+                  disabled={isLoading || selectablePoles.length === 0}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someOnPageSelected
+                  }}
+                  onChange={(e) => onTogglePage?.(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 accent-primary cursor-pointer disabled:cursor-not-allowed"
+                />
+              </th>
               <th className="p-3.5">Mã cột</th>
               <th className="p-3.5">Tuyến đường</th>
               <th className="p-3.5">Tủ điện quản lý</th>
@@ -73,7 +101,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               <PoleTableSkeleton rowCount={8} />
             ) : poles.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
+                <td colSpan={10} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
                   Không tìm thấy cột đèn nào phù hợp với bộ lọc hiện tại.
                 </td>
               </tr>
@@ -122,8 +150,17 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                     id={poleExternal ? `pole-row-${poleExternal.toLowerCase()}` : undefined}
                     className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition ${
                       isFlashing ? 'animate-row-flash' : ''
-                    }`}
+                    } ${isPoleSelected(pole) ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''}`}
                   >
+                    <td className="p-3.5 w-10">
+                      <input
+                        type="checkbox"
+                        aria-label={`Chọn cột ${pole.external_ref || pole.pole_id} để in tem QR`}
+                        checked={isPoleSelected(pole)}
+                        onChange={() => onToggleSelect?.(pole)}
+                        className="w-4 h-4 rounded border-slate-300 accent-primary cursor-pointer"
+                      />
+                    </td>
                     <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
                       {pole.external_ref}
                     </td>
@@ -232,37 +269,13 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                       <StatusBadge type="fixture" status={fixtureStatus} label={fixtureLabel} size="sm" />
                     </td>
                     <td className="p-3.5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => onViewDetail(pole)}
-                          title="Xem chi tiết"
-                          aria-label="Chi tiết"
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onEdit(pole)}
-                          title="Chỉnh sửa cột đèn"
-                          aria-label="Sửa"
-                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        {onDelete && (
-                          <button
-                            type="button"
-                            onClick={() => onDelete(pole)}
-                            title="Xóa cột đèn"
-                            aria-label="Xóa"
-                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                      <RowActions
+                        viewLabel="Xem chi tiết cột đèn"
+                        editLabel="Chỉnh sửa cột đèn"
+                        onView={() => onViewDetail(pole)}
+                        onEdit={() => onEdit(pole)}
+                        menuItems={onDelete ? [{ key: 'delete', label: 'Xóa cột đèn', icon: <Trash2 />, danger: true, onClick: () => onDelete?.(pole) }] : []}
+                      />
                     </td>
                   </tr>
                 )

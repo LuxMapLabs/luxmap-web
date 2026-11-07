@@ -1,7 +1,6 @@
 import React from 'react'
+import { RowActions } from '../../common/RowActions'
 import {
-  Eye,
-  Edit2,
   Trash2,
   Cpu,
   Zap,
@@ -141,7 +140,10 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
 
                     {/* Địa bàn */}
                     <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                      {formatFriendlyCommuneName(undefined, node.commune_id)}
+                      {formatFriendlyCommuneName(
+                        cabinets.find((c) => c.cabinet_id === node.cabinet_id)?.commune_name,
+                        node.commune_id
+                      )}
                     </td>
 
                     {/* Nguồn Dữ Liệu */}
@@ -240,48 +242,25 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
 
                     {/* Thao Tác */}
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => onViewDetail(node)}
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                          title="Xem chi tiết thiết bị IoT"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onSetRelay(node)}
-                          className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                          title="Cấu hình đấu nối rơ-le"
-                        >
-                          <Sliders className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onIssueCredential(node)}
-                          className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                          title="Cấp Secret xác thực mới"
-                        >
-                          <Key className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onEdit(node)}
-                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                          title="Chỉnh sửa thiết bị"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => node.node_id && onDelete(node.node_id)}
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                          title="Xóa thiết bị"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <RowActions
+                        viewLabel="Xem chi tiết thiết bị IoT"
+                        editLabel="Chỉnh sửa thiết bị"
+                        onView={() => onViewDetail(node)}
+                        onEdit={() => onEdit(node)}
+                        menuItems={[
+    { key: 'relay', label: 'Cấu hình đấu nối rơ-le', icon: <Sliders />, onClick: () => onSetRelay(node) },
+    { key: 'credential', label: 'Cấp Secret xác thực mới', icon: <Key />, onClick: () => onIssueCredential(node) },
+    {
+      key: 'delete',
+      label: 'Xóa thiết bị',
+      icon: <Trash2 />,
+      danger: true,
+      onClick: () => {
+        if (node.node_id) onDelete(node.node_id)
+      },
+    },
+  ]}
+                      />
                     </td>
                   </tr>
                 )

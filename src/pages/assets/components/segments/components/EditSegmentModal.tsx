@@ -165,7 +165,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
             <Route className="w-5 h-5 text-sky-200" />
           </div>
           <div>
-            <h3 className="font-bold text-white text-sm">Chỉnh Sửa Tuyến Đường: {segment.segment_id}</h3>
+            <h3 className="font-bold text-white text-sm">Chỉnh Sửa Tuyến Đường: {segment.external_ref || segment.segment_id}</h3>
             <p className="text-[11px] text-blue-200">{segment.segment_name}</p>
           </div>
         </div>
@@ -228,7 +228,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 text-[11px]">
+              <div className="grid grid-cols-1 gap-2.5 text-[11px]">
                 {/* Điểm đầu */}
                 <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900/60 shadow-xs space-y-1.5">
                   <div className="flex items-center justify-between">

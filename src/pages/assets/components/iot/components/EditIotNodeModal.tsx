@@ -3,7 +3,7 @@ import { X, Cpu, Zap, AlertCircle, Check } from 'lucide-react'
 import type { IotNodeItem, UpdateIotNodeRequest } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { DataSource } from '../../../../../types/common/enums'
-import { formatCommuneDisplayName } from '../../../../../utils/assets/communeUtils'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
 export interface EditIotNodeModalProps {
   isOpen: boolean
@@ -102,7 +102,7 @@ export const EditIotNodeModal: React.FC<EditIotNodeModalProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Địa bàn: <strong>{formatCommuneDisplayName(node.commune_id)}</strong>
+              Địa bàn: <strong>{formatFriendlyCommuneName(selectedCabinet?.commune_name, node.commune_id, 'Chưa gán địa bàn')}</strong>
             </p>
           </div>
 
