@@ -250,7 +250,7 @@ export const RbacOverviewCard: React.FC<RbacOverviewCardProps> = ({ users }) => 
             <strong className="text-base font-black font-mono block leading-tight" style={{ color: r.color }}>
               {r.count}
             </strong>
-            <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
+            <span className="text-[11px] text-slate-500 block mt-0.5 font-medium">
               {r.percent}%
             </span>
           </div>

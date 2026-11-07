@@ -10,7 +10,7 @@ import {
 } from 'recharts'
 import { Cpu, ExternalLink } from 'lucide-react'
 import type { JobStatusItem } from '../../../types/admin/system'
-import { formatRelativeTime, formatFutureTime } from '../../../utils/admin-dashboard/formatters'
+import { formatRelativeTime, formatFutureTime, getJobLabel } from '../../../utils/admin-dashboard/formatters'
 
 interface BackgroundJobsCardProps {
   jobs: JobStatusItem[]
@@ -36,7 +36,7 @@ export const BackgroundJobsCard: React.FC<BackgroundJobsCardProps> = ({ jobs, on
 
     return {
       name: j.name || 'worker',
-      displayName: (j.name || '').replace(/_/g, ' '),
+      displayName: getJobLabel(j.name),
       runs: j.run_count ?? 0,
       state,
       gradientId,
@@ -53,8 +53,8 @@ export const BackgroundJobsCard: React.FC<BackgroundJobsCardProps> = ({ jobs, on
       return (
         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-white/90 dark:border-slate-800 rounded-2xl p-3 shadow-xl text-xs space-y-1.5 z-50 pointer-events-none min-w-[200px]">
           <div className="flex items-center justify-between gap-4 pb-1 border-b border-slate-100 dark:border-slate-800">
-            <span className="font-mono font-bold text-slate-900 dark:text-white">
-              #{data.name}
+            <span className="font-bold text-slate-900 dark:text-white">
+              {data.displayName}
             </span>
             <span
               className={`w-2 h-2 rounded-full ${
@@ -141,8 +141,8 @@ export const BackgroundJobsCard: React.FC<BackgroundJobsCardProps> = ({ jobs, on
                 </linearGradient>
               </defs>
               <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'monospace' }}
+                dataKey="displayName"
+                tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }}
                 axisLine={{ stroke: '#f1f5f9' }}
                 tickLine={false}
               />
@@ -191,8 +191,11 @@ export const BackgroundJobsCard: React.FC<BackgroundJobsCardProps> = ({ jobs, on
             className="p-3 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200 text-left cursor-pointer group shadow-2xs hover:shadow-xs active:scale-98"
           >
             <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 truncate">
-                #{item.name}
+              <span
+                className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 truncate"
+                title={`#${item.name}`}
+              >
+                {item.displayName}
               </span>
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
@@ -208,7 +211,7 @@ export const BackgroundJobsCard: React.FC<BackgroundJobsCardProps> = ({ jobs, on
               <strong className="text-sm font-mono font-bold" style={{ color: item.color }}>
                 {item.runs.toLocaleString()}
               </strong>
-              <span className="text-[10px] text-slate-400 group-hover:text-indigo-500 font-medium flex items-center gap-0.5">
+              <span className="text-[11px] text-slate-500 group-hover:text-indigo-500 font-medium flex items-center gap-0.5">
                 Xem <ExternalLink className="w-2.5 h-2.5" />
               </span>
             </div>
