@@ -43,6 +43,15 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     }
   }, [user])
 
+  useEffect(() => {
+    if (!isOpen && user) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, user, isSubmitting, onClose])
+
   if (!isOpen || !user) return null
 
   const handleSelectCommune = (code: string) => {
@@ -127,7 +136,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 text-xs">
+          <div className="p-6 overflow-y-auto space-y-4 flex-1 min-h-0">
           {/* Username (Readonly) */}
           <div>
             <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -189,7 +199,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           {/* Role */}
           <div>
             <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Vai trò (Phân quyền tác nghiệp) <span className="text-rose-500">*</span>
+              Vai trò <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <Shield className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -200,7 +210,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               >
                 {Object.entries(USER_ROLE_LABELS).map(([k, label]) => (
                   <option key={k} value={k} className="dark:bg-slate-900">
-                    {label} ({k})
+                    {label}
                   </option>
                 ))}
               </select>
@@ -235,7 +245,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                     {selectedCommuneLabel}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-slate-400">Chưa chọn địa bàn</span>
+                  <span className="text-[11px] text-slate-500">Chưa chọn địa bàn</span>
                 )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
@@ -294,8 +304,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </div>
           )}
 
-          {/* Footer Buttons */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
+          </div>
+
+          {/* Footer Buttons (cố định, không cuộn) */}
+          <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onClose}

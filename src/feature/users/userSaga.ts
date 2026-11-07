@@ -1,4 +1,4 @@
-import { all, call, put, takeLatest } from 'redux-saga/effects'
+import { all, call, put, select, takeLatest } from 'redux-saga/effects'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
 import { userAPI as adminUserAPI, type UserQueryParams } from './userAPI'
@@ -9,6 +9,7 @@ import type {
   CreateUserResponse,
   InvitationResponse,
 } from '../../types/admin/users'
+import type { RootState } from '../../redux/rootReducer'
 import {
   fetchUsersRequest,
   fetchUsersSuccess,
@@ -41,6 +42,21 @@ function getErrorMessage(error: any, fallback: string): string {
     error?.response?.data?.detail ||
     error?.message ||
     fallback
+  )
+}
+
+/**
+ * Tải lại danh sách theo bộ lọc & trang hiện tại (để khớp với bộ lọc sau khi đổi trạng thái)
+ */
+function* refetchCurrentUsers() {
+  const { filters, page, pageSize } = yield select((state: RootState) => state.adminUsers)
+  yield put(
+    fetchUsersRequest({
+      role: filters.role || undefined,
+      status: filters.status || undefined,
+      page,
+      page_size: pageSize,
+    })
   )
 }
 
@@ -102,6 +118,7 @@ function* handleLockUser(action: PayloadAction<string>) {
     const result: UserAccountItem = yield call(adminUserAPI.lockUser, id)
     yield put(lockUserSuccess(result))
     toast.success('Đã khóa tài khoản thành công!')
+    yield call(refetchCurrentUsers)
   } catch (error: any) {
     const errorMsg = getErrorMessage(error, 'Không thể khóa tài khoản.')
     yield put(lockUserFailure(errorMsg))
@@ -118,6 +135,7 @@ function* handleUnlockUser(action: PayloadAction<string>) {
     const result: UserAccountItem = yield call(adminUserAPI.unlockUser, id)
     yield put(unlockUserSuccess(result))
     toast.success('Đã mở khóa tài khoản thành công!')
+    yield call(refetchCurrentUsers)
   } catch (error: any) {
     const errorMsg = getErrorMessage(error, 'Không thể mở khóa tài khoản.')
     yield put(unlockUserFailure(errorMsg))
