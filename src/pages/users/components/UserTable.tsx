@@ -23,6 +23,7 @@ export interface UserTableProps {
   onEdit: (user: UserAccountItem) => void
   onToggleLock: (user: UserAccountItem) => void
   onInvite: (user: UserAccountItem) => void
+  isSelf?: (user: UserAccountItem) => boolean
 }
 
 export const UserTable: React.FC<UserTableProps> = ({
@@ -32,6 +33,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   onEdit,
   onToggleLock,
   onInvite,
+  isSelf,
 }) => {
   // Lấy danh mục địa bàn thực tế từ Redux để map tên động theo ID
   const communes = useSelector((state: RootState) => state.adminCommunes.communes)
@@ -156,6 +158,7 @@ export const UserTable: React.FC<UserTableProps> = ({
             ) : (
               users.map((user) => {
                 const isLocked = user.status === 'locked'
+                const isSelfRow = Boolean(isSelf?.(user))
                 const roleBadge = getUserRoleBadge(user.role)
                 const initials = getInitials(user.full_name, user.username)
 
@@ -179,8 +182,13 @@ export const UserTable: React.FC<UserTableProps> = ({
                           {initials}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-900 dark:text-white truncate">
-                            {user.full_name || user.username}
+                          <div className="font-semibold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                            <span className="truncate">{user.full_name || user.username}</span>
+                            {isSelfRow && (
+                              <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 text-[10px] font-semibold border border-indigo-100 dark:border-indigo-900/60">
+                                Bạn
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate">
                             @{user.username} {user.email ? `• ${user.email}` : ''}
@@ -238,6 +246,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                           onClick={() => onEdit(user)}
                           className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95"
                           title="Chỉnh sửa tài khoản"
+                          aria-label="Chỉnh sửa tài khoản"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -246,6 +255,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                         <button
                           type="button"
                           disabled={isInviteDisabled}
+                          aria-label="Gửi lại email mời"
                           onClick={() => onInvite(user)}
                           className={`w-8 h-8 rounded-xl border flex items-center justify-center transition shadow-2xs ${
                             isRecentlyInvited
@@ -282,12 +292,22 @@ export const UserTable: React.FC<UserTableProps> = ({
                         <button
                           type="button"
                           onClick={() => onToggleLock(user)}
-                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95 ${
-                            isLocked
-                              ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300'
-                              : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-100 hover:border-rose-300 text-rose-600 dark:text-rose-400'
+                          disabled={isSelfRow}
+                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition shadow-2xs ${
+                            isSelfRow
+                              ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                              : isLocked
+                              ? 'cursor-pointer active:scale-95 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300'
+                              : 'cursor-pointer active:scale-95 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:border-rose-900/60 dark:hover:text-rose-400'
                           }`}
-                          title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản (Thao tác bảo mật)'}
+                          title={
+                            isSelfRow
+                              ? 'Không thể khóa tài khoản của chính bạn'
+                              : isLocked
+                              ? 'Mở khóa tài khoản'
+                              : 'Khóa tài khoản'
+                          }
+                          aria-label={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
                         >
                           {isLocked ? (
                             <Unlock className="w-3.5 h-3.5" />

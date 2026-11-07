@@ -1,7 +1,7 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { X, Cpu, Clock, CheckCircle2, AlertOctagon, RefreshCw, AlertTriangle, ShieldAlert } from 'lucide-react'
 import type { JobStatusItem } from '../../../types/admin/system'
-import { formatFullDateTime, formatRelativeTime, formatFutureTime } from '../../../utils/admin-dashboard/formatters'
+import { formatFullDateTime, formatRelativeTime, formatFutureTime, getJobLabel } from '../../../utils/admin-dashboard/formatters'
 
 interface JobDetailModalProps {
   job: JobStatusItem | null
@@ -18,6 +18,15 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
   onRefresh,
   isRefreshing,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen || !job) return null
 
   const renderBadge = (state?: string) => {
@@ -26,21 +35,21 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
             <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
-            <span>Đang chạy trực tiếp (Running)</span>
+            <span>Đang chạy</span>
           </span>
         )
       case 'failing':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
             <AlertOctagon className="w-3.5 h-3.5 text-rose-600" />
-            <span>Thất bại (Failing)</span>
+            <span>Thất bại</span>
           </span>
         )
       case 'stalled':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-            <span>Kẹt tiến trình (Stalled)</span>
+            <span>Kẹt tiến trình</span>
           </span>
         )
       case 'ok':
@@ -48,7 +57,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Bình thường (Healthy)</span>
+            <span>Bình thường</span>
           </span>
         )
     }
@@ -64,11 +73,12 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
               <Cpu className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white font-mono">
-                {job.name || 'Job Details'}
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                {job.name ? getJobLabel(job.name) : 'Chi tiết tác vụ'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Nhật ký kiểm toán & trạng thái thực thi tác vụ nền
+                {job.name ? <span className="font-mono"> · #{job.name}</span> : null}
               </p>
             </div>
           </div>
@@ -95,7 +105,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
               <span className="text-[11px] text-slate-400 block font-medium">Tổng số lần chạy</span>
               <span className="text-xl font-black font-mono text-slate-900 dark:text-white mt-1 block">
-                {job.run_count ?? 0}
+                {(job.run_count ?? 0).toLocaleString()}
               </span>
             </div>
 
@@ -106,7 +116,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
                   (job.consecutive_failures ?? 0) > 0 ? 'text-rose-600' : 'text-slate-900 dark:text-white'
                 }`}
               >
-                {job.consecutive_failures ?? 0}
+                {(job.consecutive_failures ?? 0).toLocaleString()}
               </span>
             </div>
           </div>

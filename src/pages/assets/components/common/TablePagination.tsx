@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export interface TablePaginationProps {
   currentListLength: number
+  /** Tổng số bản ghi từ server (nếu có); mặc định dùng currentListLength */
+  totalCount?: number
   currentPage: number
   pageSize: number
   totalPages: number
@@ -13,6 +15,7 @@ export interface TablePaginationProps {
 
 export const TablePagination: React.FC<TablePaginationProps> = ({
   currentListLength,
+  totalCount,
   currentPage,
   pageSize,
   totalPages,
@@ -20,6 +23,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
   isLoading = false,
   onPageChange,
 }) => {
+  const totalRecords = totalCount ?? currentListLength
   if (isLoading) {
     return (
       <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
@@ -42,15 +46,15 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
       <div>
         Hiển thị{' '}
         <strong className="text-slate-800 dark:text-slate-200 font-semibold">
-          {currentListLength === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+          {totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1}
         </strong>{' '}
         -{' '}
         <strong className="text-slate-800 dark:text-slate-200 font-semibold">
-          {Math.min(currentPage * pageSize, currentListLength)}
+          {Math.min(currentPage * pageSize, totalRecords)}
         </strong>{' '}
         trên tổng số{' '}
         <strong className="text-slate-800 dark:text-slate-200 font-semibold">
-          {currentListLength}
+          {totalRecords}
         </strong>{' '}
         bản ghi {unitLabel}
       </div>

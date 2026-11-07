@@ -90,3 +90,14 @@ export const formatFullDateTime = (isoString?: string | null): string => {
   const s = String(date.getSeconds()).padStart(2, '0')
   return `${h}:${mi}:${s} - ${d}/${m}/${y}`
 }
+
+/** Nhãn tiếng Việt cho các tiến trình nền (worker). Mã không có trong bảng thì hiện lại dạng đọc được. */
+export const JOB_LABELS: Record<string, string> = {
+  node_offline: 'Thiết bị mất kết nối',
+  storage_capacity: 'Kiểm tra dung lượng',
+  storage_reconciliation: 'Đối soát lưu trữ',
+  work_order_overdue: 'Lệnh công tác quá hạn',
+}
+
+export const getJobLabel = (name?: string | null): string =>
+  (name && JOB_LABELS[name]) || (name || '').replace(/_/g, ' ')

@@ -148,7 +148,13 @@ export const StorageDistributionCard: React.FC<StorageDistributionCardProps> = (
               </div>
             </>
           ) : (
-            <div className="text-center text-slate-400 text-xs">Đang nạp dữ liệu...</div>
+            <div
+              className="relative w-[180px] h-[180px] rounded-full border-[18px] border-slate-100 animate-pulse flex items-center justify-center"
+              role="status"
+              aria-label="Đang nạp dữ liệu bộ nhớ"
+            >
+              <span className="text-[11px] text-slate-400 font-medium">Đang nạp...</span>
+            </div>
           )}
         </div>
       </div>
@@ -167,21 +173,21 @@ export const StorageDistributionCard: React.FC<StorageDistributionCardProps> = (
           onMouseLeave={() => setHoveredSlice(null)}
           className="p-2.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 text-center border border-emerald-100/60 shadow-2xs cursor-pointer hover:bg-emerald-50 transition-colors"
         >
-          <span className="text-[10px] text-slate-400 block font-medium">Trống</span>
+          <span className="text-[11px] text-slate-500 block font-medium">Trống</span>
           <strong className="text-sm font-mono text-emerald-700 dark:text-emerald-300 font-bold block mt-0.5">
             {formatBytes(diskFree, 0)}
           </strong>
         </div>
 
         <div className="p-2.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 text-center border border-indigo-100/60 shadow-2xs">
-          <span className="text-[10px] text-slate-400 block font-medium">PostgreSQL</span>
+          <span className="text-[11px] text-slate-500 block font-medium">PostgreSQL</span>
           <strong className="text-sm font-mono text-indigo-700 dark:text-indigo-300 font-bold block mt-0.5">
             {formatBytes(dbBytes, 0)}
           </strong>
         </div>
 
         <div className="p-2.5 rounded-2xl bg-violet-50/50 dark:bg-violet-950/20 text-center border border-violet-100/60 shadow-2xs">
-          <span className="text-[10px] text-slate-400 block font-medium">MinIO S3</span>
+          <span className="text-[11px] text-slate-500 block font-medium">MinIO S3</span>
           <strong className="text-sm font-mono text-violet-700 dark:text-violet-300 font-bold block mt-0.5">
             {formatBytes(s3Bytes, 0)}
           </strong>

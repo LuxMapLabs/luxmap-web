@@ -1,13 +1,4 @@
 import React from 'react'
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Cell,
-} from 'recharts'
 import { FolderGit2, Video, Image, Camera, AlertCircle } from 'lucide-react'
 import type { StorageSummary, BucketUsage } from '../../../types/admin/system'
 import { formatBytes } from '../../../utils/admin-dashboard/formatters'
@@ -114,31 +105,7 @@ export const StorageBucketsCard: React.FC<StorageBucketsCardProps> = ({ storage 
     }
   })
 
-  const CustomBarTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload
-      return (
-        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-white/80 dark:border-slate-800 rounded-2xl p-3 shadow-xl text-xs z-50 pointer-events-none min-w-[160px]">
-          <span className="font-bold text-slate-900 dark:text-white block mb-1">
-            {data.fullName}
-          </span>
-          <div className="flex items-center justify-between gap-4 font-mono">
-            <span className="text-slate-400">Dung lượng:</span>
-            <strong className="font-bold" style={{ color: data.color }}>
-              {formatBytes(data.bytes)}
-            </strong>
-          </div>
-          <div className="flex items-center justify-between gap-4 font-mono mt-0.5">
-            <span className="text-slate-400">Số tệp:</span>
-            <span className="text-slate-700 dark:text-slate-300 font-semibold">
-              {data.count.toLocaleString()} tệp
-            </span>
-          </div>
-        </div>
-      )
-    }
-    return null
-  }
+  const maxBytes = Math.max(0, ...chartData.map((d) => d.bytes))
 
   return (
     <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl border border-white/90 dark:border-slate-800 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between h-full transition-all duration-300 outline-none focus:outline-none select-none">
@@ -169,44 +136,37 @@ export const StorageBucketsCard: React.FC<StorageBucketsCardProps> = ({ storage 
           </span>
         </div>
 
-        {/* Horizontal Bar Chart with Glowing Gradients */}
-        <div className="h-56 relative flex items-center justify-center my-2 outline-none focus:outline-none [&_*]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ top: 10, right: 30, left: 10, bottom: 5 }}
-            >
-              <defs>
-                {chartData.map((d) => (
-                  <linearGradient key={d.gradientId} id={d.gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor={d.startColor} />
-                    <stop offset="100%" stopColor={d.endColor} />
-                  </linearGradient>
-                ))}
-              </defs>
-              <XAxis type="number" hide />
-              <YAxis
-                type="category"
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                width={85}
-                tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
-              />
-              <Tooltip content={<CustomBarTooltip />} />
-              <Bar
-                dataKey="bytes"
-                radius={[0, 8, 8, 0]}
-                animationDuration={1200}
-                barSize={18}
+        {/* Thanh dung lượng theo phân vùng: hàng 0 B vẫn hiện đường nền và nhãn */}
+        <div className="h-56 my-2 flex flex-col justify-around" role="list" aria-label="Dung lượng theo phân vùng">
+          {chartData.map((d) => {
+            const width = maxBytes > 0 ? (d.bytes / maxBytes) * 100 : 0
+            return (
+              <div
+                key={d.key}
+                role="listitem"
+                title={`${d.fullName}: ${formatBytes(d.bytes)} (${d.count.toLocaleString()} tệp)`}
+                className="flex items-center gap-3"
               >
-                {chartData.map((entry) => (
-                  <Cell key={entry.key} fill={`url(#${entry.gradientId})`} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+                <span className="w-[85px] shrink-0 text-right text-[11px] font-semibold text-slate-500 leading-tight">
+                  {d.name}
+                </span>
+                <div className="flex-1 h-[18px] rounded-r-lg rounded-l-sm bg-slate-100 overflow-hidden">
+                  {width > 0 && (
+                    <div
+                      className="h-full rounded-r-lg transition-all duration-700"
+                      style={{
+                        width: `${Math.max(width, 1.5)}%`,
+                        background: `linear-gradient(90deg, ${d.startColor}, ${d.endColor})`,
+                      }}
+                    />
+                  )}
+                </div>
+                <span className="w-16 shrink-0 text-[11px] font-mono font-semibold text-slate-600">
+                  {formatBytes(d.bytes, 1)}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -228,7 +188,7 @@ export const StorageBucketsCard: React.FC<StorageBucketsCardProps> = ({ storage 
               <strong className="text-xs font-mono font-bold block" style={{ color: item.color }}>
                 {formatBytes(item.bytes, 1)}
               </strong>
-              <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
+              <span className="text-[11px] text-slate-500 block mt-0.5 font-mono">
                 {item.count} tệp
               </span>
             </div>

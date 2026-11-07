@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { AlertTriangle, Lock, Unlock, X } from 'lucide-react'
 import type { UserAccountItem } from '../../../types/admin/users'
 
@@ -17,6 +17,15 @@ export const LockUserDialog: React.FC<LockUserDialogProps> = ({
   onClose,
   onConfirm,
 }) => {
+  useEffect(() => {
+    if (!isOpen || isSubmitting) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, isSubmitting, onClose])
+
   if (!isOpen || !user) return null
 
   const isLocked = user.status === 'locked'

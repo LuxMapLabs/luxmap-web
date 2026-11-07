@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../../redux/rootReducer'
 import type {
@@ -35,6 +35,7 @@ export const AdminManagementPage: React.FC = () => {
     pageSize,
     isLoading,
     isSubmitting,
+    actionError,
     invitingUserId,
     filters,
   } = useSelector((state: RootState) => state.adminUsers)
@@ -61,33 +62,30 @@ export const AdminManagementPage: React.FC = () => {
     )
   }, [dispatch, filters.role, filters.status, page, pageSize])
 
-  // Lọc bỏ tài khoản đang đăng nhập (chính mình) và lọc theo từ khóa tìm kiếm (họ tên, username, email)
+  // Nhận diện tài khoản đang đăng nhập (chính mình)
+  const isSelf = (u: UserAccountItem): boolean => {
+    if (!currentUser) return false
+    const matchId = Boolean(currentUser.user_id && u.user_id === currentUser.user_id)
+    const matchUsername = Boolean(
+      currentUser.username && u.username?.toLowerCase() === currentUser.username.toLowerCase()
+    )
+    const matchEmail = Boolean(
+      currentUser.email && u.email?.toLowerCase() === currentUser.email.toLowerCase()
+    )
+    return matchId || matchUsername || matchEmail
+  }
+
+  // Lọc theo từ khóa tìm kiếm (họ tên, username, email)
   const filteredUsers = useMemo(() => {
-    const otherUsers = users.filter((u) => {
-      if (!currentUser) return true
-      const matchId =
-        Boolean(currentUser.user_id && u.user_id === currentUser.user_id)
-
-      const matchUsername =
-        currentUser.username &&
-        u.username?.toLowerCase() === currentUser.username.toLowerCase()
-      const matchEmail =
-        currentUser.email &&
-        u.email?.toLowerCase() === currentUser.email.toLowerCase()
-
-      const isSelf = Boolean(matchId || matchUsername || matchEmail)
-      return !isSelf
-    })
-
-    if (!filters.search.trim()) return otherUsers
+    if (!filters.search.trim()) return users
     const query = filters.search.toLowerCase().trim()
-    return otherUsers.filter((u) => {
+    return users.filter((u) => {
       const matchName = (u.full_name || '').toLowerCase().includes(query)
       const matchUser = (u.username || '').toLowerCase().includes(query)
       const matchEmail = (u.email || '').toLowerCase().includes(query)
       return matchName || matchUser || matchEmail
     })
-  }, [users, filters.search, currentUser])
+  }, [users, filters.search])
 
   const handleCreateSubmit = (payload: CreateUserRequest) => {
     dispatch(createUserRequest(payload))
@@ -106,8 +104,16 @@ export const AdminManagementPage: React.FC = () => {
     } else {
       dispatch(lockUserRequest(lockingUser.user_id))
     }
-    setLockingUser(null)
+    wasSubmittingLockRef.current = true
   }
+
+  // Chỉ đóng hộp thoại khóa/mở khóa sau khi API trả về thành công (giữ lại khi lỗi)
+  const wasSubmittingLockRef = useRef(false)
+  useEffect(() => {
+    if (!wasSubmittingLockRef.current || isSubmitting) return
+    wasSubmittingLockRef.current = false
+    if (!actionError) setLockingUser(null)
+  }, [isSubmitting, actionError])
 
   const handleInvite = (user: UserAccountItem) => {
     if (user.user_id && user.status === 'invited') {
@@ -139,11 +145,13 @@ export const AdminManagementPage: React.FC = () => {
           onEdit={(user) => setEditingUser(user)}
           onToggleLock={(user) => setLockingUser(user)}
           onInvite={handleInvite}
+          isSelf={isSelf}
         />
 
         {/* Pagination */}
         <TablePagination
           currentListLength={filteredUsers.length}
+          totalCount={filters.search.trim() ? undefined : total}
           currentPage={page}
           pageSize={pageSize}
           totalPages={totalPages}
