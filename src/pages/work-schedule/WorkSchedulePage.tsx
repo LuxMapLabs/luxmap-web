@@ -45,7 +45,7 @@ export const WorkSchedulePage: React.FC = () => {
     isLoadingWorkOrders,
   } = useSelector((state: RootState) => state.workSchedule)
   const currentUser = useSelector((state: RootState) => state.auth.user)
-  const activeCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
+  const activeCommuneId = currentUser?.commune_ids?.[0] || ''
 
   // Tự động tải danh sách lịch làm việc và danh sách kỹ sư từ máy chủ theo tháng được chọn
   useEffect(() => {
@@ -63,7 +63,7 @@ export const WorkSchedulePage: React.FC = () => {
     )
 
     // Tải danh sách kỹ sư hiện trường theo địa bàn xã của người dùng
-    dispatch(fetchAssigneesRequest(activeCommuneId))
+    if (activeCommuneId) dispatch(fetchAssigneesRequest(activeCommuneId))
   }, [dispatch, currentMonth, currentYear, activeCommuneId])
 
   const location = useLocation()

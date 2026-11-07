@@ -42,8 +42,8 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
           />
         </div>
 
-        {/* 2. Dropdown lọc theo Xã / Phường */}
-        {availableCommunes.length > 0 && (
+        {/* 2. Dropdown lọc theo Xã / Phường (chỉ khi phụ trách từ 2 xã trở lên; Manager chỉ có 1 xã) */}
+        {availableCommunes.length > 1 && (
           <div className="w-full sm:w-56 shrink-0">
             <select
               value={communeFilter[0] || ''}

@@ -272,6 +272,7 @@ export const CitizenReviewPage: React.FC = () => {
         items={paginatedItems}
         poles={poles}
         communeNames={communeNames}
+        showCommune={availableCommunes.length > 1}
         total={filteredItems.length}
         page={page}
         pageSize={pageSize}

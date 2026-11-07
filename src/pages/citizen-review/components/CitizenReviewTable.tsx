@@ -23,6 +23,8 @@ export interface CitizenReviewTableProps {
   items: CitizenReportItem[]
   poles?: PoleListItem[]
   communeNames?: Record<string, string>
+  /** Hiện tên xã dưới mã cột (chỉ khi dữ liệu thuộc nhiều xã) */
+  showCommune?: boolean
   total: number
   page: number
   pageSize: number
@@ -148,6 +150,7 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
   items,
   poles = [],
   communeNames = {},
+  showCommune = true,
   total,
   page,
   pageSize,
@@ -261,9 +264,11 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
                             <div className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs">
                               {primaryCode}
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
-                              {(item.commune_id && (communeNames[item.commune_id] || item.commune_id)) || 'Chưa định địa bàn'}
-                            </div>
+                            {showCommune && (
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
+                                {(item.commune_id && (communeNames[item.commune_id] || item.commune_id)) || 'Chưa định địa bàn'}
+                              </div>
+                            )}
                           </div>
                         )
                       })()}
