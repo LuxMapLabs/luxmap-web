@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { Button } from '../../../../components/Button'
 import { Search, Plus, Upload } from 'lucide-react'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../../../types/assets/feeders'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
@@ -67,7 +68,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Action Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3">
         {/* Search Box - Chiều dài co giãn giống tab Bóng đèn */}
         <div className="flex flex-1 flex-wrap items-center gap-3">
           <div className="flex-1 min-w-60 relative">
@@ -87,23 +88,21 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
 
         {/* Action Buttons: Import CSV & Add Feeder */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={onOpenImport}
-            className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-100 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            leftIcon={<Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />}
             title="Nhập dữ liệu tài sản từ file CSV"
           >
-            <Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />
-            <span>Import Dữ Liệu</span>
-          </button>
-          <button
-            type="button"
+            Import dữ liệu
+          </Button>
+          <Button
+            variant="primary"
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-1.5 bg-[#1f3864] dark:bg-blue-600 hover:bg-[#1f3864]/90 dark:hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            leftIcon={<Plus className="w-4 h-4" />}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Thêm Mạch Điện Mới</span>
-          </button>
+            Thêm mạch điện
+          </Button>
         </div>
       </div>
 

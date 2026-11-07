@@ -1,56 +1,49 @@
 # LUXMAP-WEB FRONTEND RULES
 
-## 1. Tech Stack & Directory Structure
-- **Stack**: React 18 + TypeScript 5 + Vite 5 | Redux Toolkit + **Redux-Saga** | TailwindCSS v4 + Lucide + Sonner | React Hook Form + Zod v4 | React Router v7 | MapLibre GL | Axios (`src/config/apiClient.ts`).
-- **Structure (`src/`)**:
-  - `types/`: 100% Auto-generated Backend DTOs & Enums (`npm run gen`). **READ-ONLY**.
-  - `feature/<module>/`: Quản lý State & API theo chuẩn 3 files: `<module>API.ts`, `<module>Slice.ts`, `<module>Saga.ts`.
-  - `redux/`: Root Store (`store.ts`, `rootReducer.ts`, `rootSaga.ts`).
-  - `pages/<page>/` & `components/`: Màn hình chính, sub-components cục bộ và shared UI components.
-  - `hooks/` & `utils/`: Custom hooks và hàm tiện ích thuần túy theo domain.
-  - `test/`: Tập trung toàn bộ Unit/Integration Tests (`npx vitest run`).
+## 1. Công nghệ & Cấu trúc
+
+- **Stack:** React, TypeScript, Vite, Redux Toolkit, Redux-Saga, TailwindCSS, Lucide, Sonner, React Hook Form, Zod, React Router, MapLibre GL, Axios.
+- **Thư mục chính (`src/`):**
+  - `types/`: Chứa DTO & Enum tự động từ Backend (`npm run gen`) - **Chỉ đọc, không sửa**.
+  - `feature/<tên_module>/`: Quản lý State & API theo bộ 3 file: `*API.ts`, `*Slice.ts`, `*Saga.ts`.
+  - `redux/`: Store tổng (`store.ts`, `rootReducer.ts`, `rootSaga.ts`).
+  - `pages/` & `components/`: Màn hình giao diện và component dùng chung.
+  - `hooks/` & `utils/`: Custom hooks và hàm tiện ích.
+  - `test/`: Toàn bộ Unit/Integration Tests.
 
 ---
 
-## 2. Architecture Skeleton
+## 2. Phân quyền & Định tuyến (`src/App.tsx`)
 
-### 2.1. Routes & RBAC (`src/App.tsx`)
-Phân quyền qua `UserRole`: `Admin (3)`, `MaintenanceEngineer / Manager (1)`, `ManagementAgency / Superior (0)`, `FieldCrew (2)`:
-- **Public**: `/login`, `/r/:code` & `/report` (Báo cáo QR người dân - không gọi `checkAuth`), `/forbidden`.
-- **Manager (`MaintenanceEngineer`)**: `/dashboard`, `/gis-map`, `/work-schedule`, `/assets` (Tuyến, Tủ, Mạch, Cột, Đèn, IoT), `/citizen-reports`.
-- **Superior (`ManagementAgency`)**: `/reports`, `/gis-map`.
-- **Admin (`Admin`)**: `/admin/dashboard`, `/admin/system` (Users), `/admin/communes` (Địa bàn & BBox), `/admin/firmware`, `/admin/settings`.
-
-### 2.2. State, API & Types Principle
-- **Store**: Mọi state toàn cục đăng ký tại `src/redux/rootReducer.ts` và `src/redux/rootSaga.ts`. Khi làm module nào, mở trực tiếp `src/feature/<module>/` để xem Slice/Actions/Saga của module đó.
-- **API Client (`src/config/apiClient.ts`)**: Đã gắn sẵn tiền tố `/api/v1`, HttpOnly Cookie & Token Interceptor, tự unwrap `response.data.data`. Trong `*API.ts` chỉ truyền path sau `/api/v1` (VD: `apiClient.get('/assets/poles')`, không lặp lại `/api/v1`).
-- **Types (`src/types/`)**: Toàn bộ DTO và Enum nghiệp vụ nằm sẵn trong `src/types/` (chia theo domain: `common/`, `auth/`, `assets/`, `map/`, `workorders/`, `citizen/`, `faults/`, `admin/`). Bắt buộc mở `src/types/` tra cứu và import trực tiếp.
+- **Public:** `/login`, `/r/:code` & `/report` (Quét QR người dân), `/forbidden`.
+- **Manager (`MaintenanceEngineer`):** `/dashboard`, `/gis-map`, `/work-schedule`, `/assets`, `/citizen-reports`.
+- **Superior (`ManagementAgency`):** `/reports`, `/gis-map`.
+- **Admin (`Admin`):** `/admin/dashboard`, `/admin/system`, `/admin/communes`, `/admin/firmware`, `/admin/settings`.
 
 ---
 
-## 3. Core Engineering Rules & Anti-Patterns
+## 3. Nguyên tắc cốt lõi & Những điều TUYỆT ĐỐI CẤM
 
-### 3.1. Chu trình Dữ liệu Chuẩn (4-Tier Redux-Saga Flow)
-`UI Component/Hook` --(`dispatch(actionRequest)`)--> `Slice` (bật loading) --> `Saga` (gọi `*API.ts` qua `apiClient`, xử lý `try/catch`, bắn `toast`) --(`put(Success/Failure)`)--> `Store` --(`useSelector`)--> `UI Re-render` (đảm bảo đủ 4 trạng thái: `Loading`, `Has-Data`, `Empty`, `Error`).
+### 3.1. Luồng dữ liệu chuẩn (Redux-Saga)
 
-### 3.2. Những Điều TUYỆT ĐỐI CẤM (Strict Anti-Patterns)
-1. **CẤM gọi API ngoài Redux-Saga**: Không dùng `fetch`, `axios`, `apiClient`, hay `createAsyncThunk` trực tiếp trong Component, Hook, hay `useEffect`.
-2. **CẤM vi phạm API-Types-First**:
-   - Không tự viết lại interface đã có trong `src/types/`, không dùng `as any`.
-   - Không kế thừa/bọc type thừa (`extends`, `&`, `Omit`).
-   - Không nhét state thuần UI (`isOpen`, `activeTab`) hoặc trường của thực thể khác vào DTO Backend (dữ liệu liên kết phải lookup bằng `.find()` từ Store).
-3. **CẤM Mock Data & Fake Fallbacks**:
-   - Không tạo dữ liệu giả hoặc fallback chuỗi bịa đặt trong `||`, `??` (như `'POLE-0001'`, `'Tuyến A'`).
-   - Quy tắc fallback: Trong logic code dùng `''`; khi hiển thị UI thiếu dữ liệu dùng `'-'`.
-4. **CẤM chạm vào Backend & Phá cấu trúc**:
-   - Repo `../luxmap_backend` là **100% READ-ONLY**.
-   - Không dùng `window.confirm` / `window.alert` (phải dùng Custom Modal).
-   - Chỉ sửa đúng phạm vi task (Surgical Changes), không over-engineering.
+`UI Component` --(dispatch)--> `Slice` (loading) --> `Saga` (gọi API qua `apiClient`, try/catch, toast) --(put)--> `Store` --(useSelector)--> `UI Re-render`.
+_Luôn xử lý đủ 4 trạng thái UI:_ `Loading`, `Có dữ liệu`, `Rỗng (Empty)`, `Lỗi (Error)`.
+
+### 3.2. Những điều CẤM:
+
+1. **CẤM gọi API ngoài Saga:** Không dùng `axios`, `fetch`, `apiClient` trực tiếp trong Component hay `useEffect`.
+2. **CẤM sửa/tự tạo Types:** Dùng trực tiếp DTO trong `src/types/`. Không dùng `any`, không bọc thừa (`extends`, `&`, `Omit`).
+3. **CẤM Mock Data & Bịa Fallback:** Không bịa dữ liệu giả (`'POLE-001'`, `'Tuyến A'`). Giá trị rỗng dùng `''`, khi hiển thị thiếu dữ liệu dùng `'-'`.
+4. **CẤM dùng dialog mặc định:** Không dùng `window.confirm`, `window.alert` (phải dùng Custom Modal).
+5. **CẤM sửa Backend:** Repo `../luxmap_backend` là **Read-Only**. Chỉ sửa code đúng phạm vi task frontend.
 
 ---
 
-## 4. Workflow Instructions for AI
-Khi nhận task mới, thực hiện đúng thứ tự:
-1. **Lập Plan (Tiếng Việt)**: Khảo sát code, trình bày phương án (Mục tiêu, File tác động, Types & Store sử dụng) và **chờ User duyệt trước khi code**.
-2. **Kiểm tra Types & Store**: Đọc `src/types/<domain>/` và `src/feature/<domain>/` liên quan trước khi viết logic. Nếu Backend mới đổi schema, chạy `npm run gen`.
-3. **Triển khai & Xác minh**: Giữ nguyên cấu trúc thư mục; kiểm tra lỗi tĩnh bằng `npx tsc --noEmit` và `npm run build` (không tự mở trình duyệt test).
+## 4. Quy trình làm việc
+
+1. **Lập Plan (Tiếng Việt):** Trình bày rõ mục tiêu, file tác động, Types & Store sử dụng $\rightarrow$ **Chờ User duyệt trước khi code**.
+2. **Kiểm tra Types & Store:** Chạy `npm run gen` . Sau đó mở `src/types/` và `src/feature/` đọc trước khi viết logic.
+3. **Triển khai & Kiểm tra:** Viết code chuẩn và luôn chạy xác thực:
+   - `npx tsc --noEmit`
+   - `npm run lint`
+   - `npm run build`

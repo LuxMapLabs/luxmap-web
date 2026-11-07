@@ -214,8 +214,17 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
         })
       }
 
-      if (segmentCoordsRef.current.length === 0 && rowsRef.current.length === 0 && activeBounds) {
-        map.fitBounds(activeBounds, { padding: 40, duration: 0 })
+      if (segmentCoordsRef.current.length === 0 && rowsRef.current.length === 0) {
+        const cabinetPts = existingCabinetsRef.current
+          .filter((c) => c.location)
+          .map((c) => [c.location!.lng, c.location!.lat] as [number, number])
+        if (cabinetPts.length > 0) {
+          const cabinetBounds = new maplibregl.LngLatBounds(cabinetPts[0], cabinetPts[0])
+          cabinetPts.forEach((pt) => cabinetBounds.extend(pt))
+          map.fitBounds(cabinetBounds, { padding: 60, duration: 0, maxZoom: 16 })
+        } else if (activeBounds) {
+          map.fitBounds(activeBounds, { padding: 40, duration: 0 })
+        }
       }
 
       setTimeout(() => {

@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { GitMerge, X, Loader2, AlertCircle } from 'lucide-react'
+import {
+  faultStatusLabel,
+  faultTypeLabel,
+  severityLabel,
+} from '../../../utils/citizen-report/citizenReviewFormat'
 import type { CitizenReportOpenFault, MergeCitizenReportRequest } from '../../../types/citizen-reports/citizen-reports'
 
 export interface CitizenReviewMergeModalProps {
@@ -104,7 +109,7 @@ export const CitizenReviewMergeModal: React.FC<CitizenReviewMergeModalProps> = (
                         <div>
                           <div className="font-mono text-xs">Mã sự cố: {id}</div>
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
-                            Loại: {f.fault_type} · Mức độ: {f.severity} · Trạng thái: {f.fault_status}
+                            Loại: {faultTypeLabel(f.fault_type)} · Mức độ: {severityLabel(f.severity)} · Trạng thái: {faultStatusLabel(f.fault_status)}
                           </div>
                         </div>
                         <input

@@ -1,63 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import {
-  Sparkles,
   Maximize2,
   X,
   Camera,
-  Sun,
-  Moon,
-  HelpCircle,
   Loader2,
   ImageOff,
 } from 'lucide-react'
 import type { CitizenPhotoItem } from '../../../types/citizen-reports/citizen-reports'
-import type { CitizenPhotoHint } from '../../../types/common/enums'
 import { citizenReportsAPI } from '../../../feature/citizen-reports/citizenReportsAPI'
 
 export interface CitizenReviewPhotoGalleryProps {
   reportId: string
   photos: CitizenPhotoItem[]
-}
-
-/**
- * Hiển thị Badge Gợi ý AI (AI Hint) kèm độ tin cậy
- */
-const renderAiHintBadge = (label?: CitizenPhotoHint, confidence?: number) => {
-  const percent = typeof confidence === 'number' ? Math.round(confidence * 100) : null
-
-  switch (label) {
-    case 'lamp_on':
-      return (
-        <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/90 text-white text-[10px] font-bold shadow-xs backdrop-blur-xs"
-          title={`Mô hình AI nhận định đèn đang bật sáng (${percent !== null ? `${percent}%` : ''})`}
-        >
-          <Sun className="w-3 h-3" />
-          <span>AI: Đèn Bật {percent !== null ? `(${percent}%)` : ''}</span>
-        </span>
-      )
-    case 'lamp_off':
-      return (
-        <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/90 text-white text-[10px] font-bold shadow-xs backdrop-blur-xs"
-          title={`Mô hình AI nhận định đèn bị tắt tối (${percent !== null ? `${percent}%` : ''})`}
-        >
-          <Moon className="w-3 h-3" />
-          <span>AI: Đèn Tắt {percent !== null ? `(${percent}%)` : ''}</span>
-        </span>
-      )
-    case 'inconclusive':
-    default:
-      return (
-        <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700/80 text-white text-[10px] font-medium shadow-xs backdrop-blur-xs"
-          title="Mô hình AI chưa thể kết luận hoặc ảnh chụp ban ngày"
-        >
-          <HelpCircle className="w-3 h-3" />
-          <span>AI: Chưa rõ / Ban ngày</span>
-        </span>
-      )
-  }
 }
 
 /**
@@ -141,13 +95,6 @@ const PhotoThumbnailItem: React.FC<PhotoThumbnailItemProps> = ({
         />
       )}
 
-      {/* Nhãn AI Hint đặt tại góc trên bên trái */}
-      {photo.ai_hint && (
-        <div className="absolute top-1.5 left-1.5 pointer-events-none">
-          {renderAiHintBadge(photo.ai_hint.label, photo.ai_hint.confidence)}
-        </div>
-      )}
-
       {/* Nút phóng to hiển thị khi hover */}
       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center pointer-events-none">
         <div className="p-1.5 rounded-full bg-black/60 text-white">
@@ -226,10 +173,6 @@ export const CitizenReviewPhotoGallery: React.FC<CitizenReviewPhotoGalleryProps>
           <Camera className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           <span>Ảnh hiện trường ({photos.length})</span>
         </div>
-        <div className="flex items-center gap-1 text-[10.5px] text-slate-400 italic">
-          <Sparkles className="w-3 h-3 text-purple-500" />
-          <span>Kèm phân tích AI Hint</span>
-        </div>
       </div>
 
       {/* Grid Thumbnail các ảnh (tải an toàn qua blob) */}
@@ -259,11 +202,6 @@ export const CitizenReviewPhotoGallery: React.FC<CitizenReviewPhotoGalleryProps>
             <div className="flex items-center justify-between p-3 border-b border-slate-800 text-white text-xs">
               <div className="flex items-center gap-2">
                 <span>Ảnh hiện trường chi tiết</span>
-                {selectedPhoto.ai_hint &&
-                  renderAiHintBadge(
-                    selectedPhoto.ai_hint.label,
-                    selectedPhoto.ai_hint.confidence
-                  )}
               </div>
               <button
                 type="button"

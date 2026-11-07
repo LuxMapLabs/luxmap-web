@@ -3,7 +3,7 @@ import { X, Cpu, Zap, AlertCircle, Check } from 'lucide-react'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { CreateIotNodeRequest, IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { DataSource } from '../../../../../types/common/enums'
-import { formatCommuneDisplayName } from '../../../../../utils/assets/communeUtils'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
 
 export interface AddIotNodeModalProps {
@@ -118,7 +118,7 @@ export const AddIotNodeModal: React.FC<AddIotNodeModalProps> = ({
               <div className="mt-1.5 p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
                 <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 <span>
-                  Địa bàn quản lý: <strong>{formatCommuneDisplayName(selectedCabinet.commune_id)}</strong>
+                  Địa bàn quản lý: <strong>{formatFriendlyCommuneName(selectedCabinet.commune_name, selectedCabinet.commune_id, 'Chưa gán địa bàn')}</strong>
                 </span>
               </div>
             )}

@@ -1,5 +1,6 @@
 import React from 'react'
-import { Edit2, Archive, CheckCircle2, AlertCircle, Boxes, Lightbulb, PackageMinus, Eye } from 'lucide-react'
+import { RowActions } from '../../common/RowActions'
+import { Archive, CheckCircle2, AlertCircle, Boxes, Lightbulb, PackageMinus } from 'lucide-react'
 import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import { FixtureTableSkeleton } from './FixtureTableSkeleton'
@@ -220,36 +221,18 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
 
                   {/* Thao tác */}
                   <td className="py-2.5 px-3.5 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      {onViewDetail && (
-                        <button
-                          type="button"
-                          onClick={() => onViewDetail(fixture)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 transition cursor-pointer"
-                          title="Xem chi tiết bộ đèn"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onEditFixture(fixture)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition cursor-pointer"
-                        title="Chỉnh sửa thông số"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      {!isRetired && onRetireFixture && (
-                        <button
-                          type="button"
-                          onClick={() => onRetireFixture(fixture)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 transition cursor-pointer"
-                          title="Tháo dỡ bộ đèn"
-                        >
-                          <PackageMinus className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+                    <RowActions
+                      viewLabel="Xem chi tiết bộ đèn"
+                      editLabel="Chỉnh sửa thông số"
+                      onView={onViewDetail ? () => onViewDetail(fixture) : undefined}
+                      onEdit={() => onEditFixture(fixture)}
+                      align="center"
+                      menuItems={
+    !isRetired && onRetireFixture
+      ? [{ key: 'retire', label: 'Tháo dỡ bộ đèn', icon: <PackageMinus />, danger: true, onClick: () => onRetireFixture(fixture) }]
+      : []
+  }
+                    />
                   </td>
                 </tr>
               )

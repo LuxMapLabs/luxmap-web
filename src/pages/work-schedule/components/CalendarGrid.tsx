@@ -10,6 +10,8 @@ interface CalendarGridProps {
   filterPhase: WorkScheduleState['filterPhase']
   onSelectCase: (code: string, phaseIndex: number) => void
   onAddOnDate: (dateStr: string) => void
+  /** Lệnh công tác được làm nổi bật (khi đến từ thông báo) */
+  highlightedWorkOrderId?: string | null
 }
 
 const WEEKDAYS = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật']
@@ -21,6 +23,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   filterPhase,
   onSelectCase,
   onAddOnDate,
+  highlightedWorkOrderId = null,
 }) => {
   // Tính toán số ngày và padding của tháng
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay()
@@ -206,8 +209,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   return (
                     <div
                       key={`${caseItem.code}-${phaseIndex}`}
+                      data-work-order-id={phase.workOrderId || undefined}
                       onClick={() => onSelectCase(caseItem.code, phaseIndex)}
-                      className={`p-2 rounded-xl border text-xs cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] ${cardStyle}`}
+                      className={`p-2 rounded-xl border text-xs cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] ${cardStyle} ${
+                        highlightedWorkOrderId && phase.workOrderId === highlightedWorkOrderId
+                          ? 'ring-4 ring-amber-400 shadow-lg animate-pulse'
+                          : ''
+                      }`}
                     >
                       {/* Dòng trên: Mã & Nhãn Phase */}
                       <div className="flex items-center justify-between gap-1 mb-1">

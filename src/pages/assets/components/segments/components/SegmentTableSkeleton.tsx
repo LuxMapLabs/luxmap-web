@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 
 export interface SegmentTableSkeletonProps {
@@ -5,6 +6,7 @@ export interface SegmentTableSkeletonProps {
 }
 
 export const SegmentTableSkeleton: React.FC<SegmentTableSkeletonProps> = ({ rowCount = 8 }) => {
+  const showCommune = useShowCommune()
   return (
     <>
       {Array.from({ length: rowCount }).map((_, index) => (
@@ -30,9 +32,11 @@ export const SegmentTableSkeleton: React.FC<SegmentTableSkeletonProps> = ({ rowC
             <div className="h-4 w-12 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
           {/* Địa bàn */}
-          <td className="p-3.5">
-            <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
-          </td>
+          {showCommune && (
+            <td className="p-3.5">
+              <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
+            </td>
+          )}
           {/* Nguồn dữ liệu */}
           <td className="p-3.5">
             <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />

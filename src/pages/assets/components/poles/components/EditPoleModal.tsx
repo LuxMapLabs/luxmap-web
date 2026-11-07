@@ -539,9 +539,8 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
 
               {/* Dòng 3: Ghi chú */}
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                  <span>Ghi chú hiện trường:</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Tối đa 1000 ký tự</span>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block">
+                  Ghi chú hiện trường:
                 </label>
                 <textarea
                   rows={2}
@@ -551,6 +550,9 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
                   placeholder="Ghi chú điểm tham chiếu, tình trạng trụ..."
                   className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
                 />
+                <div className="text-right text-[10px] font-normal text-slate-400 tabular-nums">
+                  {noteText.length}/1000
+                </div>
               </div>
 
               {/* Dòng 4: Tọa độ số hiển thị & cho phép nhập tay */}

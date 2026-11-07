@@ -16,17 +16,23 @@ import {
 import type { CitizenReportItem } from '../../../types/citizen-reports/citizen-reports'
 import type { CitizenReportKind, CitizenReportStatus } from '../../../types/common/enums'
 import type { PoleListItem } from '../../../types/assets/poles'
+import { formatDateTimeVN, formatNightOf } from '../../../utils/citizen-report/citizenReviewFormat'
 import { TablePagination } from '../../assets/components/common/TablePagination'
 
 export interface CitizenReviewTableProps {
   items: CitizenReportItem[]
   poles?: PoleListItem[]
+  communeNames?: Record<string, string>
+  /** Hiện tên xã dưới mã cột (chỉ khi dữ liệu thuộc nhiều xã) */
+  showCommune?: boolean
   total: number
   page: number
   pageSize: number
   isLoading: boolean
   onPageChange: (page: number) => void
   onSelectReport: (reportId: string) => void
+  /** Phản ánh được làm nổi bật (khi đến từ thông báo) */
+  highlightedReportId?: string | null
 }
 
 /**
@@ -134,12 +140,7 @@ const formatTimeAgo = (isoString?: string | null): string => {
     if (diffSec < 60) return 'Vừa xong'
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`
     if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`
-    return d.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return formatDateTimeVN(isoString)
   } catch {
     return '-'
   }
@@ -148,12 +149,15 @@ const formatTimeAgo = (isoString?: string | null): string => {
 export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
   items,
   poles = [],
+  communeNames = {},
+  showCommune = true,
   total,
   page,
   pageSize,
   isLoading,
   onPageChange,
   onSelectReport,
+  highlightedReportId = null,
 }) => {
   const totalPages = Math.ceil(total / pageSize) || 1
 
@@ -231,13 +235,18 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
                 items.map((item) => (
                   <tr
                     key={item.report_id || `${item.pole_id}-${item.night_of}`}
+                    data-report-id={item.report_id || undefined}
                     onClick={() => item.report_id && onSelectReport(item.report_id)}
-                    className="hover:bg-blue-50/40 dark:hover:bg-slate-800/50 transition cursor-pointer"
+                    className={`transition cursor-pointer ${
+                      highlightedReportId && item.report_id === highlightedReportId
+                        ? 'bg-amber-100/80 shadow-[inset_4px_0_0_0_#f59e0b] animate-pulse'
+                        : 'hover:bg-blue-50/40 dark:hover:bg-slate-800/50'
+                    }`}
                   >
                     {/* Cột thời gian */}
                     <td className="py-3 px-3.5">
                       <div className="font-semibold text-slate-900 dark:text-white">
-                        Đêm {item.night_of || '-'}
+                        Đêm {formatNightOf(item.night_of)}
                       </div>
                       <div className="text-[11px] text-slate-400">
                         {formatTimeAgo(item.last_submitted_at || item.created_at)}
@@ -255,9 +264,11 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
                             <div className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs">
                               {primaryCode}
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
-                              {item.commune_id || 'Chưa định địa bàn'}
-                            </div>
+                            {showCommune && (
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
+                                {(item.commune_id && (communeNames[item.commune_id] || item.commune_id)) || 'Chưa định địa bàn'}
+                              </div>
+                            )}
                           </div>
                         )
                       })()}

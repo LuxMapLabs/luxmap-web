@@ -311,12 +311,12 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                   <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 shadow-2xs">
                     <tr>
                       <th className="py-2.5 px-3 w-12 text-center">STT</th>
-                      <th className="py-2.5 px-3 min-w-32">Số bóng / bộ</th>
-                      <th className="py-2.5 px-3 min-w-32">Công suất (*)</th>
+                      <th className="py-2.5 px-3 min-w-24">Số bóng / bộ</th>
+                      <th className="py-2.5 px-3 min-w-24">Công suất (*)</th>
                       <th className="py-2.5 px-3 min-w-36">Loại đèn</th>
                       <th className="py-2.5 px-3 min-w-28">Nguồn điện</th>
-                      <th className="py-2.5 px-3 min-w-32">Ngày lắp</th>
-                      <th className="py-2.5 px-3 min-w-32">Hạn bảo hành</th>
+                      <th className="py-2.5 px-3 min-w-28">Ngày lắp</th>
+                      <th className="py-2.5 px-3 min-w-28">Hạn bảo hành</th>
                       <th className="py-2.5 px-3 w-14 text-center">Xóa</th>
                     </tr>
                   </thead>

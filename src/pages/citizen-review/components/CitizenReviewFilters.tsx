@@ -7,6 +7,7 @@ export interface CitizenReviewFiltersProps {
   communeFilter: string[]
   poleFilter: string | null
   availableCommunes: string[]
+  communeNames?: Record<string, string>
   pendingCount: number
   onStatusChange: (status: CitizenReportStatus[]) => void
   onCommuneChange: (communes: string[]) => void
@@ -18,6 +19,7 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
   communeFilter,
   poleFilter,
   availableCommunes,
+  communeNames = {},
   pendingCount,
   onStatusChange,
   onCommuneChange,
@@ -40,8 +42,8 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
           />
         </div>
 
-        {/* 2. Dropdown lọc theo Xã / Phường */}
-        {availableCommunes.length > 0 && (
+        {/* 2. Dropdown lọc theo Xã / Phường (chỉ khi phụ trách từ 2 xã trở lên; Manager chỉ có 1 xã) */}
+        {availableCommunes.length > 1 && (
           <div className="w-full sm:w-56 shrink-0">
             <select
               value={communeFilter[0] || ''}
@@ -54,7 +56,7 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
               <option value="">Tất cả địa bàn / Xã, Phường</option>
               {availableCommunes.map((communeId) => (
                 <option key={communeId} value={communeId}>
-                  {communeId}
+                  {communeNames[communeId] || communeId}
                 </option>
               ))}
             </select>
