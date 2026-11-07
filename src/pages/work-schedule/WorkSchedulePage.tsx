@@ -164,7 +164,6 @@ export const WorkSchedulePage: React.FC = () => {
     sawLoadingRef.current = false
     dispatch(setFilterPhase('all'))
     dispatch(fetchWorkOrderDetailRequest(targetWoId))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetWoId, dispatch])
 
   useEffect(() => {
