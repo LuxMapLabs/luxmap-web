@@ -29,6 +29,8 @@ export interface CitizenReviewTableProps {
   isLoading: boolean
   onPageChange: (page: number) => void
   onSelectReport: (reportId: string) => void
+  /** Phản ánh được làm nổi bật (khi đến từ thông báo) */
+  highlightedReportId?: string | null
 }
 
 /**
@@ -152,6 +154,7 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
   isLoading,
   onPageChange,
   onSelectReport,
+  highlightedReportId = null,
 }) => {
   const totalPages = Math.ceil(total / pageSize) || 1
 
@@ -229,8 +232,13 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
                 items.map((item) => (
                   <tr
                     key={item.report_id || `${item.pole_id}-${item.night_of}`}
+                    data-report-id={item.report_id || undefined}
                     onClick={() => item.report_id && onSelectReport(item.report_id)}
-                    className="hover:bg-blue-50/40 dark:hover:bg-slate-800/50 transition cursor-pointer"
+                    className={`transition cursor-pointer ${
+                      highlightedReportId && item.report_id === highlightedReportId
+                        ? 'bg-amber-100/80 shadow-[inset_4px_0_0_0_#f59e0b] animate-pulse'
+                        : 'hover:bg-blue-50/40 dark:hover:bg-slate-800/50'
+                    }`}
                   >
                     {/* Cột thời gian */}
                     <td className="py-3 px-3.5">

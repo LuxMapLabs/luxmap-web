@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import type { RootState, AppDispatch } from '../../redux/store'
 import {
   fetchReportsRequest,
@@ -19,6 +20,7 @@ import { fetchAssetsRequest } from '../../feature/assets/assetSlice'
 import { CitizenReviewFilters } from './components/CitizenReviewFilters'
 import { CitizenReviewTable } from './components/CitizenReviewTable'
 import { CitizenReviewDetailModal } from './components/CitizenReviewDetailModal'
+import { NOTIFICATION_TARGET_PARAMS } from '../../utils/notifications/notificationRoute'
 import type { CitizenReportStatus } from '../../types/common/enums'
 import type {
   AcceptCitizenReportRequest,
@@ -87,6 +89,79 @@ export const CitizenReviewPage: React.FC = () => {
       }
     }
   }, [searchParams, dispatch, poleFilter, statusFilter])
+
+  // 2b. Đến từ thông báo (?report=<id>): đưa về đúng trang bảng và làm nổi bật dòng đó
+  const [highlightedReportId, setHighlightedReportId] = useState<string | null>(null)
+  const sawFetchingRef = useRef(false)
+  const targetReportId = searchParams.get(NOTIFICATION_TARGET_PARAMS.citizenReport)
+
+  // Có thông báo mới trỏ tới: tải lại danh sách để chắc chắn có phản ánh đó
+  useEffect(() => {
+    if (!targetReportId) return
+    sawFetchingRef.current = false
+    dispatch(fetchReportsRequest())
+  }, [targetReportId, dispatch])
+
+  useEffect(() => {
+    if (isFetchingList) sawFetchingRef.current = true
+  }, [isFetchingList])
+
+  useEffect(() => {
+    if (!targetReportId || isFetchingList || !sawFetchingRef.current) return
+
+    const clearTargetParam = () => {
+      const next = new URLSearchParams(searchParams)
+      next.delete(NOTIFICATION_TARGET_PARAMS.citizenReport)
+      setSearchParams(next, { replace: true })
+    }
+
+    const indexAll = items.findIndex((i) => i.report_id === targetReportId)
+    if (indexAll < 0) {
+      toast.info('Phản ánh này không còn trong danh sách.')
+      clearTargetParam()
+      return
+    }
+
+    const target = items[indexAll]
+    const passesFilter =
+      (statusFilter.length === 0 || !target.status || statusFilter.includes(target.status)) &&
+      (communeFilter.length === 0 || !target.commune_id || communeFilter.includes(target.commune_id)) &&
+      !poleFilter
+
+    let position = indexAll
+    if (!passesFilter) {
+      // Bỏ bộ lọc đang che mục cần xem
+      dispatch(setStatusFilter([]))
+      dispatch(setCommuneFilter([]))
+      dispatch(setPoleFilter(null))
+    } else {
+      position = items
+        .filter(
+          (i) =>
+            (statusFilter.length === 0 || !i.status || statusFilter.includes(i.status)) &&
+            (communeFilter.length === 0 || !i.commune_id || communeFilter.includes(i.commune_id))
+        )
+        .findIndex((i) => i.report_id === targetReportId)
+    }
+    dispatch(setPage(Math.floor(Math.max(position, 0) / pageSize) + 1))
+
+    const next = new URLSearchParams(searchParams)
+    next.delete(NOTIFICATION_TARGET_PARAMS.citizenReport)
+    if (!passesFilter) {
+      next.delete('status')
+      next.delete('pole_id')
+    }
+    setSearchParams(next, { replace: true })
+
+    setHighlightedReportId(targetReportId)
+    window.setTimeout(() => {
+      document
+        .querySelector(`[data-report-id="${CSS.escape(targetReportId)}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+    window.setTimeout(() => setHighlightedReportId(null), 6000)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetReportId, isFetchingList, items])
 
   // 3. Lọc Client-side mượt mà không cần gọi lại API
   const filteredItems = useMemo(() => {
@@ -203,6 +278,7 @@ export const CitizenReviewPage: React.FC = () => {
         isLoading={isFetchingList}
         onPageChange={handlePageChange}
         onSelectReport={handleSelectReport}
+        highlightedReportId={highlightedReportId}
       />
 
       {/* Popup Modal Thẩm định chi tiết Split-View căn giữa */}
