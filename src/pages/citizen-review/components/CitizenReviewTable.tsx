@@ -16,11 +16,13 @@ import {
 import type { CitizenReportItem } from '../../../types/citizen-reports/citizen-reports'
 import type { CitizenReportKind, CitizenReportStatus } from '../../../types/common/enums'
 import type { PoleListItem } from '../../../types/assets/poles'
+import { formatDateTimeVN, formatNightOf } from '../../../utils/citizen-report/citizenReviewFormat'
 import { TablePagination } from '../../assets/components/common/TablePagination'
 
 export interface CitizenReviewTableProps {
   items: CitizenReportItem[]
   poles?: PoleListItem[]
+  communeNames?: Record<string, string>
   total: number
   page: number
   pageSize: number
@@ -134,12 +136,7 @@ const formatTimeAgo = (isoString?: string | null): string => {
     if (diffSec < 60) return 'Vừa xong'
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`
     if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`
-    return d.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return formatDateTimeVN(isoString)
   } catch {
     return '-'
   }
@@ -148,6 +145,7 @@ const formatTimeAgo = (isoString?: string | null): string => {
 export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
   items,
   poles = [],
+  communeNames = {},
   total,
   page,
   pageSize,
@@ -237,7 +235,7 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
                     {/* Cột thời gian */}
                     <td className="py-3 px-3.5">
                       <div className="font-semibold text-slate-900 dark:text-white">
-                        Đêm {item.night_of || '-'}
+                        Đêm {formatNightOf(item.night_of)}
                       </div>
                       <div className="text-[11px] text-slate-400">
                         {formatTimeAgo(item.last_submitted_at || item.created_at)}
@@ -256,7 +254,7 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
                               {primaryCode}
                             </div>
                             <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
-                              {item.commune_id || 'Chưa định địa bàn'}
+                              {(item.commune_id && (communeNames[item.commune_id] || item.commune_id)) || 'Chưa định địa bàn'}
                             </div>
                           </div>
                         )

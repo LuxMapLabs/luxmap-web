@@ -56,6 +56,15 @@ export const CitizenReviewPage: React.FC = () => {
     return Array.from(set).sort()
   }, [poles])
 
+  // Tên địa bàn theo commune_id (ưu tiên tên do Backend trả trong danh sách cột đèn)
+  const communeNames = useMemo(() => {
+    const map: Record<string, string> = {}
+    poles.forEach((p) => {
+      if (p.commune_id && p.commune_name) map[p.commune_id] = p.commune_name
+    })
+    return map
+  }, [poles])
+
   // 1. Khi mount: fetch danh sách assets để có xã/phường và fetch toàn bộ hàng đợi phản ánh
   useEffect(() => {
     dispatch(fetchAssetsRequest())
@@ -176,6 +185,7 @@ export const CitizenReviewPage: React.FC = () => {
         communeFilter={communeFilter}
         poleFilter={poleFilter}
         availableCommunes={availableCommunes}
+        communeNames={communeNames}
         pendingCount={pendingCount}
         onStatusChange={handleStatusChange}
         onCommuneChange={handleCommuneChange}
@@ -186,6 +196,7 @@ export const CitizenReviewPage: React.FC = () => {
       <CitizenReviewTable
         items={paginatedItems}
         poles={poles}
+        communeNames={communeNames}
         total={filteredItems.length}
         page={page}
         pageSize={pageSize}
@@ -199,6 +210,7 @@ export const CitizenReviewPage: React.FC = () => {
         isOpen={Boolean(selectedReportId)}
         detail={selectedDetail}
         poles={poles}
+        communeNames={communeNames}
         isLoading={isFetchingDetail}
         isSubmittingDecision={isSubmittingDecision}
         onClose={handleCloseModal}

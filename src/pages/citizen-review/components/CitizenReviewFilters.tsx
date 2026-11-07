@@ -7,6 +7,7 @@ export interface CitizenReviewFiltersProps {
   communeFilter: string[]
   poleFilter: string | null
   availableCommunes: string[]
+  communeNames?: Record<string, string>
   pendingCount: number
   onStatusChange: (status: CitizenReportStatus[]) => void
   onCommuneChange: (communes: string[]) => void
@@ -18,6 +19,7 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
   communeFilter,
   poleFilter,
   availableCommunes,
+  communeNames = {},
   pendingCount,
   onStatusChange,
   onCommuneChange,
@@ -54,7 +56,7 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
               <option value="">Tất cả địa bàn / Xã, Phường</option>
               {availableCommunes.map((communeId) => (
                 <option key={communeId} value={communeId}>
-                  {communeId}
+                  {communeNames[communeId] || communeId}
                 </option>
               ))}
             </select>
