@@ -4,21 +4,17 @@ import { useDispatch, useSelector } from 'react-redux'
 import { Header } from '../components/Header'
 import { Sidebar } from '../components/Sidebar'
 import { RootState } from '../redux/rootReducer'
-import { logout, refreshProfileRequest } from '../feature/auth/authSlice'
+import { logout } from '../feature/auth/authSlice'
 import { getRoleName, isAdmin } from '../utils/roleUtils'
 
 export const DefaultLayout: React.FC = () => {
   const dispatch = useDispatch()
   const location = useLocation()
-  const { user, isRefreshingProfile } = useSelector((state: RootState) => state.auth)
+  const { user } = useSelector((state: RootState) => state.auth)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   const handleLogout = () => {
     dispatch(logout())
-  }
-
-  const handleRefreshProfile = () => {
-    dispatch(refreshProfileRequest())
   }
 
   const roleTitle = getRoleName(user?.role)
@@ -53,8 +49,6 @@ export const DefaultLayout: React.FC = () => {
           userInitials={initials}
           isAdminUser={isAdmin(user?.role)}
           onLogout={handleLogout}
-          onRefreshProfile={handleRefreshProfile}
-          isRefreshingProfile={isRefreshingProfile}
         />
 
         {/* Full-width Main Workspace with Smooth Route Transitions */}

@@ -7,6 +7,7 @@ import adminCommuneReducer from '../feature/communes/communeSlice'
 import mapReducer from '../feature/map/mapSlice'
 import citizenReportReducer from '../feature/citizen-report/citizenReportSlice'
 import citizenReportsReducer from '../feature/citizen-reports/citizenReportsSlice'
+import notificationsReducer from '../feature/notifications/notificationsSlice'
 import qrCodeReducer from '../feature/qr-code/qrCodeSlice'
 import dashboardReducer from '../feature/dashboard/dashboardSlice'
 import settingsReducer from '../feature/settings/settingsSlice'
@@ -23,6 +24,7 @@ const rootReducer = combineReducers({
     map: mapReducer,
     citizenReport: citizenReportReducer,
     citizenReports: citizenReportsReducer,
+    notifications: notificationsReducer,
     qrCode: qrCodeReducer,
     dashboard: dashboardReducer,
     settings: settingsReducer,

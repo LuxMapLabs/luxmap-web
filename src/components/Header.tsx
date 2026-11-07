@@ -2,13 +2,11 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import {
-  Bell,
   Map,
   Boxes,
   ShieldCheck,
   LogOut,
   User as UserIcon,
-  RefreshCw,
   ChevronDown,
   CalendarDays,
   MessageSquareWarning,
@@ -23,6 +21,7 @@ import { openExportModal } from '../feature/assets/assetSlice'
 import type { CurrentUserResponse } from '../types/auth/me'
 import { getRoleName, isAdmin, isManagementAgency, isMaintenanceEngineer, isFieldCrew } from '../utils/roleUtils'
 import { ProfileModal } from './ProfileModal'
+import { NotificationBell } from './NotificationBell'
 
 export interface HeaderProps {
   user?: CurrentUserResponse | null
@@ -30,11 +29,7 @@ export interface HeaderProps {
   userRoleTitle?: string
   userInitials?: string
   isAdminUser?: boolean
-  hasNotification?: boolean
-  onNotificationClick?: () => void
   onLogout?: () => void
-  onRefreshProfile?: () => void
-  isRefreshingProfile?: boolean
   className?: string
 }
 
@@ -44,11 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   userRoleTitle,
   userInitials,
   isAdminUser,
-  hasNotification = true,
-  onNotificationClick,
   onLogout,
-  onRefreshProfile,
-  isRefreshingProfile = false,
   className = '',
 }) => {
   const dispatch = useDispatch()
@@ -71,7 +62,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Tính toán thông tin hiển thị chính xác từ user (lấy từ GET /auth/me)
   const effectiveName = user?.full_name || userName || 'Cán bộ kỹ thuật'
-  const effectiveRole = userRoleTitle || (user ? getRoleName(user.role) : 'Cán bộ vận hành')
+  // Bỏ phần tiếng Anh trong ngoặc, ví dụ "Quản lý (Manager)" thành "Quản lý"
+  const effectiveRole = (
+    userRoleTitle || (user ? getRoleName(user.role) : 'Cán bộ vận hành')
+  ).replace(/\s*\([^)]*\)\s*$/, '')
   const effectiveAdmin =
     isAdminUser !== undefined ? isAdminUser : isAdmin(user?.role)
 
@@ -137,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
         className={`h-16 bg-white/85 backdrop-blur-xl border-b border-slate-200/80 px-6 flex items-center justify-between shrink-0 select-none z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all duration-200 text-slate-900 ${className}`}
       >
         {/* Left: Current Page Title / Context */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100/80 flex items-center justify-center shrink-0 shadow-2xs">
             {isDashboard ? (
               <LayoutDashboard className="w-4.5 h-4.5" />
@@ -163,8 +157,8 @@ export const Header: React.FC<HeaderProps> = ({
               <Map className="w-4.5 h-4.5" />
             )}
           </div>
-          <div className="flex flex-col">
-            <h1 className="text-sm font-bold text-slate-900 leading-tight">
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-base font-bold text-slate-900 leading-tight truncate">
               {isDashboard
                 ? isManagementAgency(user?.role)
                   ? 'Tổng quan Giám sát Cấp trên'
@@ -191,33 +185,6 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Quản trị hệ thống'
                 : 'Bản đồ chiếu sáng'}
             </h1>
-            <p className="text-[11px] text-slate-500 font-medium leading-none mt-0.5 hidden sm:block">
-              {isDashboard
-                ? isManagementAgency(user?.role)
-                  ? 'Giám sát chỉ số vận hành, tuân thủ SLA và dự toán bảo hành'
-                  : 'Giám sát chỉ số vận hành, sự cố & tình trạng bảo hành bóng đèn'
-                : isWorkSchedule
-                ? 'Lập lịch khảo sát, kiểm tra & điều phối sửa chữa'
-                : isAssets
-                ? 'Danh mục Cột đèn, Tủ điện & Tuyến đường'
-                : isCitizenReports
-                ? 'Thẩm định và xử lý báo cáo sự cố chiếu sáng từ mã QR'
-                : isReports
-                ? 'Tổng hợp số liệu vận hành & chất lượng chiếu sáng'
-                : isCommunesAdmin
-                ? 'Khai báo đơn vị hành chính xã/thị trấn và thiết lập khung bao bản đồ định vị'
-                : isFirmwareAdmin
-                ? 'Kiểm toán nguồn gốc dữ liệu thiết bị IoT và mô hình thuật toán LuxMap'
-                : isSettingsAdmin
-                ? 'Thiết lập ngưỡng phát hiện đèn mờ & thời gian cảnh báo mất kết nối IoT'
-                : isAdminDashboard
-                ? 'Giám sát hạ tầng máy chủ, tiến trình nền, lưu trữ & tổng quan vận hành'
-                : isUsersAdmin
-                ? 'Cấu hình và phân quyền người dùng'
-                : isAdminPath
-                ? 'Cấu hình và phân quyền người dùng'
-                : 'Giám sát lưới điện & hiện trạng tài sản theo thời gian thực'}
-            </p>
           </div>
         </div>
         {/* Right: Notification Bell + Interactive Profile Dropdown + Quick Logout */}
@@ -227,29 +194,17 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => dispatch(openExportModal())}
-              className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50/80 hover:bg-emerald-100/90 text-emerald-600 hover:text-emerald-700 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border border-emerald-200/90 shadow-2xs group"
+              className="h-9 px-2.5 lg:px-3 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap bg-slate-100/70 hover:bg-white text-slate-600 hover:text-slate-900 active:scale-95 transition-all duration-200 cursor-pointer border border-slate-200/80 shadow-2xs"
               title="Xuất dữ liệu tài sản ra tệp CSV (Excel)"
               aria-label="Xuất dữ liệu tài sản"
             >
-              <FileDown className="w-4 h-4 text-emerald-600 group-hover:-translate-y-0.5 transition-transform duration-200" />
+              <FileDown className="w-4 h-4" />
+              <span className="hidden lg:inline text-xs font-semibold">Xuất dữ liệu</span>
             </button>
           )}
 
-          {/* Notification Bell with pulse ping */}
-          <button
-            type="button"
-            onClick={onNotificationClick}
-            className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100/70 hover:bg-white text-slate-600 hover:text-slate-900 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border border-slate-200/80 shadow-2xs group"
-            title="Thông báo sự cố & vận hành"
-          >
-            <Bell className="w-4 h-4 text-slate-600 group-hover:rotate-12 transition-transform duration-200" />
-            {hasNotification && (
-              <span className="absolute top-2 right-2 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 ring-2 ring-white" />
-              </span>
-            )}
-          </button>
+          {/* Chuông thông báo (chỉ Cán bộ Quản lý) */}
+          {isMaintenanceEngineer(user?.role) && <NotificationBell />}
 
           <div className="h-5 w-px bg-slate-200/80" />
 
@@ -259,17 +214,15 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
               className="flex items-center gap-2.5 p-1 rounded-2xl hover:bg-slate-100/80 transition-all duration-200 cursor-pointer select-none group border border-transparent hover:border-slate-200/70"
-              title="Xem thông tin tài khoản & quyền hạn"
+              title="Tài khoản"
+              aria-haspopup="menu"
+              aria-expanded={isProfileMenuOpen}
             >
               <div className="hidden md:flex flex-col items-end leading-tight pl-1.5">
                 <span className="font-bold text-xs text-slate-900 group-hover:text-blue-600 transition-colors">
                   {effectiveName}
                 </span>
-                <span className="inline-flex items-center gap-1.5 text-[10.5px] text-slate-500 font-medium mt-0.5">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-                  </span>
+                <span className="text-[10.5px] text-slate-500 font-medium mt-0.5">
                   {effectiveRole}
                 </span>
               </div>
@@ -339,28 +292,6 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* Actions */}
                 <div className="px-1.5 py-1.5 space-y-0.5">
-                  {/* Nút Làm mới quyền & hồ sơ (Gọi GET /auth/me từ DB) */}
-                  {onRefreshProfile && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onRefreshProfile()
-                        setIsProfileMenuOpen(false)
-                      }}
-                      disabled={isRefreshingProfile}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors cursor-pointer group disabled:opacity-50"
-                    >
-                      <RefreshCw
-                        className={`w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors ${
-                          isRefreshingProfile ? 'animate-spin' : ''
-                        }`}
-                      />
-                      <span>
-                        {isRefreshingProfile ? 'Đang làm mới...' : 'Làm mới quyền & hồ sơ'}
-                      </span>
-                    </button>
-                  )}
-
                   {/* Xem chi tiết hồ sơ cá nhân */}
                   <button
                     type="button"
@@ -371,7 +302,7 @@ export const Header: React.FC<HeaderProps> = ({
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors cursor-pointer group"
                   >
                     <UserIcon className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                    <span>Chi tiết hồ sơ cán bộ</span>
+                    <span>Hồ sơ cá nhân</span>
                   </button>
                 </div>
 
@@ -402,8 +333,6 @@ export const Header: React.FC<HeaderProps> = ({
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         user={user}
-        onRefresh={onRefreshProfile}
-        isRefreshing={isRefreshingProfile}
       />
     </>
   )

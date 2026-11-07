@@ -6,6 +6,7 @@ import adminCommuneSaga from '../feature/communes/communeSaga'
 import mapSaga from '../feature/map/mapSaga'
 import citizenReportSaga from '../feature/citizen-report/citizenReportSaga'
 import { citizenReportsSaga } from '../feature/citizen-reports/citizenReportsSaga'
+import notificationsSaga from '../feature/notifications/notificationsSaga'
 import qrCodeSaga from '../feature/qr-code/qrCodeSaga'
 import workScheduleSaga from '../feature/work-schedule/workScheduleSaga'
 import dashboardSaga from '../feature/dashboard/dashboardSaga'
@@ -23,6 +24,7 @@ export default function* rootSaga() {
         fork(mapSaga),
         fork(citizenReportSaga),
         fork(citizenReportsSaga),
+        fork(notificationsSaga),
         fork(qrCodeSaga),
         fork(workScheduleSaga),
         fork(dashboardSaga),
