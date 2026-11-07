@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { X, SearchCheck, Layers, Calendar, User, Hash, Loader2, AlertCircle } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
@@ -30,6 +30,15 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
   const users = useSelector((state: RootState) => state.adminUsers?.users || [])
   const currentUser = useSelector((state: RootState) => state.auth?.user)
 
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   const version = usage?.version
@@ -37,6 +46,8 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
 
   // Tổng số kết quả sinh ra trên toàn hệ thống
   const totalProduced = results.reduce((acc, r) => acc + (r.count ?? 0), 0)
+  const producedResults = results.filter((r) => (r.count ?? 0) > 0)
+  const emptyResults = results.filter((r) => (r.count ?? 0) <= 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -130,20 +141,20 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Layers className="w-4 h-4 text-indigo-500" />
-                    <span>Kết quả sinh ra trong hệ thống ({results.length} loại)</span>
+                    <span>Kết quả sinh ra trong hệ thống</span>
                   </h3>
                   <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200/60">
                     Tổng: {totalProduced.toLocaleString('vi-VN')} bản ghi
                   </span>
                 </div>
 
-                {results.length === 0 ? (
+                {producedResults.length === 0 ? (
                   <div className="py-8 text-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-2xl">
                     Phiên bản này chưa tạo ra bất kỳ bản ghi kết quả nào trong hệ thống.
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {results.map((r, idx) => (
+                    {producedResults.map((r, idx) => (
                       <div
                         key={r.result || idx}
                         className="p-3.5 rounded-2xl bg-white border border-slate-100 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
@@ -170,11 +181,29 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
                           <span className="text-base font-black font-mono text-indigo-600 block">
                             {(r.count ?? 0).toLocaleString('vi-VN')}
                           </span>
-                          <span className="text-[10px] text-slate-400">bản ghi</span>
+                          <span className="text-[11px] text-slate-500">bản ghi</span>
                         </div>
                       </div>
                     ))}
                   </div>
+                )}
+
+                {emptyResults.length > 0 && (
+                  <details className="mt-3 group">
+                    <summary className="text-xs text-slate-500 cursor-pointer select-none hover:text-slate-700">
+                      {emptyResults.length} loại chưa có bản ghi
+                    </summary>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {emptyResults.map((r, idx) => (
+                        <span
+                          key={r.result || idx}
+                          className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-500"
+                        >
+                          {r.result || `#${idx + 1}`}
+                        </span>
+                      ))}
+                    </div>
+                  </details>
                 )}
               </div>
             </>

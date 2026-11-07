@@ -75,6 +75,15 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
     }
   }, [isOpen])
 
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, isSubmitting, onClose])
+
   if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -154,7 +163,8 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+          <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1 min-h-0">
           {/* Server Error / Local Error */}
           {(error || localError) && (
             <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2.5">
@@ -238,7 +248,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
               required
               className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono font-semibold text-slate-800 outline-none transition"
             />
-            <span className="text-[10px] text-slate-400 block">
+            <span className="text-[11px] text-slate-500 block">
               Tối đa 100 ký tự theo quy định Backend, không chứa ký tự điều khiển.
             </span>
           </div>
@@ -256,7 +266,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
               placeholder="Ví dụ: a1b2c3d4e5f6... (64 ký tự hex)"
               className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono text-slate-800 outline-none transition"
             />
-            <span className="text-[10px] text-slate-400 block">
+            <span className="text-[11px] text-slate-500 block">
               Dùng để xác thực tính toàn vẹn khi thiết bị gửi mã băm đối chiếu.
             </span>
           </div>
@@ -315,8 +325,10 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+          </div>
+
+          {/* Footer Actions (cố định, không cuộn) */}
+          <div className="px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
