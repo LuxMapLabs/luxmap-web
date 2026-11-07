@@ -116,24 +116,19 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
                   Ngưỡng phát hiện đèn mờ
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-mono text-[11px] font-semibold text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-300 shadow-2xs">
+                  <span className="font-mono text-[11px] text-slate-500">
                     dim_threshold_ratio
                   </span>
-                  <span className="text-[11px] text-slate-400">• Đơn vị: ratio</span>
+                  <span className="text-[11px] text-slate-500">• Đơn vị: ratio</span>
                 </div>
               </div>
             </div>
 
             {/* Status Badge */}
-            {isChanged ? (
+            {isChanged && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/90 shadow-2xs shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 Chưa lưu thay đổi
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/90 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Đang áp dụng
               </span>
             )}
           </div>
@@ -152,9 +147,6 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
                 <div className="flex items-baseline gap-2.5">
                   <span className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">
                     {Math.round(value * 100)}%
-                  </span>
-                  <span className="text-[11px] font-mono font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
-                    hệ số {value.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -225,19 +217,16 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
             </div>
 
             {/* Phím mốc chọn nhanh phổ biến (Preset Quick Pills) */}
-            <div className="pt-2 border-t border-amber-100/60">
-              <span className="text-[10.5px] font-semibold text-slate-400 block mb-1.5">
-                Mốc chọn nhanh phổ biến:
-              </span>
+            <div className="pt-1">
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
-                  { label: '50% (Sâu)', val: 0.5 },
+                  { label: '50%', val: 0.5 },
                   { label: '60%', val: 0.6 },
                   { label: '70%', val: 0.7 },
-                  { label: '80% (Chuẩn)', val: 0.8 },
+                  { label: '80%', val: 0.8 },
                   { label: '85%', val: 0.85 },
                   { label: '90%', val: 0.9 },
-                  { label: '95% (Max)', val: 0.95 },
+                  { label: '95%', val: 0.95 },
                 ].map((preset) => {
                   const isSelected = Math.abs(value - preset.val) < 0.005
                   return (
@@ -246,10 +235,10 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
                       type="button"
                       onClick={() => handleNumericChange(preset.val)}
                       disabled={isUpdating}
-                      className={`px-2 py-1 rounded-lg text-[10.5px] font-mono font-semibold transition cursor-pointer border shadow-2xs ${
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer border ${
                         isSelected
-                          ? 'bg-amber-500 text-white border-amber-500 ring-2 ring-amber-400/20'
-                          : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-100 hover:text-slate-900'
+                          ? 'bg-amber-500 text-white border-amber-500'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
                       }`}
                     >
                       {preset.label}
@@ -268,10 +257,10 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
           </div>
 
           {/* 3. Khối Tác động Kỹ thuật (Impact Alert Box) */}
-          <div className="p-3.5 rounded-xl bg-amber-50/80 border-l-4 border-amber-500 text-xs text-amber-950 leading-relaxed mb-4">
-            <span className="font-bold text-amber-900">Quy tắc cảnh báo: </span>
+          <div className="text-xs text-slate-600 leading-relaxed mb-4">
+            <span className="font-semibold text-slate-700">Quy tắc cảnh báo: </span>
             Bóng đèn có công suất hoặc quang thông thực tế tụt dưới{' '}
-            <strong className="font-bold underline">{Math.round(value * 100)}%</strong> định mức sẽ tự động được hệ thống đánh dấu là đèn mờ (dim) và gắn cờ cảnh báo sự cố.
+            <strong className="font-semibold text-slate-900">{Math.round(value * 100)}%</strong> định mức sẽ tự động được hệ thống đánh dấu là đèn mờ (dim) và gắn cờ cảnh báo sự cố.
           </div>
         </div>
 
@@ -366,7 +355,17 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
   const isChanged = (setting.value !== undefined && value !== setting.value) || note.trim().length > 0
 
   // Tính % tọa độ chính xác trên thanh ray slider
-  const progressPercent = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
+  // Thanh trượt theo thang log: các mốc ngắn (15p, 30p, 1h) không bị dồn sát đầu thanh
+  const SLIDER_STEP = 5
+  const clampValue = Math.min(max, Math.max(min, value))
+  const progressPercent = Math.min(
+    100,
+    Math.max(0, (Math.log(clampValue / min) / Math.log(max / min)) * 100)
+  )
+  const sliderToValue = (percent: number): number => {
+    const raw = min * Math.pow(max / min, percent / 100)
+    return Math.min(max, Math.max(min, Math.round(raw / SLIDER_STEP) * SLIDER_STEP))
+  }
 
   const handleNumericChange = (raw: number) => {
     if (isNaN(raw)) {
@@ -412,24 +411,19 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
                   Thời gian chờ mất kết nối IoT
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-mono text-[11px] font-semibold text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-300 shadow-2xs">
+                  <span className="font-mono text-[11px] text-slate-500">
                     iot_offline_after_minutes
                   </span>
-                  <span className="text-[11px] text-slate-400">• Đơn vị: phút</span>
+                  <span className="text-[11px] text-slate-500">• Đơn vị: phút</span>
                 </div>
               </div>
             </div>
 
             {/* Status Badge */}
-            {isChanged ? (
+            {isChanged && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/90 shadow-2xs shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 Chưa lưu thay đổi
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/90 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Đang áp dụng
               </span>
             )}
           </div>
@@ -448,9 +442,6 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
                 <div className="flex items-baseline gap-2.5">
                   <span className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">
                     {value} phút
-                  </span>
-                  <span className="text-[11px] font-mono font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
-                    ≈ {hoursDisplay} giờ
                   </span>
                 </div>
               </div>
@@ -499,11 +490,11 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
                 />
                 <input
                   type="range"
-                  min={min}
-                  max={max}
-                  step={5}
-                  value={value}
-                  onChange={(e) => handleNumericChange(parseInt(e.target.value, 10))}
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  value={progressPercent}
+                  onChange={(e) => handleNumericChange(sliderToValue(parseFloat(e.target.value)))}
                   disabled={isUpdating}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                 />
@@ -521,15 +512,12 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
             </div>
 
             {/* Phím mốc chọn nhanh phổ biến (Preset Quick Pills) */}
-            <div className="pt-2 border-t border-blue-100/60">
-              <span className="text-[10.5px] font-semibold text-slate-400 block mb-1.5">
-                Mốc chọn nhanh phổ biến:
-              </span>
+            <div className="pt-1">
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { label: '15p', val: 15 },
                   { label: '30p', val: 30 },
-                  { label: '1h (60p)', val: 60 },
+                  { label: '1h', val: 60 },
                   { label: '2h', val: 120 },
                   { label: '6h', val: 360 },
                   { label: '12h', val: 720 },
@@ -542,10 +530,10 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
                       type="button"
                       onClick={() => handleNumericChange(preset.val)}
                       disabled={isUpdating}
-                      className={`px-2 py-1 rounded-lg text-[10.5px] font-mono font-semibold transition cursor-pointer border shadow-2xs ${
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer border ${
                         isSelected
-                          ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-500/20'
-                          : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-100 hover:text-slate-900'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
                       }`}
                     >
                       {preset.label}
@@ -564,10 +552,10 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
           </div>
 
           {/* 3. Khối Tác động Kỹ thuật (Impact Alert Box) */}
-          <div className="p-3.5 rounded-xl bg-blue-50/80 border-l-4 border-blue-500 text-xs text-blue-950 leading-relaxed mb-4">
-            <span className="font-bold text-blue-900">Quy tắc giám sát: </span>
+          <div className="text-xs text-slate-600 leading-relaxed mb-4">
+            <span className="font-semibold text-slate-700">Quy tắc giám sát: </span>
             Trạm hoặc thiết bị không gửi tín hiệu phản hồi quá{' '}
-            <strong className="font-bold underline">{value} phút ({hoursDisplay} giờ)</strong> sẽ tự động chuyển sang trạng thái Ngoại tuyến (Offline) và kích hoạt theo dõi.
+            <strong className="font-semibold text-slate-900">{value} phút ({hoursDisplay} giờ)</strong> sẽ tự động chuyển sang trạng thái Ngoại tuyến (Offline) và kích hoạt theo dõi.
           </div>
         </div>
 
