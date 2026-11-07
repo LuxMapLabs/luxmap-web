@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { X, Lightbulb, Zap, Calendar, ShieldCheck, ShieldAlert, Boxes, MapPin, Edit2, AlertCircle } from 'lucide-react'
@@ -23,6 +24,7 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
   onClose,
   onEdit,
 }) => {
+  const showCommune = useShowCommune()
   if (!isOpen || !fixture) return null
 
   // Lookup pole information
@@ -181,12 +183,14 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                <span className="text-slate-500">Địa bàn quản lý:</span>
-                <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {formatFriendlyCommuneName(pole?.commune_name, pole?.commune_id, 'Chưa gán địa bàn')}
-                </span>
-              </div>
+              {showCommune && (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
+                  <span className="text-slate-500">Địa bàn quản lý:</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    {formatFriendlyCommuneName(pole?.commune_name, pole?.commune_id, 'Chưa gán địa bàn')}
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
                 <span className="text-slate-500">Tọa độ GIS:</span>

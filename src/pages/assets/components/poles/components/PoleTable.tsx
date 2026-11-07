@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React, { useEffect } from 'react'
 import { RowActions } from '../../common/RowActions'
 import { Trash2, Zap, Bookmark, Lightbulb, MapPin } from 'lucide-react'
@@ -46,6 +47,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
   onToggleSelect,
   onTogglePage,
 }) => {
+  const showCommune = useShowCommune()
   const selectablePoles = poles.filter((p) => Boolean(p.pole_id))
   const isPoleSelected = (p: PoleListItem) => Boolean(p.pole_id && selectedPoleIds?.has(p.pole_id))
   const selectedOnPage = selectablePoles.filter(isPoleSelected).length
@@ -90,7 +92,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               <th className="p-3.5">Tủ điện quản lý</th>
               <th className="p-3.5">Tọa độ GIS</th>
               <th className="p-3.5">Ghi chú</th>
-              <th className="p-3.5">Địa bàn</th>
+              {showCommune && <th className="p-3.5">Địa bàn</th>}
               <th className="p-3.5">Mã bộ đèn</th>
               <th className="p-3.5">Trạng thái</th>
               <th className="p-3.5 text-right">Thao tác</th>
@@ -101,7 +103,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               <PoleTableSkeleton rowCount={8} />
             ) : poles.length === 0 ? (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
+                <td colSpan={showCommune ? 10 : 9} className="p-8 text-center text-slate-400 dark:text-slate-400 text-xs">
                   Không tìm thấy cột đèn nào phù hợp với bộ lọc hiện tại.
                 </td>
               </tr>
@@ -216,9 +218,11 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                         <span className="text-slate-400 dark:text-slate-500 font-mono">—</span>
                       )}
                     </td>
-                    <td className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">
-                      {formatFriendlyCommuneName(pole.commune_name, pole.commune_id)}
-                    </td>
+                    {showCommune && (
+                      <td className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">
+                        {formatFriendlyCommuneName(pole.commune_name, pole.commune_id)}
+                      </td>
+                    )}
                     <td className="p-3.5">
                       {pole.active_fixture ? (
                         (() => {

@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 import { RowActions } from '../../common/RowActions'
 import { Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
@@ -21,6 +22,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const showCommune = useShowCommune()
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
@@ -57,7 +59,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
               <th className="py-3 px-4">Mã Mạch</th>
               <th className="py-3 px-4">Tên Mạch Xuất Tuyến</th>
               <th className="py-3 px-4">Tủ Điện Cấp Nguồn</th>
-              <th className="py-3 px-4">Địa bàn</th>
+              {showCommune && <th className="py-3 px-4">Địa bàn</th>}
               <th className="py-3 px-4 text-center">Số Cột Đèn</th>
               <th className="py-3 px-4 text-center">Tuyến Cáp (GIS)</th>
               <th className="py-3 px-4 text-right">Thao Tác</th>
@@ -115,12 +117,14 @@ export const FeederTable: React.FC<FeederTableProps> = ({
                   </td>
 
                   {/* Địa bàn */}
-                  <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>{formatFriendlyCommuneName(feeder.commune_name, feeder.commune_id)}</span>
-                    </div>
-                  </td>
+                  {showCommune && (
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>{formatFriendlyCommuneName(feeder.commune_name, feeder.commune_id)}</span>
+                      </div>
+                    </td>
+                  )}
 
                   {/* Số Cột Đèn */}
                   <td className="py-3.5 px-4 text-center">

@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 import { X, Cable, Zap, MapPin, Calendar, User, Lightbulb } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
@@ -17,6 +18,7 @@ export const FeederDetailModal: React.FC<FeederDetailModalProps> = ({
   poles,
   onClose,
 }) => {
+  const showCommune = useShowCommune()
   if (!isOpen || !feeder) return null
 
   // Lọc các cột đèn đang đấu nối vào mạch điện này
@@ -77,20 +79,22 @@ export const FeederDetailModal: React.FC<FeederDetailModalProps> = ({
             </div>
 
             {/* Địa bàn */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-1">
-              <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-blue-500" />
-                Địa Bàn Quản Lý:
-              </span>
-              <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                {formatFriendlyCommuneName(feeder.commune_name, feeder.commune_id, 'Chưa gán địa bàn')}
-              </p>
-              {feeder.commune_id && feeder.commune_name && (
-                <span className="inline-block font-mono text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded">
-                  Mã địa bàn: {feeder.commune_id}
+            {showCommune && (
+              <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-1">
+                <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                  Địa Bàn Quản Lý:
                 </span>
-              )}
-            </div>
+                <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  {formatFriendlyCommuneName(feeder.commune_name, feeder.commune_id, 'Chưa gán địa bàn')}
+                </p>
+                {feeder.commune_id && feeder.commune_name && (
+                  <span className="inline-block font-mono text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded">
+                    Mã địa bàn: {feeder.commune_id}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Số lượng cột đèn */}
             <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-1">

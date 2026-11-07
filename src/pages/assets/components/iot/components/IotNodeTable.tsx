@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 import { RowActions } from '../../common/RowActions'
 import {
@@ -37,6 +38,7 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
   onSetRelay,
   onIssueCredential,
 }) => {
+  const showCommune = useShowCommune()
   const getCabinetName = (cabinetId: string | null) => {
     if (!cabinetId) return 'Chưa gán tủ'
     const cab = cabinets.find((c) => c.cabinet_id === cabinetId)
@@ -84,7 +86,7 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
             <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold select-none uppercase tracking-wider text-[11px]">
               <th className="py-3 px-4">Mã Thiết Bị</th>
               <th className="py-3 px-4">Tủ Điện Cấp Nguồn</th>
-              <th className="py-3 px-4">Địa bàn</th>
+              {showCommune && <th className="py-3 px-4">Địa bàn</th>}
               <th className="py-3 px-4 text-center">Nguồn Dữ Liệu</th>
               <th className="py-3 px-4 text-center">Điều Khiển Từ Xa</th>
               <th className="py-3 px-4 text-center">Xác Thực (Secret)</th>
@@ -139,12 +141,14 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
                     </td>
 
                     {/* Địa bàn */}
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                      {formatFriendlyCommuneName(
-                        cabinets.find((c) => c.cabinet_id === node.cabinet_id)?.commune_name,
-                        node.commune_id
-                      )}
-                    </td>
+                    {showCommune && (
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                        {formatFriendlyCommuneName(
+                          cabinets.find((c) => c.cabinet_id === node.cabinet_id)?.commune_name,
+                          node.commune_id
+                        )}
+                      </td>
+                    )}
 
                     {/* Nguồn Dữ Liệu */}
                     <td className="py-3.5 px-4 text-center">

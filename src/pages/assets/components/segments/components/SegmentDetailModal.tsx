@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React, { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
@@ -18,6 +19,7 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
   segment,
   onClose,
 }) => {
+  const showCommune = useShowCommune()
   const allPoles = useSelector((state: RootState) => state.assets.poles)
 
   const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
@@ -122,13 +124,15 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
 
           {/* Details */}
           <div className="p-4 bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl space-y-2.5">
-            <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
-              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
-                <span>Địa bàn quản lý:</span>
-              </span>
-              <strong className="text-slate-800 dark:text-slate-200">{formatFriendlyCommuneName(segment.commune_name, segment.commune_id, 'Chưa gán địa bàn')}</strong>
-            </div>
+            {showCommune && (
+              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                  <span>Địa bàn quản lý:</span>
+                </span>
+                <strong className="text-slate-800 dark:text-slate-200">{formatFriendlyCommuneName(segment.commune_name, segment.commune_id, 'Chưa gán địa bàn')}</strong>
+              </div>
+            )}
 
             <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
               <span className="text-slate-500 dark:text-slate-400">Mật độ cột trung bình:</span>

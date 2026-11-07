@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 import {
   X,
@@ -35,6 +36,7 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
   onSetRelay,
   onIssueCredential,
 }) => {
+  const showCommune = useShowCommune()
   if (!isOpen || !node) return null
 
   const selectedCabinet = cabinets.find((c) => c.cabinet_id === node.cabinet_id)
@@ -108,20 +110,22 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
             </div>
 
             {/* Địa bàn */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
-              <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
-                <MapPin className="w-4 h-4 text-blue-500" />
-                <span>Khu Vực Quản Lý</span>
-              </div>
-              <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                {formatFriendlyCommuneName(selectedCabinet?.commune_name, node.commune_id, 'Chưa gán địa bàn')}
-              </div>
-              {false && (
-                <div className="text-[11px] font-mono text-slate-400">
-                  Mã địa bàn: {node?.commune_id}
+            {showCommune && (
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
+                  <MapPin className="w-4 h-4 text-blue-500" />
+                  <span>Khu Vực Quản Lý</span>
                 </div>
-              )}
-            </div>
+                <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                  {formatFriendlyCommuneName(selectedCabinet?.commune_name, node.commune_id, 'Chưa gán địa bàn')}
+                </div>
+                {false && (
+                  <div className="text-[11px] font-mono text-slate-400">
+                    Mã địa bàn: {node?.commune_id}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Nguồn dữ liệu & Điều khiển */}
             <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
