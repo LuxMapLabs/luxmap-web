@@ -1,0 +1,41 @@
+# CI for pull requests into dev: typecheck, lint, test, build. No deploy key and no upload — this never touches the VPS.
+name: CI
+
+on:
+  pull_request:
+    branches: [dev]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        env:
+          VITE_API_URL: /api/v1
+        run: npm run build
