@@ -25,7 +25,6 @@ import { useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../../../redux/store'
 import { fetchPoleDetailRequest, clearPoleDetail } from '../../../feature/map/mapSlice'
 import { previewLightingRequest, openHistoryModal } from '../../../feature/lighting/lightingSlice'
-import { StatusBadge } from '../../../components/StatusBadge'
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
 
@@ -495,14 +494,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         <span className="text-slate-800 dark:text-slate-200">
                           {poleDetail?.fixture?.install_date || selectedPole.properties.install_date || '—'}
                         </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Trạng thái bảo hành:</span>
-                        <StatusBadge
-                          type="warranty"
-                          status={poleDetail?.fixture?.warranty_status || selectedPole.properties.warranty_status || 'unknown'}
-                          size="sm"
-                        />
                       </div>
                       <div className="flex justify-between">
                         <span>Hạn bảo hành:</span>

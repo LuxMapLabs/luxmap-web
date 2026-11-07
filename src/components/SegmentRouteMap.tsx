@@ -822,6 +822,13 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     })
     mapRef.current = map
 
+    // Chế độ chỉ xem: chỉ cho cuộn-zoom sau khi bấm vào bản đồ, để cuộn hộp thoại không bị bản đồ chiếm
+    if (!editable) {
+      map.scrollZoom.disable()
+      map.on('click', () => map.scrollZoom.enable())
+      map.on('mouseout', () => map.scrollZoom.disable())
+    }
+
     map.on('load', () => {
       // 0. Apply bounds limits & add commune bbox boundary layer
       const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
