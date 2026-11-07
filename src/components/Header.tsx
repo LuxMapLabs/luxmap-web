@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isFirmwareAdmin = location.pathname.startsWith('/admin/firmware')
   const isSettingsAdmin = location.pathname.startsWith('/admin/settings')
   const isAdminDashboard = location.pathname === '/admin/dashboard' || location.pathname === '/admin'
-  const isUsersAdmin = location.pathname === '/admin/system' || location.pathname.startsWith('/admin/users')
+  const isUsersAdmin = location.pathname.startsWith('/admin/users')
   const isAdminPath = location.pathname.startsWith('/admin')
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)

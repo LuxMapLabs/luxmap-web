@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isReports = location.pathname.startsWith('/reports')
   const isCitizenReports = location.pathname.startsWith('/citizen-reports')
   const isDashboardAdmin = location.pathname === '/admin/dashboard' || location.pathname === '/admin'
-  const isUsersAdmin = location.pathname === '/admin/system' || location.pathname.startsWith('/admin/users')
+  const isUsersAdmin = location.pathname.startsWith('/admin/users')
   const isCommunesAdmin = location.pathname.startsWith('/admin/communes')
   const isFirmwareAdmin = location.pathname.startsWith('/admin/firmware')
   const isSettingsAdmin = location.pathname.startsWith('/admin/settings')
@@ -70,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={`h-screen bg-white/95 backdrop-blur-xl border-r border-slate-200/80 flex flex-col shrink-0 select-none z-40 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[1px_0_3px_rgba(0,0,0,0.02)] ${
-        isCollapsed ? 'w-18' : 'w-max'
+        isCollapsed ? 'w-18' : 'w-60'
       } ${className}`}
     >
       {/* 1. Header / Logo Area */}
@@ -119,9 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Tổng quan</span>
             )}
-            {!isCollapsed && isDashboard && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -146,9 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Bản đồ GIS</span>
             )}
-            {!isCollapsed && isGisMap && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -173,9 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Lịch làm việc</span>
             )}
-            {!isCollapsed && isWorkSchedule && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -200,9 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Quản lý tài sản</span>
             )}
-            {!isCollapsed && isAssets && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -227,9 +219,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Báo cáo & Nghiệm thu</span>
             )}
-            {!isCollapsed && isReports && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -265,9 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {pendingCount}
               </span>
             )}
-            {!isCollapsed && isCitizenReports && pendingCount === 0 && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -292,16 +280,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Tổng quan hệ thống</span>
             )}
-            {!isCollapsed && isDashboardAdmin && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
         {/* Tab 5: Quản lý người dùng (Dành cho Admin) */}
         {showAdmin && (
           <NavLink
-            to="/admin/system"
+            to="/admin/users"
             title="Quản lý tài khoản"
             className={`flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
               isCollapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
@@ -319,9 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Quản lý tài khoản</span>
             )}
-            {!isCollapsed && isUsersAdmin && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -346,9 +330,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Địa bàn & Khung BBox</span>
             )}
-            {!isCollapsed && isCommunesAdmin && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -373,9 +355,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Firmware & AI</span>
             )}
-            {!isCollapsed && isFirmwareAdmin && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
 
@@ -400,9 +380,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <span className="flex-1 tracking-tight whitespace-nowrap">Cấu hình hệ thống</span>
             )}
-            {!isCollapsed && isSettingsAdmin && (
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-            )}
+
           </NavLink>
         )}
       </nav>

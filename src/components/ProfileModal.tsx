@@ -276,14 +276,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
             </>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-1.5 px-4 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Chỉnh sửa hồ sơ
-              </button>
+              {onSave && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center gap-1.5 px-4 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Chỉnh sửa hồ sơ
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}

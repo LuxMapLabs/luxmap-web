@@ -18,7 +18,7 @@
 - **Public:** `/login`, `/r/:code` & `/report` (Quét QR người dân), `/forbidden`.
 - **Manager (`MaintenanceEngineer`):** `/dashboard`, `/gis-map`, `/work-schedule`, `/assets`, `/citizen-reports`.
 - **Superior (`ManagementAgency`):** `/reports`, `/gis-map`.
-- **Admin (`Admin`):** `/admin/dashboard`, `/admin/system`, `/admin/communes`, `/admin/firmware`, `/admin/settings`.
+- **Admin (`Admin`):** `/admin/dashboard`, `/admin/users`, `/admin/communes`, `/admin/firmware`, `/admin/settings`.
 
 ---
 

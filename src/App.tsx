@@ -132,7 +132,8 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={[UserRole.Admin]} />}>
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="/admin/system" element={<AdminManagementPage />} />
+              <Route path="/admin/users" element={<AdminManagementPage />} />
+              <Route path="/admin/system" element={<Navigate to="/admin/users" replace />} />
               <Route path="/admin/communes" element={<CommunesManagementPage />} />
               <Route path="/admin/firmware" element={<FirmwareManagementPage />} />
               <Route path="/admin/settings" element={<SystemSettingsPage />} />
