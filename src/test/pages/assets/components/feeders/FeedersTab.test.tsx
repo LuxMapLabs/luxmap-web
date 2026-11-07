@@ -12,6 +12,9 @@ import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 
+
+vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
+
 describe('FeedersTab & Feeder Components Integration Tests', () => {
   const mockCabinets: CabinetListItem[] = [
     {
@@ -115,7 +118,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
     // Thanh tìm kiếm và nút bấm chuẩn đồng bộ
     expect(screen.getByPlaceholderText(/Tìm theo mã lộ, tên mạch, tên tủ, địa bàn/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Import Dữ Liệu/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Thêm Mạch Điện Mới/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Thêm mạch điện/i })).toBeInTheDocument()
 
     // Bảng dữ liệu
     expect(screen.getByText('FDR-CAB-TL8-A')).toBeInTheDocument()
@@ -159,7 +162,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
       />
     )
 
-    const addBtn = screen.getByRole('button', { name: /Thêm Mạch Điện Mới/i })
+    const addBtn = screen.getByRole('button', { name: /Thêm mạch điện/i })
     fireEvent.click(addBtn)
 
     expect(screen.getByText('Thêm Mạch Điện Chiếu Sáng')).toBeInTheDocument()

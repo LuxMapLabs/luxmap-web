@@ -13,6 +13,9 @@ import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CreateFixtureRequest } from '../../../../../types/assets/fixtures'
 
+
+vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
+
 describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Tests', () => {
   const mockPoles: PoleListItem[] = [
     {

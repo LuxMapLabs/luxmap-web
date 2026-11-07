@@ -6,6 +6,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import citizenReportsReducer, {
   fetchReportsRequest,
 } from '../../../feature/citizen-reports/citizenReportsSlice'
+import authReducer from '../../../feature/auth/authSlice'
 import assetReducer, { fetchAssetsRequest } from '../../../feature/assets/assetSlice'
 import { CitizenReviewPage } from '../../../pages/citizen-review/CitizenReviewPage'
 import type {
@@ -187,6 +188,7 @@ describe('CitizenReviewPage Component Integration Tests (UI & Review Workflow)',
 
     return configureStore({
       reducer: {
+        auth: authReducer,
         citizenReports: customCitizenReportsReducer,
         assets: customAssetReducer,
       },
