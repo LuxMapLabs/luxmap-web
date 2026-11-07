@@ -29,6 +29,9 @@ import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { ImportResult } from '../../../../../types/assets/import'
 
 
+vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
+
+
 // Mock maplibre-gl for jsdom headless testing
 vi.mock('maplibre-gl', () => {
   class MockMarker {
@@ -236,14 +239,14 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       expect(screen.getByText('Mã định danh (ID):')).toBeInTheDocument()
 
       // BẢO ĐẢM KỶ LUẬT TASK 2: Nút "Chỉnh Sửa" đã bị loại bỏ khỏi Footer
-      expect(screen.queryByRole('button', { name: /Chỉnh sửa/i })).toBeNull()
+      expect(screen.queryByRole('button', { name: /^Chỉnh sửa$/i })).toBeNull()
       expect(screen.getByRole('button', { name: /Đóng/i })).toBeInTheDocument()
     })
 
     it('mở modal sửa tủ điện và cập nhật thông tin thành công', () => {
       render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
-      const editButtons = screen.getAllByRole('button', { name: /^Sửa$/i })
+      const editButtons = screen.getAllByRole('button', { name: /^Chỉnh sửa tủ điện$/i })
       expect(editButtons.length).toBeGreaterThan(0)
       fireEvent.click(editButtons[0])
 

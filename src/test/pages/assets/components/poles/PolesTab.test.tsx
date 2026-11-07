@@ -19,6 +19,10 @@ import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { FixtureStatus } from '../../../../../types/common/enums'
 import { validateImportRow, type ValidationContext } from '../../../../../validations/assetImport.schema'
 
+
+const showCommuneMock = vi.hoisted(() => ({ value: false }))
+vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => showCommuneMock.value }))
+
 describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
   // 100% Mock Data chuẩn DTO từ src/types/
   const mockCabinet: CabinetListItem = {
@@ -518,6 +522,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
         commune_name: null,
       }
 
+      showCommuneMock.value = true
       render(
         <PoleTable
           poles={[poleWithCommuneName, poleFallbackId]}
@@ -533,6 +538,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       expect(screen.getByText('Xã Tân An Hội')).toBeInTheDocument()
       // Cột 2 chưa có commune_name -> formatFriendlyCommuneName tự động map COM-005 sang "Xã Phú Hòa Đông"
       expect(screen.getByText('COM-005')).toBeInTheDocument()
+      showCommuneMock.value = false
     })
     it('bấm nút xóa trên PoleTable sẽ hiển thị ConfirmDeleteAssetModal và gọi onDeletePole khi xác nhận', () => {
       const store = configureStore({ reducer: rootReducer })
