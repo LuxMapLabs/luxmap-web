@@ -175,10 +175,10 @@ export const CitizenReviewTable: React.FC<CitizenReviewTableProps> = ({
   return (
     <div className="space-y-3">
       {/* Container Bảng Dữ Liệu */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
+      <div className="ops-rise bg-white dark:bg-slate-900 border border-[#e2e8f0] dark:border-slate-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-850/80 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10.5px]">
+            <thead className="bg-[#f8fafc] dark:bg-slate-850/80 border-b border-[#e2e8f0] dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10.5px]">
               <tr>
                 <th className="py-3 px-3.5">Thời gian & Đêm</th>
                 <th className="py-3 px-3.5">Cột đèn & Vị trí</th>

@@ -253,7 +253,7 @@ export const CitizenReviewPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-5 p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="space-y-4 sm:space-y-5 px-1 pb-4">
       {/* Bộ lọc tác nghiệp Toolbar dạng Dropdown trên 1 hàng */}
       <CitizenReviewFilters
         statusFilter={statusFilter}
