@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
 import {
-  X,
   CheckCircle2,
   Edit3,
   MapPin,
   Zap,
-  AlertCircle,
 } from 'lucide-react'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
 import type { FeatureCollection, Feature } from 'geojson'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { PoleListItem } from '../../../../../types/assets/poles'
@@ -369,50 +367,20 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
     onClose()
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+  return (
+    <AssetModalFrame widthClass="max-w-5xl">
+      <AssetModalHeader
+        icon={<Edit3 className="w-5 h-5" />}
+        accent="blue"
+        title={`Chỉnh Sửa Cột Đèn: ${pole.external_ref || pole.pole_id}`}
+        subtitle="Hiệu chỉnh thông số kỹ thuật và định vị lại tọa độ chính xác trên bản đồ số"
+        onClose={onClose}
       />
 
-      {/* Modal Dialog (Max-w-5xl, 2 columns Web GIS) */}
-      <div className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95">
-        {/* Header */}
-        <div className="p-4 sm:px-6 sm:py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-900 dark:bg-slate-950 text-white shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center font-bold">
-              <Edit3 className="w-5 h-5 text-amber-300" />
-            </div>
-            <div>
-              <h3 className="font-bold text-white text-sm sm:text-base">
-                Chỉnh Sửa Cột Đèn: {pole.external_ref || pole.pole_id}
-              </h3>
-              <p className="text-[11px] text-slate-300 dark:text-slate-400">
-                Hiệu chỉnh thông số kỹ thuật và định vị lại tọa độ chính xác trên bản đồ số
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+      <AssetModalError message={errorMsg} />
 
-        {/* Error Notification */}
-        {errorMsg && (
-          <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* Body Form Layout 2 Cột */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {/* Body Form Layout 2 Cột */}
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="grid grid-cols-1 md:grid-cols-12 flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
             {/* CỘT TRÁI: FORM THÔNG SỐ (42% width trên md) */}
             <div className="md:col-span-5 p-4 sm:p-5 space-y-4 border-b md:border-b-0 md:border-r border-slate-100 dark:border-slate-800 overflow-y-auto text-xs">
@@ -625,27 +593,13 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
             />
           </div>
 
-          {/* Footer Actions */}
-          <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer shadow-2xs"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Lưu Thay Đổi</span>
-            </button>
-          </div>
+          <AssetModalFooter
+            onCancel={onClose}
+            submitLabel="Lưu Thay Đổi"
+            submitIcon={<CheckCircle2 className="w-4 h-4" />}
+          />
         </form>
-      </div>
-    </div>,
-    document.body
+    </AssetModalFrame>
   )
 }
 

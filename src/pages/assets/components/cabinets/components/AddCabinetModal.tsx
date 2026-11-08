@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import {
-  X,
   Zap,
   CheckCircle2,
   Trash2,
   Route,
-  AlertCircle,
   PlusCircle,
   Cpu,
   MapPin,
   HelpCircle,
 } from 'lucide-react'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
 import { AddCabinetMap } from './AddCabinetMap'
 import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
 import { fetchMapLayersRequest } from '../../../../../feature/map/mapSlice'
@@ -300,44 +298,20 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
 
   if (!isOpen) return null
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-xs animate-in fade-in select-none">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-purple-100 dark:border-purple-900/40 w-full max-w-6xl max-h-[94vh] flex flex-col overflow-hidden animate-in zoom-in-95">
-        
-        {/* Header Modal */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-[#2e1065] via-[#4c1d95] to-[#581c87] text-white flex items-center justify-between shadow-md shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
-              <Cpu className="w-5 h-5 text-amber-300" />
-            </div>
-            <div>
-              <h3 className="font-bold text-white text-base">
-                Khai Báo Danh Sách Tủ Điện Điều Khiển Tuyến
-              </h3>
-              <p className="text-xs text-purple-200 mt-0.5">
-                Thiết lập vị trí tọa độ GIS trực quan và thông tin tủ điện trên tuyến đường
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 cursor-pointer transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  return (
+    <AssetModalFrame widthClass="max-w-6xl">
+      <AssetModalHeader
+        icon={<Cpu className="w-5 h-5" />}
+        accent="purple"
+        title="Khai Báo Danh Sách Tủ Điện Điều Khiển Tuyến"
+        subtitle="Thiết lập vị trí tọa độ GIS trực quan và thông tin tủ điện trên tuyến đường"
+        onClose={onClose}
+      />
 
-        {/* Global Error Banner */}
-        {errorMsg ? (
-          <div className="px-5 py-2.5 bg-rose-50 dark:bg-rose-950/60 border-b border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-2 shrink-0 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-            <span>{errorMsg}</span>
-          </div>
-        ) : null}
+      <AssetModalError message={errorMsg} />
 
-        {/* Modal 2-Column Split Body */}
-        <form onSubmit={handleFinalSubmit} className="flex-1 overflow-hidden flex flex-col">
+      {/* Modal 2-Column Split Body */}
+      <form onSubmit={handleFinalSubmit} className="flex-1 min-h-0 flex flex-col">
           <div className="p-4 sm:p-5 overflow-y-auto flex-1 text-xs text-slate-800 dark:text-slate-200 grid grid-cols-1 lg:grid-cols-12 gap-5">
             {/* Left Column (6/12 cols): Route setup & Cabinets list */}
             <div className="lg:col-span-6 flex flex-col space-y-4">
@@ -520,31 +494,13 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
             </div>
           </div>
 
-          {/* Modal Footer */}
-          <div className="p-4 border-t border-purple-100 dark:border-purple-950/80 bg-purple-50/40 dark:bg-purple-950/20 backdrop-blur-xs flex items-center justify-end gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer shadow-2xs"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              disabled={rows.length === 0}
-              className={`px-6 py-2.5 font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-2 ${
-                rows.length > 0
-                  ? 'bg-gradient-to-r from-purple-700 to-indigo-700 text-white cursor-pointer hover:from-purple-800 hover:to-indigo-800 shadow-purple-500/20'
-                  : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Lưu Danh Sách Tủ ({rows.length})</span>
-            </button>
-          </div>
+          <AssetModalFooter
+            onCancel={onClose}
+            submitLabel={`Lưu Danh Sách Tủ (${rows.length})`}
+            submitIcon={<CheckCircle2 className="w-4 h-4" />}
+            disabled={rows.length === 0}
+          />
         </form>
-      </div>
-    </div>,
-    document.body
+    </AssetModalFrame>
   )
 }

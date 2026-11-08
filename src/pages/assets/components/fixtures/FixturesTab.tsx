@@ -233,10 +233,6 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
         poles={poles}
         segments={segments}
         onClose={() => setViewingFixture(null)}
-        onEdit={(f) => {
-          setViewingFixture(null)
-          setEditingFixture(f)
-        }}
       />
 
       <AddFixtureModal
