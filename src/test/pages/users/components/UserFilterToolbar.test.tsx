@@ -40,13 +40,15 @@ describe('UserFilterToolbar & Admin Page Data Flow (src/test/pages/users/)', () 
       expect(screen.getByRole('button', { name: /Thêm người dùng/i })).toBeInTheDocument()
     })
 
-    it('áp dụng class responsive mới max-w-full md:max-w-2xl cho search container', () => {
-      const { container } = render(<UserFilterToolbar {...defaultProps} />)
+    it('hiển thị từ khóa hiện tại trong ô tìm kiếm', () => {
+      // Arrange
+      render(<UserFilterToolbar {...defaultProps} searchTerm="engineer_01" />)
 
-      const searchContainer = container.querySelector('.relative.flex-1')
-      expect(searchContainer).not.toBeNull()
-      expect(searchContainer).toHaveClass('max-w-full')
-      expect(searchContainer).toHaveClass('md:max-w-2xl')
+      // Act
+      const searchInput = screen.getByPlaceholderText<HTMLInputElement>('Tìm theo họ tên, tài khoản, email...')
+
+      // Assert
+      expect(searchInput).toHaveValue('engineer_01')
     })
 
     it('kích hoạt onSearchChange khi người dùng nhập từ khóa tìm kiếm', () => {
