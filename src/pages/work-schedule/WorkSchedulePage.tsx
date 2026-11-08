@@ -516,9 +516,9 @@ export const WorkSchedulePage: React.FC = () => {
   }
 
   return (
-    <div className="h-full w-full overflow-y-auto custom-scrollbar bg-slate-50 select-none">
+    <div className="h-full w-full overflow-y-auto custom-scrollbar bg-transparent select-none">
       {/* Vùng nội dung toàn trang: Tự do giãn nở và cuộn mượt mà */}
-      <div className="p-4 sm:p-6 flex flex-col gap-4 pb-24">
+      <div className="px-1 pb-4 flex flex-col gap-4">
         {/* Filter Bar */}
         <div className="shrink-0">
           <ScheduleFilterBar
