@@ -17,6 +17,7 @@ export const DefaultLayout: React.FC = () => {
     dispatch(logout())
   }
 
+  const isAdminUser = isAdmin(user?.role)
   const roleTitle = getRoleName(user?.role)
   const displayName = user?.full_name || user?.username || 'Người dùng'
   const initials = displayName
@@ -31,11 +32,15 @@ export const DefaultLayout: React.FC = () => {
     : 'U'
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-slate-50 font-sans antialiased text-slate-900">
+    <div
+      className={`h-screen w-screen flex overflow-hidden font-sans antialiased text-slate-900 ${
+        isAdminUser ? 'admin-shell' : 'bg-slate-50'
+      }`}
+    >
       {/* 1. Left Vertical Navigation Sidebar (With Logo & Main Tabs) */}
       <Sidebar
         user={user}
-        isAdminUser={isAdmin(user?.role)}
+        isAdminUser={isAdminUser}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
       />
@@ -47,7 +52,7 @@ export const DefaultLayout: React.FC = () => {
           userName={displayName}
           userRoleTitle={roleTitle}
           userInitials={initials}
-          isAdminUser={isAdmin(user?.role)}
+          isAdminUser={isAdminUser}
           onLogout={handleLogout}
         />
 
