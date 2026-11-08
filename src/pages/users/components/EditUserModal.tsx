@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
 import { X, Save, Shield, Mail, User, MapPin, Globe } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
@@ -100,13 +101,13 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     ? selectedCommuneObj.name || selectedCommuneObj.commune_id || '-'
     : ''
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white/80 backdrop-blur-2xl dark:bg-slate-900 rounded-[28px] border border-white/80 dark:border-slate-800 shadow-2xl shadow-primary/30 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/50">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white/50 dark:bg-slate-950/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-2xs">
+            <div className="w-10 h-10 rounded-2xl bg-secondary/10 dark:bg-primary text-primary dark:text-secondary flex items-center justify-center shadow-2xs">
               <User className="w-5 h-5" />
             </div>
             <div>
@@ -151,10 +152,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Ví dụ: Nguyễn Văn A"
-              className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
+              className={`w-full px-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
                 errors.fullName
                   ? 'border-rose-500 focus:ring-rose-500/20'
-                  : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500/20 focus:border-indigo-500'
+                  : 'border-slate-200 dark:border-slate-700 focus:ring-secondary focus:border-secondary'
               }`}
             />
             {errors.fullName ? (
@@ -174,10 +175,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="nguyenvana@gmail.com"
-                className={`w-full pl-9 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
+                className={`w-full pl-9 pr-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
                   errors.email
                     ? 'border-rose-500 focus:ring-rose-500/20'
-                    : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500/20 focus:border-indigo-500'
+                    : 'border-slate-200 dark:border-slate-700 focus:ring-secondary focus:border-secondary'
                 }`}
               />
             </div>
@@ -196,7 +197,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               <select
                 value={role}
                 onChange={(e) => handleRoleChange(e.target.value as UserRole)}
-                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition cursor-pointer"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition cursor-pointer"
               >
                 {Object.entries(USER_ROLE_LABELS).map(([k, label]) => (
                   <option key={k} value={k} className="dark:bg-slate-900">
@@ -209,15 +210,15 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
           {/* Commune Scope */}
           {role === 'system_admin' ? (
-            <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 shrink-0">
+            <div className="p-3.5 bg-secondary/10 dark:bg-primary border border-secondary/30 dark:border-primary rounded-2xl flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-secondary/20 dark:bg-primary text-primary dark:text-secondary shrink-0">
                 <Globe className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                <div className="text-xs font-bold text-primary dark:text-secondary/30 flex items-center gap-1.5">
                   <span>Phạm vi toàn hệ thống (System-wide Scope)</span>
                 </div>
-                <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80 mt-0.5 leading-relaxed">
+                <p className="text-[11px] text-primary dark:text-secondary/50 mt-0.5 leading-relaxed">
                   Vai trò Quản trị hệ thống tự động có quyền bao quát toàn bộ địa bàn và mọi trạm đèn trên toàn hệ thống. Không cần và không phân bổ địa bàn riêng lẻ.
                 </p>
               </div>
@@ -231,7 +232,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                   <span className="text-rose-500">*</span>
                 </label>
                 {selectedCommuneLabel ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold border border-indigo-200/80 dark:border-indigo-800 max-w-[180px] truncate">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary/10 dark:bg-primary text-primary dark:text-secondary/50 text-[10px] font-semibold border border-secondary/30 dark:border-primary max-w-[180px] truncate">
                     {selectedCommuneLabel}
                   </span>
                 ) : (
@@ -244,7 +245,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               <div
                 role="radiogroup"
                 aria-label="Phạm vi địa bàn quản lý"
-                className={`max-h-36 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-800/50 border rounded-xl grid grid-cols-2 gap-1.5 ${
+                className={`max-h-36 overflow-y-auto p-2 bg-white/50 dark:bg-slate-800/50 border rounded-xl grid grid-cols-2 gap-1.5 ${
                   errors.communes
                     ? 'border-rose-400 dark:border-rose-500'
                     : 'border-slate-200 dark:border-slate-700'
@@ -267,7 +268,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                         onClick={() => handleSelectCommune(code)}
                         className={`px-2.5 py-2 rounded-xl text-left flex items-center justify-between gap-2 transition cursor-pointer text-[11px] ${
                           isSelected
-                            ? 'bg-indigo-50/90 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-300 dark:border-indigo-700 shadow-2xs'
+                            ? 'bg-secondary/10 dark:bg-primary text-primary dark:text-secondary/50 font-semibold border border-secondary/50 dark:border-primary shadow-2xs'
                             : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/80'
                         }`}
                       >
@@ -275,7 +276,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                         <span
                           className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 transition ${
                             isSelected
-                              ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-600 dark:bg-indigo-500'
+                              ? 'border-primary dark:border-secondary bg-primary dark:bg-secondary'
                               : 'border-slate-300 dark:border-slate-600 bg-transparent'
                           }`}
                         >
@@ -307,7 +308,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl bg-primary hover:bg-primary active:scale-95 text-white font-bold shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
               {isSubmitting ? (
                 <>
@@ -324,6 +325,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

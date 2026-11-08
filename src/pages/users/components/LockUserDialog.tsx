@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, Lock, Unlock, X } from 'lucide-react'
 import type { UserAccountItem } from '../../../types/admin/users'
 
@@ -21,9 +22,9 @@ export const LockUserDialog: React.FC<LockUserDialogProps> = ({
 
   const isLocked = user.status === 'locked'
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-md overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white/80 backdrop-blur-2xl dark:bg-slate-900 rounded-[28px] border border-white/80 dark:border-slate-800 shadow-2xl shadow-primary/30 w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -72,7 +73,7 @@ export const LockUserDialog: React.FC<LockUserDialogProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-end gap-2.5">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 flex items-center justify-end gap-2.5">
           <button
             type="button"
             onClick={onClose}
@@ -110,6 +111,7 @@ export const LockUserDialog: React.FC<LockUserDialogProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
