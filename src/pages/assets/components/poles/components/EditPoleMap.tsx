@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers } from 'lucide-react'
+import { MapRecenterControl, CROSSHAIR_SVG } from '../../../../../utils/gis-map/MapRecenterControl'
 import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import type { FeatureCollection } from 'geojson'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
@@ -13,6 +15,8 @@ import {
   toLngLatBounds,
   toBboxPolygonGeoJSON,
   getCommuneBboxInfo,
+  isPointInBounds,
+  OUTSIDE_MANAGED_AREA_MESSAGE,
 } from '../../../../../utils/gis-map/mapUtils'
 import {
   resolveNonOverlappingRoutePoint,
@@ -51,6 +55,12 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   const communeBoundsInfo = useMemo(() => {
     return getCommuneBboxInfo(communeId, userCommunes, adminCommunes, mapBounds)
   }, [communeId, userCommunes, adminCommunes, mapBounds])
+  const activeBounds = useMemo(
+    () => communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox),
+    [communeBoundsInfo, mapBounds]
+  )
+  const activeBoundsRef = useRef(activeBounds)
+  activeBoundsRef.current = activeBounds
   const mapBoundsRef = useRef(mapBounds)
   mapBoundsRef.current = mapBounds
 
@@ -120,6 +130,18 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+    map.addControl(
+      new MapRecenterControl({
+        title: 'Về vị trí cột',
+        iconSvg: CROSSHAIR_SVG,
+        onClick: (m) => {
+          const marker = currentPoleMarkerRef.current
+          if (!marker) return
+          m.easeTo({ center: marker.getLngLat(), zoom: Math.max(m.getZoom(), 17), duration: 600 })
+        },
+      }),
+      'top-right'
+    )
 
     // Tự động resize bản đồ khi kích thước modal / container thay đổi
     let resizeObserver: ResizeObserver | null = null
@@ -157,9 +179,14 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
     currentPoleMarkerRef.current = marker
 
+    let lastValidPos = marker.getLngLat()
+    marker.on('dragstart', () => {
+      lastValidPos = marker.getLngLat()
+    })
     const handleMarkerDrag = () => {
       isUserInteractingRef.current = true
       const pos = marker.getLngLat()
+      if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) return
       if (segmentCoordsRef.current.length >= 2) {
         const snappedPoint = getSnappedSafeCoordRef.current(pos.lng, pos.lat)
         marker.setLngLat(snappedPoint)
@@ -176,10 +203,26 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     }
 
     marker.on('drag', handleMarkerDrag)
-    marker.on('dragend', handleMarkerDrag)
+    marker.on('dragend', () => {
+      const endPos = marker.getLngLat()
+      if (!isPointInBounds(activeBoundsRef.current, endPos.lng, endPos.lat)) {
+        marker.setLngLat(lastValidPos)
+        onChangeCoordsRef.current({
+          lng: Number(lastValidPos.lng.toFixed(6)),
+          lat: Number(lastValidPos.lat.toFixed(6)),
+        })
+        toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+        return
+      }
+      handleMarkerDrag()
+    })
 
     // Click bản đồ để dời vị trí ghim (bám tim đường & tránh đè cột)
     map.on('click', (e: maplibregl.MapMouseEvent) => {
+      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
+        toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+        return
+      }
       isUserInteractingRef.current = true
       if (segmentCoordsRef.current.length >= 2) {
         const snappedPoint = getSnappedSafeCoordRef.current(e.lngLat.lng, e.lngLat.lat)
@@ -298,16 +341,6 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         })
       }
 
-      // Áp dụng giới hạn Bbox và minZoom từ Backend
-      const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-      if (activeBounds) {
-        map.setMaxBounds(activeBounds)
-        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-          map.setMinZoom(camera.zoom)
-        }
-      }
-
       const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
       if (!map.getSource('commune-bbox-boundary')) {
         map.addSource('commune-bbox-boundary', {
@@ -370,15 +403,6 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-
-    const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-    if (activeBounds) {
-      map.setMaxBounds(activeBounds)
-      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-        map.setMinZoom(camera.zoom)
-      }
-    }
 
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
     if (source) {

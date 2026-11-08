@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { Layers, Crosshair, Eye, EyeOff } from 'lucide-react'
+import { Layers, Eye, EyeOff } from 'lucide-react'
+import { MapRecenterControl, CROSSHAIR_SVG } from '../../../../../utils/gis-map/MapRecenterControl'
 import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
@@ -14,6 +16,8 @@ import {
   toLngLatBounds,
   toBboxPolygonGeoJSON,
   getCommuneBboxInfo,
+  isPointInBounds,
+  OUTSIDE_MANAGED_AREA_MESSAGE,
 } from '../../../../../utils/gis-map/mapUtils'
 
 export interface EditCabinetMapProps {
@@ -53,6 +57,12 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   const communeBoundsInfo = useMemo(() => {
     return getCommuneBboxInfo(communeId, currentUser?.communes, adminCommunes, mapBounds)
   }, [communeId, currentUser, adminCommunes, mapBounds])
+  const activeBounds = useMemo(
+    () => communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox),
+    [communeBoundsInfo, mapBounds]
+  )
+  const activeBoundsRef = useRef(activeBounds)
+  activeBoundsRef.current = activeBounds
   const mapSegments = useSelector((state: RootState) => state.map.segments)
 
   // Tạo GeoJSON FeatureCollection chứa toàn bộ các tuyến đường trên GIS
@@ -114,6 +124,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   allRoutesGeoJsonRef.current = allRoutesGeoJson
   const segmentCoordsRef = useRef(segmentCoords)
   segmentCoordsRef.current = segmentCoords
+  const handleRecenterRef = useRef<() => void>(() => {})
   const onChangeCoordsRef = useRef(onChangeCoords)
   onChangeCoordsRef.current = onChangeCoords
 
@@ -171,6 +182,14 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+    map.addControl(
+      new MapRecenterControl({
+        title: 'Về vị trí tủ điện',
+        iconSvg: CROSSHAIR_SVG,
+        onClick: () => handleRecenterRef.current(),
+      }),
+      'top-right'
+    )
 
     let resizeObserver: ResizeObserver | null = null
     if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
@@ -223,7 +242,9 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       if (pinInner) pinInner.style.transform = 'scale(1)'
     })
 
+    let lastValidPos = marker.getLngLat()
     marker.on('dragstart', () => {
+      lastValidPos = marker.getLngLat()
       markerEl.style.cursor = 'grabbing'
       if (pinInner) {
         pinInner.style.transform = 'scale(1.2)'
@@ -234,6 +255,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     const handleMarkerDrag = () => {
       isUserInteractingRef.current = true
       const pos = marker.getLngLat()
+      if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) return
       onChangeCoordsRef.current({
         lng: Number(pos.lng.toFixed(6)),
         lat: Number(pos.lat.toFixed(6)),
@@ -247,11 +269,25 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
         pinInner.style.transform = 'scale(1)'
         pinInner.style.boxShadow = '0 0 0 2.5px #581c87, 0 4px 16px rgba(124, 58, 237, 0.85), 0 3px 8px rgba(0,0,0,0.5)'
       }
+      const endPos = marker.getLngLat()
+      if (!isPointInBounds(activeBoundsRef.current, endPos.lng, endPos.lat)) {
+        marker.setLngLat(lastValidPos)
+        onChangeCoordsRef.current({
+          lng: Number(lastValidPos.lng.toFixed(6)),
+          lat: Number(lastValidPos.lat.toFixed(6)),
+        })
+        toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+        return
+      }
       handleMarkerDrag()
     })
 
     // Sự kiện nhấp chuột (click) lên bản đồ để di chuyển tủ điện ngay lập tức
     map.on('click', (e: maplibregl.MapMouseEvent) => {
+      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
+        toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+        return
+      }
       isUserInteractingRef.current = true
       const clickedLng = Number(e.lngLat.lng.toFixed(6))
       const clickedLat = Number(e.lngLat.lat.toFixed(6))
@@ -266,15 +302,6 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     map.on('load', () => {
       if (!isMounted) return
-
-      const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-      if (activeBounds) {
-        map.setMaxBounds(activeBounds)
-        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-          map.setMinZoom(camera.zoom)
-        }
-      }
 
       const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
       if (!map.getSource('commune-bbox-boundary')) {
@@ -403,15 +430,6 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-
-    const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-    if (activeBounds) {
-      map.setMaxBounds(activeBounds)
-      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-        map.setMinZoom(camera.zoom)
-      }
-    }
 
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
     if (source) {
@@ -566,6 +584,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       }
     }
   }
+  handleRecenterRef.current = handleRecenter
 
   return (
     <div className="relative w-full h-full min-h-[360px] md:min-h-[460px] bg-slate-900 overflow-hidden rounded-2xl md:rounded-r-3xl md:rounded-l-none border border-slate-700/60 shadow-inner">
@@ -631,15 +650,6 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       </div>
 
       {/* Nút bấm quay về tâm vị trí tủ điện */}
-      <button
-        type="button"
-        onClick={handleRecenter}
-        title="Quay về vị trí tủ điện"
-        className="absolute bottom-4 right-4 z-10 p-2.5 bg-purple-700/90 hover:bg-purple-600 active:scale-95 text-white rounded-xl shadow-lg backdrop-blur-md border border-purple-400/40 cursor-pointer flex items-center gap-1.5 text-xs font-semibold transition"
-      >
-        <Crosshair className="w-4 h-4 text-amber-300 animate-pulse" />
-        <span className="hidden sm:inline">Về vị trí tủ</span>
-      </button>
     </div>
   )
 }

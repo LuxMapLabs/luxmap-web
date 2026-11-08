@@ -618,3 +618,19 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
     },
   ],
 }) as unknown as StyleSpecification
+
+export type LngLatBoundsTuple = [[number, number], [number, number]]
+
+/** Thông báo khi vị trí chọn nằm ngoài khu vực quản lý của xã. */
+export const OUTSIDE_MANAGED_AREA_MESSAGE = 'Vị trí nằm ngoài khu vực quản lý của xã'
+
+/** Điểm (lng, lat) có nằm trong khung bbox xã không. Không có khung (null) thì coi là hợp lệ. */
+export function isPointInBounds(
+  bounds: LngLatBoundsTuple | null | undefined,
+  lng: number,
+  lat: number
+): boolean {
+  if (!bounds) return true
+  const [[minLng, minLat], [maxLng, maxLat]] = bounds
+  return lng >= minLng && lng <= maxLng && lat >= minLat && lat <= maxLat
+}

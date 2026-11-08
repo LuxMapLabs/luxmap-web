@@ -7,12 +7,13 @@ import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
   MAP_MAX_ZOOM,
-  FIT_BOUNDS_ROUTE_INSTANT,
-  FIT_BOUNDS_ROUTE_SMOOTH,
   toLngLatBounds,
   toBboxPolygonGeoJSON,
   getCommuneBboxInfo,
+  isPointInBounds,
+  OUTSIDE_MANAGED_AREA_MESSAGE,
 } from '../utils/gis-map/mapUtils'
+import { toast } from 'sonner'
 import type { CommuneBbox } from '../types/admin/communes'
 import { projectPointOnSegment, calculateDistanceMeters } from '../utils/gis-map/routeUtils'
 import {
@@ -23,7 +24,13 @@ import {
   Undo2,
   PlusCircle,
   MousePointer,
+  LocateFixed,
 } from 'lucide-react'
+
+// Chừa lề phải/trên để nhãn ĐẦU/CUỐI TUYẾN không đè lên cột nút điều khiển bản đồ
+const ROUTE_FIT_PADDING = { top: 70, bottom: 50, left: 60, right: 90 }
+const ROUTE_FIT_SMOOTH = { padding: ROUTE_FIT_PADDING, maxZoom: 17, duration: 400 } as const
+const ROUTE_FIT_INSTANT = { padding: ROUTE_FIT_PADDING, maxZoom: 17, duration: 0 } as const
 
 export interface SegmentPoleItem {
   id: string
@@ -134,6 +141,13 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     }
     return getCommuneBboxInfo(communeId, userCommunes, adminCommunes, mapBounds)
   }, [communeBbox, communeId, userCommunes, adminCommunes, mapBounds])
+
+  const activeBounds = useMemo(
+    () => communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox),
+    [communeBoundsInfo, mapBounds]
+  )
+  const activeBoundsRef = useRef(activeBounds)
+  activeBoundsRef.current = activeBounds
 
   // Persistent reference to original DB route to protect from accidental deletion
   const initialDbRouteRef = useRef<[number, number][]>([])
@@ -375,6 +389,34 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
             const currentIdx = (marker as any)._vertexIndex
             if (typeof currentIdx !== 'number') return
             const pos = marker.getLngLat()
+            if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) {
+              const snap = dragStartSnapshotRef.current
+              if (snap) {
+                currentCoordsRef.current = [...snap.coords]
+                marker.setLngLat(snap.coords[currentIdx])
+                if (currentIdx === 0 && startMarkerRef.current) {
+                  startMarkerRef.current.setLngLat(snap.coords[0])
+                }
+                if (currentIdx === snap.coords.length - 1 && endMarkerRef.current) {
+                  endMarkerRef.current.setLngLat(snap.coords[currentIdx])
+                }
+                const lineSrc = map.getSource('route-line') as maplibregl.GeoJSONSource | undefined
+                lineSrc?.setData({
+                  type: 'Feature',
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: snap.coords.length >= 2 ? snap.coords : [],
+                  },
+                  properties: {},
+                })
+              }
+              dragStartSnapshotRef.current = null
+              toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+              setTimeout(() => {
+                isDraggingRef.current = false
+              }, 120)
+              return
+            }
             const movedPt: [number, number] = [roundCoord(pos.lng), roundCoord(pos.lat)]
             const current = [...currentCoordsRef.current]
             current[currentIdx] = movedPt
@@ -609,6 +651,16 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
             isDraggingRef.current = false
             startEl.style.cursor = 'move'
             const pos = marker.getLngLat()
+            if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) {
+              const snap = dragStartSnapshotRef.current
+              if (snap) {
+                if (snap.start) marker.setLngLat(snap.start)
+                updateRouteLineSource(snap.coords)
+              }
+              dragStartSnapshotRef.current = null
+              toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+              return
+            }
             const { pt, updated } = computeStartUpdate(pos.lng, pos.lat)
             marker.setLngLat(pt)
             updateRouteLineSource(updated)
@@ -728,6 +780,16 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
             isDraggingRef.current = false
             endEl.style.cursor = 'move'
             const pos = marker.getLngLat()
+            if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) {
+              const snap = dragStartSnapshotRef.current
+              if (snap) {
+                if (snap.end) marker.setLngLat(snap.end)
+                updateRouteLineSource(snap.coords)
+              }
+              dragStartSnapshotRef.current = null
+              toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+              return
+            }
             const { pt, updated } = computeEndUpdate(pos.lng, pos.lat)
             marker.setLngLat(pt)
             updateRouteLineSource(updated)
@@ -832,13 +894,6 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     map.on('load', () => {
       // 0. Apply bounds limits & add commune bbox boundary layer
       const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-      if (activeBounds) {
-        map.setMaxBounds(activeBounds)
-        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-          map.setMinZoom(camera.zoom)
-        }
-      }
 
       const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
       if (!map.getSource('commune-bbox-boundary')) {
@@ -1058,6 +1113,10 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
           if (isDraggingRef.current) return
           const mode = editModeRef.current
           if (mode === 'view') return
+          if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
+            toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+            return
+          }
 
           const clickPt: [number, number] = [roundCoord(e.lngLat.lng), roundCoord(e.lngLat.lat)]
           const current = [...currentCoordsRef.current]
@@ -1148,7 +1207,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       // Fit bounds nicely if coords exist
       const b = getBounds()
       if (b) {
-        map.fitBounds(b, FIT_BOUNDS_ROUTE_SMOOTH)
+        map.fitBounds(b, ROUTE_FIT_SMOOTH)
       }
 
       setTimeout(() => {
@@ -1163,7 +1222,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       map.resize()
       const b = getBounds()
       if (b) {
-        map.fitBounds(b, FIT_BOUNDS_ROUTE_INSTANT)
+        map.fitBounds(b, ROUTE_FIT_INSTANT)
       }
     }, 220)
 
@@ -1204,13 +1263,6 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     if (!map) return
 
     const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-    if (activeBounds) {
-      map.setMaxBounds(activeBounds)
-      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-        map.setMinZoom(camera.zoom)
-      }
-    }
 
     // Update boundary polygon source
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
@@ -1296,7 +1348,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     const bounds = getBounds()
     if (mapRef.current) {
       if (bounds) {
-        mapRef.current.fitBounds(bounds, FIT_BOUNDS_ROUTE_SMOOTH)
+        mapRef.current.fitBounds(bounds, ROUTE_FIT_SMOOTH)
       } else if (communeBoundsInfo.bounds) {
         mapRef.current.fitBounds(communeBoundsInfo.bounds, { padding: 40, duration: 600 })
       } else if (mapBounds?.bbox) {
@@ -1399,7 +1451,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
 
     const bounds = getBounds(targetRoute)
     if (mapRef.current && bounds) {
-      mapRef.current.fitBounds(bounds, FIT_BOUNDS_ROUTE_SMOOTH)
+      mapRef.current.fitBounds(bounds, ROUTE_FIT_SMOOTH)
     }
   }
 
@@ -1507,7 +1559,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       )}
 
       {/* Floating Zoom & Fit Bounds Controls (Top Right) */}
-      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+      <div className="absolute top-2 right-2 z-50 flex flex-col gap-1">
         <button
           type="button"
           onClick={handleZoomIn}
@@ -1532,6 +1584,16 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
+        {hideTerminalPins && activeBounds && (
+          <button
+            type="button"
+            onClick={() => mapRef.current?.fitBounds(activeBounds, { padding: 40, duration: 800 })}
+            title="Về khu vực quản lý"
+            className="w-7 h-7 bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 backdrop-blur-md rounded-lg shadow-md border border-slate-200/80 dark:border-slate-600/80 flex items-center justify-center transition cursor-pointer"
+          >
+            <LocateFixed className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   )
