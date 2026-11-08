@@ -31,7 +31,7 @@ export const CommuneTable: React.FC<CommuneTableProps> = ({
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-8 text-center text-xs text-slate-400">
+      <div className="glass-tile p-8 text-center text-xs text-slate-400">
         <div className="flex flex-col items-center justify-center gap-2">
           <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
           <span>Đang tải danh sách địa bàn hành chính...</span>
@@ -42,7 +42,7 @@ export const CommuneTable: React.FC<CommuneTableProps> = ({
 
   if (communes.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-12 text-center text-xs text-slate-400 space-y-2">
+      <div className="glass-tile p-12 text-center text-xs text-slate-400 space-y-2">
         <Compass className="w-10 h-10 text-slate-300 mx-auto" />
         <p className="font-bold text-slate-600">Không tìm thấy địa bàn phù hợp</p>
         <p className="text-[11px] text-slate-400">Thử thay đổi từ khóa tìm kiếm hoặc thiết lập lại bộ lọc trạng thái BBox.</p>
@@ -51,7 +51,7 @@ export const CommuneTable: React.FC<CommuneTableProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden text-xs">
+    <div className="glass-tile overflow-hidden text-xs">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>

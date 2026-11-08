@@ -131,7 +131,7 @@ export const UserTable: React.FC<UserTableProps> = ({
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
+    <div className="glass-tile overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50/75 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200/80 dark:border-slate-800">
@@ -236,7 +236,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                         <button
                           type="button"
                           onClick={() => onEdit(user)}
-                          className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95"
+                          className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-secondary flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95"
                           title="Chỉnh sửa tài khoản"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
