@@ -1,93 +1,99 @@
 import React from 'react'
-import { AlertOctagon, RefreshCw, ArrowRight } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { JobStatusItem, StorageSummary } from '../../../types/admin/system'
 
 interface IncidentBannerProps {
   jobs: JobStatusItem[]
   storage?: StorageSummary
-  lockedUsersCount?: number
-  onRefresh: () => void
-  isRefreshing: boolean
+  onSelectJob?: (job: JobStatusItem) => void
 }
 
-export const IncidentBanner: React.FC<IncidentBannerProps> = ({
-  jobs,
-  storage,
-  onRefresh,
-  isRefreshing,
-}) => {
-  const failingJobs = jobs.filter((j) => j.state === 'failing')
-  const stalledJobs = jobs.filter((j) => j.state === 'stalled')
-  const isDiskLow = storage?.disk?.low ?? false
+interface AttentionItem {
+  key: string
+  tone: 'danger' | 'warning'
+  title: string
+  detail: string
+  to?: string
+  job?: JobStatusItem
+}
 
-  const totalIncidents = failingJobs.length + stalledJobs.length + (isDiskLow ? 1 : 0)
+export const IncidentBanner: React.FC<IncidentBannerProps> = ({ jobs, storage, onSelectJob }) => {
+  const items: AttentionItem[] = []
 
-  // Trường hợp có biến cố / sự cố
-  if (totalIncidents > 0) {
-    return (
-      <div className="p-5 rounded-3xl bg-rose-50/90 dark:bg-rose-950/60 border-2 border-rose-300 dark:border-rose-800 shadow-md animate-in fade-in duration-300">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-600/30">
-              <AlertOctagon className="w-5 h-5 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black text-rose-950 dark:text-rose-100 uppercase tracking-wide">
-                  Trung Tâm Cảnh Báo Biến Cố Khẩn Cấp ({totalIncidents} sự cố cần chú ý)
-                </h3>
-              </div>
-              <ul className="mt-2 space-y-1.5 text-xs text-rose-800 dark:text-rose-200">
-                {isDiskLow && (
-                  <li className="flex items-center gap-1.5 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
-                    <span>Dung lượng ổ cứng máy chủ đã rơi vào vùng nguy hiểm (Dưới ngưỡng an toàn). Cần dọn dẹp hoặc mở rộng dung lượng.</span>
-                  </li>
-                )}
-                {failingJobs.map((j) => (
-                  <li key={j.name} className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
-                    <span>
-                      Tiến trình nền <strong className="font-mono">{j.name}</strong> đã thất bại {j.consecutive_failures ?? 1} lần liên tiếp
-                      {j.last_error ? `: "${j.last_error}"` : '.'}
-                    </span>
-                  </li>
-                ))}
-                {stalledJobs.map((j) => (
-                  <li key={j.name} className="flex items-center gap-1.5 text-amber-800 dark:text-amber-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
-                    <span>
-                      Tiến trình nền <strong className="font-mono">{j.name}</strong> đang bị kẹt (Stalled lease). Không có worker nào tiếp nhận.
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5 self-end md:self-center shrink-0">
-            <button
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold text-xs hover:bg-rose-100/50 transition cursor-pointer flex items-center gap-1.5 shadow-xs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Kiểm tra lại</span>
-            </button>
-            <Link
-              to="/admin/settings"
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-rose-600/30"
-            >
-              <span>Xử lý ngay</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
+  if (storage?.disk?.low) {
+    items.push({
+      key: 'disk-low',
+      tone: 'danger',
+      title: 'Ổ cứng máy chủ sắp đầy',
+      detail: 'Dung lượng khả dụng dưới ngưỡng an toàn. Cần dọn dẹp hoặc mở rộng.',
+      to: '/admin/settings',
+    })
   }
 
-  // Nếu không có sự cố nào: Không hiển thị banner, trả về null để giao diện thoáng đãng
-  return null
+  jobs
+    .filter((j) => j.state === 'failing')
+    .forEach((j) => {
+      items.push({
+        key: `failing-${j.name}`,
+        tone: 'danger',
+        title: `Worker ${j.name || '-'} thất bại`,
+        detail: `${j.consecutive_failures ?? 1} lần liên tiếp${j.last_error ? `: ${j.last_error}` : '.'}`,
+        job: j,
+      })
+    })
+
+  jobs
+    .filter((j) => j.state === 'stalled')
+    .forEach((j) => {
+      items.push({
+        key: `stalled-${j.name}`,
+        tone: 'warning',
+        title: `Worker ${j.name || '-'} bị kẹt`,
+        detail: 'Không có worker nào tiếp nhận tiến trình này.',
+        job: j,
+      })
+    })
+
+  return (
+    <section className="glass-tile glass-lift p-5 h-full select-none">
+      <h2 className="text-[13px] text-slate-500 dark:text-slate-400">Cần chú ý</h2>
+
+      {items.length === 0 ? (
+        <div className="mt-4 flex items-start gap-3">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+          <div>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Không có mục nào cần xử lý</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Worker và dung lượng đều trong ngưỡng an toàn.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <ul className="mt-4 space-y-2.5">
+          {items.map((item) => (
+            <li key={item.key} className="glass-item flex items-center gap-3 px-3.5 py-3">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.tone === 'danger' ? 'bg-danger' : 'bg-warning'}`}
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13.5px] font-semibold text-slate-900 dark:text-white">{item.title}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{item.detail}</p>
+              </div>
+              {item.to ? (
+                <Link to={item.to} className="glass-btn">
+                  Xử lý
+                </Link>
+              ) : (
+                <button type="button" className="glass-btn" onClick={() => item.job && onSelectJob?.(item.job)}>
+                  Xem
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
 }
