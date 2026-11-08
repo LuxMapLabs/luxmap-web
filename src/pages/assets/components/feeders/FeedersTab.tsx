@@ -68,7 +68,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Action Toolbar */}
-      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
         {/* Search Box - Chiều dài co giãn giống tab Bóng đèn */}
         <div className="flex flex-1 flex-wrap items-center gap-3">
           <div className="flex-1 min-w-60 relative">

@@ -56,13 +56,13 @@ export const FeederTable: React.FC<FeederTableProps> = ({
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold select-none uppercase tracking-wider text-[11px]">
-              <th className="py-3 px-4">Mã Mạch</th>
-              <th className="py-3 px-4">Tên Mạch Xuất Tuyến</th>
-              <th className="py-3 px-4">Tủ Điện Cấp Nguồn</th>
+              <th className="py-3 px-4">Mã mạch</th>
+              <th className="py-3 px-4">Tên mạch xuất tuyến</th>
+              <th className="py-3 px-4">Tủ điện cấp nguồn</th>
               {showCommune && <th className="py-3 px-4">Địa bàn</th>}
-              <th className="py-3 px-4 text-center">Số Cột Đèn</th>
-              <th className="py-3 px-4 text-center">Tuyến Cáp (GIS)</th>
-              <th className="py-3 px-4 text-right">Thao Tác</th>
+              <th className="py-3 px-4 text-center">Số cột đèn</th>
+              <th className="py-3 px-4 text-center">Tuyến cáp (GIS)</th>
+              <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">

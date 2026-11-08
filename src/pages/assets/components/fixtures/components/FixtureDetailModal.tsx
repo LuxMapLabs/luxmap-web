@@ -71,7 +71,7 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
       {/* Modal Dialog */}
       <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-linear-to-r from-teal-700 to-teal-600 text-white">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-bold">
               <Lightbulb className="w-6 h-6 text-white" />

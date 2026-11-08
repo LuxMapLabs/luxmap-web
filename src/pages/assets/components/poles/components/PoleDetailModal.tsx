@@ -75,7 +75,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
       {/* Modal Dialog */}
       <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-[#1f3864] dark:bg-slate-950 text-white">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-linear-to-r from-teal-700 to-teal-600 text-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center font-bold">
               <Lightbulb className="w-5 h-5 text-amber-300" />
@@ -185,14 +185,14 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
           </div>
 
           {/* Ghi chú hiện trường */}
-          <div className="p-4 bg-amber-50/70 dark:bg-amber-950/30 rounded-2xl border border-amber-200 dark:border-amber-900/60 space-y-1.5">
-            <div className="font-bold text-amber-950 dark:text-amber-200 flex items-center justify-between">
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-1.5">
+            <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Bookmark className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <Bookmark className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                 <span>Ghi chú hiện trường:</span>
               </span>
               {pole.updated_at && (
-                <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                   Cập nhật: {new Date(pole.updated_at).toLocaleDateString('vi-VN')}
                 </span>
               )}
@@ -207,7 +207,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
               </p>
             )}
             {(pole.updated_by_name || pole.updated_by) && (
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-amber-200/60 dark:border-amber-900/40">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700">
                 Người cập nhật: <strong className="text-slate-700 dark:text-slate-300">{pole.updated_by_name || pole.updated_by}</strong>
                 {pole.updated_by && pole.updated_by_name && <span className="font-mono text-[10px] text-slate-400 ml-1">({pole.updated_by})</span>}
               </div>
@@ -224,7 +224,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
                 onClose()
                 onViewQr(pole)
               }}
-              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
             >
               <QrCode className="w-4 h-4" />
               <span>Xem / Tải mã QR</span>

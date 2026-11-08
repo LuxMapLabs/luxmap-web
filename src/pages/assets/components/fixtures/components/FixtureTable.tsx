@@ -66,16 +66,16 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
         <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 sticky top-0 z-10 select-none">
           <tr>
             <th className="py-3 px-3.5">Mã bộ đèn</th>
-            <th className="py-3 px-3.5">Cột Lắp Đặt</th>
-            <th className="py-3 px-3.5">Tuyến Đường</th>
+            <th className="py-3 px-3.5">Cột lắp đặt</th>
+            <th className="py-3 px-3.5">Tuyến đường</th>
             <th className="py-3 px-3.5 text-center">Số bóng / bộ</th>
-            <th className="py-3 px-3.5 text-center">Công Suất</th>
-            <th className="py-3 px-3.5">Loại đèn / Nguồn</th>
-            <th className="py-3 px-3.5">Ngày Lắp Đặt</th>
-            <th className="py-3 px-3.5">Hạn Bảo Hành</th>
-            <th className="py-3 px-3.5">Ngày Tháo Dỡ</th>
-            <th className="py-3 px-3.5 text-center">Trạng Thái</th>
-            <th className="py-3 px-3.5 text-center w-24">Thao Tác</th>
+            <th className="py-3 px-3.5 text-center">Công suất</th>
+            <th className="py-3 px-3.5">Loại đèn / nguồn</th>
+            <th className="py-3 px-3.5">Ngày lắp đặt</th>
+            <th className="py-3 px-3.5">Hạn bảo hành</th>
+            <th className="py-3 px-3.5">Ngày tháo dỡ</th>
+            <th className="py-3 px-3.5 text-center">Trạng thái</th>
+            <th className="py-3 px-3.5 text-center w-24">Thao tác</th>
           </tr>
         </thead>
 

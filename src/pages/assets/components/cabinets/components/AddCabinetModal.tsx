@@ -375,8 +375,8 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                       <thead className="bg-purple-50/80 dark:bg-purple-950/40 text-purple-950 dark:text-purple-200 sticky top-0 z-10 font-bold border-b border-purple-200 dark:border-purple-900/60">
                         <tr>
                           <th className="py-2 px-2.5 w-9 text-center">#</th>
-                          <th className="py-2 px-2.5">Tên Tủ Điện</th>
-                          <th className="py-2 px-2.5 w-44">Tọa Độ Lat / Lng</th>
+                          <th className="py-2 px-2.5">Tên tủ điện</th>
+                          <th className="py-2 px-2.5 w-44">Tọa độ lat / lng</th>
                           <th className="py-2 px-2 w-10 text-center">Xóa</th>
                         </tr>
                       </thead>

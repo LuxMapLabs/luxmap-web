@@ -68,10 +68,10 @@ export const PoleTable: React.FC<PoleTableProps> = ({
   }, [flashingPoleCode])
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden">
+    <div className="ops-rise bg-white dark:bg-slate-900 rounded-[20px] shadow-ops overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
+          <thead className="bg-[#f8fafc] dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
             <tr>
               <th className="p-3.5 w-10">
                 <input
@@ -150,7 +150,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                   <tr
                     key={pole.external_ref || pole.pole_id || Math.random()}
                     id={poleExternal ? `pole-row-${poleExternal.toLowerCase()}` : undefined}
-                    className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition ${
+                    className={`hover:bg-teal-50/40 dark:hover:bg-slate-800/80 hover:shadow-[inset_3px_0_0_#0f766e] transition-all ${
                       isFlashing ? 'animate-row-flash' : ''
                     } ${isPoleSelected(pole) ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''}`}
                   >
@@ -241,7 +241,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                                     toast.info(`Mã bộ đèn: ${fixtureCode}`)
                                   }
                                 }}
-                                className="cursor-pointer inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 font-semibold shadow-2xs hover:border-amber-400 hover:bg-amber-100/70 transition group"
+                                className="cursor-pointer inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-semibold shadow-2xs hover:border-teal-400 hover:bg-teal-50 transition group"
                                 title={`Mã bộ đèn: ${fixtureCode} • ${lampCount} bóng — Bấm để chuyển sang tab Bộ đèn`}
                               >
                                 <Lightbulb className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0 group-hover:scale-110 transition" />
@@ -249,7 +249,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                               </button>
                               {lampCount > 1 ? (
                                 <span
-                                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700"
+                                  className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                                   title={`Bộ đèn gồm ${lampCount} bóng`}
                                 >
                                   x{lampCount}

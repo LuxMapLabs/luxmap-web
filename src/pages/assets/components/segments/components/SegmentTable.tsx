@@ -24,10 +24,10 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
 }) => {
   const showCommune = useShowCommune()
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden">
+    <div className="ops-rise bg-white dark:bg-slate-900 rounded-[20px] shadow-ops overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
+          <thead className="bg-[#f8fafc] dark:bg-slate-950/80 text-slate-500 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
             <tr>
               <th className="p-3.5">Mã tuyến</th>
               <th className="p-3.5">Tên tuyến đường</th>
@@ -50,7 +50,7 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
               </tr>
             ) : (
               segments.map((seg) => (
-                <tr key={seg.external_ref || seg.segment_id || Math.random()} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition">
+                <tr key={seg.external_ref || seg.segment_id || Math.random()} className="hover:bg-teal-50/40 dark:hover:bg-slate-800/80 hover:shadow-[inset_3px_0_0_#0f766e] transition-all">
                   <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
                     {seg.external_ref || seg.segment_id}
                   </td>
