@@ -1,5 +1,6 @@
 import React from 'react'
-import { ShieldCheck } from 'lucide-react'
+import { OpsCard } from '../../../components/ops/OpsCard'
+import { OpsTabs } from '../../../components/ops/OpsTabs'
 import type { WarrantyItem } from '../../../types/statistics/warranty'
 
 interface WarrantyTableCardProps {
@@ -22,82 +23,50 @@ export const WarrantyTableCard: React.FC<WarrantyTableCardProps> = ({
   totalCount,
 }) => {
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Bảo Hành Sắp & Quá Hạn</h3>
-              <p className="text-[11px] text-slate-500">Chỉ hiển thị bóng hết hạn hoặc sắp hết trong vòng 1 tháng</p>
-            </div>
-          </div>
-          <span className="text-[11px] font-bold px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-200/60">
-            {items.length} bóng đèn
-          </span>
-        </div>
+    <OpsCard
+      index={4}
+      title="Bảo hành sắp hết và quá hạn"
+      description="Chỉ hiển thị bóng hết hạn hoặc sắp hết trong vòng 1 tháng"
+      flush
+    >
+      <div className="px-6 pb-4 pt-4">
+        <OpsTabs
+          value={activeTab}
+          onChange={onTabChange}
+          items={[
+            { key: 'all', label: 'Tất cả', count: totalCount },
+            { key: 'expired', label: 'Quá hạn', count: expiredCount },
+            { key: 'expiring', label: 'Sắp hết ≤ 30 ngày', count: expiringCount },
+          ]}
+        />
+      </div>
 
-        {/* 3 Tab Lọc Bảo hành */}
-        <div className="flex gap-1.5 border-b border-slate-100 pb-2.5 mb-3 text-xs">
-          <button
-            onClick={() => onTabChange('all')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
-              activeTab === 'all'
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-            }`}
-          >
-            Tất cả ({totalCount})
-          </button>
-          <button
-            onClick={() => onTabChange('expired')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'expired'
-                ? 'bg-red-600 text-white'
-                : 'text-slate-500 hover:text-red-600 hover:bg-red-50'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-            Quá hạn ({expiredCount})
-          </button>
-          <button
-            onClick={() => onTabChange('expiring')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'expiring'
-                ? 'bg-amber-600 text-white'
-                : 'text-slate-500 hover:text-amber-600 hover:bg-amber-50'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            Sắp hết ≤ 30 ngày ({expiringCount})
-          </button>
-        </div>
-
-        <div className="overflow-x-auto max-h-[360px] overflow-y-auto custom-scrollbar">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 bg-slate-50 z-10 shadow-2xs">
-              <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-2.5 px-3">Mã Cột / Mã Bóng</th>
-                <th className="py-2.5 px-3">Tuyến Đường</th>
-                <th className="py-2.5 px-3">Hạn Bảo Hành</th>
-                <th className="py-2.5 px-3">Tình Trạng Hạn</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+      <div className="max-h-[360px] overflow-auto custom-scrollbar">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead className="sticky top-0 z-10 bg-slate-50">
+            <tr className="border-b border-slate-100 text-slate-500 font-semibold text-[11px]">
+              <th className="py-2.5 px-6">Mã cột / mã bóng</th>
+              <th className="py-2.5 px-3">Tuyến đường</th>
+              <th className="py-2.5 px-3">Hạn bảo hành</th>
+              <th className="py-2.5 px-6">Tình trạng hạn</th>
+            </tr>
+          </thead>
+          <tbody>
               {items.length > 0 ? (
                 items.map((item, idx) => {
                   const isOverdue = item.days_remaining != null && item.days_remaining < 0
                   const segmentName = segmentNameMap[item.segment_id || ''] || item.segment_id || 'Chưa rõ tuyến'
                   
                   return (
-                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-3">
-                        <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                    <tr
+                      key={idx}
+                      className="group border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:bg-teal-50/40 hover:shadow-[inset_3px_0_0_#0f766e]"
+                    >
+                      <td className="py-3 px-6">
+                        <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-[#f1f5f9] text-slate-700 transition-colors group-hover:bg-teal-100 group-hover:text-teal-800">
                           {item.pole_id}
                         </span>
-                        <div className="text-[11px] font-mono text-blue-600 mt-0.5">
+                        <div className="text-[11px] font-mono text-teal-700 mt-0.5">
                           {item.fixture_id || 'Chưa gán mã'}
                         </div>
                       </td>
@@ -113,7 +82,7 @@ export const WarrantyTableCard: React.FC<WarrantyTableCardProps> = ({
                           Lắp đặt: {item.install_date || 'N/A'}
                         </div>
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-6">
                         {isOverdue ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200/60 whitespace-nowrap">
                             Quá hạn {Math.abs(item.days_remaining!)} ngày
@@ -134,15 +103,14 @@ export const WarrantyTableCard: React.FC<WarrantyTableCardProps> = ({
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
-        </div>
+          </tbody>
+        </table>
       </div>
 
-      <div className="border-t border-slate-100 pt-3 mt-3 flex items-center justify-between text-[11px] text-slate-400">
-        <span>Tổng số bóng theo dõi: <strong className="text-slate-700">{items.length}</strong></span>
-        <span>Thời hạn cảnh báo: <strong>≤ 30 ngày</strong></span>
+      <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3.5 text-xs text-slate-500">
+        <span>Tổng số bóng theo dõi: <strong className="text-slate-800 tabular-nums">{items.length}</strong></span>
+        <span>Thời hạn cảnh báo: <strong className="text-slate-800">≤ 30 ngày</strong></span>
       </div>
-    </div>
+    </OpsCard>
   )
 }
