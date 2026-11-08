@@ -8,7 +8,8 @@ import { UserRole } from './types/auth/web'
 import type { RootState } from './redux/rootReducer'
 import { isSystemAdmin, isManagementAgency, isManager } from './utils/roleUtils'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { DefaultLayout } from './layout/DefaultLayout'
+import { ManagerLayout } from './layout/ManagerLayout'
+import { AdminLayout } from './layout/AdminLayout'
 
 // Import trực tiếp tất cả các trang
 import { LoginPage } from './pages/login/LoginPage'
@@ -87,56 +88,54 @@ function App() {
           {/* Route thông báo từ chối quyền truy cập (403 Forbidden) */}
           <Route path="/forbidden" element={<ForbiddenPage />} />
 
-          {/* Các Route ứng dụng tác nghiệp bên trong DefaultLayout (yêu cầu xác thực) */}
+          {/* Điều hướng thông minh theo vai trò (cần đăng nhập, chưa thuộc layout nào) */}
           <Route
+            path="/"
             element={
               <ProtectedRoute>
-                <DefaultLayout />
+                <RootRedirect />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Layout Manager: Cán bộ Quản lý (Manager) & Cấp trên Giám sát (Superior) */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]}>
+                <ManagerLayout />
               </ProtectedRoute>
             }
           >
-            {/* Điều hướng thông minh theo vai trò */}
-            <Route path="/" element={<RootRedirect />} />
+            <Route path="/gis-map" element={<GisMapPage />} />
+            <Route path="/dashboard" element={<DashboardRoute />} />
 
-            {/* Tuyến bản đồ GIS: Dành cho Cán bộ Quản lý (Manager) & Cấp trên Giám sát (Superior) */}
-            <Route
-              element={
-                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]} />
-              }
-            >
-              <Route path="/gis-map" element={<GisMapPage />} />
-            </Route>
-
-            {/* Tuyến Bảng điều khiển (Tổng quan): Dành cho cả Cán bộ Quản lý (Manager) & Cấp trên Giám sát (Superior) */}
-            <Route
-              element={
-                <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]} />
-              }
-            >
-              <Route path="/dashboard" element={<DashboardRoute />} />
-            </Route>
-
-            {/* Tuyến dành riêng cho Cán bộ Quản lý (Manager): Lịch làm việc, Quản lý tài sản & Phản ánh người dân */}
+            {/* Dành riêng cho Cán bộ Quản lý (Manager): Lịch làm việc, Quản lý tài sản & Phản ánh người dân */}
             <Route element={<ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer]} />}>
               <Route path="/work-schedule" element={<WorkSchedulePage />} />
               <Route path="/assets" element={<AssetManagementPage />} />
               <Route path="/citizen-reports" element={<CitizenReviewPage />} />
             </Route>
 
-            {/* Tuyến Báo cáo & Nghiệm thu: CHỈ DÀNH RIÊNG CHO Cấp trên Giám sát (Superior) */}
+            {/* Báo cáo & Nghiệm thu: CHỈ DÀNH RIÊNG CHO Cấp trên Giám sát (Superior) */}
             <Route element={<ProtectedRoute allowedRoles={[UserRole.ManagementAgency]} />}>
               <Route path="/reports" element={<SuperiorReportsPage />} />
             </Route>
+          </Route>
 
-            {/* Tuyến đường Quản trị: CHỈ CHO PHÉP Quản trị viên (Admin) */}
-            <Route element={<ProtectedRoute allowedRoles={[UserRole.Admin]} />}>
-              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="/admin/system" element={<AdminManagementPage />} />
-              <Route path="/admin/communes" element={<CommunesManagementPage />} />
-              <Route path="/admin/firmware" element={<FirmwareManagementPage />} />
-              <Route path="/admin/settings" element={<SystemSettingsPage />} />
-            </Route>
+          {/* Layout Admin: CHỈ CHO PHÉP Quản trị viên (Admin) */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.Admin]}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin/system" element={<AdminManagementPage />} />
+            <Route path="/admin/communes" element={<CommunesManagementPage />} />
+            <Route path="/admin/firmware" element={<FirmwareManagementPage />} />
+            <Route path="/admin/settings" element={<SystemSettingsPage />} />
           </Route>
 
           {/* 404 Not Found Page */}

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&display=swap');
 @import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -8,6 +8,9 @@
 
 /* Design tokens từ đặc tả CivicFlow & Bảng màu GovTech Navy (#1f3864 / hover: #27467c) */
 @theme {
+  --font-ops: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --shadow-ops: 0 1px 2px rgba(15, 27, 45, 0.04), 0 6px 18px -8px rgba(15, 27, 45, 0.1);
+  --shadow-ops-hover: 0 2px 4px rgba(15, 27, 45, 0.05), 0 18px 34px -14px rgba(13, 148, 136, 0.28);
   --color-primary: #1f3864;
   --color-secondary: #3e86c9;
   --color-accent: #5fc4b0;
@@ -333,7 +336,7 @@ button:focus-visible {
 }
 
 .animate-tab-view {
-  animation: tab-view-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: tab-view-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Row Flash Pulse Highlight Animation (3 gentle pulses over 2.5s) */
@@ -661,6 +664,244 @@ button:focus-visible {
 }
 
 /* Print styles for A4 Technical Inspection Report */
+/* Manager và Superior: đổi dải màu blue của Tailwind sang xanh ngọc đậm.
+   DefaultLayout gắn class này lên <html> khi người dùng không phải Admin, nên modal portal cũng ăn theo. */
+.ops-theme {
+  --color-blue-50: #f0fdfa;
+  --color-blue-100: #ccfbf1;
+  --color-blue-200: #99f6e4;
+  --color-blue-300: #5eead4;
+  --color-blue-400: #2dd4bf;
+  --color-blue-500: #14b8a6;
+  --color-blue-600: #0f766e;
+  --color-blue-700: #115e59;
+  --color-blue-800: #134e4a;
+  --color-blue-900: #0f3d3a;
+  --color-blue-950: #042f2e;
+  /* indigo dùng lẫn trong các tab/chip: gom về cùng dải teal để không lệch tông */
+  --color-indigo-50: #f0fdfa;
+  --color-indigo-100: #ccfbf1;
+  --color-indigo-200: #99f6e4;
+  --color-indigo-300: #5eead4;
+  --color-indigo-400: #2dd4bf;
+  --color-indigo-500: #14b8a6;
+  --color-indigo-600: #0f766e;
+  --color-indigo-700: #115e59;
+  --color-indigo-800: #134e4a;
+  --color-indigo-900: #0f3d3a;
+  /* nút chính */
+  --color-primary: #0f766e;
+  --color-secondary: #14b8a6;
+
+  /* Thang chữ thống nhất cho Manager: 11 (chú thích, nhãn) · 13 (nội dung, bảng, nút) · 14 (nhấn mạnh) · 16+ (tiêu đề) */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --font-mono: var(--font-ops);
+}
+
+/* Các cỡ chữ lẻ (8–11.5px) gom về cỡ chú thích 11px, (12–13.5px) gom về cỡ nội dung 13px */
+.ops-theme .text-\[8px\],
+.ops-theme .text-\[9px\],
+.ops-theme .text-\[9\.5px\],
+.ops-theme .text-\[10px\],
+.ops-theme .text-\[10\.5px\],
+.ops-theme .text-\[11px\],
+.ops-theme .text-\[11\.5px\] {
+  font-size: 11px;
+  line-height: 1.35;
+}
+.ops-theme .text-\[12px\],
+.ops-theme .text-\[12\.5px\],
+.ops-theme .text-\[13px\],
+.ops-theme .text-\[13\.5px\] {
+  font-size: 13px;
+}
+/* Badge, chip, huy hiệu trạng thái: chữ nhỏ hơn nội dung (nhận biết qua span có bo góc và padding) */
+.ops-theme span.text-xs:is([class*="rounded-full"], [class*="rounded-md"], [class*="rounded-lg"])[class*="px-"],
+.ops-theme span.text-sm:is([class*="rounded-full"], [class*="rounded-md"], [class*="rounded-lg"])[class*="px-"],
+.ops-theme main table td button[class*="rounded-lg"][class*="px-2.5"][class*="py-1 "],
+.ops-theme main table td :is(div, button)[class*="rounded-lg"][class*="px-2"][class*="bg-"] > span.font-mono {
+  font-size: 11px;
+  line-height: 1.35;
+}
+/* Nhãn không viết hoa toàn bộ và không giãn chữ, để mọi nhãn cùng một kiểu */
+.ops-theme .uppercase {
+  text-transform: none;
+}
+.ops-theme .tracking-wider,
+.ops-theme .tracking-widest,
+.ops-theme .tracking-wide {
+  letter-spacing: 0;
+}
+/* Tiêu đề cột của mọi bảng: một cỡ, một độ đậm */
+.ops-theme thead th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+/* Bảng trong vùng nội dung: cùng khoảng đệm, không xuống dòng ở tiêu đề và badge, hover giống nhau */
+.ops-theme main table thead th {
+  padding: 12px 16px;
+  white-space: nowrap;
+  color: #64748b;
+  background-color: #f8fafc;
+}
+.ops-theme main table tbody td {
+  padding: 12px 12px;
+  vertical-align: middle;
+}
+.ops-theme main table tbody td:not(.whitespace-normal) {
+  white-space: nowrap;
+}
+.ops-theme main table thead th {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.ops-theme main table :is(th, td):first-child {
+  padding-left: 22px;
+}
+.ops-theme main table :is(th, td):last-child {
+  padding-right: 22px;
+}
+.ops-theme main table tbody tr {
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+.ops-theme main table tbody tr:hover {
+  background-color: rgba(240, 253, 250, 0.75);
+  box-shadow: inset 3px 0 0 #0f766e;
+}
+.ops-theme main table td :is(span, div)[class*="rounded-full"],
+.ops-theme main table td span[class*="rounded-lg"][class*="px-"],
+.ops-theme main table td span[class*="rounded-md"][class*="px-"] {
+  white-space: nowrap;
+}
+/* Mã và số liệu dùng cùng font với chữ, chỉ giữ chữ số đều nhau để cột thẳng hàng */
+.ops-theme .font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bộ hiệu ứng vào/ra dùng chung cho modal, drawer, dropdown (dự án chưa cài tw-animate-css nên tự định nghĩa).
+   Các class animate-in / fade-in / zoom-in-95 / slide-in-from-* đã được dùng sẵn khắp nơi. */
+@keyframes tw-enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-tx, 0), var(--tw-enter-ty, 0), 0) scale(var(--tw-enter-scale, 1));
+  }
+}
+@keyframes tw-exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(var(--tw-exit-tx, 0), var(--tw-exit-ty, 0), 0) scale(var(--tw-exit-scale, 1));
+  }
+}
+.animate-in {
+  animation: tw-enter var(--tw-duration, 0.24s) cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.animate-out {
+  animation: tw-exit var(--tw-duration, 0.18s) cubic-bezier(0.4, 0, 1, 1) both;
+}
+.fade-in { --tw-enter-opacity: 0; }
+.zoom-in { --tw-enter-scale: 0.6; }
+.zoom-in-95 { --tw-enter-scale: 0.95; --tw-enter-ty: 6px; }
+.slide-in-from-top-1 { --tw-enter-ty: -0.25rem; }
+.slide-in-from-top-2 { --tw-enter-ty: -0.5rem; }
+.fade-out { --tw-exit-opacity: 0; }
+.zoom-out { --tw-exit-scale: 0.95; --tw-exit-ty: 6px; }
+
+/* Backdrop mờ dần, hộp thoại nảy nhẹ khi mở và thu lại khi đóng */
+@keyframes ui-backdrop-in { from { opacity: 0; } }
+@keyframes ui-backdrop-out { to { opacity: 0; } }
+@keyframes ui-dialog-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.95); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ui-dialog-out { to { opacity: 0; transform: translateY(10px) scale(0.97); } }
+@keyframes ui-drawer-in { from { transform: translateX(100%); } }
+@keyframes ui-drawer-out { to { transform: translateX(100%); } }
+.animate-fadeIn { animation: ui-backdrop-in 0.22s ease-out backwards; }
+.animate-scaleUp { animation: ui-dialog-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.animate-slideLeft { animation: ui-drawer-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.ui-closing .animate-fadeIn { animation: ui-backdrop-out 0.18s ease-in both; }
+.ui-closing .animate-scaleUp { animation: ui-dialog-out 0.18s ease-in both; }
+.ui-closing .animate-slideLeft { animation: ui-drawer-out 0.2s ease-in both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, .animate-out, .animate-fadeIn, .animate-scaleUp, .animate-slideLeft { animation: none !important; }
+}
+
+/* Nền và chuyển động cho Manager / Superior (khác kiểu kính mờ của Admin) */
+.ops-bg {
+  background-color: #f2f5f8;
+  background-image:
+    radial-gradient(1100px 360px at 70% -120px, rgba(13, 148, 136, 0.1), transparent 70%),
+    radial-gradient(#dfe7ee 1px, transparent 1.3px);
+  background-size: auto, 26px 26px;
+  background-attachment: fixed;
+}
+@keyframes ops-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ops-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes ops-sweep {
+  from { background-position: -160% 0; }
+  to { background-position: 260% 0; }
+}
+@keyframes ops-ping {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+  100% { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0); }
+}
+.ops-rise { animation: ops-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+.ops-grow { transform-origin: left; animation: ops-grow 1s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 70ms + 300ms); }
+.ops-shine {
+  background-image: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  background-size: 60% 100%;
+  background-repeat: no-repeat;
+  animation: ops-sweep 2.6s ease-in-out 1.2s 1;
+}
+.ops-ping { animation: ops-ping 1.6s ease-out infinite; }
+/* Chuông thông báo rung khi rê chuột vào, lắc quanh điểm treo ở đỉnh chuông */
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(16deg); }
+  30% { transform: rotate(-14deg); }
+  45% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(4deg); }
+  90% { transform: rotate(-2deg); }
+}
+.bell-icon { transform-origin: 50% 8%; }
+.bell-trigger:hover .bell-icon,
+.bell-trigger:focus-visible .bell-icon {
+  animation: bell-ring 0.8s ease-in-out;
+}
+/* Nút xuất dữ liệu: mũi tên trượt xuống rồi mờ đi, mũi tên mới rơi từ trên xuống, khay đứng yên */
+@keyframes arrow-download {
+  0% { transform: translateY(0); opacity: 1; }
+  40% { transform: translateY(7px); opacity: 0; }
+  41% { transform: translateY(-7px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.download-trigger:hover .download-arrow,
+.download-trigger:focus-visible .download-arrow {
+  animation: arrow-download 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .download-trigger:hover .download-arrow,
+  .download-trigger:focus-visible .download-arrow { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bell-trigger:hover .bell-icon,
+  .bell-trigger:focus-visible .bell-icon { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ops-rise, .ops-grow, .ops-shine, .ops-ping { animation: none; }
+}
+
 @media print {
   body * {
     visibility: hidden;
