@@ -9,6 +9,7 @@ import type { RootState } from './redux/rootReducer'
 import { isSystemAdmin, isManagementAgency, isManager } from './utils/roleUtils'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ManagerLayout } from './layout/ManagerLayout'
+import { DefaultLayout } from './layout/DefaultLayout'
 import { AdminLayout } from './layout/AdminLayout'
 
 // Import trực tiếp tất cả các trang
@@ -52,6 +53,12 @@ const RootRedirect: React.FC = () => {
 /**
  * Hiển thị Dashboard phù hợp theo vai trò (Manager Dashboard vs Superior Dashboard)
  */
+// Manager dùng layout teal mới; Superior vẫn dùng layout mặc định cũ cho tới khi được thiết kế lại
+const OpsShell: React.FC = () => {
+  const { user } = useSelector((state: RootState) => state.auth)
+  return isManagementAgency(user?.role) ? <DefaultLayout /> : <ManagerLayout />
+}
+
 const DashboardRoute: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
   if (isManagementAgency(user?.role)) {
@@ -102,7 +109,7 @@ function App() {
           <Route
             element={
               <ProtectedRoute allowedRoles={[UserRole.MaintenanceEngineer, UserRole.ManagementAgency]}>
-                <ManagerLayout />
+                <OpsShell />
               </ProtectedRoute>
             }
           >
