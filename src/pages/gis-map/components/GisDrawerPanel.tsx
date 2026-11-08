@@ -432,7 +432,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   onClick={() =>
                     setLightboxImage({
                       url: polePhotoUrl,
-                      title: `Ảnh hiện trường: ${selectedPole.properties.external_ref || selectedPole.properties.pole_id}`,
+                      title: `Ảnh cột đèn: ${selectedPole.properties.external_ref || selectedPole.properties.pole_id}`,
                     })
                   }
                   className="relative h-44 rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs"
@@ -454,7 +454,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               ) : (
                 <div className="h-28 rounded-xl border border-dashed border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/40 flex flex-col items-center justify-center p-3 text-center text-slate-400 dark:text-slate-500 text-xs">
                   <CameraOff className="w-6 h-6 mb-1 text-slate-300 dark:text-slate-600" />
-                  <span>Chưa có ảnh khảo sát thực địa</span>
+                  <span>Chưa có ảnh cột đèn</span>
                 </div>
               )}
 
