@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Cpu, SunMedium, Hash, FileCode, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
 import type { RegisterArtifactVersionRequest } from '../../../types/admin/artifact-versions'
 
@@ -9,10 +10,10 @@ const FIRMWARE_COMPONENTS = [
     subLabel: 'Tủ điều khiển IoT',
     icon: Cpu,
     activeClasses:
-      'border-indigo-500 bg-gradient-to-br from-indigo-50/90 to-indigo-100/40 text-indigo-950 ring-2 ring-indigo-500/20 shadow-indigo-500/10 shadow-sm',
-    iconActiveClasses: 'bg-indigo-600 text-white shadow-xs',
-    iconInactiveClasses: 'bg-slate-100 text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50',
-    dotActiveClasses: 'bg-indigo-600 ring-4 ring-indigo-100 shadow-2xs',
+      'border-secondary bg-gradient-to-br from-secondary/10 to-secondary/20 text-primary ring-2 ring-secondary shadow-secondary shadow-sm',
+    iconActiveClasses: 'bg-primary text-white shadow-xs',
+    iconInactiveClasses: 'bg-slate-100 text-slate-400 group-hover:text-primary group-hover:bg-secondary/10',
+    dotActiveClasses: 'bg-primary ring-4 ring-secondary/20 shadow-2xs',
   },
   {
     value: 'lux_module_firmware' as const,
@@ -126,13 +127,13 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
     })
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white/80 backdrop-blur-2xl rounded-[28px] border border-white/80 shadow-2xl shadow-primary/30 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs">
+            <div className="w-10 h-10 rounded-2xl bg-secondary/10 text-primary flex items-center justify-center shadow-2xs">
               <Cpu className="w-5 h-5" />
             </div>
             <div>
@@ -178,7 +179,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
                     className={`group relative p-3 rounded-2xl border text-xs cursor-pointer transition-all duration-200 ease-out active:scale-[0.98] flex items-center justify-between gap-2.5 select-none ${
                       isSelected
                         ? opt.activeClasses
-                        : 'border-slate-200/90 bg-white hover:border-slate-300 hover:bg-slate-50/70 hover:-translate-y-0.5 text-slate-700 shadow-2xs'
+                        : 'border-slate-200/90 bg-white/60 hover:border-slate-300 hover:bg-slate-50/70 hover:-translate-y-0.5 text-slate-700 shadow-2xs'
                     }`}
                   >
                     <input
@@ -236,7 +237,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
               onChange={(e) => setVersion(e.target.value)}
               placeholder="Ví dụ: v1.0.4, 2.1.0-prod, 2026.10-rc1"
               required
-              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono font-semibold text-slate-800 outline-none transition"
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-secondary focus:ring-2 focus:ring-secondary text-xs font-mono font-semibold text-slate-800 outline-none transition"
             />
             <span className="text-[10px] text-slate-400 block">
               Tối đa 100 ký tự theo quy định Backend, không chứa ký tự điều khiển.
@@ -254,7 +255,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
               value={artifactHash}
               onChange={(e) => setArtifactHash(e.target.value)}
               placeholder="Ví dụ: a1b2c3d4e5f6... (64 ký tự hex)"
-              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono text-slate-800 outline-none transition"
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 focus:border-secondary focus:ring-2 focus:ring-secondary text-xs font-mono text-slate-800 outline-none transition"
             />
             <span className="text-[10px] text-slate-400 block">
               Dùng để xác thực tính toàn vẹn khi thiết bị gửi mã băm đối chiếu.
@@ -276,7 +277,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
                     ? 'bg-rose-50 border-rose-300 text-rose-700 font-bold animate-pulse shadow-2xs'
                     : usagePercent > 80
                     ? 'bg-amber-50 border-amber-300 text-amber-800 font-semibold shadow-2xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-500 font-medium'
+                    : 'bg-white/50 border-slate-200 text-slate-500 font-medium'
                 }`}
                 title={`Dung lượng thực tế: ${metadataByteSize} / ${MAX_METADATA_BYTES} bytes`}
               >
@@ -296,7 +297,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
               className={`w-full px-3.5 py-2.5 rounded-2xl border text-xs font-mono text-slate-800 outline-none transition resize-y min-h-[110px] max-h-[260px] leading-relaxed custom-scrollbar ${
                 isOverByteLimit
                   ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 bg-rose-50/20'
-                  : 'border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10'
+                  : 'border-slate-200 focus:border-secondary focus:ring-2 focus:ring-secondary'
               }`}
             />
 
@@ -308,7 +309,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
                     ? 'bg-rose-500 w-full'
                     : usagePercent > 80
                     ? 'bg-amber-500'
-                    : 'bg-indigo-500'
+                    : 'bg-secondary'
                 }`}
                 style={{ width: `${isOverByteLimit ? 100 : usagePercent}%` }}
               />
@@ -321,14 +322,14 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-white/60 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+              className="px-5 py-2 rounded-xl bg-primary hover:bg-primary text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
@@ -345,6 +346,7 @@ export const RegisterFirmwareModal: React.FC<RegisterFirmwareModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

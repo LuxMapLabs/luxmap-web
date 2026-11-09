@@ -81,13 +81,13 @@ export const NotificationBell: React.FC = () => {
       <button
         type="button"
         onClick={toggle}
-        className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100/70 hover:bg-white text-slate-600 hover:text-slate-900 active:scale-95 transition-all duration-200 cursor-pointer border border-slate-200/80 shadow-2xs"
+        className="bell-trigger relative w-10 h-10 rounded-2xl flex items-center justify-center bg-white text-slate-600 hover:text-teal-700 shadow-ops hover:shadow-ops-hover hover:-translate-y-0.5 active:scale-95 transition-all duration-200 cursor-pointer"
         title={unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : 'Thông báo'}
         aria-label={unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : 'Thông báo'}
         aria-haspopup="true"
         aria-expanded={open}
       >
-        <Bell className="w-4 h-4 text-slate-600" />
+        <Bell className="bell-icon w-[18px] h-[18px]" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold leading-4 text-center ring-2 ring-white">
             {badge}

@@ -22,16 +22,16 @@ export const UserFilterToolbar: React.FC<UserFilterToolbarProps> = ({
   onOpenCreateModal,
 }) => {
   return (
-    <div className="bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div className="glass-tile p-2.5 sm:p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
       {/* Search Input with Clear Button */}
-      <div className="relative flex-1 max-w-full md:max-w-2xl">
+      <div className="relative flex-1 max-w-full md:max-w-md">
         <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Tìm theo họ tên, tài khoản, email..."
-          className="w-full pl-8 pr-7 py-1.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/70 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+          className="w-full pl-8 pr-7 py-1.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/70 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition"
         />
         {searchTerm && (
           <button
@@ -83,7 +83,7 @@ export const UserFilterToolbar: React.FC<UserFilterToolbarProps> = ({
         <button
           type="button"
           onClick={onOpenCreateModal}
-          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-semibold text-xs shadow-sm transition flex items-center gap-1.5 cursor-pointer shrink-0 ml-1"
+          className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary active:scale-95 text-white font-semibold text-xs shadow-sm transition flex items-center gap-1.5 cursor-pointer shrink-0 ml-1"
         >
           <UserPlus className="w-3.5 h-3.5" />
           <span>Thêm người dùng</span>

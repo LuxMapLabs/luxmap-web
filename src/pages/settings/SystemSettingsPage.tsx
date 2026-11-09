@@ -99,7 +99,7 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 flex flex-col justify-between overflow-hidden relative h-full">
+    <div className="glass-tile transition-all duration-300 flex flex-col justify-between overflow-hidden relative h-full">
       {/* Vạch màu nhận diện phân hệ (Amber / Golden Glow Top Accent) */}
       <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500" />
 
@@ -292,7 +292,7 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
       </div>
 
       {/* 5. Chân Card (Footer Actions) */}
-      <div className="px-5 sm:px-6 py-3.5 bg-slate-50/70 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="px-5 sm:px-6 py-3.5 bg-white/40 border-t border-white/60 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-1.5 text-slate-500 font-medium">
           <Clock className="w-3.5 h-3.5 shrink-0 text-slate-400" />
           <span>{formatFullDateTime(setting.updated_at)}</span>
@@ -395,7 +395,7 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
   const hoursDisplay = (value / 60).toFixed(1)
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 flex flex-col justify-between overflow-hidden relative h-full">
+    <div className="glass-tile transition-all duration-300 flex flex-col justify-between overflow-hidden relative h-full">
       {/* Vạch màu nhận diện phân hệ (Electric Sapphire / Cyan Glow Top Accent) */}
       <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400" />
 
@@ -588,7 +588,7 @@ const IotCard: React.FC<IotCardProps> = ({ setting, isUpdating, onSave }) => {
       </div>
 
       {/* 5. Chân Card (Footer Actions) */}
-      <div className="px-5 sm:px-6 py-3.5 bg-slate-50/70 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="px-5 sm:px-6 py-3.5 bg-white/40 border-t border-white/60 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-1.5 text-slate-500 font-medium">
           <Clock className="w-3.5 h-3.5 shrink-0 text-slate-400" />
           <span>{formatFullDateTime(setting.updated_at)}</span>
@@ -685,8 +685,8 @@ export const SystemSettingsPage: React.FC = () => {
   )
 
   return (
-    <div className="h-full w-full bg-slate-50 overflow-y-auto p-4 sm:p-6 md:p-8 font-sans text-slate-800 select-none">
-      <div className="w-full max-w-[1600px] mx-auto space-y-6">
+    <div className="admin-glass-root h-full w-full overflow-y-auto custom-scrollbar p-4 sm:p-6 md:p-8 text-slate-800 select-none">
+      <div className="glass-slab w-full max-w-[1600px] mx-auto p-5 md:p-6 space-y-6">
         {/* Thông báo lỗi nếu có */}
         {error && (
           <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-xs text-rose-700 shadow-2xs">
@@ -710,7 +710,7 @@ export const SystemSettingsPage: React.FC = () => {
             {[1, 2].map((idx) => (
               <div
                 key={idx}
-                className="h-[440px] rounded-2xl bg-white animate-pulse border border-slate-200/80 shadow-xs"
+                className="glass-tile h-[440px] animate-pulse"
               />
             ))}
           </div>

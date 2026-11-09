@@ -175,11 +175,11 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     expect(screen.getByText('Thêm thiết bị IoT')).toBeInTheDocument()
 
     // Kiểm tra các cột tiêu đề bảng
-    expect(screen.getByText('Mã Thiết Bị')).toBeInTheDocument()
-    expect(screen.getByText('Tủ Điện Cấp Nguồn')).toBeInTheDocument()
-    expect(screen.getByText('Nguồn Dữ Liệu')).toBeInTheDocument()
-    expect(screen.getByText('Điều Khiển Từ Xa')).toBeInTheDocument()
-    expect(screen.getByText('Xác Thực (Secret)')).toBeInTheDocument()
+    expect(screen.getByText('Mã thiết bị')).toBeInTheDocument()
+    expect(screen.getByText('Tủ điện cấp nguồn')).toBeInTheDocument()
+    expect(screen.getByText('Nguồn dữ liệu')).toBeInTheDocument()
+    expect(screen.getByText('Điều khiển từ xa')).toBeInTheDocument()
+    expect(screen.getByText('Xác thực (Secret)')).toBeInTheDocument()
 
     // Kiểm tra dữ liệu dòng
     expect(screen.getByText('IOT-NODE-001')).toBeInTheDocument()

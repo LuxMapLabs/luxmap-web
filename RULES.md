@@ -15,7 +15,7 @@
 
 ## 2. Phân quyền & Định tuyến (`src/App.tsx`)
 
-- **Public:** `/login`, `/r/:code` & `/report` (Quét QR người dân), `/forbidden`.
+- **Public:** `/login`, `/r/:code` & `/report` (Quét QR người dân), `/privacy`, `/forbidden`.
 - **Manager (`MaintenanceEngineer`):** `/dashboard`, `/gis-map`, `/work-schedule`, `/assets`, `/citizen-reports`.
 - **Superior (`ManagementAgency`):** `/reports`, `/gis-map`.
 - **Admin (`Admin`):** `/admin/dashboard`, `/admin/system`, `/admin/communes`, `/admin/firmware`, `/admin/settings`.

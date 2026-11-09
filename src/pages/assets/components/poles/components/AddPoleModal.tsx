@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { useSelector, useDispatch } from 'react-redux'
+import { toast } from 'sonner'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
+import { createManagedAreaControl } from '../../../../../utils/gis-map/MapRecenterControl'
 import {
   PlusCircle,
-  X,
   MapPin,
   CheckCircle2,
   Trash2,
@@ -22,6 +23,8 @@ import {
   FIT_BOUNDS_ASSET_ADD_SMOOTH,
   toLngLatBounds,
   toBboxPolygonGeoJSON,
+  isPointInBounds,
+  OUTSIDE_MANAGED_AREA_MESSAGE,
   getCommuneBboxInfo,
 } from '../../../../../utils/gis-map/mapUtils'
 import {
@@ -109,6 +112,12 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const communeBoundsInfo = useMemo(() => {
     return getCommuneBboxInfo(activeCommuneId, userCommunes, adminCommunes, mapBounds)
   }, [activeCommuneId, userCommunes, adminCommunes, mapBounds])
+  const activeBounds = useMemo(
+    () => communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox),
+    [communeBoundsInfo, mapBounds]
+  )
+  const activeBoundsRef = useRef(activeBounds)
+  activeBoundsRef.current = activeBounds
 
   // Merged existing poles belonging to the currently selected segment (allPoles + mapPoles)
   const existingPolesOnSegment = useMemo(() => {
@@ -558,6 +567,8 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     })
 
     mapRef.current = map
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+    map.addControl(createManagedAreaControl(() => activeBoundsRef.current), 'top-right')
 
     let resizeObserver: ResizeObserver | null = null
     if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
@@ -571,13 +582,6 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
     map.on('load', () => {
       const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-      if (activeBounds) {
-        map.setMaxBounds(activeBounds)
-        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-          map.setMinZoom(camera.zoom)
-        }
-      }
 
       const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
       if (!map.getSource('commune-bbox-boundary')) {
@@ -737,6 +741,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     // Click map to snap & add pole
     map.on('click', (e) => {
       if (!selectedSegmentIdRef.current || segmentCoordsRef.current.length < 2) return
+      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
+        toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+        return
+      }
       addPoleAtPoint(e.lngLat.lng, e.lngLat.lat)
     })
 
@@ -765,13 +773,6 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     if (!map) return
 
     const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-    if (activeBounds) {
-      map.setMaxBounds(activeBounds)
-      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-        map.setMinZoom(camera.zoom)
-      }
-    }
 
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
     if (source) {
@@ -925,7 +926,9 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
         marker.getElement().style.zIndex = '50'
 
         // Drag start: disable map panning to make dragging responsive
+        let dragStartPos = marker.getLngLat()
         marker.on('dragstart', () => {
+          dragStartPos = marker!.getLngLat()
           map.dragPan.disable()
         })
 
@@ -942,6 +945,11 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
         marker.on('dragend', () => {
           map.dragPan.enable()
           const raw = marker!.getLngLat()
+          if (!isPointInBounds(activeBoundsRef.current, raw.lng, raw.lat)) {
+            marker!.setLngLat(dragStartPos)
+            toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+            return
+          }
           if (segmentCoordsRef.current.length >= 2) {
             const snappedPoint = resolveNonOverlappingRoutePoint(raw.lng, raw.lat, row.rowId)
             marker!.setLngLat(snappedPoint)
@@ -1078,44 +1086,20 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     onClose()
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in select-none">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95">
-        
-        {/* Header Modal */}
-        <div className="p-5 bg-gradient-to-r from-[#172b4d] via-[#1f3864] to-[#25457a] text-white flex items-center justify-between shadow-md shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
-              <Layers className="w-5 h-5 text-amber-300" />
-            </div>
-            <div>
-              <h3 className="font-bold text-white text-base">
-                Thêm Cột Đèn Mới Vào Hệ Thống GIS
-              </h3>
-              <p className="text-xs text-slate-300">
-                Khai báo theo Tuyến đường và Tủ điện quản lý nguồn
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 cursor-pointer transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  return (
+    <AssetModalFrame widthClass="max-w-7xl">
+      <AssetModalHeader
+        icon={<Layers className="w-5 h-5" />}
+        accent="blue"
+        title="Thêm Cột Đèn Mới Vào Hệ Thống GIS"
+        subtitle="Khai báo theo Tuyến đường và Tủ điện quản lý nguồn"
+        onClose={onClose}
+      />
 
-        {/* Global Error Banner */}
-        {errorMsg && (
-          <div className="px-5 py-2.5 bg-rose-50 dark:bg-rose-950/60 border-b border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-2 shrink-0 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
+      <AssetModalError message={errorMsg} />
 
-        {/* Modal Body - 2 Columns Layout */}
-        <form onSubmit={handleBatchSubmit} className="flex-1 flex flex-col overflow-hidden">
+      {/* Modal Body - 2 Columns Layout */}
+      <form onSubmit={handleBatchSubmit} className="flex-1 flex flex-col min-h-0">
           <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
             
             {/* ================= CỘT TRÁI (~45%): THÔNG SỐ & BẢNG CỘT ĐÈN ================= */}
@@ -1396,26 +1380,12 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer shadow-2xs"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-[#1f3864] dark:bg-blue-600 hover:bg-[#1f3864]/90 dark:hover:bg-blue-500 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Xác Nhận Lưu ({rows.length} Cột)</span>
-            </button>
-          </div>
+          <AssetModalFooter
+            onCancel={onClose}
+            submitLabel={`Xác Nhận Lưu (${rows.length} Cột)`}
+            submitIcon={<CheckCircle2 className="w-4 h-4" />}
+          />
         </form>
-      </div>
-    </div>,
-    document.body
+    </AssetModalFrame>
   )
 }

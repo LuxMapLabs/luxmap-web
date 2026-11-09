@@ -156,9 +156,9 @@ export const CommunesTab: React.FC = () => {
   return (
     <div className="space-y-3.5">
       {/* 1. Workspace Toolbar: Search, Filter Pills & Add Button */}
-      <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="glass-tile p-2.5 sm:p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         {/* Search Input */}
-        <div className="relative flex-1 max-w-full lg:max-w-md">
+        <div className="relative flex-1 max-w-full md:max-w-md">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -225,7 +225,7 @@ export const CommunesTab: React.FC = () => {
               setEditingCommune(null)
               setIsFormModalOpen(true)
             }}
-            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white font-semibold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 active:scale-95 text-white font-semibold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Thêm địa bàn</span>
@@ -236,7 +236,7 @@ export const CommunesTab: React.FC = () => {
       {/* 2. Interactive Spatial Split Console (DUY NHẤT 1 CHẾ ĐỘ ĐỘT PHÁ) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
         {/* CỘT TRÁI: DANH SÁCH ĐỊA BÀN TƯƠNG TÁC (40% BỀ NGANG) */}
-        <div className="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 flex flex-col justify-between min-h-[580px] lg:h-[calc(100vh-215px)]">
+        <div className="lg:col-span-5 xl:col-span-4 glass-tile p-3 flex flex-col justify-between min-h-[580px] lg:h-[calc(100vh-280px)]">
           {/* Header Danh mục */}
           <div className="pb-2.5 mb-1 border-b border-slate-100 flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
@@ -419,7 +419,7 @@ export const CommunesTab: React.FC = () => {
         </div>
 
         {/* CỘT PHẢI: LIVE BBOX VIEWER MAP (60% BỀ NGANG) */}
-        <div className="lg:col-span-7 xl:col-span-8 bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col min-h-[580px] lg:h-[calc(100vh-215px)] relative">
+        <div className="lg:col-span-7 xl:col-span-8 glass-tile overflow-hidden flex flex-col min-h-[580px] lg:h-[calc(100vh-280px)] relative">
           {activeCommune ? (
             <>
               {/* Header điều khiển bản đồ phân tầng 2 lớp chuyên nghiệp */}
@@ -467,7 +467,7 @@ export const CommunesTab: React.FC = () => {
                         setEditingCommune(activeCommune)
                         setIsFormModalOpen(true)
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 active:scale-95 text-white font-semibold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                       <span>Sửa BBox</span>

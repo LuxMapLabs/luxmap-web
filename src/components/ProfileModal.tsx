@@ -62,7 +62,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
   const isAdmin = checkIsAdmin(user.role)
 
   let badgeColor = 'bg-blue-50 text-blue-700 border-blue-200'
-  if (isAdmin) badgeColor = 'bg-purple-50 text-purple-700 border-purple-200'
+  if (isAdmin) badgeColor = 'bg-primary/10 text-primary border-primary/20'
   else if (isManagementAgency(user.role)) badgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200'
   else if (isMaintenanceEngineer(user.role)) badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200'
   else if (isFieldCrew(user.role)) badgeColor = 'bg-amber-50 text-amber-800 border-amber-200'
@@ -114,13 +114,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div onClick={onClose} className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200" />
+      <div onClick={onClose} className={`fixed inset-0 animate-in fade-in duration-200 ${isAdmin ? 'bg-slate-900/30 backdrop-blur-md' : 'bg-slate-900/50 backdrop-blur-xs'}`} />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Hồ sơ cá nhân"
-        className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md z-10 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className={`relative shadow-2xl border w-full max-w-md z-10 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 ${isAdmin ? 'bg-white/80 backdrop-blur-2xl rounded-[28px] border-white/80 shadow-primary/30' : 'bg-white rounded-2xl border-slate-200'}`}
       >
         <button
           type="button"
@@ -143,7 +143,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   className="w-24 h-24 rounded-full object-cover ring-4 ring-slate-100"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-3xl font-bold flex items-center justify-center ring-4 ring-slate-100">
+                <div className={`w-24 h-24 rounded-full ${isAdmin ? 'bg-gradient-to-br from-secondary to-primary' : 'bg-gradient-to-br from-blue-500 to-indigo-600'} text-white text-3xl font-bold flex items-center justify-center ring-4 ring-slate-100`}>
                   {initials}
                 </div>
               )}
@@ -237,7 +237,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   </dt>
                   <dd className="font-semibold text-slate-900">
                     {hasAllCommunes ? (
-                      <span className="inline-flex items-center gap-1.5 text-purple-700">
+                      <span className="inline-flex items-center gap-1.5 text-primary">
                         <Globe className="w-3.5 h-3.5" />
                         Toàn bộ địa bàn
                       </span>
@@ -269,7 +269,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                 onClick={handleSave}
                 disabled={!canSave}
                 title={!onSave ? 'Chờ hệ thống bổ sung API lưu hồ sơ' : undefined}
-                className="px-4 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:bg-slate-300 disabled:cursor-not-allowed cursor-pointer"
+                className={`px-4 h-9 rounded-xl ${isAdmin ? 'bg-primary hover:bg-primary/90' : 'bg-blue-600 hover:bg-blue-700'} text-white text-xs font-bold disabled:bg-slate-300 disabled:cursor-not-allowed cursor-pointer`}
               >
                 {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
               </button>
@@ -287,7 +287,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+                className={`px-5 h-9 rounded-xl ${isAdmin ? 'bg-primary hover:bg-primary/90' : 'bg-slate-900 hover:bg-slate-800'} text-white text-xs font-bold cursor-pointer`}
               >
                 Đóng
               </button>

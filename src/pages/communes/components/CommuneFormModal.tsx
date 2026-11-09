@@ -161,10 +161,10 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white/80 backdrop-blur-2xl dark:bg-slate-900 rounded-[28px] border border-white/80 dark:border-slate-800 shadow-2xl shadow-primary/30 w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-950/70">
+        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white/50 dark:bg-slate-950/70">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-2xs">
               <Compass className="w-5 h-5" />
@@ -202,7 +202,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="VD: Xã Phước Đồng, Thị trấn Diên Khánh, Phường Tân Phú..."
-                className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition ${
+                className={`w-full px-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition ${
                   errors.name ? 'border-rose-500' : 'border-slate-200 dark:border-slate-700'
                 }`}
               />
@@ -251,7 +251,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
               )}
 
               {/* 4 Ô Nhập Số Tọa Độ: Chuẩn La bàn GIS (Bắc ở trên, Nam ở dưới) */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2.5">
+              <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2.5">
                 <div className="space-y-2">
                   {/* Bắc (Top) */}
                   <div className="flex justify-center">
@@ -265,7 +265,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                         value={bbox?.max_lat !== undefined && bbox?.max_lat !== null ? String(bbox.max_lat) : ''}
                         onChange={(e) => handleCoordInputChange('max_lat', e.target.value)}
                         placeholder="11.02..."
-                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full px-2.5 py-1.5 bg-white/60 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -282,7 +282,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                         value={bbox?.min_lng !== undefined && bbox?.min_lng !== null ? String(bbox.min_lng) : ''}
                         onChange={(e) => handleCoordInputChange('min_lng', e.target.value)}
                         placeholder="106.45..."
-                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full px-2.5 py-1.5 bg-white/60 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
                     <div>
@@ -295,7 +295,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                         value={bbox?.max_lng !== undefined && bbox?.max_lng !== null ? String(bbox.max_lng) : ''}
                         onChange={(e) => handleCoordInputChange('max_lng', e.target.value)}
                         placeholder="106.52..."
-                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full px-2.5 py-1.5 bg-white/60 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -312,7 +312,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                         value={bbox?.min_lat !== undefined && bbox?.min_lat !== null ? String(bbox.min_lat) : ''}
                         onChange={(e) => handleCoordInputChange('min_lat', e.target.value)}
                         placeholder="10.95..."
-                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full px-2.5 py-1.5 bg-white/60 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -370,7 +370,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
         </form>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-end gap-3">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -382,7 +382,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+            className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary/90 active:scale-95 transition shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
           >
             {isSubmitting ? 'Đang lưu...' : isEdit ? 'Lưu Thay Đổi' : 'Thêm Địa Bàn'}
           </button>

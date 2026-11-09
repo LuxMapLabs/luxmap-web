@@ -60,32 +60,29 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+        <div className="flex items-center justify-between p-5 bg-linear-to-r from-teal-700 to-teal-600 text-white shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-800 shadow-xs">
-              <Cpu className="w-5 h-5" />
+            <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center">
+              <Cpu className="w-6 h-6 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 font-mono">
-                  {node.node_id}
-                </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
+                <span className="font-mono text-xs bg-white/25 px-2 py-0.5 rounded-md font-bold">
                   {node.node_role}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Chi tiết bộ điều khiển viễn trắc IoT tủ điện
-              </p>
+              <h3 className="font-extrabold text-base mt-0.5 font-mono">
+                {node.node_id}
+              </h3>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -215,9 +212,9 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
                   <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase font-bold text-slate-600 dark:text-slate-300">
                     <tr>
                       <th className="py-2.5 px-3">Rơ-le #</th>
-                      <th className="py-2.5 px-3">Mạch Xuất Tuyến</th>
-                      <th className="py-2.5 px-3 text-center">Chế Độ Báo Cáo</th>
-                      <th className="py-2.5 px-3 text-right">Thời Điểm Báo Cáo</th>
+                      <th className="py-2.5 px-3">Mạch xuất tuyến</th>
+                      <th className="py-2.5 px-3 text-center">Chế độ báo cáo</th>
+                      <th className="py-2.5 px-3 text-right">Thời điểm báo cáo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

@@ -28,7 +28,7 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
   const currentStatus = statusFilter.length === 1 ? statusFilter[0] : ''
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
+    <div className="ops-rise bg-white dark:bg-slate-900 border border-[#e2e8f0] dark:border-slate-800 rounded-xl p-4">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         {/* 1. Tìm kiếm theo mã cột đèn (hỗ trợ cả POLE-xxxx và external_ref) */}
         <div className="relative flex-1 min-w-[200px]">

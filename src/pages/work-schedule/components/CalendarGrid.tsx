@@ -104,9 +104,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const todayYear = today.getFullYear()
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+    <div className="ops-rise bg-white rounded-[20px] shadow-ops overflow-x-auto">
       {/* Header thứ trong tuần */}
-      <div className="grid grid-cols-7 bg-slate-50/90 border-b border-slate-200 text-center select-none shrink-0">
+      <div className="grid min-w-[640px] grid-cols-7 bg-slate-50/90 border-b border-slate-200 text-center select-none shrink-0">
         {WEEKDAYS.map((w, idx) => (
           <div
             key={w}
@@ -119,7 +119,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       </div>
 
       {/* Lưới các ô ngày: Tự động co giãn chiều cao theo số lượng thẻ lịch (giống bản Prototype) */}
-      <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-100 auto-rows-[minmax(130px,auto)]">
+      <div className="grid min-w-[640px] grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-100 auto-rows-[minmax(130px,auto)]">
         {/* Render ngày đệm tháng trước */}
         {prevDays.map((d) => (
           <div key={`prev-${d}`} className="bg-slate-50/40 p-2.5 min-h-[130px] flex flex-col opacity-40">

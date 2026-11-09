@@ -23,7 +23,7 @@ export const CabinetDetailModal: React.FC<CabinetDetailModalProps> = ({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-lg overflow-hidden animate-in zoom-in-95">
         {/* Header */}
-        <div className="p-5 text-white flex items-center justify-between bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700">
+        <div className="p-5 text-white flex items-center justify-between bg-linear-to-r from-teal-700 to-teal-600">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
               <Zap className="w-6 h-6 text-white" />

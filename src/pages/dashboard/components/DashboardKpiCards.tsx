@@ -1,5 +1,6 @@
 import React from 'react'
-import { Lightbulb, AlertTriangle, AlertOctagon, ShieldCheck, ArrowDownRight } from 'lucide-react'
+import { Lightbulb, AlertTriangle, ZapOff, ShieldAlert, type LucideIcon } from 'lucide-react'
+import { useCountUp } from '../../../hooks/useCountUp'
 
 interface DashboardKpiCardsProps {
   fixtureKpis: {
@@ -23,6 +24,82 @@ interface DashboardKpiCardsProps {
   onClickWarranty?: () => void
 }
 
+interface MeterPart {
+  pct: number
+  color: string
+}
+
+type Tone = 'ok' | 'bad' | 'warn'
+
+interface KpiCardProps {
+  index: number
+  icon: LucideIcon
+  label: string
+  value: number
+  display?: string
+  suffix?: string
+  decimals?: number
+  hint: string
+  tone: Tone
+  parts: MeterPart[]
+  title: string
+  onClick?: () => void
+}
+
+const TONE: Record<Tone, { value: string; tile: string }> = {
+  ok: { value: 'text-emerald-600', tile: 'bg-emerald-50 text-emerald-600' },
+  bad: { value: 'text-red-600', tile: 'bg-red-50 text-red-600' },
+  warn: { value: 'text-amber-600', tile: 'bg-amber-50 text-amber-600' },
+}
+
+const KpiCard: React.FC<KpiCardProps> = ({
+  index,
+  icon: Icon,
+  label,
+  value,
+  display,
+  suffix = '',
+  decimals = 0,
+  hint,
+  tone,
+  parts,
+  title,
+  onClick,
+}) => {
+  const animated = useCountUp(value)
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{ '--i': index } as React.CSSProperties}
+      className="ops-rise group text-left bg-white rounded-[20px] shadow-ops px-5 py-[18px] cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-ops-hover active:translate-y-0"
+    >
+      <span
+        className={`flex h-[42px] w-[42px] items-center justify-center rounded-[14px] transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6 ${TONE[tone].tile}`}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="mt-3.5 block text-[12.5px] font-semibold text-slate-500">{label}</span>
+      <span className="mt-0.5 flex items-baseline gap-1.5">
+        <strong className={`text-[32px] leading-[1.15] font-extrabold tracking-tight tabular-nums ${TONE[tone].value}`}>
+          {display ?? `${animated.toFixed(decimals)}${suffix}`}
+        </strong>
+        <em className="not-italic text-xs font-medium text-slate-400">{hint}</em>
+      </span>
+      <span className="mt-3 flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        {parts.map((p, i) => (
+          <span
+            key={i}
+            style={{ width: `${Math.max(0, Math.min(100, p.pct))}%`, backgroundColor: p.color }}
+            className="ops-grow ops-shine block h-full"
+          />
+        ))}
+      </span>
+    </button>
+  )
+}
+
 export const DashboardKpiCards: React.FC<DashboardKpiCardsProps> = ({
   fixtureKpis,
   faultsCount,
@@ -32,149 +109,64 @@ export const DashboardKpiCards: React.FC<DashboardKpiCardsProps> = ({
   onClickSevereFaults,
   onClickWarranty,
 }) => {
+  const hasPoles = fixtureKpis.totalPoles > 0
+  const warrantyTotal = warrantyKpis.expiredCount + warrantyKpis.expiringCount
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* KPI 1: Tỷ lệ chiếu sáng bình thường -> Trỏ xuống Biểu đồ */}
-      <div
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <KpiCard
+        index={0}
+        icon={Lightbulb}
+        label="Tỷ lệ sáng bình thường"
+        value={hasPoles ? Number(fixtureKpis.normalPct) : 0}
+        display={hasPoles ? undefined : '-'}
+        suffix="%"
+        decimals={1}
+        hint={hasPoles ? `${fixtureKpis.totalNormal} / ${fixtureKpis.totalPoles} cột` : 'Chưa có cột đèn'}
+        tone="ok"
+        parts={[{ pct: Number(fixtureKpis.normalPct), color: '#12a37f' }]}
+        title="Cuộn xuống xem biểu đồ phân tích chiếu sáng"
         onClick={onClickNormal}
-        title="Bấm để cuộn xuống xem Biểu đồ phân tích chiếu sáng"
-        className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-lg hover:border-emerald-400 hover:-translate-y-1 transition-all cursor-pointer group active:scale-[0.98]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-slate-500 group-hover:text-emerald-700 transition-colors">
-              Tỷ lệ sáng bình thường
-            </span>
-            <ArrowDownRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 transition-colors" />
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100 group-hover:scale-105 transition-all">
-            <Lightbulb className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="flex items-baseline gap-2.5 my-3">
-          <span className="text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
-            {fixtureKpis.totalPoles > 0 ? `${fixtureKpis.normalPct}%` : '---'}
-          </span>
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
-            {fixtureKpis.totalPoles > 0
-              ? `${fixtureKpis.totalNormal} / ${fixtureKpis.totalPoles} cột`
-              : 'Chưa có cột đèn'}
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">
-          <span>Sáng yếu: <strong className="text-amber-600">{fixtureKpis.totalDim}</strong></span>
-          <span>Mất sáng: <strong className="text-red-600">{fixtureKpis.totalOut}</strong></span>
-          <span className="text-emerald-600 font-bold group-hover:underline flex items-center gap-0.5">
-            Xem biểu đồ ↘
-          </span>
-        </div>
-      </div>
-
-      {/* KPI 2: Sự cố đang tồn đọng -> Trỏ xuống Bảng giám sát sự cố (Tất cả) */}
-      <div
+      />
+      <KpiCard
+        index={1}
+        icon={AlertTriangle}
+        label="Sự cố đang tồn đọng"
+        value={faultsCount}
+        hint={faultsCount > 0 ? 'cần khắc phục' : 'không có sự cố'}
+        tone={faultsCount > 0 ? 'bad' : 'ok'}
+        parts={[{ pct: faultsCount > 0 ? 100 : 0, color: '#e5484d' }]}
+        title="Cuộn xuống bảng giám sát sự cố bóng đèn"
         onClick={onClickPendingFaults}
-        title="Bấm để cuộn xuống Bảng giám sát sự cố bóng đèn (Tất cả sự cố)"
-        className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-lg hover:border-rose-400 hover:-translate-y-1 transition-all cursor-pointer group active:scale-[0.98]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-slate-500 group-hover:text-rose-700 transition-colors">
-              Sự cố đang tồn đọng
-            </span>
-            <ArrowDownRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-rose-600 transition-colors" />
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 group-hover:scale-105 transition-all">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="flex items-baseline gap-2.5 my-3">
-          <span className="text-3xl font-extrabold text-rose-600 tracking-tight leading-none">
-            {faultsCount}
-          </span>
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700">
-            Cần khắc phục
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">
-          <span className="truncate max-w-[150px]">
-            {faultsCount > 0 ? `Ghi nhận ${faultsCount} sự cố` : 'Không có sự cố'}
-          </span>
-          <span className="text-rose-600 font-bold group-hover:underline flex items-center gap-0.5">
-            Xem sự cố ↘
-          </span>
-        </div>
-      </div>
-
-      {/* KPI 3: Mất sáng nghiêm trọng -> Trỏ xuống Bảng sự cố và chuyển tab Mất sáng hoàn toàn */}
-      <div
+      />
+      <KpiCard
+        index={2}
+        icon={ZapOff}
+        label="Mất sáng nghiêm trọng"
+        value={fixtureKpis.totalOut}
+        hint={`${fixtureKpis.outPct}% số cột`}
+        tone={fixtureKpis.totalOut > 0 ? 'bad' : 'ok'}
+        parts={[{ pct: Number(fixtureKpis.outPct), color: '#e5484d' }]}
+        title="Lọc các cột mất sáng hoàn toàn trong bảng sự cố"
         onClick={onClickSevereFaults}
-        title="Bấm để cuộn xuống Bảng sự cố và lọc các cột Mất sáng hoàn toàn"
-        className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-lg hover:border-rose-500 hover:-translate-y-1 transition-all cursor-pointer group active:scale-[0.98]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-slate-500 group-hover:text-rose-700 transition-colors">
-              Mất sáng nghiêm trọng
-            </span>
-            <ArrowDownRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-rose-600 transition-colors" />
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 group-hover:scale-105 transition-all">
-            <AlertOctagon className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="flex items-baseline gap-2.5 my-3">
-          <span className="text-3xl font-extrabold text-rose-600 tracking-tight leading-none">
-            {fixtureKpis.totalOut}
-          </span>
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700">
-            {fixtureKpis.outPct}% số cột
-          </span>
-        </div>
-        <div className="space-y-1.5">
-          <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
-            <div
-              style={{ width: `${Math.min(100, Math.max(8, Number(fixtureKpis.outPct)))}%` }}
-              className="bg-rose-500 rounded-full"
-            />
-          </div>
-          <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-            <span>Sáng yếu: <strong className="text-amber-600 font-bold">{fixtureKpis.totalDim} cột</strong></span>
-            <span className="text-rose-600 font-bold group-hover:underline">Lọc mất sáng ↘</span>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI 4: Cảnh báo bảo hành (<= 30 ngày) -> Trỏ xuống Bảng bảo hành */}
-      <div
+      />
+      <KpiCard
+        index={3}
+        icon={ShieldAlert}
+        label="Bảo hành cần xử lý (≤ 1 tháng)"
+        value={warrantyKpis.itemsCount}
+        hint={`${warrantyKpis.expiredCount} quá hạn`}
+        tone="warn"
+        parts={
+          warrantyTotal > 0
+            ? [
+                { pct: (warrantyKpis.expiredCount / warrantyTotal) * 100, color: '#e5484d' },
+                { pct: (warrantyKpis.expiringCount / warrantyTotal) * 100, color: '#f5a524' },
+              ]
+            : []
+        }
+        title="Cuộn xuống bảng theo dõi bảo hành"
         onClick={onClickWarranty}
-        title="Bấm để cuộn xuống Bảng theo dõi bảo hành"
-        className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-lg hover:border-amber-400 hover:-translate-y-1 transition-all cursor-pointer group active:scale-[0.98]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-slate-500 group-hover:text-amber-700 transition-colors">
-              Bảo hành cần xử lý (≤ 1 tháng)
-            </span>
-            <ArrowDownRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-600 transition-colors" />
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-100 group-hover:scale-105 transition-all">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="flex items-baseline gap-2.5 my-3">
-          <span className="text-3xl font-extrabold text-amber-600 tracking-tight leading-none">
-            {warrantyKpis.itemsCount}
-          </span>
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700">
-            Bóng đèn
-          </span>
-        </div>
-        <div className="flex justify-between text-[11px] text-slate-500 font-medium border-t border-slate-100 pt-2">
-          <span>Quá hạn: <strong className="text-red-600 font-bold">{warrantyKpis.expiredCount}</strong></span>
-          <span className="text-amber-600 font-bold group-hover:underline">Xem bảo hành ↘</span>
-        </div>
-      </div>
+      />
     </div>
   )
 }
-

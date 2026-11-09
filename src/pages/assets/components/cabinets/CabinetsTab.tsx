@@ -114,7 +114,7 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
   return (
     <>
       {/* Search & Dynamic Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
         {/* Left: Filters */}
         <div className="flex flex-1 flex-wrap items-center gap-3">
           {/* Search Box */}

@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react'
-import { AlertTriangle, Filter, AlertCircle } from 'lucide-react'
+import { AlertCircle, ChevronDown } from 'lucide-react'
+import { OpsCard } from '../../../components/ops/OpsCard'
+import { OpsTabs } from '../../../components/ops/OpsTabs'
 import type { FaultItem } from '../../../types/faults/faults'
 
 export type ProgressFilterType =
@@ -140,151 +142,55 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
   }, [faults, progressFilter])
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-      <div>
-        {/* Header bảng */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Giám Sát Sự Cố Bóng Đèn</h3>
-              <p className="text-[11px] text-slate-500">
-                Tổng hợp đa nguồn (Xe quét AI, Khảo sát, Cảm biến IoT, Dân quét QR)
-              </p>
-            </div>
-          </div>
-          <span className="text-[11px] font-bold px-2.5 py-1 bg-rose-50 text-rose-700 rounded-full border border-rose-200/60">
-            {displayedFaults.length} / {faults.length} sự cố
-          </span>
-        </div>
-
-        {/* 4 Tab Lọc Theo Loại Sự Cố */}
-        <div className="flex gap-1.5 border-b border-slate-100 pb-2.5 mb-2.5 text-xs flex-wrap">
-          <button
-            onClick={() => onTabChange('all')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
-              activeTab === 'all'
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-            }`}
+    <OpsCard
+      index={3}
+      className="h-full"
+      title="Sự cố bóng đèn"
+      description="Tổng hợp từ xe quét AI, khảo sát, cảm biến IoT và người dân quét QR"
+      actions={
+        <label className="relative flex items-center">
+          <span className="sr-only">Lọc theo tiến độ xử lý</span>
+          <select
+            value={progressFilter}
+            onChange={(e) => setProgressFilter(e.target.value as ProgressFilterType)}
+            className="h-8 appearance-none rounded-lg border border-[#e2e8f0] bg-white pl-3 pr-8 text-xs font-semibold text-slate-700 outline-hidden cursor-pointer transition-all hover:border-teal-300 hover:bg-slate-50 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
           >
-            Tất cả ({totalCount})
-          </button>
-          <button
-            onClick={() => onTabChange('blackout')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'blackout'
-                ? 'bg-red-600 text-white'
-                : 'text-slate-500 hover:text-red-600 hover:bg-red-50'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-            Mất sáng hoàn toàn ({blackoutCount})
-          </button>
-          <button
-            onClick={() => onTabChange('dim')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'dim'
-                ? 'bg-amber-600 text-white'
-                : 'text-slate-500 hover:text-amber-600 hover:bg-amber-50'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            Sáng yếu / Suy giảm ({dimCount})
-          </button>
-          <button
-            onClick={() => onTabChange('offline')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'offline'
-                ? 'bg-purple-600 text-white'
-                : 'text-slate-500 hover:text-purple-600 hover:bg-purple-50'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-            Mất kết nối IoT ({offlineCount})
-          </button>
-        </div>
+            <option value="all">Tiến độ: Tất cả ({faults.length})</option>
+            <option value="unassigned">Chưa phân lịch ({progressCounts.unassigned})</option>
+            <option value="waiting_repair">Chờ sửa chữa ({progressCounts.waitingRepair})</option>
+            <option value="in_progress">Đang sửa chữa ({progressCounts.inProgress})</option>
+            <option value="verified">Đã nghiệm thu ({progressCounts.verified})</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-slate-400" />
+        </label>
+      }
+      flush
+    >
+      <div className="px-6 pb-4 pt-4">
+        <OpsTabs
+          value={activeTab}
+          onChange={onTabChange}
+          items={[
+            { key: 'all', label: 'Tất cả', count: totalCount },
+            { key: 'blackout', label: 'Mất sáng hoàn toàn', count: blackoutCount },
+            { key: 'dim', label: 'Sáng yếu / Suy giảm', count: dimCount },
+            { key: 'offline', label: 'Mất kết nối IoT', count: offlineCount },
+          ]}
+        />
+      </div>
 
-        {/* Thanh Lọc Theo Tiến Độ Xử Lý */}
-        <div className="flex items-center justify-between bg-slate-50/80 px-3 py-2 rounded-xl border border-slate-200/70 mb-3 text-xs flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 text-slate-700 font-bold text-[11px]">
-            <Filter className="w-3.5 h-3.5 text-blue-600" />
-            <span>Lọc theo tiến độ xử lý:</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => setProgressFilter('all')}
-              className={`px-2 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
-                progressFilter === 'all'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
-              }`}
-            >
-              Tất cả ({faults.length})
-            </button>
-            <button
-              onClick={() => setProgressFilter('unassigned')}
-              className={`px-2 py-1 rounded-md text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
-                progressFilter === 'unassigned'
-                  ? 'bg-rose-600 text-white shadow-2xs'
-                  : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-              Chưa phân lịch ({progressCounts.unassigned})
-            </button>
-            <button
-              onClick={() => setProgressFilter('waiting_repair')}
-              className={`px-2 py-1 rounded-md text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
-                progressFilter === 'waiting_repair'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              Chờ sửa chữa ({progressCounts.waitingRepair})
-            </button>
-            <button
-              onClick={() => setProgressFilter('in_progress')}
-              className={`px-2 py-1 rounded-md text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
-                progressFilter === 'in_progress'
-                  ? 'bg-amber-600 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              Đang sửa chữa ({progressCounts.inProgress})
-            </button>
-            <button
-              onClick={() => setProgressFilter('verified')}
-              className={`px-2 py-1 rounded-md text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
-                progressFilter === 'verified'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Đã nghiệm thu ({progressCounts.verified})
-            </button>
-          </div>
-        </div>
-
-        {/* Bảng dữ liệu sự cố */}
-        <div className="overflow-x-auto max-h-[360px] overflow-y-auto custom-scrollbar rounded-xl border border-slate-200/80">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 bg-slate-100 z-10 shadow-2xs">
-              <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-2.5 px-3">Mã Cột / Tuyến</th>
-                <th className="py-2.5 px-3">Hiện Trạng Sự Cố</th>
-                <th className="py-2.5 px-3">Nguồn Phát Hiện</th>
-                <th className="py-2.5 px-3">Tiến Độ Xử Lý</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {displayedFaults.length > 0 ? (
+      <div className="max-h-[360px] overflow-auto custom-scrollbar">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead className="sticky top-0 z-10 bg-slate-50">
+            <tr className="border-b border-slate-100 text-slate-500 font-semibold text-[11px]">
+              <th className="py-2.5 px-6">Mã cột / tuyến</th>
+              <th className="py-2.5 px-3">Hiện trạng</th>
+              <th className="py-2.5 px-3">Nguồn phát hiện</th>
+              <th className="py-2.5 px-6">Tiến độ xử lý</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayedFaults.length > 0 ? (
                 displayedFaults.map((fault, idx) => {
                   const faultTypeStr = String(fault.fault_type || '').toLowerCase()
                   const isOffline = faultTypeStr.includes('offline') || faultTypeStr.includes('node')
@@ -328,10 +234,9 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                           onSelectFault(fault)
                         }
                       }}
-                      className={`transition-all cursor-pointer group ${
-                        isUnassigned
-                          ? 'bg-rose-50/60 hover:bg-rose-100/80 border-l-4 border-l-rose-500 shadow-2xs'
-                          : 'hover:bg-slate-50/80 border-l-4 border-l-transparent'
+                      style={{ '--i': idx } as React.CSSProperties}
+                      className={`ops-rise group cursor-pointer border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:shadow-[inset_3px_0_0_#0f766e] ${
+                        isUnassigned ? 'bg-rose-50/50 hover:bg-rose-50' : 'hover:bg-teal-50/40'
                       }`}
                       title={
                         isUnassigned
@@ -339,7 +244,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                           : 'Bấm vào hàng để xem tọa độ GPS chi tiết'
                       }
                     >
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-6">
                         <span
                           className={`font-mono text-xs font-semibold px-1.5 py-0.5 rounded transition-colors ${
                             isUnassigned
@@ -385,9 +290,9 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                             : 'Gần đây'}
                         </div>
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-6">
                         {isUnassigned ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs whitespace-nowrap animate-pulse">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 whitespace-nowrap ops-ping">
                             <AlertCircle className="w-3 h-3 text-rose-600" />
                             Chưa phân lịch
                           </span>
@@ -411,21 +316,20 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                 </tr>
               )}
             </tbody>
-          </table>
-        </div>
+        </table>
       </div>
 
-      <div className="border-t border-slate-100 pt-3 mt-3 flex items-center justify-between text-[11px] text-slate-400">
+      <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-6 py-3.5 text-xs text-slate-500">
         <span>
-          Đang hiển thị: <strong className="text-slate-800">{displayedFaults.length}</strong> / Tổng sự cố:{' '}
-          <strong className="text-rose-600">{faults.length}</strong>
+          Hiển thị <strong className="text-slate-800 tabular-nums">{displayedFaults.length}</strong> /{' '}
+          <strong className="text-slate-800 tabular-nums">{faults.length}</strong> sự cố
         </span>
-        <span className="italic">
-          * Hàng màu hồng viền đỏ là sự cố chưa phân lịch (Nhấp để tạo lịch ngay)
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-xs border border-rose-200 bg-rose-50" />
+          Hàng nền hồng là sự cố chưa phân lịch, bấm để tạo lịch
         </span>
       </div>
-    </div>
+    </OpsCard>
   )
 }
 export default FaultsTableCard
-

@@ -84,15 +84,15 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold select-none uppercase tracking-wider text-[11px]">
-              <th className="py-3 px-4">Mã Thiết Bị</th>
-              <th className="py-3 px-4">Tủ Điện Cấp Nguồn</th>
+              <th className="py-3 px-4">Mã thiết bị</th>
+              <th className="py-3 px-4">Tủ điện cấp nguồn</th>
               {showCommune && <th className="py-3 px-4">Địa bàn</th>}
-              <th className="py-3 px-4 text-center">Nguồn Dữ Liệu</th>
-              <th className="py-3 px-4 text-center">Điều Khiển Từ Xa</th>
-              <th className="py-3 px-4 text-center">Xác Thực (Secret)</th>
-              <th className="py-3 px-4">Báo Cáo Gần Nhất</th>
-              <th className="py-3 px-4">Rơ-le Đấu Nối</th>
-              <th className="py-3 px-4 text-right">Thao Tác</th>
+              <th className="py-3 px-4 text-center">Nguồn dữ liệu</th>
+              <th className="py-3 px-4 text-center">Điều khiển từ xa</th>
+              <th className="py-3 px-4 text-center">Xác thực (Secret)</th>
+              <th className="py-3 px-4">Báo cáo gần nhất</th>
+              <th className="py-3 px-4">Rơ-le đấu nối</th>
+              <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">

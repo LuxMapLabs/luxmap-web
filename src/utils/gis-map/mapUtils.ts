@@ -230,7 +230,7 @@ export const FIT_BOUNDS_GIS_SEGMENT = {
   duration: 800,
 } as const
 
-export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY 
+export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY || ''
 
 /**
  * Bản đồ Vệ Tinh Google Hybrid Sạch (Google Satellite + Tự Động Nạp Hoàng Sa & Trường Sa từ Google + MapTiler Vector Sạch trong đất liền - 0% Rác Quán Xá)
@@ -239,7 +239,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
   version: 8,
   id: 'hybrid',
   name: 'Satellite Hybrid',
-  glyphs: 'https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=4A7ex43XNIzlzIcSnO8d',
+  glyphs: `https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=${MAPTILER_KEY}`,
   sprite: 'https://api.maptiler.com/maps/hybrid/sprite',
   bearing: 0,
   pitch: 0,
@@ -247,7 +247,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
   zoom: 1,
   sources: {
     maptiler_planet: {
-      url: 'https://api.maptiler.com/tiles/v3/tiles.json?key=4A7ex43XNIzlzIcSnO8d',
+      url: `https://api.maptiler.com/tiles/v3/tiles.json?key=${MAPTILER_KEY}`,
       type: 'vector',
     },
     satellite: {
@@ -618,3 +618,19 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
     },
   ],
 }) as unknown as StyleSpecification
+
+export type LngLatBoundsTuple = [[number, number], [number, number]]
+
+/** Thông báo khi vị trí chọn nằm ngoài khu vực quản lý của xã. */
+export const OUTSIDE_MANAGED_AREA_MESSAGE = 'Vị trí nằm ngoài khu vực quản lý của xã'
+
+/** Điểm (lng, lat) có nằm trong khung bbox xã không. Không có khung (null) thì coi là hợp lệ. */
+export function isPointInBounds(
+  bounds: LngLatBoundsTuple | null | undefined,
+  lng: number,
+  lat: number
+): boolean {
+  if (!bounds) return true
+  const [[minLng, minLat], [maxLng, maxLat]] = bounds
+  return lng >= minLng && lng <= maxLng && lat >= minLat && lat <= maxLat
+}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Copy,
   Check,
@@ -55,7 +56,7 @@ const renderJsonSyntax = (data: any) => {
       if (/:$/.test(token)) {
         const keyName = token.slice(0, -1)
         parts.push(
-          <span key={keyIndex++} className="text-indigo-600 font-semibold">
+          <span key={keyIndex++} className="text-primary font-semibold">
             {keyName}
           </span>
         )
@@ -125,10 +126,10 @@ const renderKeyValueRows = (data: any) => {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
+    <div className="glass-tile overflow-hidden">
       <table className="w-full table-fixed text-xs border-collapse">
         <thead>
-          <tr className="bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          <tr className="bg-white/50 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             <th className="py-2.5 px-4 text-left w-5/12">Khóa (Key)</th>
             <th className="py-2.5 px-2 text-center w-2/12">Kiểu dữ liệu</th>
             <th className="py-2.5 px-4 text-right w-5/12">Giá trị (Value)</th>
@@ -142,11 +143,11 @@ const renderKeyValueRows = (data: any) => {
               <tr
                 key={key}
                 className={`transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/60 ${
-                  idx % 2 === 1 ? 'bg-slate-50/30 dark:bg-slate-800/20' : 'bg-white dark:bg-slate-900'
+                  idx % 2 === 1 ? 'bg-white/50 dark:bg-slate-800/20' : 'bg-transparent'
                 }`}
               >
-                <td className="py-2.5 px-4 font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-400 text-left align-middle select-text truncate">
-                  <span className="px-2 py-0.5 rounded-md bg-indigo-50/70 dark:bg-indigo-950/50 border border-indigo-100/80 dark:border-indigo-900/60 inline-block">
+                <td className="py-2.5 px-4 font-mono text-xs font-semibold text-primary dark:text-secondary text-left align-middle select-text truncate">
+                  <span className="px-2 py-0.5 rounded-md bg-secondary/10 dark:bg-primary border border-secondary/20 dark:border-primary inline-block">
                     {key}
                   </span>
                 </td>
@@ -218,11 +219,11 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+    <div className="glass-tile overflow-hidden">
       <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <tr className="bg-white/50 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <th className="py-3.5 px-4 w-12 text-center">ID</th>
               <th className="py-3.5 px-4">Thành phần (Component)</th>
               <th className="py-3.5 px-4">Phiên bản (Version)</th>
@@ -244,7 +245,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
               <tr>
                 <td colSpan={8} className="py-16 text-center">
                   <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-100 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-secondary/10 to-slate-100 border border-secondary/20 text-primary flex items-center justify-center shadow-xs">
                       <PackageSearch className="w-7 h-7" />
                     </div>
                     <div>
@@ -259,7 +260,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                       <button
                         type="button"
                         onClick={onOpenRegister}
-                        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer shadow-xs hover:shadow-sm"
+                        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary text-white font-bold text-xs transition cursor-pointer shadow-xs hover:shadow-sm"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Đăng ký Firmware</span>
@@ -292,7 +293,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                       <span
                         className={`font-mono text-xs font-bold px-2.5 py-1 rounded-lg border shadow-2xs inline-flex items-center gap-1.5 ${
                           item.component === 'node_firmware'
-                            ? 'bg-indigo-50/90 text-indigo-700 border-indigo-200'
+                            ? 'bg-secondary/10 text-primary border-secondary/30'
                             : item.component === 'lux_module_firmware'
                             ? 'bg-amber-50/90 text-amber-800 border-amber-200'
                             : 'bg-slate-100 text-slate-800 border-slate-200'
@@ -301,7 +302,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${
                             item.component === 'node_firmware'
-                              ? 'bg-indigo-600'
+                              ? 'bg-primary'
                               : item.component === 'lux_module_firmware'
                               ? 'bg-amber-500'
                               : 'bg-slate-400'
@@ -329,7 +330,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                           <button
                             type="button"
                             onClick={() => handleCopy(rowId, item.artifact_hash!)}
-                            className={`p-1 rounded-md transition cursor-pointer ${copiedRowId === rowId ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                            className={`p-1 rounded-md transition cursor-pointer ${copiedRowId === rowId ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50' : 'text-slate-400 hover:text-primary hover:bg-secondary/10'}`}
                             title={copiedRowId === rowId ? "Đã sao chép mã SHA-256!" : "Sao chép toàn bộ mã SHA-256"}
                           >
                             {copiedRowId === rowId ? (
@@ -396,7 +397,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                       <button
                         type="button"
                         onClick={() => onViewUsage(item.version_id!)}
-                        className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition cursor-pointer inline-flex items-center gap-1 shadow-2xs hover:shadow-xs"
+                        className="px-3 py-1.5 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-primary font-bold text-xs transition cursor-pointer inline-flex items-center gap-1 shadow-2xs hover:shadow-xs"
                         title="Kiểm toán số lượng kết quả nghiệp vụ do phiên bản này sinh ra"
                       >
                         <SearchCheck className="w-3.5 h-3.5" />
@@ -412,18 +413,18 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
       </div>
 
       {/* Modal Popup xem chi tiết Metadata (Light Mode Inspector) */}
-      {viewMetadata && (
+      {viewMetadata && createPortal(
         <div
           onClick={(e) => {
             if (e.target === e.currentTarget) setViewMetadata(null)
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200"
         >
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+          <div className="bg-white/80 backdrop-blur-2xl rounded-[28px] border border-white/80 shadow-2xl shadow-primary/30 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white/50">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs shrink-0 border border-indigo-100/60">
+                <div className="w-10 h-10 rounded-2xl bg-secondary/10 text-primary flex items-center justify-center shadow-2xs shrink-0 border border-secondary/20">
                   <FileCode className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
@@ -434,7 +435,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                     <span
                       className={`px-2 py-0.5 rounded-md font-bold text-[10px] border ${
                         viewMetadata.component === 'node_firmware'
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          ? 'bg-secondary/10 text-primary border-secondary/30'
                           : viewMetadata.component === 'lux_module_firmware'
                           ? 'bg-amber-50 text-amber-800 border-amber-200'
                           : 'bg-slate-100 text-slate-700 border-slate-200'
@@ -460,7 +461,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
             </div>
 
             {/* Sub-toolbar: Tabs Switcher & Copy */}
-            <div className="px-5 py-2.5 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+            <div className="px-5 py-2.5 bg-white/50 border-b border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
               {/* Segmented Tab control */}
               <div className="flex items-center gap-1 p-1 bg-slate-200/60 rounded-xl">
                 <button
@@ -472,7 +473,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Table className="w-3.5 h-3.5 text-indigo-600" />
+                  <Table className="w-3.5 h-3.5 text-primary" />
                   <span>Dạng Bảng (Key - Value)</span>
                 </button>
                 <button
@@ -484,7 +485,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Braces className="w-3.5 h-3.5 text-indigo-600" />
+                  <Braces className="w-3.5 h-3.5 text-primary" />
                   <span>Dạng JSON (Raw)</span>
                 </button>
               </div>
@@ -520,7 +521,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
             </div>
 
             {/* Inspector Body (Light Theme) */}
-            <div className="p-4 overflow-y-auto max-h-[55vh] bg-slate-50/40 custom-scrollbar">
+            <div className="p-4 overflow-y-auto max-h-[55vh] bg-white/50 custom-scrollbar">
               {metadataTab === 'table' ? (
                 renderKeyValueRows(viewMetadata.data)
               ) : (
@@ -533,7 +534,7 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
+            <div className="p-3.5 bg-white/50 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
                 onClick={() => setViewMetadata(null)}
@@ -543,7 +544,8 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
