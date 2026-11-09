@@ -29,6 +29,7 @@ import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
 import { SuperiorDashboardPage } from './pages/superior-dashboard/SuperiorDashboardPage'
 import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
 import { AdminDashboardPage } from './pages/admin-dashboard/AdminDashboardPage'
+import { PrivacyPolicyPage } from './pages/privacy/PrivacyPolicyPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
@@ -71,8 +72,9 @@ function App() {
   const dispatch = useDispatch()
 
   useEffect(() => {
-    // Không chạy checkAuth() nếu đang truy cập trang công khai /r/ hoặc /report (tránh request thừa và lỗi 401 console)
-    if (window.location.pathname.startsWith('/report') || window.location.pathname.startsWith('/r/')) {
+    // Không chạy checkAuth() nếu đang truy cập trang công khai /r/, /report hoặc /privacy (tránh request thừa và lỗi 401 console)
+    const path = window.location.pathname
+    if (path.startsWith('/report') || path.startsWith('/r/') || path.startsWith('/privacy')) {
       return
     }
     // Khởi chạy kiểm tra phiên làm việc qua HttpOnly Cookie ngay khi load app
@@ -91,6 +93,9 @@ function App() {
           {/* Route báo cáo sự cố ẩn danh dành cho người dân qua quét mã QR (Public, Không cần đăng nhập) */}
           <Route path="/r/:code" element={<CitizenReportPage />} />
           <Route path="/report" element={<CitizenReportPage />} />
+
+          {/* Chính sách quyền riêng tư (Public, dùng cho Google OAuth consent screen) */}
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
           {/* Route thông báo từ chối quyền truy cập (403 Forbidden) */}
           <Route path="/forbidden" element={<ForbiddenPage />} />
