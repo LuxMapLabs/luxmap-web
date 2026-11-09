@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import authAPI from './authAPI'
 import {
   LoginRequest,
+  GoogleLoginRequest,
   WebAuthTokenResponse,
 
 
@@ -13,6 +14,7 @@ import tokenStorage from '../../utils/tokenStorage'
 import { createUserFromToken } from '../../utils/roleUtils'
 import {
   loginRequest,
+  googleLoginRequest,
   loginSuccess,
   loginFailure,
   logout,
@@ -88,6 +90,61 @@ function* handleLogin(action: PayloadAction<LoginRequest>) {
     } else {
       errorMessage =
         error.response.data?.error?.message || error.message || 'Đăng nhập thất bại'
+    }
+
+    yield put(loginFailure(errorMessage))
+  }
+}
+
+// Saga xử lý đăng nhập Web bằng Google (ID token), phiên web_session, không tự tạo tài khoản
+function* handleGoogleLogin(action: PayloadAction<GoogleLoginRequest>) {
+  try {
+    const response: WebAuthTokenResponse = yield call(authAPI.googleLogin, action.payload)
+    const accessToken = response?.access_token || response?.accessToken
+
+    if (!accessToken) {
+      yield put(loginFailure('Không nhận được phản hồi xác thực từ máy chủ.'))
+      return
+    }
+
+    tokenStorage.setAccessToken(accessToken, false)
+
+    let user: CurrentUserResponse | null = null
+    try {
+      user = yield call(authAPI.getMe)
+    } catch (meError) {
+      console.warn('Không thể tải profile từ /auth/me, kích hoạt fallback từ JWT:', meError)
+      user = createUserFromToken(accessToken, '')
+    }
+
+    if (!user) {
+      throw new Error('Dữ liệu hồ sơ người dùng không hợp lệ')
+    }
+
+    yield put(loginSuccess({ user }))
+  } catch (error: any) {
+    tokenStorage.clearAll()
+    const status = error?.response?.status
+    const serverMessage = error?.response?.data?.error?.message || error?.response?.data?.message
+    let errorMessage = 'Đăng nhập bằng Google thất bại'
+
+    if (!error?.response) {
+      errorMessage =
+        'Không thể kết nối đến máy chủ Backend. Vui lòng kiểm tra API hoặc cấu hình HTTPS/CORS.'
+    } else if (status === 401) {
+      // BE dùng chung thông báo "sai mật khẩu" cho mọi lý do từ chối nên không hiển thị lại ở đây
+      errorMessage =
+        'Email Google này chưa có tài khoản hoặc chưa kích hoạt trong hệ thống. Vui lòng liên hệ Quản trị viên để được cấp tài khoản.'
+    } else if (status === 403) {
+      errorMessage = serverMessage || 'Tài khoản bị khóa hoặc Origin không hợp lệ.'
+    } else if (status === 400) {
+      errorMessage = serverMessage || 'Dữ liệu đăng nhập không hợp lệ.'
+    } else if (status === 429) {
+      errorMessage = 'Bạn thử đăng nhập quá nhiều lần. Vui lòng đợi một lát rồi thử lại.'
+    } else if (status >= 500) {
+      errorMessage = 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'
+    } else {
+      errorMessage = serverMessage || error.message || errorMessage
     }
 
     yield put(loginFailure(errorMessage))
@@ -172,6 +229,7 @@ function* handleLogout() {
 
 export default function* authSaga() {
   yield takeLatest(loginRequest.type, handleLogin)
+  yield takeLatest(googleLoginRequest.type, handleGoogleLogin)
   yield takeLatest(logout.type, handleLogout)
   yield takeLeading(checkAuth.type, handleCheckAuth)
   yield takeLatest(refreshProfileRequest.type, handleRefreshProfile)
