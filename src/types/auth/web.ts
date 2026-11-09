@@ -4,6 +4,10 @@
  */
 import type { CurrentUserResponse } from './me'
 
+export interface GoogleLoginRequest {
+    id_token: string | null
+}
+
 export interface WebAuthTokenResponse {
     accessToken?: string
     access_token?: string | null

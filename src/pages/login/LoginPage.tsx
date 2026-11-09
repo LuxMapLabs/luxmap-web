@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { loginRequest } from '../../feature/auth/authSlice'
+import { loginRequest, googleLoginRequest } from '../../feature/auth/authSlice'
+import { GoogleSignInButton } from '../../components/GoogleSignInButton'
 import { RootState } from '../../redux/rootReducer'
 import {
   Mail,
@@ -55,6 +56,10 @@ export const LoginPage: React.FC = () => {
         rememberMe,
       })
     )
+  }
+
+  const handleGoogleCredential = (idToken: string) => {
+    dispatch(googleLoginRequest({ id_token: idToken }))
   }
 
   return (
@@ -243,6 +248,23 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
+
+          {/* Đăng nhập bằng Google (ẩn nếu chưa cấu hình VITE_GOOGLE_CLIENT_ID) */}
+          {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+            <div className="pt-5">
+              <div className="flex items-center gap-3 text-[11px] text-slate-400 select-none">
+                <span className="h-px flex-1 bg-white/10" />
+                <span>hoặc</span>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+              <div className={`mt-4 ${loading ? 'pointer-events-none opacity-60' : ''}`}>
+                <GoogleSignInButton
+                  onCredential={handleGoogleCredential}
+                  onLoadError={() => toast.error('Không tải được đăng nhập Google. Vui lòng thử lại sau.')}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Telemetry Status Bar đặt tinh tế bên trong khung đăng nhập */}
           <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-xs select-none text-slate-400">

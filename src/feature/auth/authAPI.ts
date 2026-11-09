@@ -1,6 +1,7 @@
 import apiClient from '../../config/apiClient'
 import {
   WebLoginRequest,
+  GoogleLoginRequest,
   WebAuthTokenResponse,
 
   RegisterRequest,
@@ -32,6 +33,14 @@ export const authAPI = {
       remember_me: isRemember,
       rememberMe: isRemember,
     })
+    return response.data
+  },
+
+  /**
+   * Đăng nhập bằng Google ID token (ACCT-4), cookie phiên web, không tự tạo tài khoản
+   */
+  googleLogin: async (data: GoogleLoginRequest): Promise<WebAuthTokenResponse> => {
+    const response = await apiClient.post<WebAuthTokenResponse>('/auth/web/google', data)
     return response.data
   },
 

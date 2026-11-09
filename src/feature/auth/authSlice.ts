@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { AuthState, LoginRequest } from '../../types/auth/web'
+import { AuthState, LoginRequest, GoogleLoginRequest } from '../../types/auth/web'
 import type { CurrentUserResponse } from '../../types/auth/me'
 
 // Khi ứng dụng khởi chạy, mặc định loading = true để thực hiện Silent Refresh kiểm tra phiên cookie
@@ -16,6 +16,10 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     loginRequest: (state, _action: PayloadAction<LoginRequest>) => {
+      state.loading = true
+      state.error = null
+    },
+    googleLoginRequest: (state, _action: PayloadAction<GoogleLoginRequest>) => {
       state.loading = true
       state.error = null
     },
@@ -69,6 +73,7 @@ const authSlice = createSlice({
 
 export const {
   loginRequest,
+  googleLoginRequest,
   loginSuccess,
   loginFailure,
   logout,
