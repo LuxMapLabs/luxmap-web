@@ -92,7 +92,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       email: email.trim(),
       full_name: fullName.trim(),
       role,
-      commune_ids: role === 'system_admin' ? [] : [selectedCommune],
+      // system_admin bao quát mọi địa bàn: backend yêu cầu không gửi commune_ids (ACCT-1)
+      ...(role === 'system_admin' ? {} : { commune_ids: [selectedCommune] }),
     })
   }
 

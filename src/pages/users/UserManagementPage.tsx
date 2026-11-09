@@ -36,11 +36,14 @@ export const AdminManagementPage: React.FC = () => {
     isLoading,
     isSubmitting,
     invitingUserId,
+    actionError,
     filters,
   } = useSelector((state: RootState) => state.adminUsers)
 
   // Local state for modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  // Modal tạo mới chỉ đóng khi request xong và thành công (thất bại thì giữ lại để người dùng sửa)
+  const [isCreatePending, setIsCreatePending] = useState(false)
   const [editingUser, setEditingUser] = useState<UserAccountItem | null>(null)
   const [lockingUser, setLockingUser] = useState<UserAccountItem | null>(null)
 
@@ -89,9 +92,16 @@ export const AdminManagementPage: React.FC = () => {
     })
   }, [users, filters.search, currentUser])
 
+  useEffect(() => {
+    if (isCreatePending && !isSubmitting) {
+      setIsCreatePending(false)
+      if (!actionError) setIsCreateModalOpen(false)
+    }
+  }, [isCreatePending, isSubmitting, actionError])
+
   const handleCreateSubmit = (payload: CreateUserRequest) => {
     dispatch(createUserRequest(payload))
-    setIsCreateModalOpen(false)
+    setIsCreatePending(true)
   }
 
   const handleEditSubmit = (id: string, payload: UpdateUserRequest) => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
-import { X, UserPlus, Shield, Mail, User, MapPin, Globe } from 'lucide-react'
+import { X, UserPlus, Shield, Mail, MapPin, Globe } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
 import type { CreateUserRequest } from '../../../types/admin/users'
 import type { UserRole } from '../../../types/common/enums'
@@ -14,6 +14,15 @@ export interface CreateUserModalProps {
   onSubmit: (payload: CreateUserRequest) => void
 }
 
+// Backend sinh tên đăng nhập từ họ tên nên chỉ nhận chữ cái Latin/tiếng Việt, khoảng trắng và dấu gạch ngang (ACCT-2)
+const isValidFullName = (value: string): boolean => {
+  const latin = value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd')
+  return /^[A-Za-z\s-]+$/.test(latin) && /[A-Za-z]/.test(latin)
+}
+
 export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   isOpen,
   isSubmitting = false,
@@ -21,7 +30,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   onSubmit,
 }) => {
   const communes = useSelector((state: RootState) => state.adminCommunes.communes)
-  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('field_engineer')
@@ -30,7 +38,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setUsername('')
       setEmail('')
       setFullName('')
       setRole('field_engineer')
@@ -60,12 +67,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
-    if (!username.trim()) {
-      newErrors.username = 'Tên đăng nhập không được để trống'
-    } else if (!/^[a-zA-Z0-9_.-]{3,30}$/.test(username.trim())) {
-      newErrors.username = 'Tên đăng nhập chỉ chứa chữ cái, số, dấu gạch (3-30 ký tự)'
-    }
-
     if (!email.trim()) {
       newErrors.email = 'Email không được để trống'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -74,6 +75,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
     if (!fullName.trim()) {
       newErrors.fullName = 'Họ và tên không được để trống'
+    } else if (!isValidFullName(fullName)) {
+      newErrors.fullName = 'Họ và tên chỉ gồm chữ cái, khoảng trắng và dấu gạch ngang (không có số hoặc ký tự đặc biệt)'
     }
 
     if (role !== 'system_admin' && !selectedCommune) {
@@ -89,11 +92,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     if (!validate()) return
 
     onSubmit({
-      username: username.trim(),
       email: email.trim(),
       full_name: fullName.trim(),
       role,
-      commune_ids: role === 'system_admin' ? [] : [selectedCommune],
+      // system_admin bao quát mọi địa bàn: backend yêu cầu không gửi commune_ids (ACCT-1)
+      ...(role === 'system_admin' ? {} : { commune_ids: [selectedCommune] }),
     })
   }
 
@@ -122,6 +125,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            disabled={isSubmitting}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -130,30 +134,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
-          {/* Username */}
-          <div>
-            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Tên đăng nhập (Username) <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Ví dụ: engineer_field01"
-                className={`w-full pl-9 pr-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
-                  errors.username
-                    ? 'border-rose-500 focus:ring-rose-500/20'
-                    : 'border-slate-200 dark:border-slate-700 focus:ring-secondary focus:border-secondary'
-                }`}
-              />
-            </div>
-            {errors.username ? (
-              <p className="text-rose-500 mt-1 text-[11px]">{errors.username}</p>
-            ) : null}
-          </div>
-
           {/* Full Name */}
           <div>
             <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -196,7 +176,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
             </div>
             {errors.email ? (
               <p className="text-rose-500 mt-1 text-[11px]">{errors.email}</p>
-            ) : null}
+            ) : (
+              <p className="text-slate-500 dark:text-slate-400 mt-1 text-[11px]">
+                Tên đăng nhập do hệ thống tự tạo. Thư mời kích hoạt sẽ gửi tới email này.
+              </p>
+            )}
           </div>
 
           {/* Role */}
