@@ -3,6 +3,8 @@ import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers } from 'lucide-react'
 import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
+import { createManagedAreaControl } from '../../../../../utils/gis-map/MapRecenterControl'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import {
@@ -13,6 +15,8 @@ import {
   toLngLatBounds,
   toBboxPolygonGeoJSON,
   getCommuneBboxInfo,
+  isPointInBounds,
+  OUTSIDE_MANAGED_AREA_MESSAGE,
 } from '../../../../../utils/gis-map/mapUtils'
 
 export interface CabinetRowDraft {
@@ -55,6 +59,12 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
   const communeBoundsInfo = useMemo(() => {
     return getCommuneBboxInfo(communeId, currentUser?.communes, adminCommunes, mapBounds)
   }, [communeId, currentUser, adminCommunes, mapBounds])
+  const activeBounds = useMemo(
+    () => communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox),
+    [communeBoundsInfo, mapBounds]
+  )
+  const activeBoundsRef = useRef(activeBounds)
+  activeBoundsRef.current = activeBounds
   const mapSegments = useSelector((state: RootState) => state.map.segments)
 
   // GeoJSON toàn bộ các tuyến đường trên GIS
@@ -143,6 +153,7 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
 
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+    map.addControl(createManagedAreaControl(() => activeBoundsRef.current), 'top-right')
 
     let resizeObserver: ResizeObserver | null = null
     if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
@@ -155,6 +166,10 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
     }
 
     map.on('click', (e: maplibregl.MapMouseEvent) => {
+      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
+        toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+        return
+      }
       const clickedLng = Number(e.lngLat.lng.toFixed(6))
       const clickedLat = Number(e.lngLat.lat.toFixed(6))
 
@@ -176,13 +191,6 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
       if (!isMounted) return
 
       const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-      if (activeBounds) {
-        map.setMaxBounds(activeBounds)
-        const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-        if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-          map.setMinZoom(camera.zoom)
-        }
-      }
 
       const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
       if (!map.getSource('commune-bbox-boundary')) {
@@ -214,8 +222,17 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
         })
       }
 
-      if (segmentCoordsRef.current.length === 0 && rowsRef.current.length === 0 && activeBounds) {
-        map.fitBounds(activeBounds, { padding: 40, duration: 0 })
+      if (segmentCoordsRef.current.length === 0 && rowsRef.current.length === 0) {
+        const cabinetPts = existingCabinetsRef.current
+          .filter((c) => c.location)
+          .map((c) => [c.location!.lng, c.location!.lat] as [number, number])
+        if (cabinetPts.length > 0) {
+          const cabinetBounds = new maplibregl.LngLatBounds(cabinetPts[0], cabinetPts[0])
+          cabinetPts.forEach((pt) => cabinetBounds.extend(pt))
+          map.fitBounds(cabinetBounds, { padding: 60, duration: 0, maxZoom: 16 })
+        } else if (activeBounds) {
+          map.fitBounds(activeBounds, { padding: 40, duration: 0 })
+        }
       }
 
       setTimeout(() => {
@@ -345,13 +362,6 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
     if (!map) return
 
     const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
-    if (activeBounds) {
-      map.setMaxBounds(activeBounds)
-      const camera = map.cameraForBounds(activeBounds, { padding: 30 })
-      if (typeof camera?.zoom === 'number' && Number.isFinite(camera.zoom)) {
-        map.setMinZoom(camera.zoom)
-      }
-    }
 
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
     if (source) {
@@ -425,6 +435,16 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
 
         marker.on('dragend', () => {
           const pos = marker!.getLngLat()
+          if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) {
+            const current = rowsRef.current.find((r) => r.rowId === row.rowId)
+            const prevLng = parseFloat(current?.lng ?? '')
+            const prevLat = parseFloat(current?.lat ?? '')
+            if (Number.isFinite(prevLng) && Number.isFinite(prevLat)) {
+              marker!.setLngLat([prevLng, prevLat])
+            }
+            toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+            return
+          }
           onUpdateCoordsRef.current(row.rowId, {
             lat: Number(pos.lat.toFixed(6)),
             lng: Number(pos.lng.toFixed(6)),

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { Button } from '../../../../components/Button'
 import { Search, Plus } from 'lucide-react'
 import type {
   IotNodeItem,
@@ -109,7 +110,7 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Action Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+      <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
         {/* Search Box - Chiều dài co giãn giống tab Bóng đèn */}
         <div className="flex flex-1 flex-wrap items-center gap-3">
           <div className="flex-1 min-w-60 relative">
@@ -129,14 +130,13 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
 
         {/* Action Button: Add IoT Node */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 bg-primary dark:bg-blue-600 hover:bg-primary/90 dark:hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            leftIcon={<Plus className="w-4 h-4" />}
           >
-            <Plus className="w-4 h-4" />
-            <span>Đăng Ký Thiết Bị IoT</span>
-          </button>
+            Thêm thiết bị IoT
+          </Button>
         </div>
       </div>
 

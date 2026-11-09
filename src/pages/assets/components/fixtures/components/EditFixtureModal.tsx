@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import { X, Edit3, Check } from 'lucide-react'
+import { Edit3, CheckCircle2 } from 'lucide-react'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter } from '../../common/AssetModal'
 import type { FixtureType, PowerSource, DataSource } from '../../../../../types/common/enums'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
@@ -107,44 +107,18 @@ export const EditFixtureModal: React.FC<EditFixtureModalProps> = ({
     onClose()
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity duration-200"
+  return (
+    <AssetModalFrame widthClass="max-w-lg">
+      <AssetModalHeader
+        icon={<Edit3 className="w-5 h-5" />}
+        accent="amber"
+        title={`Chỉnh Sửa Bộ Đèn: ${fixture.fixture_id || '-'}`}
+        subtitle="Chỉnh sửa thông số kỹ thuật và vị trí cột gắn bộ đèn"
+        onClose={onClose}
       />
 
-      {/* Modal Dialog */}
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
-              <Edit3 className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-900 text-base">Cập Nhật Bộ Đèn</h3>
-                <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-                  {fixture.fixture_id || 'CHƯA ĐẶT'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">Chỉnh sửa thông số kỹ thuật và vị trí cột gắn bộ đèn</p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs text-slate-700">
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+        <div className="p-5 sm:p-6 space-y-4 text-xs text-slate-700 dark:text-slate-300 overflow-y-auto flex-1">
           {/* Vị trí lắp đặt: Tuyến đường & Cột điện */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -290,26 +264,14 @@ export const EditFixtureModal: React.FC<EditFixtureModalProps> = ({
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl text-xs hover:bg-slate-100 cursor-pointer transition shadow-2xs"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <Check className="w-4 h-4" />
-              <span>Lưu Thay Đổi</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
+        </div>
+
+        <AssetModalFooter
+          onCancel={onClose}
+          submitLabel="Lưu Thay Đổi"
+          submitIcon={<CheckCircle2 className="w-4 h-4" />}
+        />
+      </form>
+    </AssetModalFrame>
   )
 }

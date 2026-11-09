@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { X, Cpu, Clock, CheckCircle2, AlertOctagon, RefreshCw, AlertTriangle, ShieldAlert } from 'lucide-react'
 import type { JobStatusItem } from '../../../types/admin/system'
 import { formatFullDateTime, formatRelativeTime, formatFutureTime } from '../../../utils/admin-dashboard/formatters'
@@ -54,13 +55,13 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white/80 backdrop-blur-2xl dark:bg-slate-900 rounded-[28px] border border-white/80 dark:border-slate-800 shadow-2xl shadow-primary/30 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/50">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white/50 dark:bg-slate-950/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-2xs">
+            <div className="w-10 h-10 rounded-2xl bg-secondary/10 dark:bg-primary text-primary dark:text-secondary flex items-center justify-center shadow-2xs">
               <Cpu className="w-5 h-5" />
             </div>
             <div>
@@ -83,7 +84,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
         {/* Body Content */}
         <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
           {/* Status Badge Row */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
             <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
               Trạng thái vận hành hiện tại:
             </span>
@@ -92,14 +93,14 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+            <div className="p-3.5 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
               <span className="text-[11px] text-slate-400 block font-medium">Tổng số lần chạy</span>
               <span className="text-xl font-black font-mono text-slate-900 dark:text-white mt-1 block">
                 {job.run_count ?? 0}
               </span>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+            <div className="p-3.5 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
               <span className="text-[11px] text-slate-400 block font-medium">Lỗi liên tiếp</span>
               <span
                 className={`text-xl font-black font-mono mt-1 block ${
@@ -112,7 +113,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
           </div>
 
           {/* Timestamps */}
-          <div className="space-y-2.5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs">
+          <div className="space-y-2.5 p-4 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-slate-500 dark:text-slate-400">Lần bắt đầu gần nhất:</span>
               <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
@@ -129,7 +130,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60 gap-2">
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
-                <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                <Clock className="w-3.5 h-3.5 text-secondary" />
                 <span>Thời gian dự kiến chạy tiếp theo:</span>
               </span>
               <div className="flex items-center gap-2 font-mono">
@@ -137,7 +138,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
                   {job.next_run_at ? formatFullDateTime(job.next_run_at) : 'Chưa xếp lịch'}
                 </span>
                 {job.next_run_at && (
-                  <span className="text-[11px] font-sans font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                  <span className="text-[11px] font-sans font-bold px-2 py-0.5 rounded-full bg-secondary/10 text-primary dark:bg-primary dark:text-secondary/50 border border-secondary/30 dark:border-primary">
                     {formatFutureTime(job.next_run_at)}
                   </span>
                 )}
@@ -160,11 +161,11 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
         </div>
 
         {/* Footer: Gom về góc phải theo chuẩn UX Modal */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3 bg-slate-50/50 dark:bg-slate-950/50">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3 bg-white/50 dark:bg-slate-950/50">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition cursor-pointer shadow-2xs"
+            className="px-5 py-2 rounded-xl bg-white/60 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition cursor-pointer shadow-2xs"
           >
             Đóng
           </button>
@@ -173,13 +174,14 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
             type="button"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shadow-xs"
+            className="px-4 py-2 rounded-xl bg-primary hover:bg-primary text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shadow-xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Kiểm tra lại tác vụ</span>
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

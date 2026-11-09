@@ -5,7 +5,7 @@
 import type { UserRole } from '../common/enums'
 
 export interface CreateUserRequest {
-    username: string | null
+    username?: any
     email: string | null
     full_name: string | null
     role: UserRole

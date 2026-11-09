@@ -1,6 +1,7 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Lightbulb, Zap, Calendar, ShieldCheck, ShieldAlert, Boxes, MapPin, Edit2, AlertCircle } from 'lucide-react'
+import { X, Lightbulb, Zap, Calendar, ShieldCheck, ShieldAlert, Boxes, MapPin, AlertCircle } from 'lucide-react'
 import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
@@ -12,7 +13,6 @@ export interface FixtureDetailModalProps {
   poles?: PoleListItem[]
   segments?: SegmentListItem[]
   onClose: () => void
-  onEdit?: (fixture: ManagedFixture) => void
 }
 
 export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
@@ -21,8 +21,8 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
   poles = [],
   segments = [],
   onClose,
-  onEdit,
 }) => {
+  const showCommune = useShowCommune()
   if (!isOpen || !fixture) return null
 
   // Lookup pole information
@@ -71,7 +71,7 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
       {/* Modal Dialog */}
       <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-linear-to-r from-teal-700 to-teal-600 text-white">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-bold">
               <Lightbulb className="w-6 h-6 text-white" />
@@ -109,8 +109,8 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
         <div className="p-6 space-y-4 text-xs text-slate-700 dark:text-slate-300 max-h-[75vh] overflow-y-auto">
           {/* Grid Thông số Kỹ thuật Nổi bật */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="p-3 bg-amber-50/60 dark:bg-amber-950/30 rounded-2xl border border-amber-200/80 dark:border-amber-900/60">
-              <div className="text-[10px] text-amber-700 dark:text-amber-400 font-bold uppercase flex items-center gap-1">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
                 <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
                 <span>Số bóng / bộ</span>
               </div>
@@ -122,12 +122,12 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
               </div>
             </div>
 
-            <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30 rounded-2xl border border-blue-200/80 dark:border-blue-900/60">
-              <div className="text-[10px] text-blue-700 dark:text-blue-400 font-bold uppercase flex items-center gap-1">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
                 <Zap className="w-3.5 h-3.5 text-blue-500" />
                 <span>Tổng công suất</span>
               </div>
-              <div className="text-base font-black text-blue-700 dark:text-blue-300 mt-1">
+              <div className="text-base font-black text-slate-900 dark:text-slate-100 mt-1">
                 {totalWatt} W
               </div>
               <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
@@ -135,8 +135,8 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
               </div>
             </div>
 
-            <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-2xl border border-emerald-200/80 dark:border-emerald-900/60 col-span-2 sm:col-span-1">
-              <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase flex items-center gap-1">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 col-span-2 sm:col-span-1">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Bảo hành</span>
               </div>
@@ -181,12 +181,14 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                <span className="text-slate-500">Địa bàn quản lý:</span>
-                <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {formatFriendlyCommuneName(pole?.commune_name, pole?.commune_id, 'Chưa gán địa bàn')}
-                </span>
-              </div>
+              {showCommune && (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
+                  <span className="text-slate-500">Địa bàn quản lý:</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    {formatFriendlyCommuneName(pole?.commune_name, pole?.commune_id, 'Chưa gán địa bàn')}
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
                 <span className="text-slate-500">Tọa độ GIS:</span>
@@ -201,8 +203,8 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
           </div>
 
           {/* Vòng đời & Thời gian vận hành */}
-          <div className="p-4 bg-orange-50/50 dark:bg-orange-950/20 rounded-2xl border border-orange-200/70 dark:border-orange-900/50 space-y-2">
-            <div className="font-bold text-orange-950 dark:text-orange-200 text-xs flex items-center gap-1.5">
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 space-y-2">
+            <div className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />
               <span>Vòng Đời Vận Hành & Lịch Sử</span>
             </div>
@@ -231,7 +233,7 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-orange-200/50 dark:border-orange-900/40">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-700/60">
                 <span>Nguồn dữ liệu:</span>
                 <span className="font-semibold uppercase tracking-wider">
                   {fixture.data_source || 'field'}
@@ -242,19 +244,7 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex items-center justify-between">
-          <div>
-            {onEdit && (
-              <button
-                type="button"
-                onClick={() => onEdit(fixture)}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>Chỉnh sửa thông số</span>
-              </button>
-            )}
-          </div>
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex items-center justify-end">
           <button
             type="button"
             onClick={onClose}

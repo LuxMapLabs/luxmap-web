@@ -15,6 +15,9 @@ import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 
+
+vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
+
 vi.mock('../../../../../feature/assets/assetAPI', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../feature/assets/assetAPI')>()
   return {
@@ -169,14 +172,14 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     expect(
       screen.getByPlaceholderText('Tìm theo mã thiết bị, mã tủ, tên tủ, địa bàn...')
     ).toBeInTheDocument()
-    expect(screen.getByText('Đăng Ký Thiết Bị IoT')).toBeInTheDocument()
+    expect(screen.getByText('Thêm thiết bị IoT')).toBeInTheDocument()
 
     // Kiểm tra các cột tiêu đề bảng
-    expect(screen.getByText('Mã Thiết Bị')).toBeInTheDocument()
-    expect(screen.getByText('Tủ Điện Cấp Nguồn')).toBeInTheDocument()
-    expect(screen.getByText('Nguồn Dữ Liệu')).toBeInTheDocument()
-    expect(screen.getByText('Điều Khiển Từ Xa')).toBeInTheDocument()
-    expect(screen.getByText('Xác Thực (Secret)')).toBeInTheDocument()
+    expect(screen.getByText('Mã thiết bị')).toBeInTheDocument()
+    expect(screen.getByText('Tủ điện cấp nguồn')).toBeInTheDocument()
+    expect(screen.getByText('Nguồn dữ liệu')).toBeInTheDocument()
+    expect(screen.getByText('Điều khiển từ xa')).toBeInTheDocument()
+    expect(screen.getByText('Xác thực (Secret)')).toBeInTheDocument()
 
     // Kiểm tra dữ liệu dòng
     expect(screen.getByText('IOT-NODE-001')).toBeInTheDocument()
@@ -226,7 +229,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
       />
     )
 
-    const addBtn = screen.getByText('Đăng Ký Thiết Bị IoT')
+    const addBtn = screen.getByText('Thêm thiết bị IoT')
     fireEvent.click(addBtn)
 
     expect(screen.getByText('Đăng Ký Thiết Bị IoT Mới')).toBeInTheDocument()
@@ -328,9 +331,10 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     )
 
     // Tìm nút xóa cho node IOT-NODE-002 (node này không có rơ-le nối mạch)
-    const deleteButtons = screen.getAllByTitle('Xóa thiết bị')
-    // Nút thứ 2 là của IOT-NODE-002
-    fireEvent.click(deleteButtons[1])
+    // Hành động xóa nằm trong menu "Thêm thao tác" của từng dòng; dòng thứ 2 là IOT-NODE-002
+    const moreButtons = screen.getAllByRole('button', { name: 'Thêm thao tác' })
+    fireEvent.click(moreButtons[1])
+    fireEvent.click(screen.getByRole('menuitem', { name: /Xóa thiết bị/ }))
 
     // Kiểm tra modal xác nhận xóa xuất hiện
     expect(screen.getByText('Xác Nhận Xóa Thiết Bị IoT')).toBeInTheDocument()

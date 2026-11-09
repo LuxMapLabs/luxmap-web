@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React, { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
@@ -18,6 +19,7 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
   segment,
   onClose,
 }) => {
+  const showCommune = useShowCommune()
   const allPoles = useSelector((state: RootState) => state.assets.poles)
 
   const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
@@ -59,7 +61,7 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-xl overflow-hidden animate-in zoom-in-95">
         {/* Header */}
-        <div className="p-5 bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-900 dark:to-indigo-950 text-white flex items-center justify-between">
+        <div className="p-5 bg-linear-to-r from-teal-700 to-teal-600 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
               <Route className="w-6 h-6 text-white" />
@@ -122,13 +124,15 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
 
           {/* Details */}
           <div className="p-4 bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl space-y-2.5">
-            <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
-              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
-                <span>Địa bàn quản lý:</span>
-              </span>
-              <strong className="text-slate-800 dark:text-slate-200">{formatFriendlyCommuneName(segment.commune_name, segment.commune_id, 'Chưa gán địa bàn')}</strong>
-            </div>
+            {showCommune && (
+              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                  <span>Địa bàn quản lý:</span>
+                </span>
+                <strong className="text-slate-800 dark:text-slate-200">{formatFriendlyCommuneName(segment.commune_name, segment.commune_id, 'Chưa gán địa bàn')}</strong>
+              </div>
+            )}
 
             <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
               <span className="text-slate-500 dark:text-slate-400">Mật độ cột trung bình:</span>

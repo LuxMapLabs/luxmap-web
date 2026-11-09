@@ -22,6 +22,18 @@ import type {
 } from '../../../types/citizen-reports/citizen-reports'
 import type { CitizenReportKind, FixtureStatus } from '../../../types/common/enums'
 import type { PoleListItem } from '../../../types/assets/poles'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../../../redux/store'
+import {
+  REPORT_DECISION_LABELS_VN,
+  faultStatusLabel,
+  faultTypeLabel,
+  formatDateTimeVN,
+  formatDateVN,
+  formatNightOf,
+  formatTimeVN,
+  severityLabel,
+} from '../../../utils/citizen-report/citizenReviewFormat'
 import { CitizenReviewPhotoGallery } from './CitizenReviewPhotoGallery'
 import { CitizenReviewAcceptModal } from './CitizenReviewAcceptModal'
 import { CitizenReviewMergeModal } from './CitizenReviewMergeModal'
@@ -80,15 +92,6 @@ const renderKindBadge = (kind: CitizenReportKind) => {
   }
 }
 
-const FAULT_STATUS_LABELS: Record<string, string> = {
-  detected: 'Mới phát hiện',
-  confirmed: 'Đã xác nhận',
-  in_progress: 'Đang xử lý',
-  resolved: 'Đã sửa xong',
-  verified: 'Đã nghiệm thu',
-  rejected: 'Đã từ chối',
-}
-
 /**
  * Render Trạng thái bóng đèn từ đợt khảo sát đo sáng gần nhất (Survey Sweep)
  */
@@ -130,6 +133,7 @@ export interface CitizenReviewDetailModalProps {
   isOpen: boolean
   detail: CitizenReportDetail | null
   poles?: PoleListItem[]
+  communeNames?: Record<string, string>
   isLoading: boolean
   isSubmittingDecision: boolean
   onClose: () => void
@@ -142,6 +146,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
   isOpen,
   detail,
   poles = [],
+  communeNames = {},
   isLoading,
   isSubmittingDecision,
   onClose,
@@ -152,6 +157,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false)
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
+  const currentUser = useSelector((state: RootState) => state.auth.user)
 
   // Tra cứu external_ref từ danh sách poles
   const matchedPole = useMemo(() => {
@@ -160,6 +166,12 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
   }, [poles, detail?.pole_id])
 
   const externalRef = matchedPole?.external_ref || null
+
+  // Backend chỉ trả mã người duyệt; hiển thị tên khi đó là người dùng hiện tại
+  const decidedByName =
+    detail?.decided_by && currentUser?.user_id === detail.decided_by
+      ? currentUser.full_name || currentUser.username || detail.decided_by
+      : detail?.decided_by || '-'
   const displayCode = externalRef || detail?.pole_id || 'Chi tiết phản ánh'
 
   // Lắng nghe phím Escape để đóng modal (khi không mở sub-modal nào)
@@ -209,6 +221,13 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
     hasActiveUnresolvedFault &&
     (!detail?.allowed_actions || detail.allowed_actions.includes('merge'))
 
+  // Giải thích vì sao không có nút Chấp thuận để người duyệt không phải đoán
+  const reviewHint = !canReview || canAccept
+    ? null
+    : hasActiveUnresolvedFault
+      ? 'Cột đèn đang có sự cố chưa đóng, nên chỉ có thể gộp phản ánh vào sự cố đó hoặc từ chối.'
+      : 'Loại phản ánh này không tạo sự cố trực tiếp từ màn hình này. Hãy từ chối, hoặc xử lý cột đèn qua phiếu công việc.'
+
   // Nút "Từ chối": luôn khả dụng cho phản ánh chờ duyệt
   const canReject =
     canReview &&
@@ -252,7 +271,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
 
               <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
                 <Clock className="w-3.5 h-3.5" />
-                <span>Đêm phát sinh: {detail?.night_of || '-'}</span>
+                <span>Đêm phát sinh: {formatNightOf(detail?.night_of)}</span>
                 <span>·</span>
                 <span>{detail?.submission_count || 0} lượt phản ánh</span>
               </div>
@@ -294,7 +313,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                     <div>
                       <span className="text-slate-400 block">Địa bàn quản lý:</span>
                       <strong className="text-slate-700 dark:text-slate-300 font-semibold">
-                        {detail.commune_id || '-'}
+                        {(detail.commune_id && (communeNames[detail.commune_id] || detail.commune_id)) || '-'}
                       </strong>
                     </div>
                     <div>
@@ -303,7 +322,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                         {renderFixtureStatus(detail.pole?.fixture_status)}
                         {detail.pole?.last_seen_at && (
                           <span className="text-[10px] text-slate-400 block mt-0.5">
-                            Khảo sát: {new Date(detail.pole.last_seen_at).toLocaleDateString('vi-VN')}
+                            Khảo sát: {formatDateVN(detail.pole.last_seen_at)}
                           </span>
                         )}
                       </div>
@@ -341,7 +360,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                   )}
                 </div>
 
-                {/* 2. Thư viện ảnh hiện trường & AI Hint */}
+                {/* 2. Thư viện ảnh hiện trường */}
                 <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
                   <CitizenReviewPhotoGallery
                     reportId={detail.report_id || ''}
@@ -356,7 +375,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                     <span>Lời người dân phản ánh ({detail.submissions?.length || 0} lượt)</span>
                   </div>
 
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  <div className="space-y-2">
                     {detail.submissions?.map((sub, idx) => (
                       <div
                         key={sub.submission_id || idx}
@@ -365,7 +384,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-slate-700 dark:text-slate-300">
-                              Lượt #{idx + 1} · {sub.received_at ? new Date(sub.received_at).toLocaleTimeString('vi-VN') : ''}
+                              Lượt #{idx + 1} · {formatTimeVN(sub.received_at)}
                             </span>
                             {/* Hiển thị tình trạng mà lượt gửi này báo */}
                             {sub.kind && renderKindBadge(sub.kind)}
@@ -387,7 +406,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                 </div>
 
                 {/* 4. Card Sự cố đang mở trên cột (Open Faults) nếu có */}
-                {detail.open_faults && detail.open_faults.length > 0 && (
+                {detail.status === 'pending' && detail.open_faults && detail.open_faults.length > 0 && (
                   <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 space-y-2">
                     <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
                       <Lightbulb className="w-4 h-4 text-amber-600" />
@@ -402,11 +421,11 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                           <div>
                             <strong className="font-mono text-xs">{f.fault_id}</strong>
                             <span className="text-slate-500 ml-1.5">
-                              ({f.fault_type} - {f.severity})
+                              ({faultTypeLabel(f.fault_type)} · {severityLabel(f.severity)})
                             </span>
                           </div>
                           <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-[10px] font-bold uppercase">
-                            {FAULT_STATUS_LABELS[f.fault_status] || f.fault_status}
+                            {faultStatusLabel(f.fault_status)}
                           </span>
                         </div>
                       ))}
@@ -414,15 +433,22 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                   </div>
                 )}
 
+                {reviewHint && (
+                  <div className="flex items-start gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[11.5px] text-slate-600 dark:text-slate-300">
+                    <HelpCircle className="w-4 h-4 shrink-0 mt-px text-slate-400" />
+                    <span>{reviewHint}</span>
+                  </div>
+                )}
+
                 {/* 5. Card Kết quả thẩm định (nếu đã xử lý trước đó) */}
                 {detail.status !== 'pending' && (
                   <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
                     <div className="font-bold text-slate-800 dark:text-slate-200">
-                      Kết quả thẩm định ({detail.status})
+                      Kết quả thẩm định: {REPORT_DECISION_LABELS_VN[detail.status] || detail.status}
                     </div>
                     <div className="text-[11px] text-slate-600 dark:text-slate-400 space-y-0.5">
-                      <div>Người duyệt: <strong>{detail.decided_by || 'Cán bộ'}</strong></div>
-                      <div>Thời điểm: {detail.decided_at ? new Date(detail.decided_at).toLocaleString('vi-VN') : '-'}</div>
+                      <div>Người duyệt: <strong>{decidedByName}</strong></div>
+                      <div>Thời điểm: {formatDateTimeVN(detail.decided_at)}</div>
                       {detail.decision_note && <div>Ghi chú: {detail.decision_note}</div>}
                       {detail.fault_id && (
                         <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-semibold pt-1">

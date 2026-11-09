@@ -70,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={`h-screen bg-white/95 backdrop-blur-xl border-r border-slate-200/80 flex flex-col shrink-0 select-none z-40 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[1px_0_3px_rgba(0,0,0,0.02)] ${
-        isCollapsed ? 'w-18' : 'w-max'
+        isCollapsed ? 'w-18' : isAdminUser ? 'w-60' : 'w-max'
       } ${className}`}
     >
       {/* 1. Header / Logo Area */}

@@ -7,9 +7,10 @@ import type { FaultItem } from '../../types/faults/faults'
 
 import { DashboardToolbar } from './components/DashboardToolbar'
 import { DashboardKpiCards } from './components/DashboardKpiCards'
-import { DashboardCharts } from './components/DashboardCharts'
+import { LightingStatusCard } from './components/DashboardCharts'
 import { WarrantyTableCard } from './components/WarrantyTableCard'
-import { FaultsTableCard } from './components/FaultsTableCard'
+import { FaultsTableCard, getFaultProgressInfo } from './components/FaultsTableCard'
+import { UrgentFaultsCard } from './components/UrgentFaultsCard'
 import { FaultDetailModal } from './components/FaultDetailModal'
 
 export const ManagerDashboardPage: React.FC = () => {
@@ -246,6 +247,11 @@ export const ManagerDashboardPage: React.FC = () => {
     }).length
   }, [segmentFaults])
 
+  const unassignedFaults = useMemo(
+    () => segmentFaults.filter((f) => getFaultProgressInfo(f).key === 'unassigned'),
+    [segmentFaults]
+  )
+
   const filteredFaults = useMemo(() => {
     let list = segmentFaults
     if (faultTab === 'blackout') {
@@ -276,9 +282,9 @@ export const ManagerDashboardPage: React.FC = () => {
   }, [segmentFaults, faultTab])
 
   return (
-    <div className="w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto pb-24 bg-slate-50 text-slate-800 custom-scrollbar select-none">
+    <div className="w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto text-slate-800 custom-scrollbar select-none">
       {/* NỘI DUNG TRANG */}
-      <div className="px-7 py-6 space-y-5">
+      <div className="px-1 pb-2 space-y-4">
         {/* 1. Thanh công cụ Lọc Tuyến Đường */}
         <DashboardToolbar
           selectedSegment={selectedSegment}
@@ -302,47 +308,51 @@ export const ManagerDashboardPage: React.FC = () => {
           onClickWarranty={handleScrollToWarranty}
         />
 
-        {/* 3. Hàng 2 Biểu đồ (Charts) */}
-        <div ref={chartsRef} id="dashboard-charts" className="scroll-mt-4">
-          <DashboardCharts
-            barChartData={barChartData}
-            donutChartData={donutChartData}
-            selectedSegment={selectedSegment}
+        {/* 3. Tình trạng chiếu sáng cạnh danh sách sự cố cần xử lý ngay */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-4 items-stretch">
+          <div ref={chartsRef} id="dashboard-charts" className="scroll-mt-4">
+            <LightingStatusCard
+              barChartData={barChartData}
+              donutChartData={donutChartData}
+              selectedSegment={selectedSegment}
+              segmentNameMap={segmentNameMap}
+              totalPoles={fixtureKpis.totalPoles}
+            />
+          </div>
+          <UrgentFaultsCard
+            faults={unassignedFaults}
             segmentNameMap={segmentNameMap}
-            totalPoles={fixtureKpis.totalPoles}
+            onCreateSchedule={handleNavigateToCreateSchedule}
           />
         </div>
 
-        {/* 4. Hàng 2 Bảng Dữ Liệu Chi Tiết */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Bảng Trái: Theo dõi bảo hành */}
-          <div ref={warrantyTableRef} id="warranty-table-card" className="scroll-mt-4">
-            <WarrantyTableCard
-              items={filteredWarrantyItems}
-              activeTab={warrantyTab}
-              onTabChange={setWarrantyTab}
-              segmentNameMap={segmentNameMap}
-              totalCount={warrantyKpis.items.length}
-              expiredCount={warrantyKpis.expiredCount}
-              expiringCount={warrantyKpis.expiringCount}
-            />
-          </div>
+        {/* 4. Bảng sự cố */}
+        <div ref={faultsTableRef} id="faults-table-card" className="scroll-mt-4">
+          <FaultsTableCard
+            faults={filteredFaults}
+            activeTab={faultTab}
+            onTabChange={setFaultTab}
+            segmentNameMap={segmentNameMap}
+            onSelectFault={setSelectedFault}
+            onNavigateToCreateSchedule={handleNavigateToCreateSchedule}
+            totalCount={segmentFaults.length}
+            blackoutCount={blackoutFaultsCount}
+            dimCount={dimFaultsCount}
+            offlineCount={offlineFaultsCount}
+          />
+        </div>
 
-          {/* Bảng Phải: Giám sát sự cố bóng đèn */}
-          <div ref={faultsTableRef} id="faults-table-card" className="scroll-mt-4">
-            <FaultsTableCard
-              faults={filteredFaults}
-              activeTab={faultTab}
-              onTabChange={setFaultTab}
-              segmentNameMap={segmentNameMap}
-              onSelectFault={setSelectedFault}
-              onNavigateToCreateSchedule={handleNavigateToCreateSchedule}
-              totalCount={segmentFaults.length}
-              blackoutCount={blackoutFaultsCount}
-              dimCount={dimFaultsCount}
-              offlineCount={offlineFaultsCount}
-            />
-          </div>
+        {/* 5. Bảng theo dõi bảo hành */}
+        <div ref={warrantyTableRef} id="warranty-table-card" className="scroll-mt-4">
+          <WarrantyTableCard
+            items={filteredWarrantyItems}
+            activeTab={warrantyTab}
+            onTabChange={setWarrantyTab}
+            segmentNameMap={segmentNameMap}
+            totalCount={warrantyKpis.items.length}
+            expiredCount={warrantyKpis.expiredCount}
+            expiringCount={warrantyKpis.expiringCount}
+          />
         </div>
       </div>
 

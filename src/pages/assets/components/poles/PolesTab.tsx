@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { Button } from '../../../../components/Button'
 import { useDispatch, useSelector } from 'react-redux'
 import { Search, Plus, Upload, Filter, Printer } from 'lucide-react'
 import type { RootState } from '../../../../redux/rootReducer'
@@ -142,6 +143,43 @@ export const PolesTab: React.FC<PolesTabProps> = ({
     return filteredPoles.slice(start, start + pageSize)
   }, [filteredPoles, currentPage, pageSize])
 
+  // Chọn cột đèn để in tem QR (giữ nguyên lựa chọn khi đổi trang hoặc bộ lọc)
+  const [selectedPoleIds, setSelectedPoleIds] = useState<Set<string>>(new Set())
+  const selectedPoles = useMemo(
+    () => poles.filter((p) => p.pole_id && selectedPoleIds.has(p.pole_id)),
+    [poles, selectedPoleIds]
+  )
+
+  const handleToggleSelect = (pole: PoleListItem) => {
+    const id = pole.pole_id
+    if (!id) return
+    setSelectedPoleIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleTogglePage = (checked: boolean) => {
+    setSelectedPoleIds((prev) => {
+      const next = new Set(prev)
+      paginatedPoles.forEach((p) => {
+        const id = p.pole_id
+        if (!id) return
+        if (checked) next.add(id)
+        else next.delete(id)
+      })
+      return next
+    })
+  }
+
+  const handleSelectAllFiltered = () => {
+    setSelectedPoleIds(new Set(filteredPoles.flatMap((p) => (p.pole_id ? [p.pole_id] : []))))
+  }
+
+  const handleClearSelection = () => setSelectedPoleIds(new Set())
+
   // Trigger flash highlight and jump to appropriate page when activePoleCode is provided
   useEffect(() => {
     if (activePoleCode) {
@@ -183,7 +221,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
   return (
     <>
       {/* Action Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+      <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-1 flex-wrap items-center gap-3">
           {/* Search Box - Chiều dài co giãn giống tab Bóng đèn */}
           <div className="flex-1 min-w-60 relative">
@@ -223,33 +261,71 @@ export const PolesTab: React.FC<PolesTabProps> = ({
 
         {/* Action Buttons: Add, Bulk QR Print & Import */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            disabled={selectedPoles.length === 0}
             onClick={() => setIsBulkPrintModalOpen(true)}
-            className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-100 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            title="Dàn trang và in hàng loạt tem mã QR decal (khổ A4)"
+            leftIcon={<Printer className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
+            title={
+              selectedPoles.length === 0
+                ? 'Tích chọn cột đèn trong bảng trước khi in tem QR'
+                : `In tem QR cho ${selectedPoles.length} cột đã chọn`
+            }
           >
-            <Printer className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-            <span>In Tem QR</span>
-          </button>
-          <button
-            type="button"
+            {selectedPoles.length > 0 ? `In tem QR (${selectedPoles.length})` : 'In tem QR'}
+          </Button>
+          <Button
+            variant="outline"
             onClick={onOpenImport}
-            className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-100 rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            leftIcon={<Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />}
             title="Nhập dữ liệu tài sản từ file CSV"
           >
-            <Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />
-            <span>Import Dữ Liệu</span>
-          </button>
-          <button
-            type="button"
+            Import dữ liệu
+          </Button>
+          <Button
+            variant="primary"
             onClick={() => setIsAddPoleModalOpen(true)}
-            className="px-4 py-1.5 bg-[#1f3864] dark:bg-blue-600 hover:bg-[#1f3864]/90 dark:hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            leftIcon={<Plus className="w-4 h-4" />}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Thêm Cột Đèn Mới</span>
-          </button>
+            Thêm cột đèn
+          </Button>
         </div>
+      </div>
+
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 min-h-[42px] rounded-xl border text-xs transition-colors ${
+          selectedPoles.length > 0
+            ? 'border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200'
+            : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400'
+        }`}
+      >
+        {selectedPoles.length > 0 ? (
+          <>
+            <span>
+              Đã chọn <strong>{selectedPoles.length}</strong> cột đèn để in tem QR
+            </span>
+            <div className="flex items-center gap-3">
+              {selectedPoles.length < filteredPoles.length && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllFiltered}
+                  className="font-semibold underline underline-offset-2 hover:text-blue-600 dark:hover:text-blue-100 cursor-pointer"
+                >
+                  Chọn tất cả {filteredPoles.length} cột đang lọc
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="font-semibold underline underline-offset-2 hover:text-blue-600 dark:hover:text-blue-100 cursor-pointer"
+              >
+                Bỏ chọn
+              </button>
+            </div>
+          </>
+        ) : (
+          <span>Tick vào ô vuông đầu mỗi dòng để chọn cột đèn cần in tem QR.</span>
+        )}
       </div>
 
       {/* Main Table */}
@@ -266,6 +342,9 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         onViewCabinetDetail={handleCabinetClick}
         onSelectFixture={onSelectFixture}
         onSelectCabinet={onSelectCabinet}
+        selectedPoleIds={selectedPoleIds}
+        onToggleSelect={handleToggleSelect}
+        onTogglePage={handleTogglePage}
       />
 
       {/* Pagination Footer */}
@@ -334,7 +413,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
       {/* Modal In Tem QR Hàng Loạt */}
       <BulkPoleQrPrintModal
         isOpen={isBulkPrintModalOpen}
-        poles={filteredPoles}
+        poles={selectedPoles}
         segments={segments}
         onClose={() => setIsBulkPrintModalOpen(false)}
       />

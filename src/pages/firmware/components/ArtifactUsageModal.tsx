@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
 import { X, SearchCheck, Layers, Calendar, User, Hash, Loader2, AlertCircle } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
@@ -38,13 +39,13 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
   // Tổng số kết quả sinh ra trên toàn hệ thống
   const totalProduced = results.reduce((acc, r) => acc + (r.count ?? 0), 0)
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white/80 backdrop-blur-2xl rounded-[28px] border border-white/80 shadow-2xl shadow-primary/30 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs">
+            <div className="w-10 h-10 rounded-2xl bg-secondary/10 text-primary flex items-center justify-center shadow-2xs">
               <SearchCheck className="w-5 h-5" />
             </div>
             <div>
@@ -69,7 +70,7 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
         <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
           {isLoading && (
             <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400 text-xs">
-              <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
               <span>Đang truy vấn kiểm toán dữ liệu...</span>
             </div>
           )}
@@ -84,10 +85,10 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
           {!isLoading && version && (
             <>
               {/* Thẻ định danh phiên bản */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+              <div className="p-4 rounded-2xl bg-white/50 border border-slate-100 space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-700 font-bold">
+                    <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-secondary/20 text-primary font-bold">
                       {version.component || 'N/A'}
                     </span>
                     <strong className="text-sm font-mono text-slate-900">
@@ -129,10 +130,10 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Layers className="w-4 h-4 text-indigo-500" />
+                    <Layers className="w-4 h-4 text-secondary" />
                     <span>Kết quả sinh ra trong hệ thống ({results.length} loại)</span>
                   </h3>
-                  <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200/60">
+                  <span className="text-xs font-bold text-primary bg-secondary/10 px-2.5 py-0.5 rounded-full border border-secondary/30">
                     Tổng: {totalProduced.toLocaleString('vi-VN')} bản ghi
                   </span>
                 </div>
@@ -146,7 +147,7 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
                     {results.map((r, idx) => (
                       <div
                         key={r.result || idx}
-                        className="p-3.5 rounded-2xl bg-white border border-slate-100 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                        className="p-3.5 rounded-2xl bg-white/60 border border-slate-100 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                       >
                         <div className="min-w-0">
                           <strong className="text-xs font-mono font-bold text-slate-800 block truncate">
@@ -167,7 +168,7 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="text-base font-black font-mono text-indigo-600 block">
+                          <span className="text-base font-black font-mono text-primary block">
                             {(r.count ?? 0).toLocaleString('vi-VN')}
                           </span>
                           <span className="text-[10px] text-slate-400">bản ghi</span>
@@ -182,7 +183,7 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-100 flex items-center justify-end bg-slate-50/50">
+        <div className="p-4 border-t border-slate-100 flex items-center justify-end bg-white/50">
           <button
             type="button"
             onClick={onClose}
@@ -192,6 +193,7 @@ export const ArtifactUsageModal: React.FC<ArtifactUsageModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

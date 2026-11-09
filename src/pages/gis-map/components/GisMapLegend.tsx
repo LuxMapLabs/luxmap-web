@@ -164,7 +164,10 @@ const CabinetLegendIcon: React.FC<CabinetLegendIconProps> = ({
 }
 
 export const GisMapLegend: React.FC = () => {
-  const [isExpanded, setIsExpanded] = useState(true)
+  // Màn hình hẹp thu gọn sẵn để không che bản đồ
+  const [isExpanded, setIsExpanded] = useState(
+    () => typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 768px)').matches
+  )
 
   // Nút mở dạng icon khi đang thu nhỏ / ẩn
   if (!isExpanded) {

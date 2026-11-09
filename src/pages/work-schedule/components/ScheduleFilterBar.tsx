@@ -110,7 +110,7 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
   )
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3.5 sm:p-4 mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div className="ops-rise bg-white rounded-[20px] shadow-ops p-3.5 sm:p-4 mb-5 flex flex-wrap items-center justify-between gap-4">
       {/* Cụm chọn Tháng & Năm bằng Popover chuyên nghiệp (Chỉ chọn Tháng và Năm, không có ngày) */}
       <div className="flex items-center gap-2.5">
         <div className="relative" ref={dropdownRef}>

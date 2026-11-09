@@ -1,5 +1,7 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
-import { Eye, Edit2, Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
+import { RowActions } from '../../common/RowActions'
+import { Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
@@ -20,6 +22,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const showCommune = useShowCommune()
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
@@ -53,13 +56,13 @@ export const FeederTable: React.FC<FeederTableProps> = ({
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold select-none uppercase tracking-wider text-[11px]">
-              <th className="py-3 px-4">Mã Mạch</th>
-              <th className="py-3 px-4">Tên Mạch Xuất Tuyến</th>
-              <th className="py-3 px-4">Tủ Điện Cấp Nguồn</th>
-              <th className="py-3 px-4">Địa bàn</th>
-              <th className="py-3 px-4 text-center">Số Cột Đèn</th>
-              <th className="py-3 px-4 text-center">Tuyến Cáp (GIS)</th>
-              <th className="py-3 px-4 text-right">Thao Tác</th>
+              <th className="py-3 px-4">Mã mạch</th>
+              <th className="py-3 px-4">Tên mạch xuất tuyến</th>
+              <th className="py-3 px-4">Tủ điện cấp nguồn</th>
+              {showCommune && <th className="py-3 px-4">Địa bàn</th>}
+              <th className="py-3 px-4 text-center">Số cột đèn</th>
+              <th className="py-3 px-4 text-center">Tuyến cáp (GIS)</th>
+              <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
@@ -114,12 +117,14 @@ export const FeederTable: React.FC<FeederTableProps> = ({
                   </td>
 
                   {/* Địa bàn */}
-                  <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>{formatFriendlyCommuneName(feeder.commune_name, feeder.commune_id)}</span>
-                    </div>
-                  </td>
+                  {showCommune && (
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>{formatFriendlyCommuneName(feeder.commune_name, feeder.commune_id)}</span>
+                      </div>
+                    </td>
+                  )}
 
                   {/* Số Cột Đèn */}
                   <td className="py-3.5 px-4 text-center">
@@ -149,33 +154,13 @@ export const FeederTable: React.FC<FeederTableProps> = ({
 
                   {/* Thao Tác */}
                   <td className="py-3.5 px-4 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onViewDetail(feeder)}
-                        title="Xem chi tiết & Cột đèn đấu nối"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onEdit(feeder)}
-                        title="Chỉnh sửa thông số mạch"
-                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(feeder)}
-                        title="Xóa mạch điện"
-                        aria-label="Xóa"
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <RowActions
+                      viewLabel="Xem chi tiết mạch điện"
+                      editLabel="Chỉnh sửa mạch điện"
+                      onView={() => onViewDetail(feeder)}
+                      onEdit={() => onEdit(feeder)}
+                      menuItems={[{ key: 'delete', label: 'Xóa mạch điện', icon: <Trash2 />, danger: true, onClick: () => onDelete(feeder) }]}
+                    />
                   </td>
                 </tr>
               )

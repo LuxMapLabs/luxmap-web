@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { X, Cpu, Zap, AlertCircle, Check } from 'lucide-react'
+import { Cpu, Zap, CheckCircle2 } from 'lucide-react'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
 import type { IotNodeItem, UpdateIotNodeRequest } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { DataSource } from '../../../../../types/common/enums'
-import { formatCommuneDisplayName } from '../../../../../utils/assets/communeUtils'
+import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
 export interface EditIotNodeModalProps {
   isOpen: boolean
@@ -55,41 +56,18 @@ export const EditIotNodeModal: React.FC<EditIotNodeModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-800">
-              <Cpu className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Chỉnh Sửa Thiết Bị IoT
-              </h3>
-              <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                {node.node_id}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <AssetModalFrame widthClass="max-w-lg">
+      <AssetModalHeader
+        icon={<Cpu className="w-5 h-5" />}
+        accent="cyan"
+        title="Chỉnh Sửa Thiết Bị IoT"
+        subtitle={node.node_id}
+        onClose={onClose}
+      />
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-          {errorMsg && (
-            <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/60 rounded-xl text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+        <AssetModalError message={errorMsg} />
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
           {/* Tủ điện cố định */}
           <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
             <span className="text-[11px] text-slate-400 uppercase font-bold tracking-wider block">
@@ -102,7 +80,7 @@ export const EditIotNodeModal: React.FC<EditIotNodeModalProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Địa bàn: <strong>{formatCommuneDisplayName(node.commune_id)}</strong>
+              Địa bàn: <strong>{formatFriendlyCommuneName(selectedCabinet?.commune_name, node.commune_id, 'Chưa gán địa bàn')}</strong>
             </p>
           </div>
 
@@ -180,25 +158,14 @@ export const EditIotNodeModal: React.FC<EditIotNodeModalProps> = ({
             </label>
           </div>
 
-          {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition cursor-pointer"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-[#1f3864] hover:bg-[#1f3864]/90 dark:bg-blue-600 dark:hover:bg-blue-500 text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5"
-            >
-              <Check className="w-4 h-4" />
-              <span>Lưu Cập Nhật</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <AssetModalFooter
+          onCancel={onClose}
+          submitLabel="Lưu Thay Đổi"
+          submitIcon={<CheckCircle2 className="w-4 h-4" />}
+        />
+      </form>
+    </AssetModalFrame>
   )
 }

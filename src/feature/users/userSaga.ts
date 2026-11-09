@@ -67,7 +67,11 @@ function* handleCreateUser(action: PayloadAction<CreateUserRequest>) {
   try {
     const result: CreateUserResponse = yield call(adminUserAPI.createUser, action.payload)
     yield put(createUserSuccess(result))
-    toast.success('Tạo tài khoản người dùng thành công!')
+    if (result?.invitation_sent === false) {
+      toast.warning('Đã tạo tài khoản, nhưng máy chủ mail chưa gửi được thư mời. Hãy gửi lại lời mời.')
+    } else {
+      toast.success('Tạo tài khoản người dùng thành công!')
+    }
     // Tải lại danh sách người dùng mới nhất
     yield put(fetchUsersRequest())
   } catch (error: any) {

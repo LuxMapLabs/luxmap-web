@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { useExitTransition } from '../hooks/useExitTransition'
 
 export interface ModalProps {
   isOpen: boolean
@@ -27,7 +28,8 @@ export const Modal: React.FC<ModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  const { mounted, closing } = useExitTransition(isOpen)
+  if (!mounted) return null
 
   const widthStyles: Record<string, string> = {
     sm: 'max-w-sm',
@@ -38,7 +40,7 @@ export const Modal: React.FC<ModalProps> = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div data-esc-self className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${closing ? 'ui-closing pointer-events-none' : ''}`}>
       {/* Backdrop */}
       <div
         onClick={onClose}

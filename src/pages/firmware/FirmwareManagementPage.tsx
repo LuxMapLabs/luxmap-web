@@ -140,14 +140,14 @@ export const FirmwareManagementPage: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
-    <div className="h-full w-full bg-slate-50 overflow-y-auto p-4 sm:p-6 md:p-8 font-sans text-slate-800 select-none">
-      <div className="w-full max-w-[1600px] mx-auto space-y-4">
+    <div className="admin-glass-root h-full w-full overflow-y-auto custom-scrollbar p-4 sm:p-6 md:p-8 text-slate-800 select-none">
+      <div className="glass-slab w-full max-w-[1600px] mx-auto p-5 md:p-6 space-y-4">
         {/* 1. Header Toolbar (Không lặp lại Header - Bắt đầu ngay với các công cụ nghiệp vụ) */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="glass-tile p-2.5 sm:p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Left: Search & Filter */}
           <div className="flex flex-1 flex-wrap items-center gap-3">
             {/* 1. Search Box (Đầu tiên bên trái) */}
-            <div className="relative flex-1 min-w-[260px] max-w-md">
+            <div className="relative flex-1 min-w-[260px] max-w-full md:max-w-md">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                 <Search className="w-3.5 h-3.5" />
               </div>
@@ -156,7 +156,7 @@ export const FirmwareManagementPage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm theo phiên bản (1.0.0), mã băm SHA-256..."
-                className="w-full pl-9 pr-8 py-1.5 text-xs rounded-2xl border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition shadow-2xs"
+                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200/80 bg-slate-50 focus:bg-white text-slate-800 placeholder:text-slate-400 outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/30 transition shadow-2xs"
               />
               {searchQuery && (
                 <button
@@ -193,7 +193,7 @@ export const FirmwareManagementPage: React.FC = () => {
             <button
               type="button"
               onClick={handleOpenRegister}
-              className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
+              className="px-4 py-2 rounded-2xl bg-primary hover:bg-primary text-white font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
             >
               <Plus className="w-4 h-4" />
               <span>Đăng ký Firmware</span>

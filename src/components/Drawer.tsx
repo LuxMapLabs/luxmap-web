@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { X } from 'lucide-react'
+import { useExitTransition } from '../hooks/useExitTransition'
 
 export interface DrawerProps {
   isOpen: boolean
@@ -28,7 +29,8 @@ export const Drawer: React.FC<DrawerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  const { mounted, closing } = useExitTransition(isOpen)
+  if (!mounted) return null
 
   const widthStyles: Record<string, string> = {
     sm: 'w-80',
@@ -38,7 +40,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div data-esc-self className={`fixed inset-0 z-50 flex justify-end ${closing ? 'ui-closing pointer-events-none' : ''}`}>
       {/* Backdrop */}
       <div
         onClick={onClose}

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { RootState } from '../../redux/rootReducer'
 import { TaskKind } from '../../types/workSchedule'
@@ -28,6 +28,7 @@ import { CalendarGrid } from './components/CalendarGrid'
 import { CaseDetailModal } from './components/CaseDetailModal'
 import { CreateNextPhaseModal } from './components/CreateNextPhaseModal'
 import { CreateManualModal } from './components/CreateManualModal'
+import { NOTIFICATION_TARGET_PARAMS } from '../../utils/notifications/notificationRoute'
 import { formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
 
 export const WorkSchedulePage: React.FC = () => {
@@ -40,9 +41,11 @@ export const WorkSchedulePage: React.FC = () => {
     assignees,
     selectedCaseCode,
     viewingPhaseIndex,
+    workOrderDetail,
+    isLoadingWorkOrders,
   } = useSelector((state: RootState) => state.workSchedule)
   const currentUser = useSelector((state: RootState) => state.auth.user)
-  const activeCommuneId = currentUser?.commune_ids?.[0] || 'COM-001'
+  const activeCommuneId = currentUser?.commune_ids?.[0] || ''
 
   // Tự động tải danh sách lịch làm việc và danh sách kỹ sư từ máy chủ theo tháng được chọn
   useEffect(() => {
@@ -60,7 +63,7 @@ export const WorkSchedulePage: React.FC = () => {
     )
 
     // Tải danh sách kỹ sư hiện trường theo địa bàn xã của người dùng
-    dispatch(fetchAssigneesRequest(activeCommuneId))
+    if (activeCommuneId) dispatch(fetchAssigneesRequest(activeCommuneId))
   }, [dispatch, currentMonth, currentYear, activeCommuneId])
 
   const location = useLocation()
@@ -142,6 +145,63 @@ export const WorkSchedulePage: React.FC = () => {
       dispatch(clearWorkOrderDetail())
     }
   }, [selectedCaseCode, viewingPhaseIndex, selectedCase?.phases?.length, dispatch])
+
+  // Đến từ thông báo (?work_order=<id>): nhảy tới đúng tháng, mở đúng sự vụ và làm nổi bật thẻ trên lịch
+  const [searchParams, setSearchParams] = useSearchParams()
+  const targetWoId = searchParams.get(NOTIFICATION_TARGET_PARAMS.workOrder)
+  const [highlightedWoId, setHighlightedWoId] = useState<string | null>(null)
+  const sawLoadingRef = useRef(false)
+
+  const clearTargetParam = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete(NOTIFICATION_TARGET_PARAMS.workOrder)
+    setSearchParams(next, { replace: true })
+  }
+
+  // B1: lấy chi tiết để biết lịch của lệnh nằm ở tháng nào
+  useEffect(() => {
+    if (!targetWoId) return
+    sawLoadingRef.current = false
+    dispatch(setFilterPhase('all'))
+    dispatch(fetchWorkOrderDetailRequest(targetWoId))
+  }, [targetWoId, dispatch])
+
+  useEffect(() => {
+    if (isLoadingWorkOrders) sawLoadingRef.current = true
+  }, [isLoadingWorkOrders])
+
+  // B2: chuyển sang tháng của lệnh (nếu đang ở tháng khác)
+  useEffect(() => {
+    if (!targetWoId || workOrderDetail?.work_order_id !== targetWoId) return
+    const m = /^(\d{4})-(\d{2})/.exec(workOrderDetail.scheduled_date || '')
+    if (!m) return
+    const year = Number(m[1])
+    const month = Number(m[2]) - 1
+    if (year !== currentYear || month !== currentMonth) {
+      dispatch(setCurrentMonth({ month, year }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetWoId, workOrderDetail?.work_order_id])
+
+  // B3: khi danh sách của tháng đã có, mở đúng sự vụ + giai đoạn và làm nổi bật
+  useEffect(() => {
+    if (!targetWoId || workOrderDetail?.work_order_id !== targetWoId) return
+    for (const c of cases || []) {
+      const phaseIndex = (c.phases || []).findIndex((p) => p.workOrderId === targetWoId)
+      if (phaseIndex >= 0) {
+        dispatch(openCaseDetail({ code: c.code, phaseIndex }))
+        setHighlightedWoId(targetWoId)
+        window.setTimeout(() => setHighlightedWoId(null), 6000)
+        clearTargetParam()
+        return
+      }
+    }
+    if (!isLoadingWorkOrders && sawLoadingRef.current) {
+      toast.info('Không tìm thấy lệnh công tác này trên lịch.')
+      clearTargetParam()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetWoId, workOrderDetail?.work_order_id, cases, isLoadingWorkOrders])
 
   // Xử lý tạo mới sự vụ: từ ô lịch (lấy ngày của ô đó) hoặc từ nút Header (tự chọn ngày)
   const handleOpenCreateManual = (dateStr?: string) => {
@@ -456,9 +516,9 @@ export const WorkSchedulePage: React.FC = () => {
   }
 
   return (
-    <div className="h-full w-full overflow-y-auto custom-scrollbar bg-slate-50 select-none">
+    <div className="h-full w-full overflow-y-auto custom-scrollbar bg-transparent select-none">
       {/* Vùng nội dung toàn trang: Tự do giãn nở và cuộn mượt mà */}
-      <div className="p-4 sm:p-6 flex flex-col gap-4 pb-24">
+      <div className="px-1 pb-4 flex flex-col gap-4">
         {/* Filter Bar */}
         <div className="shrink-0">
           <ScheduleFilterBar
@@ -484,6 +544,7 @@ export const WorkSchedulePage: React.FC = () => {
           filterPhase={filterPhase}
           onSelectCase={(code, phaseIndex) => dispatch(openCaseDetail({ code, phaseIndex }))}
           onAddOnDate={(dateStr) => handleOpenCreateManual(dateStr)}
+          highlightedWorkOrderId={highlightedWoId}
         />
       </div>
 

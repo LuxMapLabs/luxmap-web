@@ -10,6 +10,8 @@ interface CalendarGridProps {
   filterPhase: WorkScheduleState['filterPhase']
   onSelectCase: (code: string, phaseIndex: number) => void
   onAddOnDate: (dateStr: string) => void
+  /** Lệnh công tác được làm nổi bật (khi đến từ thông báo) */
+  highlightedWorkOrderId?: string | null
 }
 
 const WEEKDAYS = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật']
@@ -21,6 +23,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   filterPhase,
   onSelectCase,
   onAddOnDate,
+  highlightedWorkOrderId = null,
 }) => {
   // Tính toán số ngày và padding của tháng
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay()
@@ -101,9 +104,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const todayYear = today.getFullYear()
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+    <div className="ops-rise bg-white rounded-[20px] shadow-ops overflow-x-auto">
       {/* Header thứ trong tuần */}
-      <div className="grid grid-cols-7 bg-slate-50/90 border-b border-slate-200 text-center select-none shrink-0">
+      <div className="grid min-w-[640px] grid-cols-7 bg-slate-50/90 border-b border-slate-200 text-center select-none shrink-0">
         {WEEKDAYS.map((w, idx) => (
           <div
             key={w}
@@ -116,7 +119,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       </div>
 
       {/* Lưới các ô ngày: Tự động co giãn chiều cao theo số lượng thẻ lịch (giống bản Prototype) */}
-      <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-100 auto-rows-[minmax(130px,auto)]">
+      <div className="grid min-w-[640px] grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-100 auto-rows-[minmax(130px,auto)]">
         {/* Render ngày đệm tháng trước */}
         {prevDays.map((d) => (
           <div key={`prev-${d}`} className="bg-slate-50/40 p-2.5 min-h-[130px] flex flex-col opacity-40">
@@ -206,8 +209,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   return (
                     <div
                       key={`${caseItem.code}-${phaseIndex}`}
+                      data-work-order-id={phase.workOrderId || undefined}
                       onClick={() => onSelectCase(caseItem.code, phaseIndex)}
-                      className={`p-2 rounded-xl border text-xs cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] ${cardStyle}`}
+                      className={`p-2 rounded-xl border text-xs cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] ${cardStyle} ${
+                        highlightedWorkOrderId && phase.workOrderId === highlightedWorkOrderId
+                          ? 'ring-4 ring-amber-400 shadow-lg animate-pulse'
+                          : ''
+                      }`}
                     >
                       {/* Dòng trên: Mã & Nhãn Phase */}
                       <div className="flex items-center justify-between gap-1 mb-1">

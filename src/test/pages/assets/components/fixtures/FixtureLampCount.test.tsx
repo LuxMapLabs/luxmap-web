@@ -13,6 +13,9 @@ import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CreateFixtureRequest } from '../../../../../types/assets/fixtures'
 
+
+vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
+
 describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Tests', () => {
   const mockPoles: PoleListItem[] = [
     {
@@ -363,14 +366,12 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
 
   it("12. FixtureDetailModal hiển thị đầy đủ thông số kỹ thuật, số bóng, vị trí lắp đặt và bảo hành", () => {
     const onCloseMock = vi.fn()
-    const onEditMock = vi.fn()
     render(
       <FixtureDetailModal
         isOpen={true}
         fixture={mockFixtures[0]}
         poles={mockPoles}
         onClose={onCloseMock}
-        onEdit={onEditMock}
       />
     )
     expect(screen.getByText("FIX-POLE-0001")).toBeInTheDocument()
@@ -379,9 +380,7 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
     expect(screen.getByText("2 bóng")).toBeInTheDocument()
     expect(screen.getByText("200 W")).toBeInTheDocument()
     expect(screen.getByText("POLE-0001")).toBeInTheDocument()
-    const editBtn = screen.getByText("Chỉnh sửa thông số")
-    fireEvent.click(editBtn)
-    expect(onEditMock).toHaveBeenCalledWith(mockFixtures[0])
+    expect(screen.queryByText("Chỉnh sửa thông số")).not.toBeInTheDocument()
     const closeBtn = screen.getByText("Đóng")
     fireEvent.click(closeBtn)
     expect(onCloseMock).toHaveBeenCalledTimes(1)

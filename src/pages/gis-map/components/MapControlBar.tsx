@@ -61,7 +61,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
         </button>
         <input
           type="text"
-          placeholder="Tìm mã cột, tuyến đường, tủ điện, atlas (gần nhà ông A...)..."
+          placeholder="Tìm cột, tuyến, tủ điện, địa điểm..."
           value={searchQuery}
           onFocus={() => setIsSearchFocused(true)}
           onChange={(e) => {

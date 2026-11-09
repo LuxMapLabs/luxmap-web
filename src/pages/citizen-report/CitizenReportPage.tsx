@@ -21,6 +21,7 @@ import {
   LightbulbOff,
   AlertTriangle,
   ZapOff,
+  HelpCircle,
   Camera,
   Plus,
   X,
@@ -33,8 +34,10 @@ import {
   Ban,
 } from 'lucide-react'
 
+type FaultOptionId = CitizenReportKind | 'other_generic'
+
 interface FaultOptionItem {
-  id: CitizenReportKind
+  id: FaultOptionId
   kind: CitizenReportKind
   title: string
   desc: string
@@ -71,6 +74,13 @@ const FAULT_OPTIONS: readonly FaultOptionItem[] = [
     desc: 'Ưu tiên khẩn cấp: Rò rỉ điện, đứt dây hoặc chạm chập có nguy cơ tai nạn',
     icon: AlertTriangle,
   },
+  {
+    id: 'other_generic',
+    kind: 'other',
+    title: 'Khác',
+    desc: 'Sự cố không thuộc các mục trên. Vui lòng mô tả rõ ở bước 2',
+    icon: HelpCircle,
+  },
 ] as const
 
 export const CitizenReportPage: React.FC = () => {
@@ -93,7 +103,7 @@ export const CitizenReportPage: React.FC = () => {
   } = useSelector((state: RootState) => state.citizenReport)
 
   // Form local state
-  const [selectedOptionId, setSelectedOptionId] = useState<CitizenReportKind>('lamp_out')
+  const [selectedOptionId, setSelectedOptionId] = useState<FaultOptionId>('lamp_out')
   const [description, setDescription] = useState<string>('')
   const [reporterName, setReporterName] = useState<string>('')
   const [reporterPhone, setReporterPhone] = useState<string>('')
@@ -307,6 +317,10 @@ export const CitizenReportPage: React.FC = () => {
       }
     }
 
+    // Loại gửi lên Backend (mục 'Khác' dùng chung kind 'other')
+    const selectedKind: CitizenReportKind =
+      FAULT_OPTIONS.find((opt) => opt.id === selectedOptionId)?.kind ?? 'other'
+
     // Ghép thông tin người phản ánh vào phần mô tả nếu có
     let fullDescription = description.trim()
     const contactParts: string[] = []
@@ -332,7 +346,7 @@ export const CitizenReportPage: React.FC = () => {
           dispatch(
             submitReportRequest({
               code: qrCode,
-              kind: selectedOptionId,
+              kind: selectedKind,
               description: fullDescription,
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
@@ -347,7 +361,7 @@ export const CitizenReportPage: React.FC = () => {
           dispatch(
             submitReportRequest({
               code: qrCode,
-              kind: selectedOptionId,
+              kind: selectedKind,
               description: fullDescription,
               lat: null,
               lng: null,
@@ -363,7 +377,7 @@ export const CitizenReportPage: React.FC = () => {
       dispatch(
         submitReportRequest({
           code: qrCode,
-          kind: selectedOptionId,
+          kind: selectedKind,
           description: fullDescription,
           lat: null,
           lng: null,
@@ -429,6 +443,8 @@ export const CitizenReportPage: React.FC = () => {
                     type="button"
                     onClick={() => setSelectedOptionId(opt.id)}
                     className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer ${
+                      opt.id === 'other_generic' ? 'sm:col-span-2 ' : ''
+                    }${
                       isSelected
                         ? 'border-blue-600 dark:border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 shadow-xs'
                         : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'

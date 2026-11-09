@@ -19,7 +19,7 @@ import { FeedersTab } from './components/feeders/FeedersTab'
 import { IotNodesTab } from './components/iot/IotNodesTab'
 import { ImportAssetModal } from './components/ImportAssetModal'
 import { ExportAssetModal, type ExportableCategory } from './components/ExportAssetModal'
-import { TabCountBadge } from './components/common/TabCountBadge'
+import { AssetTabs } from './components/common/AssetTabs'
 import { useAssetData } from '../../hooks/assets/useAssetData'
 
 export type AssetCategory =
@@ -46,6 +46,17 @@ export const AssetManagementPage: React.FC = () => {
       : activeCategory === 'poles_and_fixtures'
       ? 'poles'
       : activeCategory
+
+  // Chuyển tab và xóa các mã đang được chọn sẵn ở những tab khác
+  const selectCategory = (
+    category: AssetCategory,
+    reset: { pole?: boolean; fixture?: boolean; cabinet?: boolean }
+  ) => {
+    if (reset.fixture) setSelectedFixtureCode('')
+    if (reset.pole) setSelectedPoleCode('')
+    if (reset.cabinet) setSelectedCabinetCode('')
+    setActiveCategory(category)
+  }
 
   const handleSelectFixture = (fixtureCode: string) => {
     setSelectedFixtureCode(fixtureCode)
@@ -98,12 +109,12 @@ export const AssetManagementPage: React.FC = () => {
   } = useAssetData()
 
   return (
-    <div className="h-full w-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none">
+    <div className="h-full w-full flex flex-col bg-transparent dark:bg-slate-950 overflow-hidden select-none">
       {/* Scrollable Container */}
-      <div className="flex-1 p-6 overflow-y-auto space-y-4">
+      <div className="flex-1 px-1 pb-4 overflow-y-auto space-y-4">
         {/* Top Notification Banner */}
         {successBanner && (
-          <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-2xl text-xs font-semibold flex items-center shadow-xs animate-in slide-in-from-top-2">
+          <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-xl text-xs font-semibold flex items-center animate-in slide-in-from-top-2">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>{successBanner}</span>
@@ -111,213 +122,68 @@ export const AssetManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Segmented Control Navigation Tabs - Silky Sliding Active Pill */}
-        <div className="relative grid grid-cols-6 bg-slate-100/85 dark:bg-slate-900/85 p-1.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] select-none">
-          {/* Animated Sliding Active Pill */}
-          <div
-            className="absolute top-1.5 bottom-1.5 left-1.5 rounded-xl bg-white dark:bg-slate-800 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.04)] border border-slate-200/80 dark:border-slate-700/80 pointer-events-none transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
-            style={{
-              width: 'calc((100% - 15px) / 6)',
-              transform: `translateX(calc(${
-                activeCategory === 'segments'
-                  ? 0
-                  : activeCategory === 'cabinets'
-                  ? 100
-                  : activeCategory === 'feeders'
-                  ? 200
-                  : activeCategory === 'iot_nodes'
-                  ? 300
-                  : activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
-                  ? 400
-                  : 500
-              }%))`,
-            }}
-          />
-
-          {/* Tab 1: Tuyến đường chiếu sáng */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedPoleCode('')
-              setSelectedCabinetCode('')
-              setActiveCategory('segments')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'segments'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Route
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'segments'
-                  ? 'text-indigo-600 dark:text-indigo-400 scale-110 drop-shadow-[0_1px_2px_rgba(79,70,229,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Tuyến đường chiếu sáng</span>
-            <TabCountBadge
-              count={segments.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'segments'}
-              colorScheme="indigo"
-            />
-          </button>
-
-          {/* Tab 2: Tủ điện */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedPoleCode('')
-              setActiveCategory('cabinets')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'cabinets'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Zap
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'cabinets'
-                  ? 'text-amber-500 dark:text-amber-400 scale-110 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Tủ điện</span>
-            <TabCountBadge
-              count={cabinets.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'cabinets'}
-              colorScheme="purple"
-            />
-          </button>
-
-          {/* Tab 3: Mạch điện (Feeder) */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedPoleCode('')
-              setSelectedCabinetCode('')
-              setActiveCategory('feeders')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'feeders'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Cable
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'feeders'
-                  ? 'text-emerald-600 dark:text-emerald-400 scale-110 drop-shadow-[0_1px_2px_rgba(5,150,105,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Mạch điện</span>
-            <TabCountBadge
-              count={feeders.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'feeders'}
-              colorScheme="blue"
-            />
-          </button>
-
-          {/* Tab 4: Thiết bị IoT */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedPoleCode('')
-              setSelectedCabinetCode('')
-              setActiveCategory('iot_nodes')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'iot_nodes'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Cpu
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'iot_nodes'
-                  ? 'text-purple-600 dark:text-purple-400 scale-110 drop-shadow-[0_1px_2px_rgba(147,51,234,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Thiết bị IoT</span>
-            <TabCountBadge
-              count={iotNodes.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'iot_nodes'}
-              colorScheme="purple"
-            />
-          </button>
-
-          {/* Tab 5: Cột điện */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedCabinetCode('')
-              setActiveCategory('poles')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Boxes
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'
-                  ? 'text-blue-600 dark:text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(37,99,235,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Cột điện</span>
-            <TabCountBadge
-              count={poles.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'poles' || activeCategory === 'poles_and_fixtures'}
-              colorScheme="blue"
-            />
-          </button>
-
-          {/* Tab 6: Bộ đèn */}
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedFixtureCode('')
-              setSelectedPoleCode('')
-              setSelectedCabinetCode('')
-              setActiveCategory('fixtures')
-            }}
-            className={`relative z-10 py-2.5 px-4 rounded-xl text-xs transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-0 ${
-              activeCategory === 'fixtures'
-                ? 'text-slate-900 dark:text-white font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
-            }`}
-          >
-            <Lightbulb
-              className={`w-4 h-4 transition-all duration-300 ${
-                activeCategory === 'fixtures'
-                  ? 'text-amber-500 dark:text-amber-400 scale-110 drop-shadow-[0_1px_2px_rgba(245,158,11,0.3)]'
-                  : 'text-slate-400'
-              }`}
-            />
-            <span>Bộ đèn</span>
-            <TabCountBadge
-              count={fixtures.length}
-              isLoading={isLoadingAssets}
-              isActive={activeCategory === 'fixtures'}
-              colorScheme="amber"
-            />
-          </button>
-        </div>
+        <AssetTabs
+          groups={[
+            [
+              {
+                key: 'segments',
+                label: 'Tuyến đường',
+                icon: Route,
+                count: segments.length,
+                isLoading: isLoadingAssets,
+                active: activeCategory === 'segments',
+                onSelect: () => selectCategory('segments', { pole: true, fixture: true, cabinet: true }),
+              },
+              {
+                key: 'cabinets',
+                label: 'Tủ điện',
+                icon: Zap,
+                count: cabinets.length,
+                isLoading: isLoadingAssets,
+                active: activeCategory === 'cabinets',
+                onSelect: () => selectCategory('cabinets', { pole: true, fixture: true }),
+              },
+              {
+                key: 'feeders',
+                label: 'Mạch điện',
+                icon: Cable,
+                count: feeders.length,
+                isLoading: isLoadingAssets,
+                active: activeCategory === 'feeders',
+                onSelect: () => selectCategory('feeders', { pole: true, fixture: true, cabinet: true }),
+              },
+            ],
+            [
+              {
+                key: 'iot_nodes',
+                label: 'Thiết bị IoT',
+                icon: Cpu,
+                count: iotNodes.length,
+                isLoading: isLoadingAssets,
+                active: activeCategory === 'iot_nodes',
+                onSelect: () => selectCategory('iot_nodes', { pole: true, fixture: true, cabinet: true }),
+              },
+              {
+                key: 'poles',
+                label: 'Cột điện',
+                icon: Boxes,
+                count: poles.length,
+                isLoading: isLoadingAssets,
+                active: activeCategory === 'poles' || activeCategory === 'poles_and_fixtures',
+                onSelect: () => selectCategory('poles', { fixture: true, cabinet: true }),
+              },
+              {
+                key: 'fixtures',
+                label: 'Bộ đèn',
+                icon: Lightbulb,
+                count: fixtures.length,
+                isLoading: isLoadingAssets,
+                active: activeCategory === 'fixtures',
+                onSelect: () => selectCategory('fixtures', { pole: true, fixture: true, cabinet: true }),
+              },
+            ],
+          ]}
+        />
 
         {/* Tab 1 Content: Tuyến đường chiếu sáng */}
         {activeCategory === 'segments' && (

@@ -22,7 +22,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+      <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
         <div className="h-4 w-52 bg-slate-200 dark:bg-slate-700 rounded-md animate-pulse" />
         <div className="flex items-center gap-1">
           <div className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 opacity-40">
@@ -38,7 +38,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
   }
 
   return (
-    <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+    <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
       <div>
         Hiển thị{' '}
         <strong className="text-slate-800 dark:text-slate-200 font-semibold">
@@ -55,7 +55,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
         bản ghi {unitLabel}
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <button
           type="button"
           disabled={currentPage <= 1}
@@ -64,7 +64,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="px-3 py-1 font-bold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg">
+        <span className="whitespace-nowrap px-3 py-1 font-bold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg">
           {currentPage} / {totalPages}
         </span>
         <button

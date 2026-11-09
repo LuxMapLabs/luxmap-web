@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, X, Loader2 } from 'lucide-react'
-import type { FaultType, Severity } from '../../../types/common/enums'
+import type { FaultType } from '../../../types/common/enums'
+import { faultTypeLabel } from '../../../utils/citizen-report/citizenReviewFormat'
 import type { AcceptCitizenReportRequest } from '../../../types/citizen-reports/citizen-reports'
 
 export interface CitizenReviewAcceptModalProps {
@@ -12,21 +13,6 @@ export interface CitizenReviewAcceptModalProps {
   onClose: () => void
   onSubmit: (data: AcceptCitizenReportRequest) => void
 }
-
-const FAULT_TYPE_LABELS: Record<FaultType, string> = {
-  lamp_out: 'Đèn tắt hoàn toàn / Cháy bóng (lamp_out)',
-  lamp_dim: 'Đèn sáng yếu / Chập chờn (lamp_dim)',
-  segment_outage: 'Mất điện toàn tuyến (segment_outage)',
-  node_offline: 'Mất tín hiệu điều khiển (node_offline)',
-  runtime_decline: 'Suy giảm hiệu năng (runtime_decline)',
-}
-
-const SEVERITY_OPTIONS: { id: Severity; label: string }[] = [
-  { id: 'low', label: 'Thấp (Low)' },
-  { id: 'medium', label: 'Trung bình (Medium - Mặc định)' },
-  { id: 'high', label: 'Cao (High)' },
-  { id: 'critical', label: 'Khẩn cấp (Critical)' },
-]
 
 export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> = ({
   isOpen,
@@ -40,7 +26,6 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
   const [faultType, setFaultType] = useState<FaultType>(
     acceptableFaultTypes.length > 0 ? acceptableFaultTypes[0] : 'lamp_out'
   )
-  const [severity, setSeverity] = useState<Severity>('medium')
   const [note, setNote] = useState<string>('')
 
   // Đồng bộ lại faultType khi modal mở hoặc danh sách acceptableFaultTypes thay đổi
@@ -59,7 +44,6 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
     onSubmit({
       submission_count: submissionCount,
       fault_type: faultType,
-      severity,
       note: note.trim() || null,
     })
   }
@@ -76,7 +60,7 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
             <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-            <span>Chấp Thuận & Tạo Sự Cố (Fault)</span>
+            <span>Chấp Thuận & Tạo Sự Cố</span>
           </div>
           <button
             type="button"
@@ -106,31 +90,13 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
             >
               {acceptableFaultTypes.map((ft) => (
                 <option key={ft} value={ft}>
-                  {FAULT_TYPE_LABELS[ft] || ft}
+                  {faultTypeLabel(ft)}
                 </option>
               ))}
             </select>
             <p className="text-[10.5px] text-slate-400">
               * Chỉ hiển thị các loại sự cố phù hợp với nội dung người dân đã báo.
             </p>
-          </div>
-
-          {/* Chọn mức độ nghiêm trọng */}
-          <div className="space-y-1.5">
-            <label className="font-bold text-slate-800 dark:text-slate-200">
-              Mức độ nghiêm trọng (Severity)
-            </label>
-            <select
-              value={severity}
-              onChange={(e) => setSeverity(e.target.value as Severity)}
-              className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition cursor-pointer"
-            >
-              {SEVERITY_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Ghi chú thẩm định */}

@@ -4,23 +4,20 @@ import { useDispatch, useSelector } from 'react-redux'
 import { Header } from '../components/Header'
 import { Sidebar } from '../components/Sidebar'
 import { RootState } from '../redux/rootReducer'
-import { logout, refreshProfileRequest } from '../feature/auth/authSlice'
+import { logout } from '../feature/auth/authSlice'
 import { getRoleName, isAdmin } from '../utils/roleUtils'
 
 export const DefaultLayout: React.FC = () => {
   const dispatch = useDispatch()
   const location = useLocation()
-  const { user, isRefreshingProfile } = useSelector((state: RootState) => state.auth)
+  const { user } = useSelector((state: RootState) => state.auth)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   const handleLogout = () => {
     dispatch(logout())
   }
 
-  const handleRefreshProfile = () => {
-    dispatch(refreshProfileRequest())
-  }
-
+  const isAdminUser = isAdmin(user?.role)
   const roleTitle = getRoleName(user?.role)
   const displayName = user?.full_name || user?.username || 'Người dùng'
   const initials = displayName
@@ -35,11 +32,15 @@ export const DefaultLayout: React.FC = () => {
     : 'U'
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-slate-50 font-sans antialiased text-slate-900">
+    <div
+      className={`h-screen w-screen flex overflow-hidden font-sans antialiased text-slate-900 ${
+        isAdminUser ? 'admin-shell' : 'bg-slate-50'
+      }`}
+    >
       {/* 1. Left Vertical Navigation Sidebar (With Logo & Main Tabs) */}
       <Sidebar
         user={user}
-        isAdminUser={isAdmin(user?.role)}
+        isAdminUser={isAdminUser}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
       />
@@ -51,10 +52,8 @@ export const DefaultLayout: React.FC = () => {
           userName={displayName}
           userRoleTitle={roleTitle}
           userInitials={initials}
-          isAdminUser={isAdmin(user?.role)}
+          isAdminUser={isAdminUser}
           onLogout={handleLogout}
-          onRefreshProfile={handleRefreshProfile}
-          isRefreshingProfile={isRefreshingProfile}
         />
 
         {/* Full-width Main Workspace with Smooth Route Transitions */}

@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 
 export interface CabinetTableSkeletonProps {
@@ -5,6 +6,7 @@ export interface CabinetTableSkeletonProps {
 }
 
 export const CabinetTableSkeleton: React.FC<CabinetTableSkeletonProps> = ({ rowCount = 8 }) => {
+  const showCommune = useShowCommune()
   return (
     <>
       {Array.from({ length: rowCount }).map((_, index) => (
@@ -18,9 +20,11 @@ export const CabinetTableSkeleton: React.FC<CabinetTableSkeletonProps> = ({ rowC
             <div className="h-4 w-36 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
           {/* Địa bàn */}
-          <td className="p-3.5">
-            <div className="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-md" />
-          </td>
+          {showCommune && (
+            <td className="p-3.5">
+              <div className="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-md" />
+            </td>
+          )}
           {/* Số cột quản lý */}
           <td className="p-3.5">
             <div className="h-4 w-14 bg-slate-200 dark:bg-slate-800 rounded-md" />

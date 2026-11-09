@@ -37,10 +37,10 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white/80 backdrop-blur-2xl rounded-[28px] border border-white/80 shadow-2xl shadow-primary/30 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header Modal */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-white/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-600 flex items-center justify-center shadow-2xs shrink-0">
               <MapPin className="w-5 h-5" />
@@ -80,7 +80,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
         {/* Body Modal: Hồ sơ thông số kỹ thuật (Dossier View - Chuẩn Key-Value đồng nhất) */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
           {/* 1. Thông tin hành chính */}
-          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-1.5">
+          <div className="bg-white/50 p-3.5 rounded-xl border border-slate-200/80 space-y-1.5">
             <h3 className="font-bold text-slate-800 text-xs border-b border-slate-200/70 pb-2 flex items-center gap-1.5">
               <Compass className="w-3.5 h-3.5 text-blue-500" />
               <span>Thông Tin Địa Giới Hành Chính</span>
@@ -125,10 +125,10 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
           </div>
 
           {/* 2. Chi tiết 4 cạnh BBox: Mô hình La bàn GIS chuẩn (Bắc ở trên, Nam ở dưới) */}
-          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-2.5">
+          <div className="bg-white/50 p-3.5 rounded-xl border border-slate-200/80 space-y-2.5">
             <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
               <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                <Compass className="w-3.5 h-3.5 text-indigo-500" />
+                <Compass className="w-3.5 h-3.5 text-secondary" />
                 <span>Tọa Độ Khung Bao Bản Đồ (Bounding Box)</span>
               </h3>
               <span className="text-[10px] text-slate-500 font-mono font-medium">EPSG:4326</span>
@@ -138,7 +138,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
               <div className="space-y-2 pt-1">
                 {/* Đỉnh trên: Bắc (max_lat) */}
                 <div className="flex justify-center">
-                  <div className="w-48 px-3 py-2 bg-white rounded-lg border border-slate-200/90 text-center shadow-2xs">
+                  <div className="w-48 px-3 py-2 bg-white/60 rounded-lg border border-slate-200/90 text-center shadow-2xs">
                     <span className="text-[10px] text-slate-400 font-sans block mb-0.5">Vĩ độ Bắc (max_lat)</span>
                     <strong className="font-mono text-xs font-semibold text-slate-800">{commune.bbox.max_lat}</strong>
                   </div>
@@ -146,7 +146,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
 
                 {/* Hàng giữa: Tây (min_lng) <---> Tâm BBox <---> Đông (max_lng) */}
                 <div className="flex items-center justify-between gap-2.5">
-                  <div className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-200/90 text-center shadow-2xs">
+                  <div className="flex-1 px-3 py-2 bg-white/60 rounded-lg border border-slate-200/90 text-center shadow-2xs">
                     <span className="text-[10px] text-slate-400 font-sans block mb-0.5">Kinh độ Tây (min_lng)</span>
                     <strong className="font-mono text-xs font-semibold text-slate-800">{commune.bbox.min_lng}</strong>
                   </div>
@@ -162,7 +162,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
                     </strong>
                   </div>
 
-                  <div className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-200/90 text-center shadow-2xs">
+                  <div className="flex-1 px-3 py-2 bg-white/60 rounded-lg border border-slate-200/90 text-center shadow-2xs">
                     <span className="text-[10px] text-slate-400 font-sans block mb-0.5">Kinh độ Đông (max_lng)</span>
                     <strong className="font-mono text-xs font-semibold text-slate-800">{commune.bbox.max_lng}</strong>
                   </div>
@@ -170,14 +170,14 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
 
                 {/* Đáy dưới: Nam (min_lat) */}
                 <div className="flex justify-center">
-                  <div className="w-48 px-3 py-2 bg-white rounded-lg border border-slate-200/90 text-center shadow-2xs">
+                  <div className="w-48 px-3 py-2 bg-white/60 rounded-lg border border-slate-200/90 text-center shadow-2xs">
                     <span className="text-[10px] text-slate-400 font-sans block mb-0.5">Vĩ độ Nam (min_lat)</span>
                     <strong className="font-mono text-xs font-semibold text-slate-800">{commune.bbox.min_lat}</strong>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="p-4 text-center text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+              <div className="p-4 text-center text-slate-400 bg-white/60 rounded-lg border border-dashed border-slate-200">
                 Chưa thiết lập tọa độ vùng bao cho địa bàn này.
               </div>
             )}
@@ -185,7 +185,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
         </div>
 
         {/* Footer Modal */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
+        <div className="p-4 border-t border-slate-100 bg-white/50 flex items-center justify-between gap-2">
           {onEdit ? (
             <button
               type="button"
@@ -205,7 +205,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
+            className="px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white/60 border border-slate-200 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
           >
             Đóng
           </button>

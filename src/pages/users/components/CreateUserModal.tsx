@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
-import { X, UserPlus, Shield, Mail, User, MapPin, Globe } from 'lucide-react'
+import { X, UserPlus, Shield, Mail, MapPin, Globe } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
 import type { CreateUserRequest } from '../../../types/admin/users'
 import type { UserRole } from '../../../types/common/enums'
@@ -13,6 +14,15 @@ export interface CreateUserModalProps {
   onSubmit: (payload: CreateUserRequest) => void
 }
 
+// Backend sinh tên đăng nhập từ họ tên nên chỉ nhận chữ cái Latin/tiếng Việt, khoảng trắng và dấu gạch ngang (ACCT-2)
+const isValidFullName = (value: string): boolean => {
+  const latin = value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd')
+  return /^[A-Za-z\s-]+$/.test(latin) && /[A-Za-z]/.test(latin)
+}
+
 export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   isOpen,
   isSubmitting = false,
@@ -20,7 +30,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   onSubmit,
 }) => {
   const communes = useSelector((state: RootState) => state.adminCommunes.communes)
-  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('field_engineer')
@@ -29,7 +38,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setUsername('')
       setEmail('')
       setFullName('')
       setRole('field_engineer')
@@ -59,12 +67,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
-    if (!username.trim()) {
-      newErrors.username = 'Tên đăng nhập không được để trống'
-    } else if (!/^[a-zA-Z0-9_.-]{3,30}$/.test(username.trim())) {
-      newErrors.username = 'Tên đăng nhập chỉ chứa chữ cái, số, dấu gạch (3-30 ký tự)'
-    }
-
     if (!email.trim()) {
       newErrors.email = 'Email không được để trống'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -73,6 +75,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
     if (!fullName.trim()) {
       newErrors.fullName = 'Họ và tên không được để trống'
+    } else if (!isValidFullName(fullName)) {
+      newErrors.fullName = 'Họ và tên chỉ gồm chữ cái, khoảng trắng và dấu gạch ngang (không có số hoặc ký tự đặc biệt)'
     }
 
     if (role !== 'system_admin' && !selectedCommune) {
@@ -88,11 +92,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     if (!validate()) return
 
     onSubmit({
-      username: username.trim(),
       email: email.trim(),
       full_name: fullName.trim(),
       role,
-      commune_ids: role === 'system_admin' ? [] : [selectedCommune],
+      // system_admin bao quát mọi địa bàn: backend yêu cầu không gửi commune_ids (ACCT-1)
+      ...(role === 'system_admin' ? {} : { commune_ids: [selectedCommune] }),
     })
   }
 
@@ -101,13 +105,13 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     ? selectedCommuneObj.name || selectedCommuneObj.commune_id || '-'
     : ''
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white/80 backdrop-blur-2xl dark:bg-slate-900 rounded-[28px] border border-white/80 dark:border-slate-800 shadow-2xl shadow-primary/30 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/50">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white/50 dark:bg-slate-950/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-2xs">
+            <div className="w-10 h-10 rounded-2xl bg-secondary/10 dark:bg-primary text-primary dark:text-secondary flex items-center justify-center shadow-2xs">
               <UserPlus className="w-5 h-5" />
             </div>
             <div>
@@ -121,6 +125,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            disabled={isSubmitting}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -129,30 +134,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
-          {/* Username */}
-          <div>
-            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Tên đăng nhập (Username) <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Ví dụ: engineer_field01"
-                className={`w-full pl-9 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
-                  errors.username
-                    ? 'border-rose-500 focus:ring-rose-500/20'
-                    : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500/20 focus:border-indigo-500'
-                }`}
-              />
-            </div>
-            {errors.username ? (
-              <p className="text-rose-500 mt-1 text-[11px]">{errors.username}</p>
-            ) : null}
-          </div>
-
           {/* Full Name */}
           <div>
             <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -163,10 +144,10 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Ví dụ: Nguyễn Văn A"
-              className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
+              className={`w-full px-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
                 errors.fullName
                   ? 'border-rose-500 focus:ring-rose-500/20'
-                  : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500/20 focus:border-indigo-500'
+                  : 'border-slate-200 dark:border-slate-700 focus:ring-secondary focus:border-secondary'
               }`}
             />
             {errors.fullName ? (
@@ -186,16 +167,20 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="nguyenvana@gmail.com"
-                className={`w-full pl-9 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
+                className={`w-full pl-9 pr-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
                   errors.email
                     ? 'border-rose-500 focus:ring-rose-500/20'
-                    : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500/20 focus:border-indigo-500'
+                    : 'border-slate-200 dark:border-slate-700 focus:ring-secondary focus:border-secondary'
                 }`}
               />
             </div>
             {errors.email ? (
               <p className="text-rose-500 mt-1 text-[11px]">{errors.email}</p>
-            ) : null}
+            ) : (
+              <p className="text-slate-500 dark:text-slate-400 mt-1 text-[11px]">
+                Tên đăng nhập do hệ thống tự tạo. Thư mời kích hoạt sẽ gửi tới email này.
+              </p>
+            )}
           </div>
 
           {/* Role */}
@@ -208,7 +193,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               <select
                 value={role}
                 onChange={(e) => handleRoleChange(e.target.value as UserRole)}
-                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition cursor-pointer"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition cursor-pointer"
               >
                 {Object.entries(USER_ROLE_LABELS).map(([k, label]) => (
                   <option key={k} value={k} className="dark:bg-slate-900">
@@ -221,15 +206,15 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
           {/* Commune Scope */}
           {role === 'system_admin' ? (
-            <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 shrink-0">
+            <div className="p-3.5 bg-secondary/10 dark:bg-primary border border-secondary/30 dark:border-primary rounded-2xl flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-secondary/20 dark:bg-primary text-primary dark:text-secondary shrink-0">
                 <Globe className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                <div className="text-xs font-bold text-primary dark:text-secondary/30 flex items-center gap-1.5">
                   <span>Phạm vi toàn hệ thống (System-wide Scope)</span>
                 </div>
-                <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80 mt-0.5 leading-relaxed">
+                <p className="text-[11px] text-primary dark:text-secondary/50 mt-0.5 leading-relaxed">
                   Vai trò Quản trị hệ thống tự động có quyền bao quát toàn bộ địa bàn và mọi trạm đèn trên toàn hệ thống. Không cần và không phân bổ địa bàn riêng lẻ.
                 </p>
               </div>
@@ -243,7 +228,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   <span className="text-rose-500">*</span>
                 </label>
                 {selectedCommuneLabel ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold border border-indigo-200/80 dark:border-indigo-800 max-w-[180px] truncate">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary/10 dark:bg-primary text-primary dark:text-secondary/50 text-[10px] font-semibold border border-secondary/30 dark:border-primary max-w-[180px] truncate">
                     {selectedCommuneLabel}
                   </span>
                 ) : (
@@ -256,7 +241,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               <div
                 role="radiogroup"
                 aria-label="Phạm vi địa bàn quản lý"
-                className={`max-h-36 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-800/50 border rounded-xl grid grid-cols-2 gap-1.5 ${
+                className={`max-h-36 overflow-y-auto p-2 bg-white/50 dark:bg-slate-800/50 border rounded-xl grid grid-cols-2 gap-1.5 ${
                   errors.communes
                     ? 'border-rose-400 dark:border-rose-500'
                     : 'border-slate-200 dark:border-slate-700'
@@ -279,7 +264,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                         onClick={() => handleSelectCommune(code)}
                         className={`px-2.5 py-2 rounded-xl text-left flex items-center justify-between gap-2 transition cursor-pointer text-[11px] ${
                           isSelected
-                            ? 'bg-indigo-50/90 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-300 dark:border-indigo-700 shadow-2xs'
+                            ? 'bg-secondary/10 dark:bg-primary text-primary dark:text-secondary/50 font-semibold border border-secondary/50 dark:border-primary shadow-2xs'
                             : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/80'
                         }`}
                       >
@@ -287,7 +272,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                         <span
                           className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 transition ${
                             isSelected
-                              ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-600 dark:bg-indigo-500'
+                              ? 'border-primary dark:border-secondary bg-primary dark:bg-secondary'
                               : 'border-slate-300 dark:border-slate-600 bg-transparent'
                           }`}
                         >
@@ -319,7 +304,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl bg-primary hover:bg-primary active:scale-95 text-white font-bold shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
               {isSubmitting ? (
                 <>
@@ -336,6 +321,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

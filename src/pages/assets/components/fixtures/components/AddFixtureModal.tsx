@@ -1,14 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import {
-  X,
-  Lightbulb,
-  PlusCircle,
-  Trash2,
-  CheckCircle2,
-  Route,
-  AlertCircle,
-} from 'lucide-react'
+import { Lightbulb, PlusCircle, Trash2, CheckCircle2, Route } from 'lucide-react'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
 import type { CreateFixtureRequest } from '../../../../../types/assets/fixtures'
 import type { FixtureType, PowerSource, DataSource } from '../../../../../types/common/enums'
 import type { PoleListItem } from '../../../../../types/assets/poles'
@@ -172,51 +164,19 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
 
   if (!isOpen) return null
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200"
+  return (
+    <AssetModalFrame widthClass="max-w-4xl">
+      <AssetModalHeader
+        icon={<Lightbulb className="w-5 h-5" />}
+        accent="amber"
+        title="Thêm Bộ Đèn Chiếu Sáng"
+        subtitle="Lựa chọn tuyến đường, cột điện và cấu hình bộ đèn gắn trên cột"
+        onClose={onClose}
       />
 
-      {/* Modal Dialog */}
-      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="p-4 sm:px-6 sm:py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <Lightbulb className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                Thêm Bộ Đèn Chiếu Sáng
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Lựa chọn tuyến đường, cột điện và cấu hình bộ đèn gắn trên cột
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Content Body */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs">
-          {/* Validation Alert */}
-          {validationError && (
-            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-2xl text-rose-700 dark:text-rose-300 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
-              <span>{validationError}</span>
-            </div>
-          )}
-
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 text-xs">
+        <AssetModalError message={validationError} />
+        <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
           {/* ================= SECTION 1: CHỌN TUYẾN ĐƯỜNG & CỘT ĐIỆN ================= */}
           <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
             <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 text-xs">
@@ -311,12 +271,12 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                   <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 shadow-2xs">
                     <tr>
                       <th className="py-2.5 px-3 w-12 text-center">STT</th>
-                      <th className="py-2.5 px-3 min-w-32">Số bóng / bộ</th>
-                      <th className="py-2.5 px-3 min-w-32">Công suất (*)</th>
+                      <th className="py-2.5 px-3 min-w-24">Số bóng / bộ</th>
+                      <th className="py-2.5 px-3 min-w-24">Công suất (*)</th>
                       <th className="py-2.5 px-3 min-w-36">Loại đèn</th>
                       <th className="py-2.5 px-3 min-w-28">Nguồn điện</th>
-                      <th className="py-2.5 px-3 min-w-32">Ngày lắp</th>
-                      <th className="py-2.5 px-3 min-w-32">Hạn bảo hành</th>
+                      <th className="py-2.5 px-3 min-w-28">Ngày lắp</th>
+                      <th className="py-2.5 px-3 min-w-28">Hạn bảo hành</th>
                       <th className="py-2.5 px-3 w-14 text-center">Xóa</th>
                     </tr>
                   </thead>
@@ -476,27 +436,15 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
             </div>
           </div>
 
-          {/* ================= SECTION 3: FOOTER ACTIONS ================= */}
-          <div className="p-4 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 mt-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition shadow-2xs"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              disabled={rows.length === 0 || !selectedPoleId}
-              className="px-5 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Xác Nhận Thêm ({rows.length} Bộ Đèn)</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
+        </div>
+
+        <AssetModalFooter
+          onCancel={onClose}
+          submitLabel={`Xác Nhận Thêm (${rows.length} Bộ Đèn)`}
+          submitIcon={<CheckCircle2 className="w-4 h-4" />}
+          disabled={rows.length === 0 || !selectedPoleId}
+        />
+      </form>
+    </AssetModalFrame>
   )
 }

@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 
 export interface IotNodeTableSkeletonProps {
@@ -5,6 +6,7 @@ export interface IotNodeTableSkeletonProps {
 }
 
 export const IotNodeTableSkeleton: React.FC<IotNodeTableSkeletonProps> = ({ rowCount = 8 }) => {
+  const showCommune = useShowCommune()
   return (
     <>
       {Array.from({ length: rowCount }).map((_, index) => (
@@ -18,9 +20,11 @@ export const IotNodeTableSkeleton: React.FC<IotNodeTableSkeletonProps> = ({ rowC
             <div className="h-5 w-28 bg-slate-200 dark:bg-slate-800 rounded-lg" />
           </td>
           {/* Khu vực */}
-          <td className="py-3.5 px-4">
-            <div className="h-4 w-28 bg-slate-200 dark:bg-slate-800 rounded-md" />
-          </td>
+          {showCommune && (
+            <td className="py-3.5 px-4">
+              <div className="h-4 w-28 bg-slate-200 dark:bg-slate-800 rounded-md" />
+            </td>
+          )}
           {/* Nguồn dữ liệu */}
           <td className="py-3.5 px-4 text-center">
             <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto" />

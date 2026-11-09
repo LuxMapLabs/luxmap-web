@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react'
-import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
-import { Route, X, CheckCircle2, MapPin, RotateCcw } from 'lucide-react'
+import { Route, CheckCircle2, MapPin, RotateCcw } from 'lucide-react'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter } from '../../common/AssetModal'
 import { SegmentRouteMap, SegmentPoleItem } from '../../../../../components/SegmentRouteMap'
 import { calculateRouteLengthMeters, extractSegmentCoordinates } from '../../../../../utils/gis-map/routeUtils'
 
@@ -158,28 +158,16 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
 
   return (
     <>
-      {/* Header */}
-      <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-blue-700 via-indigo-700 to-sky-700 text-white">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center font-bold">
-            <Route className="w-5 h-5 text-sky-200" />
-          </div>
-          <div>
-            <h3 className="font-bold text-white text-sm">Chỉnh Sửa Tuyến Đường: {segment.segment_id}</h3>
-            <p className="text-[11px] text-blue-200">{segment.segment_name}</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+      <AssetModalHeader
+        icon={<Route className="w-5 h-5" />}
+        accent="indigo"
+        title={`Chỉnh Sửa Tuyến Đường: ${segment.external_ref || segment.segment_id}`}
+        subtitle={segment.segment_name}
+        onClose={onClose}
+      />
 
       {/* Form Body - 2 Columns Layout */}
-      <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
           {/* CỘT TRÁI (40% width trên md) */}
           <div className="md:col-span-5 p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
@@ -228,7 +216,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 text-[11px]">
+              <div className="grid grid-cols-1 gap-2.5 text-[11px]">
                 {/* Điểm đầu */}
                 <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900/60 shadow-xs space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -343,23 +331,11 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer shadow-2xs"
-          >
-            Hủy bỏ
-          </button>
-          <button
-            type="submit"
-            className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Lưu Thay Đổi</span>
-          </button>
-        </div>
+        <AssetModalFooter
+          onCancel={onClose}
+          submitLabel="Lưu Thay Đổi"
+          submitIcon={<CheckCircle2 className="w-4 h-4" />}
+        />
       </form>
     </>
   )
@@ -373,25 +349,15 @@ export const EditSegmentModal: React.FC<EditSegmentModalProps> = ({
 }) => {
   if (!isOpen || !segment) return null
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+  return (
+    <AssetModalFrame widthClass="max-w-5xl">
+      <EditSegmentModalContent
+        key={segment.segment_id}
+        segment={segment}
+        onClose={onClose}
+        onSave={onSave}
       />
-
-      {/* Modal Dialog */}
-      <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95">
-        <EditSegmentModalContent
-          key={segment.segment_id}
-          segment={segment}
-          onClose={onClose}
-          onSave={onSave}
-        />
-      </div>
-    </div>,
-    document.body
+    </AssetModalFrame>
   )
 }
 

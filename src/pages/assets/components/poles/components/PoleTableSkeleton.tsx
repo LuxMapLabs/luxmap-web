@@ -1,3 +1,4 @@
+import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 
 export interface PoleTableSkeletonProps {
@@ -5,10 +6,15 @@ export interface PoleTableSkeletonProps {
 }
 
 export const PoleTableSkeleton: React.FC<PoleTableSkeletonProps> = ({ rowCount = 8 }) => {
+  const showCommune = useShowCommune()
   return (
     <>
       {Array.from({ length: rowCount }).map((_, index) => (
         <tr key={index} className="animate-pulse">
+          {/* Chọn */}
+          <td className="p-3.5 w-10">
+            <div className="h-4 w-4 bg-slate-200 dark:bg-slate-800 rounded" />
+          </td>
           {/* Mã cột */}
           <td className="p-3.5">
             <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
@@ -30,9 +36,11 @@ export const PoleTableSkeleton: React.FC<PoleTableSkeletonProps> = ({ rowCount =
             <div className="h-4 w-28 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
           {/* Địa bàn */}
-          <td className="p-3.5">
-            <div className="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-md" />
-          </td>
+          {showCommune && (
+            <td className="p-3.5">
+              <div className="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded-md" />
+            </td>
+          )}
           {/* Mã bóng */}
           <td className="p-3.5">
             <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />

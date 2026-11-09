@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { createPortal } from 'react-dom'
 import { useSelector, useDispatch } from 'react-redux'
-import { Zap, X, CheckCircle2, MapPin, AlertCircle, Route } from 'lucide-react'
+import { Zap, CheckCircle2, MapPin, Route } from 'lucide-react'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { DataSource } from '../../../../../types/common/enums'
@@ -140,44 +140,20 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
     onClose()
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 md:p-6 bg-slate-900/60 backdrop-blur-xs select-none animate-in fade-in">
-      {/* Modal Dialog */}
-      <div className="relative w-full max-w-6xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[92vh]">
-        {/* Header */}
-        <div className="p-4 px-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-900 dark:bg-slate-950 text-white shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold border border-purple-500/30">
-              <Zap className="w-5 h-5 text-yellow-300" />
-            </div>
-            <div>
-              <h3 className="font-bold text-white text-base">
-                Chỉnh Sửa Tủ Điện: {cabinet.external_ref || cabinet.cabinet_id || '-'}
-              </h3>
-              <p className="text-xs text-slate-300 dark:text-slate-400">
-                Mã hệ thống: {cabinet.cabinet_id || '-'} • Địa bàn: {cabinet.commune_name || cabinet.commune_id || '-'}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 cursor-pointer transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  return (
+    <AssetModalFrame widthClass="max-w-6xl">
+      <AssetModalHeader
+        icon={<Zap className="w-5 h-5" />}
+        accent="purple"
+        title={`Chỉnh Sửa Tủ Điện: ${cabinet.external_ref || cabinet.cabinet_id || '-'}`}
+        subtitle={`Mã hệ thống: ${cabinet.cabinet_id || '-'} • Địa bàn: ${cabinet.commune_name || cabinet.commune_id || '-'}`}
+        onClose={onClose}
+      />
 
-        {/* Error Notification */}
-        {errorMsg ? (
-          <div className="mx-6 mt-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-            <span>{errorMsg}</span>
-          </div>
-        ) : null}
+      <AssetModalError message={errorMsg} />
 
-        {/* Main Content - 2 Columns (Form trái + Map phải) */}
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+      {/* Main Content - 2 Columns (Form trái + Map phải) */}
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
           <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
             
             {/* CỘT TRÁI (~40%): THÔNG SỐ TỦ ĐIỆN & TỌA ĐỘ */}
@@ -304,23 +280,6 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-purple-700 hover:bg-purple-800 dark:bg-purple-600 dark:hover:bg-purple-500 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Lưu Thay Đổi</span>
-                </button>
-              </div>
             </div>
 
             {/* CỘT PHẢI (~60%): BẢN ĐỒ VỆ TINH GIS ĐỊNH VỊ */}
@@ -344,10 +303,14 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
             </div>
 
           </div>
+
+          <AssetModalFooter
+            onCancel={onClose}
+            submitLabel="Lưu Thay Đổi"
+            submitIcon={<CheckCircle2 className="w-4 h-4" />}
+          />
         </form>
-      </div>
-    </div>,
-    document.body
+    </AssetModalFrame>
   )
 }
 

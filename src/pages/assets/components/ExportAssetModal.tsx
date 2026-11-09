@@ -11,6 +11,7 @@ import {
   Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { DownloadIcon } from '../../../components/ops/DownloadIcon'
 import type { PoleListItem } from '../../../types/assets/poles'
 import type { CabinetListItem } from '../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../types/assets/segments'
@@ -47,50 +48,50 @@ interface CategoryOption {
   id: ExportableCategory
   name: string
   subtitle: string
-  icon: React.ReactNode
-  activeColor: string
+  icon: React.ElementType
+  tile: string
   description: string
 }
 
 const CATEGORY_OPTIONS: CategoryOption[] = [
   {
     id: 'segments',
+    tile: 'bg-teal-100 text-teal-700',
     name: 'Tuyến đường chiếu sáng',
     subtitle: 'Đường trục liên xã, liên thôn',
-    icon: <Route className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />,
-    activeColor: 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30',
+    icon: Route,
     description: 'Bao gồm tên tuyến, cấp đường, chiều dài (m) và hình học tọa độ LineString WKT.',
   },
   {
     id: 'cabinets',
+    tile: 'bg-violet-100 text-violet-700',
     name: 'Tủ điện điều khiển',
     subtitle: 'Trạm tủ điều khiển chiếu sáng',
-    icon: <Zap className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
-    activeColor: 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/30',
+    icon: Zap,
     description: 'Bao gồm mã tủ, tên trạm tủ điện, xã/phường và tọa độ vị trí Point WKT.',
   },
   {
     id: 'feeders',
+    tile: 'bg-emerald-100 text-emerald-700',
     name: 'Tuyến lộ cấp nguồn',
     subtitle: 'Mạch lộ cấp điện hạ thế',
-    icon: <Cable className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />,
-    activeColor: 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30',
+    icon: Cable,
     description: 'Bao gồm mã tuyến lộ, tên lộ cấp nguồn và mã tủ điện liên kết cấp nguồn.',
   },
   {
     id: 'poles',
+    tile: 'bg-sky-100 text-sky-700',
     name: 'Cột điện chiếu sáng',
     subtitle: 'Cột đèn và liên kết tuyến',
-    icon: <Boxes className="w-5 h-5 text-blue-600 dark:text-blue-400" />,
-    activeColor: 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30',
+    icon: Boxes,
     description: 'Bao gồm mã cột, liên kết tuyến đường, lộ cấp điện, địa bàn và tọa độ vị trí Point WKT.',
   },
   {
     id: 'fixtures',
+    tile: 'bg-rose-100 text-rose-700',
     name: 'Bộ đèn chiếu sáng',
     subtitle: 'Bóng đèn lắp đặt trên cột',
-    icon: <Lightbulb className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
-    activeColor: 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/30',
+    icon: Lightbulb,
     description: 'Bao gồm mã cột gắn đèn, loại bóng LED, công suất (Watt), nguồn điện và ngày lắp đặt.',
   },
 ]
@@ -179,134 +180,118 @@ export const ExportAssetModal: React.FC<ExportAssetModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-      {/* Backdrop */}
       <div
         onClick={onClose}
         className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200 animate-in fade-in"
       />
 
-      {/* Main Dialog Window */}
-      <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
-        {/* Modal Header */}
-        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+      <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
+        {/* Header */}
+        <div className="p-5 text-white flex items-center justify-between shrink-0 bg-linear-to-r from-teal-700 to-teal-600">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900/60 flex items-center justify-center shrink-0">
-              <Download className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+              <Download className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base tracking-tight flex items-center gap-2">
-                Xuất Dữ Liệu Tài Sản Ra CSV
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <h3 className="font-bold text-base tracking-tight">Xuất Dữ Liệu Tài Sản Ra CSV</h3>
+              <p className="text-[13px] text-teal-50/90 mt-0.5">
                 Chọn các danh mục tài sản cần xuất (tải nhiều tệp CSV riêng biệt)
               </p>
             </div>
           </div>
-
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-xl text-white/80 hover:text-white hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer shrink-0"
             aria-label="Đóng"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="p-6 text-xs text-slate-700 dark:text-slate-300 overflow-y-auto flex-1">
-          {/* Danh mục tài sản (Multi-select) */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                Chọn danh mục tài sản xuất file:
-              </label>
-              <div className="flex items-center gap-2">
-                {isAllSelected ? (
-                  <button
-                    type="button"
-                    onClick={handleDeselectAll}
-                    className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                  >
-                    Bỏ chọn tất cả
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSelectAll}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer"
-                  >
-                    Chọn tất cả
-                  </button>
-                )}
-              </div>
-            </div>
+        {/* Body */}
+        <div className="p-5 overflow-y-auto flex-1">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[13px] font-bold text-slate-800 dark:text-slate-200">
+              Chọn danh mục tài sản xuất file:
+            </span>
+            <button
+              type="button"
+              onClick={isAllSelected ? handleDeselectAll : handleSelectAll}
+              className="text-[13px] font-semibold text-teal-700 hover:text-teal-800 hover:underline underline-offset-4 transition-colors cursor-pointer"
+            >
+              {isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+            </button>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {CATEGORY_OPTIONS.map((opt) => {
-                const isSelected = selectedCategories.includes(opt.id)
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {CATEGORY_OPTIONS.map((opt) => {
+              const isSelected = selectedCategories.includes(opt.id)
+              const Icon = opt.icon
 
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => handleToggleCategory(opt.id)}
-                    className={`relative p-3.5 rounded-2xl border text-left transition flex items-start gap-3 cursor-pointer ${
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => handleToggleCategory(opt.id)}
+                  className={`group relative p-3.5 rounded-2xl border-2 text-left flex items-start gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 ${
+                    isSelected
+                      ? 'border-teal-500 bg-teal-50/70 shadow-[0_10px_22px_-14px_rgba(13,148,136,0.7)]'
+                      : 'border-slate-200 bg-white hover:border-teal-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900'
+                  }`}
+                >
+                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${opt.tile}`}>
+                    <Icon className="w-5 h-5" />
+                  </span>
+                  <span className="flex-1 min-w-0 pr-6">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-[13px] block">{opt.name}</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block line-clamp-1">
+                      {opt.subtitle}
+                    </span>
+                  </span>
+                  <span
+                    className={`absolute top-3.5 right-3.5 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 ${
                       isSelected
-                        ? `${opt.activeColor} border-2 shadow-xs`
-                        : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 bg-white dark:bg-slate-900'
+                        ? 'bg-teal-600 text-white'
+                        : 'border-2 border-slate-300 bg-white text-transparent dark:border-slate-600 dark:bg-slate-800'
                     }`}
                   >
-                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0 mt-0.5">
-                      {opt.icon}
-                    </div>
-                    <div className="flex-1 min-w-0 pr-6">
-                      <span className="font-bold text-slate-900 dark:text-slate-100 text-xs block">
-                        {opt.name}
-                      </span>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
-                        {opt.subtitle}
-                      </p>
-                    </div>
-
-                    <div
-                      className={`absolute top-3.5 right-3.5 w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
-                        isSelected
-                          ? 'bg-blue-600 text-white'
-                          : 'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-transparent'
-                      }`}
-                    >
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+                    <Check className="w-3 h-3 stroke-[3.5]" />
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Modal Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-end gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold shadow-xs transition cursor-pointer"
-          >
-            Hủy Bỏ
-          </button>
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={selectedCategories.length === 0}
-            className="px-5 py-2 bg-[#1f3864] hover:bg-[#1f3864]/90 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>
-              {selectedCategories.length > 0
-                ? `Xác Nhận Xuất (${selectedCategories.length} tệp CSV)`
-                : 'Xác Nhận Xuất File'}
-            </span>
-          </button>
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex items-center justify-between gap-3 shrink-0">
+          <span className="hidden sm:block text-[13px] text-slate-500">
+            Đã chọn {selectedCategories.length}/{CATEGORY_OPTIONS.length} danh mục
+          </span>
+          <div className="flex items-center gap-2.5 ml-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-[13px] font-semibold transition cursor-pointer"
+            >
+              Hủy Bỏ
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={selectedCategories.length === 0}
+              className="download-trigger px-5 py-2 bg-linear-to-br from-teal-500 to-teal-700 hover:shadow-[0_10px_20px_-10px_rgba(13,148,136,0.75)] hover:-translate-y-px active:scale-[0.97] text-white rounded-xl text-[13px] font-bold transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+            >
+              <DownloadIcon className="w-4 h-4" />
+              <span>
+                {selectedCategories.length > 0
+                  ? `Xác Nhận Xuất (${selectedCategories.length} tệp CSV)`
+                  : 'Xác Nhận Xuất File'}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>,

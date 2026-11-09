@@ -288,7 +288,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       )
 
       // 1. Kiểm tra placeholder khi không có ảnh (không còn ảnh Unsplash ngẫu nhiên)
-      expect(screen.getByText('Chưa có ảnh khảo sát thực địa')).toBeInTheDocument()
+      expect(screen.getByText('Chưa có ảnh cột đèn')).toBeInTheDocument()
 
       // 2. Kiểm tra badge "Bình thường" trên accordion khi không có lỗi
       expect(screen.getByText('Sự cố đang ghi nhận')).toBeInTheDocument()
@@ -354,7 +354,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
         </Provider>
       )
 
-      // 1. Kiểm tra ảnh hiện trường thực tế render đúng
+      // 1. Kiểm tra ảnh cột đèn render đúng
       const actualImg = screen.getByRole('img', { name: 'POL-001' })
       expect(actualImg).toHaveAttribute('src', 'https://cdn.luxmap.vn/frames/frm-001-thumb.jpg')
 

@@ -36,11 +36,14 @@ export const AdminManagementPage: React.FC = () => {
     isLoading,
     isSubmitting,
     invitingUserId,
+    actionError,
     filters,
   } = useSelector((state: RootState) => state.adminUsers)
 
   // Local state for modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  // Modal tạo mới chỉ đóng khi request xong và thành công (thất bại thì giữ lại để người dùng sửa)
+  const [isCreatePending, setIsCreatePending] = useState(false)
   const [editingUser, setEditingUser] = useState<UserAccountItem | null>(null)
   const [lockingUser, setLockingUser] = useState<UserAccountItem | null>(null)
 
@@ -89,9 +92,16 @@ export const AdminManagementPage: React.FC = () => {
     })
   }, [users, filters.search, currentUser])
 
+  useEffect(() => {
+    if (isCreatePending && !isSubmitting) {
+      setIsCreatePending(false)
+      if (!actionError) setIsCreateModalOpen(false)
+    }
+  }, [isCreatePending, isSubmitting, actionError])
+
   const handleCreateSubmit = (payload: CreateUserRequest) => {
     dispatch(createUserRequest(payload))
-    setIsCreateModalOpen(false)
+    setIsCreatePending(true)
   }
 
   const handleEditSubmit = (id: string, payload: UpdateUserRequest) => {
@@ -118,8 +128,8 @@ export const AdminManagementPage: React.FC = () => {
   const totalPages = Math.ceil(total / pageSize) || 1
 
   return (
-    <div className="h-full w-full bg-slate-50 dark:bg-slate-950 overflow-y-auto p-4 sm:p-6 md:p-8 font-sans text-slate-800 dark:text-slate-200">
-      <div className="max-w-7xl mx-auto space-y-3.5">
+    <div className="admin-glass-root h-full w-full overflow-y-auto custom-scrollbar p-4 sm:p-6 md:p-8 text-slate-800 dark:text-slate-200">
+      <div className="glass-slab max-w-7xl mx-auto p-5 md:p-6 space-y-3.5">
         {/* Toolbar & Filter with Add User on the far right */}
         <UserFilterToolbar
           searchTerm={filters.search}

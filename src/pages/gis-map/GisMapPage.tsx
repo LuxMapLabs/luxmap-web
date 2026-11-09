@@ -8,6 +8,7 @@ import {
   FIT_BOUNDS_GIS_SEGMENT,
 } from '../../utils/gis-map/mapUtils'
 import * as maplibregl from 'maplibre-gl'
+import { createManagedAreaControl } from '../../utils/gis-map/MapRecenterControl'
 
 import type { FixtureType, PowerSource, RoadClass, DataSource } from '../../types/common/enums'
 
@@ -104,7 +105,7 @@ export const GisMapPage: React.FC = () => {
   const { mapContainerRef, mapRef, popupRef, isMapLoaded } = useGisMapInstance()
 
   // Open on the account's commune center (GET /auth/me map_bounds.center) taken 100% directly from backend.
-  // Restrict zoom-out (minZoom) to the entire commune panorama bbox (map_bounds.bbox) and restrict panning (maxBounds).
+  // Không khóa kéo/zoom: khu vực quản lý được khoanh bằng viền + vùng ngoài tô mờ, có nút quay về.
   const mapBounds = useSelector((state: RootState) => state.auth.user?.map_bounds)
   const lastFramedBboxRef = useRef<string | null>(null)
   useEffect(() => {
@@ -130,10 +131,6 @@ export const GisMapPage: React.FC = () => {
     // 1. Tính mức zoom toàn cảnh vừa khít cái Bbox của xã từ Backend
     const camera = mapRef.current.cameraForBounds(bounds, { padding: 40 })
     const panoramaZoom = camera?.zoom
-    if (typeof panoramaZoom === 'number' && Number.isFinite(panoramaZoom)) {
-      mapRef.current.setMinZoom(panoramaZoom)
-    }
-    mapRef.current.setMaxBounds(bounds)
 
     // 2. Mở bản đồ cận cảnh tại Tâm (Center) lấy 100% trực tiếp từ Backend
     const detailedZoom = typeof panoramaZoom === 'number' && Number.isFinite(panoramaZoom)
@@ -146,6 +143,92 @@ export const GisMapPage: React.FC = () => {
     })
 
     lastFramedBboxRef.current = bboxKey
+  }, [isMapLoaded, mapBounds, mapRef])
+
+  // Khoanh vùng khu vực quản lý: viền nét đứt + tô mờ phần bên ngoài bbox của xã
+  useEffect(() => {
+    const map = mapRef.current
+    const bounds = toLngLatBounds(mapBounds?.bbox)
+    if (!isMapLoaded || !map) return
+
+    const sourceId = 'managed-area'
+    const emptyData: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+
+    let maskData: GeoJSON.Feature<GeoJSON.Polygon> | null = null
+    let lineData: GeoJSON.Feature<GeoJSON.Polygon> | null = null
+    if (bounds) {
+      const [[minLng, minLat], [maxLng, maxLat]] = bounds
+      const inner: [number, number][] = [
+        [minLng, minLat],
+        [minLng, maxLat],
+        [maxLng, maxLat],
+        [maxLng, minLat],
+        [minLng, minLat],
+      ]
+      const outer: [number, number][] = [
+        [-180, -85],
+        [180, -85],
+        [180, 85],
+        [-180, 85],
+        [-180, -85],
+      ]
+      maskData = {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Polygon', coordinates: [outer, inner] },
+      }
+      lineData = {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Polygon', coordinates: [inner] },
+      }
+    }
+
+    const maskId = `${sourceId}-mask`
+    const lineId = `${sourceId}-line`
+    try {
+      const maskSrc = map.getSource(maskId) as maplibregl.GeoJSONSource | undefined
+      const lineSrc = map.getSource(lineId) as maplibregl.GeoJSONSource | undefined
+
+      if (maskSrc && lineSrc) {
+        maskSrc.setData(maskData || emptyData)
+        lineSrc.setData(lineData || emptyData)
+        return
+      }
+
+      map.addSource(maskId, { type: 'geojson', data: maskData || emptyData })
+      map.addSource(lineId, { type: 'geojson', data: lineData || emptyData })
+      map.addLayer({
+        id: `${sourceId}-mask-fill`,
+        type: 'fill',
+        source: maskId,
+        paint: { 'fill-color': '#0f172a', 'fill-opacity': 0.35 },
+      })
+      map.addLayer({
+        id: `${sourceId}-line-stroke`,
+        type: 'line',
+        source: lineId,
+        paint: {
+          'line-color': '#38bdf8',
+          'line-width': 2,
+          'line-dasharray': [3, 2],
+          'line-opacity': 0.9,
+        },
+      })
+    } catch {
+      // Style chưa sẵn sàng (vd. khi hot-reload) - bỏ qua, effect sẽ chạy lại khi bbox đổi
+    }
+  }, [isMapLoaded, mapBounds, mapRef])
+
+  // Nút "Về khu vực quản lý": xếp ngay trên cụm zoom, cùng kiểu với nút điều khiển gốc của bản đồ
+  useEffect(() => {
+    const map = mapRef.current
+    if (!isMapLoaded || !map || !toLngLatBounds(mapBounds?.bbox)) return
+    const control = createManagedAreaControl(() => toLngLatBounds(mapBounds?.bbox))
+    map.addControl(control, 'bottom-right')
+    return () => {
+      if (map.hasControl(control)) map.removeControl(control)
+    }
   }, [isMapLoaded, mapBounds, mapRef])
 
   // 2. Trạng thái bộ lọc & thanh tìm kiếm

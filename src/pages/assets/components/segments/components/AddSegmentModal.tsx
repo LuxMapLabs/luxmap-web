@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { useSelector } from 'react-redux'
-import { createPortal } from 'react-dom'
-import { X, Route, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Route, CheckCircle2 } from 'lucide-react'
+import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
 import { SegmentRouteMap } from '../../../../../components/SegmentRouteMap'
 import { calculateRouteLengthMeters } from '../../../../../utils/gis-map/routeUtils'
 import type { RootState } from '../../../../../redux/rootReducer'
@@ -109,35 +109,18 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
     onClose()
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95">
-        {/* Header */}
-        <div className="p-4 sm:px-6 sm:py-4 bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-800 dark:to-indigo-900 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-md">
-              <Route className="w-5 h-5 text-blue-200" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-blue-200">
-                  {roadClass === 'inter_commune' ? 'Đường liên xã (Trục chính)' : 'Đường liên thôn / liên ấp'}
-                </span>
-              </div>
-              <h3 className="font-extrabold text-base mt-0.5">Khai Báo Tuyến Đường Chiếu Sáng Mới</h3>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
-          >
-            <X className="w-4 h-4 text-white" />
-          </button>
-        </div>
+  return (
+    <AssetModalFrame widthClass="max-w-5xl">
+      <AssetModalHeader
+        icon={<Route className="w-5 h-5" />}
+        accent="indigo"
+        title="Khai Báo Tuyến Đường Chiếu Sáng Mới"
+        subtitle={roadClass === 'inter_commune' ? 'Đường liên xã (Trục chính)' : 'Đường liên thôn / liên ấp'}
+        onClose={onClose}
+      />
 
-        {/* Form Body - 2 Columns Layout */}
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+        <AssetModalError message={submitError} />
           <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
             {/* CỘT TRÁI (40% width trên md) */}
             <div className="md:col-span-5 p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
@@ -197,13 +180,6 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                 </span>
               </div>
 
-              {/* Validation Error Alert Box */}
-              {submitError ? (
-                <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-center gap-2.5 text-rose-700 dark:text-rose-300 text-xs font-semibold animate-in fade-in slide-in-from-bottom-1">
-                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                  <span>{submitError}</span>
-                </div>
-              ) : null}
             </div>
 
             {/* CỘT PHẢI: BẢN ĐỒ VẼ LỘ TRÌNH (60% width trên md) */}
@@ -225,27 +201,13 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex justify-end gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs cursor-pointer transition shadow-2xs"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-600/20 text-xs cursor-pointer transition flex items-center gap-1.5 active:scale-95"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Tạo Tuyến Đường</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
+        <AssetModalFooter
+          onCancel={onClose}
+          submitLabel="Tạo Tuyến Đường"
+          submitIcon={<CheckCircle2 className="w-4 h-4" />}
+        />
+      </form>
+    </AssetModalFrame>
   )
 }
 
