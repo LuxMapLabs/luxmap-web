@@ -13,6 +13,9 @@ import type {
   ReviewWorkOrderRequest,
   FollowUpWorkOrderRequest,
   StartWorkOrderRequest,
+  PolePhotoItem,
+  PolePhotoItemPagedResult,
+  PolePhotoDecisionRequest,
 } from '../../types/workorders/orders'
 
 export interface GetWorkOrdersFilter {
@@ -255,6 +258,96 @@ export const workScheduleAPI = {
         due_date: params.dueDate,
       })
       return response.data
+    }
+  },
+
+  /**
+   * Lấy danh sách ảnh chụp từng cột đèn trong lệnh công tác (kèm phân loại AI và review của kỹ sư)
+   * GET /api/v1/work-orders/{id}/pole-photos
+   */
+  async getWorkOrderPolePhotos(
+    id: string,
+    params?: { pole_id?: string; page?: number; page_size?: number }
+  ): Promise<PolePhotoItemPagedResult> {
+    try {
+      const response = await apiClient.get<PolePhotoItemPagedResult>(`/work-orders/${id}/pole-photos`, {
+        params: { page_size: 100, ...params },
+      })
+      return (
+        response.data || {
+          items: [],
+          total: 0,
+          page: 1,
+          page_size: 100,
+        }
+      )
+    } catch (error) {
+      console.warn(`[WorkScheduleAPI] getWorkOrderPolePhotos failed for ${id}:`, error)
+      return { items: [], total: 0, page: 1, page_size: 100 }
+    }
+  },
+
+  /**
+   * Lấy chi tiết một ảnh cột đèn
+   * GET /api/v1/work-orders/{id}/pole-photos/{photo_id}
+   */
+  async getPolePhotoDetail(id: string, photoId: string): Promise<PolePhotoItem> {
+    const response = await apiClient.get<PolePhotoItem>(`/work-orders/${id}/pole-photos/${photoId}`)
+    return response.data
+  },
+
+  /**
+   * Tải ảnh cột đèn qua Blob URL (tự động kèm Authorization Bearer token)
+   * GET /api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail | /original
+   */
+  async fetchPolePhotoBlob(workOrderId: string, photoId: string, original = false): Promise<string> {
+    const variant = original ? 'original' : 'thumbnail'
+    const endpoint = `/work-orders/${encodeURIComponent(workOrderId)}/pole-photos/${encodeURIComponent(photoId)}/${variant}`
+    const response = await apiClient.get<Blob>(endpoint, {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(response.data)
+  },
+
+  /**
+   * Quản lý phê duyệt (confirm / reject) một ảnh khảo sát cột đèn
+   * POST /api/v1/work-orders/{id}/pole-photos/{photo_id}/decision
+   */
+  async decidePolePhoto(
+    workOrderId: string,
+    photoId: string,
+    payload: PolePhotoDecisionRequest
+  ): Promise<PolePhotoItem> {
+    const response = await apiClient.post<PolePhotoItem>(
+      `/work-orders/${workOrderId}/pole-photos/${photoId}/decision`,
+      payload
+    )
+    return response.data
+  },
+
+  /**
+   * Tự động xác nhận toàn bộ các ảnh cột đèn chưa duyệt trong ca khảo sát
+   * Gọi khi Quản lý bấm Duyệt báo cáo khảo sát hoặc Tạo lịch tiếp theo
+   */
+  async confirmAllPendingPolePhotos(workOrderId: string): Promise<void> {
+    try {
+      const photosRes = await this.getWorkOrderPolePhotos(workOrderId)
+      const items = photosRes.items || []
+      // Lọc các ảnh chưa có quyết định decision
+      const pendingItems = items.filter((p) => p.photo_id && !p.decision && p.decision !== 'confirm')
+      if (pendingItems.length === 0) return
+
+      // Xác nhận song song các ảnh để Backend chuyển cột thành out và tạo fault detected
+      await Promise.allSettled(
+        pendingItems.map((p) =>
+          this.decidePolePhoto(workOrderId, p.photo_id!, {
+            decision: 'confirm',
+            note: 'Quản lý duyệt báo cáo khảo sát hiện trường.',
+          })
+        )
+      )
+    } catch (err) {
+      console.warn(`[WorkScheduleAPI] confirmAllPendingPolePhotos error for ${workOrderId}:`, err)
     }
   },
 }

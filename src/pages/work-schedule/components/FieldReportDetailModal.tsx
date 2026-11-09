@@ -17,9 +17,10 @@ import { useSelector } from 'react-redux'
 import type { RootState } from '../../../redux/rootReducer'
 import { ScheduleCase, SchedulePhase } from '../../../types/workSchedule'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
-import { EvidenceItem, WorkOrderPole } from '../../../types/workorders/orders'
+import { EvidenceItem, WorkOrderPole, PolePhotoItem } from '../../../types/workorders/orders'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { EvidenceImage } from './EvidenceImage'
+import { PolePhotoImage } from './PolePhotoImage'
 import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
 
 interface FieldReportDetailModalProps {
@@ -31,7 +32,10 @@ interface FieldReportDetailModalProps {
 
 interface ZoomImageTarget {
   evidenceId?: string | null
+  polePhotoId?: string | null
+  workOrderId?: string | null
   src?: string
+  title?: string
 }
 
 export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
@@ -45,6 +49,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const [zoomImage, setZoomImage] = useState<ZoomImageTarget | null>(null)
   const [backendEvidence, setBackendEvidence] = useState<EvidenceItem[]>([])
   const [poles, setPoles] = useState<WorkOrderPole[]>([])
+  const [polePhotos, setPolePhotos] = useState<PolePhotoItem[]>([])
 
   // Chi tiết lệnh công tác từ Redux store
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
@@ -76,6 +81,18 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           }
         })
         .catch(() => setPoles([]))
+
+      // Tải danh sách ảnh chụp từng cột đèn khảo sát thực tế từ Kỹ sư Mobile
+      workScheduleAPI
+        .getWorkOrderPolePhotos(targetWorkOrderId)
+        .then((res) => {
+          if (res.items && res.items.length > 0) {
+            setPolePhotos(res.items)
+          } else {
+            setPolePhotos([])
+          }
+        })
+        .catch(() => setPolePhotos([]))
     }
   }, [isOpen, targetWorkOrderId])
 
@@ -338,70 +355,158 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           {/* TAB 2: ẢNH CHỤP BẰNG CHỨNG HIỆN TRƯỜNG */}
           {activeTab === 'photos' && (
             <div className="flex flex-col gap-4 animate-in fade-in duration-150">
-              {displayPhotos.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {displayPhotos.map((photo, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => setZoomImage({ evidenceId: photo.evidenceId, src: photo.src })}
-                      className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer group flex flex-col"
-                    >
-                      <div className="relative aspect-4/3 overflow-hidden bg-slate-950">
-                        <EvidenceImage
-                          evidenceId={photo.evidenceId}
-                          fallbackSrc={photo.src}
-                          alt={photo.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900/80 backdrop-blur-md text-white border border-white/20">
-                          {photo.tag}
-                        </span>
-                        <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center">
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-slate-900 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shadow-lg">
-                            <Maximize2 className="w-3.5 h-3.5" /> Phóng to
+              {/* Trường hợp 1: Giai đoạn Khảo sát (Survey) - Hiển thị ảnh chụp từng cột đèn từ Mobile */}
+              {phase.phaseType === 'survey' ? (
+                polePhotos.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {polePhotos.map((photo, idx) => {
+                      const effectiveState = photo.final_cv_state || photo.cv_state
+                      const isOut = effectiveState === 'off'
+                      const isNormal = effectiveState === 'on'
+                      const isDecided = photo.decision === 'confirm'
+
+                      return (
+                        <div
+                          key={photo.photo_id || idx}
+                          onClick={() =>
+                            setZoomImage({
+                              polePhotoId: photo.photo_id,
+                              workOrderId: targetWorkOrderId,
+                              src: photo.original_url || photo.thumbnail_url || undefined,
+                              title: `Cột ${photo.pole_id || ''}`,
+                            })
+                          }
+                          className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer group flex flex-col"
+                        >
+                          <div className="relative aspect-4/3 overflow-hidden bg-slate-950">
+                            <PolePhotoImage
+                              workOrderId={targetWorkOrderId}
+                              photoId={photo.photo_id}
+                              fallbackSrc={photo.original_url || photo.thumbnail_url || undefined}
+                              alt={`Cột ${photo.pole_id || ''}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            {/* Badge trạng thái phát hiện của đèn */}
+                            <span
+                              className={`absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-md text-[10px] font-black backdrop-blur-md shadow-xs border ${
+                                isOut
+                                  ? 'bg-rose-600/90 text-white border-rose-400/30'
+                                  : isNormal
+                                  ? 'bg-emerald-600/90 text-white border-emerald-400/30'
+                                  : 'bg-amber-600/90 text-white border-amber-400/30'
+                              }`}
+                            >
+                              {isOut ? 'MẤT SÁNG (LỖI)' : isNormal ? 'ĐẠT CHUẨN' : 'CHƯA RÕ'}
+                            </span>
+
+                            {/* Mã cột */}
+                            <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/80 backdrop-blur-md text-white border border-white/20">
+                              {photo.pole_id || `Cột #${idx + 1}`}
+                            </span>
+
+                            <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center">
+                              <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-slate-900 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shadow-lg">
+                                <Maximize2 className="w-3.5 h-3.5" /> Phóng to
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-3.5 flex flex-col gap-1.5 flex-1 justify-between text-xs">
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-slate-900 text-sm">
+                                  Cột {photo.pole_id || 'Chưa định danh'}
+                                </span>
+                                {isDecided ? (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    ✓ Đã duyệt
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                    Chờ duyệt ca
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-1">
+                                Chụp lúc: {photo.captured_at ? new Date(photo.captured_at).toLocaleString('vi-VN') : 'Gần đây'}
+                              </p>
+                              {photo.review_note && (
+                                <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200 mt-1 line-clamp-2">
+                                  <strong>Ghi chú:</strong> {photo.review_note}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10.5px] text-slate-500 font-medium">
+                              <span>
+                                Độ tin cậy: <strong className="text-slate-700">{photo.confidence ? `${Math.round(photo.confidence * 100)}%` : '90%'}</strong>
+                              </span>
+                              {photo.lat && photo.lng && (
+                                <span className="font-mono text-slate-400">
+                                  GPS: {photo.lat.toFixed(4)}, {photo.lng.toFixed(4)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center flex flex-col items-center justify-center gap-2">
+                    <Camera className="w-8 h-8 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-700">Chưa có ảnh khảo sát cột đèn</span>
+                    <span className="text-[11px] text-slate-500 max-w-md">
+                      Kỹ sư hiện trường chưa tải lên ảnh chụp cột đèn nào cho lệnh khảo sát này. Sau khi kỹ sư hoàn tất trên ứng dụng di động, ảnh sẽ xuất hiện tại đây.
+                    </span>
+                  </div>
+                )
+              ) : (
+                /* Trường hợp 2: Giai đoạn Kiểm tra / Sửa chữa - Hiển thị ảnh Before/After/Observation */
+                displayPhotos.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {displayPhotos.map((photo, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setZoomImage({ evidenceId: photo.evidenceId, src: photo.src })}
+                        className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-200 hover:-translate-y-1 cursor-pointer group flex flex-col"
+                      >
+                        <div className="relative aspect-4/3 overflow-hidden bg-slate-950">
+                          <EvidenceImage
+                            evidenceId={photo.evidenceId}
+                            fallbackSrc={photo.src}
+                            alt={photo.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900/80 backdrop-blur-md text-white border border-white/20">
+                            {photo.tag}
                           </span>
+                          <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center">
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-slate-900 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shadow-lg">
+                              <Maximize2 className="w-3.5 h-3.5" /> Phóng to
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-3.5 flex flex-col gap-1 flex-1 justify-between">
+                          <h4 className="text-xs font-extrabold text-slate-900 line-clamp-1">
+                            {photo.title}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                            {photo.desc}
+                          </p>
                         </div>
                       </div>
-                      <div className="p-3.5 flex flex-col gap-1 flex-1 justify-between">
-                        <h4 className="text-xs font-extrabold text-slate-900 line-clamp-1">
-                          {photo.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
-                          {photo.desc}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : phase.phaseType === 'survey' ? (
-                <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center flex flex-col items-center justify-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Video className="w-6 h-6" />
+                    ))}
                   </div>
-                  <div className="max-w-md flex flex-col gap-1">
-                    <h4 className="text-sm font-bold text-slate-900">
-                      Khảo sát thực địa ghi nhận toàn tuyến bằng Video hành trình
-                    </h4>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      Theo chuẩn tác nghiệp, giai đoạn khảo sát ghi hình liên tục ban đêm bằng camera hành trình chuyên dụng và cảm biến đo đạc. Không lưu vết ảnh tĩnh chụp rời từng cột.
-                    </p>
+                ) : (
+                  <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center flex flex-col items-center justify-center gap-2">
+                    <Camera className="w-8 h-8 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-700">Chưa có ảnh bằng chứng được tải lên</span>
+                    <span className="text-[11px] text-slate-500">
+                      Kỹ sư hiện trường chưa đính kèm ảnh trước / sau tác nghiệp cho lệnh này.
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('video')}
-                    className="mt-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl border border-blue-200 transition cursor-pointer"
-                  >
-                    Xem Video Quét Tuyến Ban Đêm →
-                  </button>
-                </div>
-              ) : (
-                <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center flex flex-col items-center justify-center gap-2">
-                  <Camera className="w-8 h-8 text-slate-400" />
-                  <span className="text-xs font-bold text-slate-700">Chưa có ảnh bằng chứng được tải lên</span>
-                  <span className="text-[11px] text-slate-500">
-                    Kỹ sư hiện trường chưa đính kèm ảnh trước / sau tác nghiệp cho lệnh này.
-                  </span>
-                </div>
+                )
               )}
             </div>
           )}
@@ -540,13 +645,24 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out animate-in fade-in duration-150"
         >
           <div className="relative max-w-5xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <EvidenceImage
-              evidenceId={zoomImage.evidenceId}
-              fallbackSrc={zoomImage.src}
-              preferOriginal={true}
-              alt="Zoomed Evidence"
-              className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain border border-white/20"
-            />
+            {zoomImage.polePhotoId && zoomImage.workOrderId ? (
+              <PolePhotoImage
+                workOrderId={zoomImage.workOrderId}
+                photoId={zoomImage.polePhotoId}
+                fallbackSrc={zoomImage.src}
+                preferOriginal={true}
+                alt={zoomImage.title || 'Zoomed Pole'}
+                className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain border border-white/20"
+              />
+            ) : (
+              <EvidenceImage
+                evidenceId={zoomImage.evidenceId}
+                fallbackSrc={zoomImage.src}
+                preferOriginal={true}
+                alt={zoomImage.title || 'Zoomed Evidence'}
+                className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain border border-white/20"
+              />
+            )}
             <button
               type="button"
               onClick={() => setZoomImage(null)}
