@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Toaster } from 'sonner'
-import { checkAuth } from './feature/auth/authSlice'
+import { checkAuth, checkAuthFailure } from './feature/auth/authSlice'
 import { UserRole } from './types/auth/web'
 
 import type { RootState } from './redux/rootReducer'
@@ -30,6 +30,7 @@ import { SuperiorDashboardPage } from './pages/superior-dashboard/SuperiorDashbo
 import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
 import { AdminDashboardPage } from './pages/admin-dashboard/AdminDashboardPage'
 import { PrivacyPolicyPage } from './pages/privacy/PrivacyPolicyPage'
+import { SetPasswordPage } from './pages/set-password/SetPasswordPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
@@ -77,6 +78,12 @@ function App() {
     if (path.startsWith('/report') || path.startsWith('/r/') || path.startsWith('/privacy')) {
       return
     }
+    // /set-password bỏ qua kiểm tra phiên nhưng người dùng sẽ chuyển sang /login ngay sau đó,
+    // nên phải tắt cờ loading mặc định (true), nếu không form đăng nhập bị khóa cứng
+    if (path.startsWith('/set-password')) {
+      dispatch(checkAuthFailure())
+      return
+    }
     // Khởi chạy kiểm tra phiên làm việc qua HttpOnly Cookie ngay khi load app
     dispatch(checkAuth())
   }, [dispatch])
@@ -96,6 +103,9 @@ function App() {
 
           {/* Chính sách quyền riêng tư (Public, dùng cho Google OAuth consent screen) */}
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
+
+          {/* Đặt mật khẩu từ link mời / đặt lại trong email (Public, token trên URL) */}
+          <Route path="/set-password" element={<SetPasswordPage />} />
 
           {/* Route thông báo từ chối quyền truy cập (403 Forbidden) */}
           <Route path="/forbidden" element={<ForbiddenPage />} />
