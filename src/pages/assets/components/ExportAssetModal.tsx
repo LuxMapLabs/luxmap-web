@@ -187,14 +187,14 @@ export const ExportAssetModal: React.FC<ExportAssetModalProps> = ({
 
       <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 z-10 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="p-5 text-white flex items-center justify-between shrink-0 bg-linear-to-r from-teal-700 to-teal-600">
+        <div className="px-5 py-4 sm:px-6 border-b border-slate-100 bg-white flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
-              <Download className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-2xl border bg-blue-50 text-blue-600 border-blue-200 flex items-center justify-center shrink-0">
+              <Download className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base tracking-tight">Xuất Dữ Liệu Tài Sản Ra CSV</h3>
-              <p className="text-[13px] text-teal-50/90 mt-0.5">
+              <h3 className="font-bold text-slate-900 text-base">Xuất dữ liệu tài sản ra CSV</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Chọn các danh mục tài sản cần xuất (tải nhiều tệp CSV riêng biệt)
               </p>
             </div>
@@ -202,7 +202,7 @@ export const ExportAssetModal: React.FC<ExportAssetModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl text-white/80 hover:text-white hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
             aria-label="Đóng"
           >
             <X className="w-5 h-5" />
@@ -237,7 +237,7 @@ export const ExportAssetModal: React.FC<ExportAssetModalProps> = ({
                   onClick={() => handleToggleCategory(opt.id)}
                   className={`group relative p-3.5 rounded-2xl border-2 text-left flex items-start gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 ${
                     isSelected
-                      ? 'border-teal-500 bg-teal-50/70 shadow-[0_10px_22px_-14px_rgba(13,148,136,0.7)]'
+                      ? 'border-teal-500 bg-teal-50/70 shadow-[0_10px_22px_-14px_rgba(190,69,122,0.7)]'
                       : 'border-slate-200 bg-white hover:border-teal-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900'
                   }`}
                 >
@@ -276,19 +276,19 @@ export const ExportAssetModal: React.FC<ExportAssetModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-[13px] font-semibold transition cursor-pointer"
             >
-              Hủy Bỏ
+              Hủy bỏ
             </button>
             <button
               type="button"
               onClick={handleExport}
               disabled={selectedCategories.length === 0}
-              className="download-trigger px-5 py-2 bg-linear-to-br from-teal-500 to-teal-700 hover:shadow-[0_10px_20px_-10px_rgba(13,148,136,0.75)] hover:-translate-y-px active:scale-[0.97] text-white rounded-xl text-[13px] font-bold transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+              className="download-trigger px-5 py-2 bg-linear-to-br from-teal-500 to-teal-700 hover:shadow-[0_10px_20px_-10px_rgba(190,69,122,0.75)] hover:-translate-y-px active:scale-[0.97] text-white rounded-xl text-[13px] font-bold transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               <DownloadIcon className="w-4 h-4" />
               <span>
                 {selectedCategories.length > 0
-                  ? `Xác Nhận Xuất (${selectedCategories.length} tệp CSV)`
-                  : 'Xác Nhận Xuất File'}
+                  ? `Xác nhận xuất (${selectedCategories.length} tệp CSV)`
+                  : 'Xác nhận xuất File'}
               </span>
             </button>
           </div>

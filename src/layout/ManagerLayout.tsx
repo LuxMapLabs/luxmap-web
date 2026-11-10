@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   Lightbulb,
+  LogOut,
   LayoutDashboard,
   Map,
   CalendarDays,
@@ -18,8 +19,8 @@ import {
 import type { RootState } from '../redux/rootReducer'
 import { logout } from '../feature/auth/authSlice'
 import { openExportModal } from '../feature/assets/assetSlice'
-import { canAccessTab, isMaintenanceEngineer, isManagementAgency } from '../utils/roleUtils'
-import { UserMenu } from '../components/UserMenu'
+import { canAccessTab, getRoleName, isMaintenanceEngineer, isManagementAgency } from '../utils/roleUtils'
+import { ProfileModal } from '../components/ProfileModal'
 import { NotificationBell } from '../components/NotificationBell'
 import { DownloadIcon } from '../components/ops/DownloadIcon'
 import { useModalEscape } from '../hooks/useModalEscape'
@@ -53,13 +54,14 @@ export const ManagerLayout: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
   const [userCollapsed, setUserCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const isMobile = useMediaQuery('(max-width: 767px)')
   const isTablet = useMediaQuery('(max-width: 1023px)')
   // Máy tính bảng luôn dùng thanh icon thu gọn; điện thoại dùng ngăn kéo đầy đủ
   const collapsed = !isMobile && (userCollapsed || isTablet)
   useModalEscape()
 
-  // Gắn bảng màu teal cho cả modal được render qua portal
+  // Gắn bảng màu hồng nhẹ cho cả modal được render qua portal
   useEffect(() => {
     document.documentElement.classList.add('ops-theme')
     return () => document.documentElement.classList.remove('ops-theme')
@@ -78,9 +80,19 @@ export const ManagerLayout: React.FC = () => {
   const items = NAV_ITEMS.filter((item) => canAccessTab(item.tab, role))
   const path = location.pathname
 
+  const displayName = user?.full_name || user?.username || 'bạn'
+  const initials =
+    displayName
+      .trim()
+      .split(/\s+/)
+      .map((word) => word.charAt(0))
+      .slice(-2)
+      .join('')
+      .toUpperCase() || 'U'
+  const roleName = user ? getRoleName(user.role).replace(/\s*\([^)]*\)\s*$/, '') : ''
+
   const isGis = path.startsWith('/gis-map')
   const isAssets = path.startsWith('/assets')
-  const displayName = user?.full_name || user?.username || 'bạn'
 
   let title = ''
   let subtitle = ''
@@ -113,35 +125,30 @@ export const ManagerLayout: React.FC = () => {
         />
       )}
       <aside
-        className={`flex flex-col bg-white rounded-3xl shadow-ops p-3.5 select-none transition-[width,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`flex flex-col bg-linear-to-b from-blue-100/80 via-blue-50 to-white rounded-3xl shadow-ops p-3.5 select-none transition-[width,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isMobile
             ? `fixed inset-y-2 left-2 z-50 w-64 max-w-[85vw] ${mobileOpen ? 'translate-x-0' : '-translate-x-[110%]'}`
             : `h-full shrink-0 z-40 ${collapsed ? 'w-[76px]' : 'w-58'}`
         }`}
       >
-        <div className={`flex items-center gap-3 pb-4 pt-1 ${collapsed ? 'justify-center' : 'px-2'}`}>
-          <div className="w-10 h-10 rounded-[14px] bg-linear-to-br from-teal-400 to-teal-600 flex items-center justify-center shrink-0 shadow-[0_8px_16px_-6px_rgba(13,148,136,0.55)]">
-            <Lightbulb className="w-5 h-5 text-amber-200 fill-amber-200 drop-shadow-[0_0_6px_rgba(245,165,36,0.9)]" />
+        <div className={`flex items-center gap-2.5 pb-5 pt-1 ${collapsed ? 'justify-center' : 'px-2'}`}>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-linear-to-br from-teal-400 to-teal-600 shadow-[0_8px_16px_-6px_rgba(190,69,122,0.55)]">
+            <Lightbulb className="h-[18px] w-[18px] fill-amber-200 text-amber-200 drop-shadow-[0_0_6px_rgba(245,165,36,0.9)]" />
           </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <span className="block text-[15px] font-extrabold tracking-wide text-slate-900">LUXMAP</span>
-              <span className="block text-[11px] font-medium text-slate-400 whitespace-nowrap">Quản lý Chiếu sáng</span>
-            </div>
-          )}
+          {!collapsed && <span className="flex-1 text-[15px] font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
           {isMobile && (
             <button
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Đóng menu"
-              className="ml-auto flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-700 cursor-pointer"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-white/70 hover:text-slate-800 cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
           )}
         </div>
 
-        {!collapsed && <p className="px-3 pb-1.5 text-[11px] font-bold text-slate-400">Vận hành</p>}
+        {!collapsed && <p className="px-3 pb-1.5 text-[11px] font-bold text-slate-500">Vận hành</p>}
 
         <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar -mx-1 px-1 py-1">
           {items.map((item) => {
@@ -157,26 +164,26 @@ export const ManagerLayout: React.FC = () => {
                     collapsed ? 'justify-center h-12 w-12 mx-auto' : 'gap-3 px-3 py-2.5'
                   } ${
                     isActive
-                      ? 'bg-linear-to-br from-teal-500 to-teal-700 text-white shadow-[0_10px_20px_-10px_rgba(13,148,136,0.75)]'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:translate-x-0.5'
+                      ? 'bg-white text-blue-700 shadow-ops'
+                      : 'text-slate-600 hover:bg-white/60 hover:text-slate-900 hover:translate-x-0.5'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] transition-colors duration-200 ${
-                        isActive ? 'bg-white/20' : 'bg-slate-50 group-hover:bg-white'
-                      }`}
-                    >
-                      <Icon className="h-[17px] w-[17px]" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+                      <Icon
+                        className={`h-[18px] w-[18px] transition-colors duration-200 ${
+                          isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-800'
+                        }`}
+                      />
                     </span>
                     {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
                     {badge > 0 && (
                       <span
                         className={`rounded-full px-2 text-[11px] font-bold ${
                           collapsed ? 'absolute -top-0.5 -right-0.5' : ''
-                        } ${isActive ? 'bg-white/25 text-white' : 'bg-teal-50 text-teal-800'}`}
+                        } ${isActive ? 'bg-blue-100 text-blue-800' : 'bg-white text-blue-700'}`}
                       >
                         {badge}
                       </span>
@@ -188,21 +195,56 @@ export const ManagerLayout: React.FC = () => {
           })}
         </nav>
 
-        <button
-          type="button"
-          onClick={() => setUserCollapsed((v) => !v)}
-          title={collapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
-          className="mb-2 hidden lg:flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer"
-        >
-          {collapsed ? <ChevronsRight className="h-4 w-4" /> : <><ChevronsLeft className="h-4 w-4" />Thu gọn</>}
-        </button>
-
-        <UserMenu user={user ?? null} variant="sidebar" collapsed={collapsed} onLogout={() => dispatch(logout())} />
+        <div className="mt-2 space-y-1 border-t border-blue-200/60 pt-3">
+          {/* Một hàng duy nhất cho tài khoản: bấm vào người dùng mở hồ sơ, icon bên cạnh để đăng xuất */}
+          <div className={collapsed ? 'space-y-1' : 'flex items-center gap-1'}>
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              title={`${displayName} · ${roleName} (xem hồ sơ cá nhân)`}
+              aria-label={`Hồ sơ cá nhân của ${displayName}`}
+              className={`group flex items-center rounded-2xl transition-colors duration-200 cursor-pointer hover:bg-white/60 ${
+                collapsed ? 'mx-auto h-12 w-12 justify-center' : 'min-w-0 flex-1 gap-2.5 p-2 text-left'
+              }`}
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-400 to-blue-600 text-xs font-extrabold text-white shadow-ops ring-2 ring-white">
+                {initials}
+              </span>
+              {!collapsed && (
+                <span className="min-w-0 flex-1 leading-tight">
+                  <span className="block truncate text-[13px] font-bold text-slate-800">{displayName}</span>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">{roleName}</span>
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => dispatch(logout())}
+              title="Đăng xuất"
+              aria-label="Đăng xuất"
+              className={`group flex shrink-0 items-center justify-center rounded-2xl text-slate-500 transition-colors duration-200 cursor-pointer hover:bg-white/60 hover:text-rose-600 ${
+                collapsed ? 'mx-auto h-12 w-12' : 'h-11 w-11'
+              }`}
+            >
+              <LogOut className="h-[18px] w-[18px]" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUserCollapsed((v) => !v)}
+            title={collapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
+            className="hidden w-full lg:flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold text-slate-500 hover:bg-white/60 hover:text-slate-800 transition-colors cursor-pointer"
+          >
+            {collapsed ? <ChevronsRight className="h-4 w-4" /> : <><ChevronsLeft className="h-4 w-4" />Thu gọn</>}
+          </button>
+        </div>
       </aside>
+
+      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} user={user ?? null} />
 
       <div className="flex-1 min-w-0 flex flex-col gap-4">
         {(!isGis || isMobile) && (
-          <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-x-3 gap-y-2 px-1 pt-1 shrink-0">
+          <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-x-3 gap-y-2 rounded-3xl bg-white/80 px-5 py-3 shadow-ops backdrop-blur-sm shrink-0">
             {isMobile && (
               <button
                 type="button"

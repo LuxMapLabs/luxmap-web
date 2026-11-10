@@ -88,7 +88,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
       <AssetModalHeader
         icon={<Route className="w-5 h-5" />}
         accent="indigo"
-        title="Khai Báo Tuyến Đường Chiếu Sáng Mới"
+        title="Khai báo tuyến đường chiếu sáng mới"
         subtitle={roadClass === 'inter_commune' ? 'Đường liên xã (Trục chính)' : 'Đường liên thôn / liên ấp'}
         onClose={onClose}
       />
@@ -175,8 +175,8 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
             </div>
 
             {/* CỘT PHẢI: BẢN ĐỒ VẼ LỘ TRÌNH (60% width trên md) */}
-            <div className="md:col-span-7 p-4 bg-slate-950 flex flex-col justify-between min-h-[480px] relative">
-              <div className="min-h-[480px] h-[480px] rounded-2xl overflow-hidden border border-slate-700/80 shadow-inner relative">
+            <div className="md:col-span-7 p-4 bg-blue-50 flex flex-col justify-between min-h-[480px] relative">
+              <div className="min-h-[480px] h-[480px] rounded-2xl overflow-hidden border border-blue-200 shadow-inner relative">
                 <SegmentPolePickerMap
                   poles={candidates}
                   selected={selected}
@@ -196,7 +196,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
 
         <AssetModalFooter
           onCancel={onClose}
-          submitLabel="Tạo Tuyến Đường"
+          submitLabel="Tạo tuyến đường"
           submitIcon={<CheckCircle2 className="w-4 h-4" />}
         />
       </form>

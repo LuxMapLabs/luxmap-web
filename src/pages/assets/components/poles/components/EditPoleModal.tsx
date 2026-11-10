@@ -372,7 +372,7 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
       <AssetModalHeader
         icon={<Edit3 className="w-5 h-5" />}
         accent="blue"
-        title={`Chỉnh Sửa Cột Đèn: ${pole.external_ref || pole.pole_id}`}
+        title={`Chỉnh sửa cột đèn: ${pole.external_ref || pole.pole_id}`}
         subtitle="Hiệu chỉnh thông số kỹ thuật và định vị lại tọa độ chính xác trên bản đồ số"
         onClose={onClose}
       />
@@ -595,7 +595,7 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
 
           <AssetModalFooter
             onCancel={onClose}
-            submitLabel="Lưu Thay Đổi"
+            submitLabel="Lưu thay đổi"
             submitIcon={<CheckCircle2 className="w-4 h-4" />}
           />
         </form>

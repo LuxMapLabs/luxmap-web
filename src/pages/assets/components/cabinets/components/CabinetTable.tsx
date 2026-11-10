@@ -75,7 +75,7 @@ export const CabinetTable: React.FC<CabinetTableProps> = ({
                   <tr
                     key={cab.external_ref || cab.cabinet_id || Math.random()}
                     id={cabExternal ? `cabinet-row-${cabExternal.toLowerCase()}` : undefined}
-                    className={`hover:bg-teal-50/40 dark:hover:bg-slate-800/80 hover:shadow-[inset_3px_0_0_#0f766e] transition-all ${
+                    className={`hover:bg-teal-50/40 dark:hover:bg-slate-800/80 hover:shadow-[inset_3px_0_0_#be457a] transition-all ${
                       isFlashing ? 'animate-row-flash' : ''
                     }`}
                   >

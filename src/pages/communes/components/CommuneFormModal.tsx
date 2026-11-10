@@ -384,7 +384,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
             disabled={isSubmitting}
             className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary/90 active:scale-95 transition shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
           >
-            {isSubmitting ? 'Đang lưu...' : isEdit ? 'Lưu Thay Đổi' : 'Thêm Địa Bàn'}
+            {isSubmitting ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Thêm Địa Bàn'}
           </button>
         </div>
       </div>

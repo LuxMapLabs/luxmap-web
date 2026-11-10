@@ -587,56 +587,56 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   handleRecenterRef.current = handleRecenter
 
   return (
-    <div className="relative w-full h-full min-h-[360px] md:min-h-[460px] bg-slate-900 overflow-hidden rounded-2xl md:rounded-r-3xl md:rounded-l-none border border-slate-700/60 shadow-inner">
+    <div className="relative w-full h-full min-h-[360px] md:min-h-[460px] bg-blue-50 overflow-hidden rounded-2xl md:rounded-r-3xl md:rounded-l-none border border-blue-200 shadow-inner">
       {/* Container bản đồ */}
       <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Legend & Bảng điều khiển trực quan */}
-      <div className="absolute top-3 left-3 z-10 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 shadow-lg text-[11px] text-white max-w-[280px] space-y-2 select-none">
-        <div className="flex items-center justify-between gap-1.5 font-bold text-amber-300 pb-1 border-b border-slate-700/60">
+      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-xl p-3 shadow-lg text-[11px] text-slate-800 max-w-[280px] space-y-2 select-none">
+        <div className="flex items-center justify-between gap-1.5 font-bold text-amber-700 pb-1 border-b border-blue-100">
           <div className="flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5" />
             <span>Định Vị Tủ Điện GIS</span>
           </div>
-          <span className="text-[10px] text-purple-300 font-semibold">Zoom 18</span>
+          <span className="text-[10px] text-blue-700 font-semibold">Zoom 18</span>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-md bg-purple-600 border border-white flex items-center justify-center text-[10px] text-yellow-300 font-bold shrink-0 shadow-xs">
             ⚡
           </div>
-          <span className="text-slate-200 font-medium">Tủ đang sửa (Kéo hoặc nhấp chuột để đặt)</span>
+          <span className="text-slate-700 font-medium">Tủ đang sửa (Kéo hoặc nhấp chuột để đặt)</span>
         </div>
 
         <div className="flex items-center gap-2 pt-0.5">
           <div className="w-4 h-1.5 rounded-full bg-sky-400 shrink-0 shadow-xs" />
-          <span className="text-sky-300 font-medium text-[10px]">Tuyến đường liên kết</span>
+          <span className="text-sky-700 font-medium text-[10px]">Tuyến đường liên kết</span>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="w-4 h-1.5 rounded-full bg-slate-400 shrink-0" />
-          <span className="text-slate-300 font-medium text-[10px]">Các tuyến đường khác</span>
+          <span className="text-slate-600 font-medium text-[10px]">Các tuyến đường khác</span>
         </div>
 
         {/* Toggle ẩn/hiện các tủ khác để tránh rối mắt */}
         {filteredOtherCabinets.length > 0 && (
-          <div className="pt-1 border-t border-slate-800 flex items-center justify-between">
-            <span className="text-slate-300 text-[10px]">
+          <div className="pt-1 border-t border-blue-100 flex items-center justify-between">
+            <span className="text-slate-600 text-[10px]">
               Tủ khác ({filteredOtherCabinets.length}):
             </span>
             <button
               type="button"
               onClick={() => setShowOtherCabinets(!showOtherCabinets)}
-              className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 rounded text-[10px] font-medium flex items-center gap-1 cursor-pointer transition"
+              className="px-2 py-0.5 bg-white hover:bg-blue-50 border border-blue-200 text-slate-700 rounded text-[10px] font-medium flex items-center gap-1 cursor-pointer transition"
             >
               {showOtherCabinets ? (
                 <>
-                  <EyeOff className="w-3 h-3 text-rose-400" />
+                  <EyeOff className="w-3 h-3 text-rose-600" />
                   <span>Ẩn bớt</span>
                 </>
               ) : (
                 <>
-                  <Eye className="w-3 h-3 text-emerald-400" />
+                  <Eye className="w-3 h-3 text-emerald-600" />
                   <span>Hiện {filteredOtherCabinets.length} tủ</span>
                 </>
               )}
@@ -644,7 +644,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
           </div>
         )}
 
-        <p className="text-[10px] text-amber-200/90 pt-1 border-t border-slate-800">
+        <p className="text-[10px] text-amber-700 pt-1 border-t border-blue-100">
           💡 Nhấp chuột lên bản đồ hoặc kéo ghim ⚡ để đặt vị trí thực địa chính xác.
         </p>
       </div>

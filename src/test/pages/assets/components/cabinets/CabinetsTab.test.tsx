@@ -251,11 +251,11 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       fireEvent.click(editButtons[0])
 
       // Modal Sửa xuất hiện
-      expect(screen.getByText(/Chỉnh Sửa Tủ Điện/i)).toBeInTheDocument()
+      expect(screen.getByText(/Chỉnh sửa tủ điện/i)).toBeInTheDocument()
       const nameInput = screen.getByDisplayValue('Tủ điện Tỉnh Lộ 8 - Trạm 1')
       fireEvent.change(nameInput, { target: { value: 'Tủ điện Tỉnh Lộ 8 - Đã nâng cấp' } })
 
-      const saveBtn = screen.getByRole('button', { name: /Lưu Thay Đổi/i })
+      const saveBtn = screen.getByRole('button', { name: /Lưu thay đổi/i })
       fireEvent.click(saveBtn)
 
       expect(defaultProps.onUpdateCabinet).toHaveBeenCalledWith(

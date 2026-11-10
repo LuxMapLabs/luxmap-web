@@ -165,14 +165,14 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
     const addBtn = screen.getByRole('button', { name: /Thêm mạch điện/i })
     fireEvent.click(addBtn)
 
-    expect(screen.getByText('Thêm Mạch Điện Chiếu Sáng')).toBeInTheDocument()
+    expect(screen.getByText('Thêm mạch điện chiếu sáng')).toBeInTheDocument()
 
     // Chọn tủ điện
     const select = screen.getByDisplayValue('-- Chọn tủ điện đấu nối --')
     fireEvent.change(select, { target: { value: 'CAB-001' } })
 
     // Nhấn Lưu
-    const saveBtn = screen.getByRole('button', { name: /Lưu Mạch Điện/i })
+    const saveBtn = screen.getByRole('button', { name: /Lưu mạch điện/i })
     fireEvent.click(saveBtn)
 
     expect(handleAdd).toHaveBeenCalledWith(

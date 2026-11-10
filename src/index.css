@@ -10,7 +10,7 @@
 @theme {
   --font-ops: 'Plus Jakarta Sans', system-ui, sans-serif;
   --shadow-ops: 0 1px 2px rgba(15, 27, 45, 0.04), 0 6px 18px -8px rgba(15, 27, 45, 0.1);
-  --shadow-ops-hover: 0 2px 4px rgba(15, 27, 45, 0.05), 0 18px 34px -14px rgba(13, 148, 136, 0.28);
+  --shadow-ops-hover: 0 2px 4px rgba(15, 27, 45, 0.05), 0 18px 34px -14px rgba(190, 69, 122, 0.28);
   --color-primary: #1f3864;
   --color-secondary: #3e86c9;
   --color-accent: #5fc4b0;
@@ -664,34 +664,46 @@ button:focus-visible {
 }
 
 /* Print styles for A4 Technical Inspection Report */
-/* Manager và Superior: đổi dải màu blue của Tailwind sang xanh ngọc đậm.
+/* Manager và Superior: đổi dải màu blue của Tailwind sang hồng nhẹ.
    DefaultLayout gắn class này lên <html> khi người dùng không phải Admin, nên modal portal cũng ăn theo. */
 .ops-theme {
-  --color-blue-50: #f0fdfa;
-  --color-blue-100: #ccfbf1;
-  --color-blue-200: #99f6e4;
-  --color-blue-300: #5eead4;
-  --color-blue-400: #2dd4bf;
-  --color-blue-500: #14b8a6;
-  --color-blue-600: #0f766e;
-  --color-blue-700: #115e59;
-  --color-blue-800: #134e4a;
-  --color-blue-900: #0f3d3a;
-  --color-blue-950: #042f2e;
-  /* indigo dùng lẫn trong các tab/chip: gom về cùng dải teal để không lệch tông */
-  --color-indigo-50: #f0fdfa;
-  --color-indigo-100: #ccfbf1;
-  --color-indigo-200: #99f6e4;
-  --color-indigo-300: #5eead4;
-  --color-indigo-400: #2dd4bf;
-  --color-indigo-500: #14b8a6;
-  --color-indigo-600: #0f766e;
-  --color-indigo-700: #115e59;
-  --color-indigo-800: #134e4a;
-  --color-indigo-900: #0f3d3a;
+  /* Bảng màu hồng nhẹ (hồng pha tím, lệch khỏi đỏ rose của trạng thái sự cố). Gom blue, indigo và teal về cùng một dải. */
+  --color-blue-50: #fdf4f8;
+  --color-blue-100: #fbe7f0;
+  --color-blue-200: #f6cfe0;
+  --color-blue-300: #efa8c6;
+  --color-blue-400: #e37fa9;
+  --color-blue-500: #d4608f;
+  --color-blue-600: #be457a;
+  --color-blue-700: #9d3764;
+  --color-blue-800: #7f2e52;
+  --color-blue-900: #67274a;
+  --color-blue-950: #3d1230;
+  --color-indigo-50: #fdf4f8;
+  --color-indigo-100: #fbe7f0;
+  --color-indigo-200: #f6cfe0;
+  --color-indigo-300: #efa8c6;
+  --color-indigo-400: #e37fa9;
+  --color-indigo-500: #d4608f;
+  --color-indigo-600: #be457a;
+  --color-indigo-700: #9d3764;
+  --color-indigo-800: #7f2e52;
+  --color-indigo-900: #67274a;
+  --color-indigo-950: #3d1230;
+  --color-teal-50: #fdf4f8;
+  --color-teal-100: #fbe7f0;
+  --color-teal-200: #f6cfe0;
+  --color-teal-300: #efa8c6;
+  --color-teal-400: #e37fa9;
+  --color-teal-500: #d4608f;
+  --color-teal-600: #be457a;
+  --color-teal-700: #9d3764;
+  --color-teal-800: #7f2e52;
+  --color-teal-900: #67274a;
+  --color-teal-950: #3d1230;
   /* nút chính */
-  --color-primary: #0f766e;
-  --color-secondary: #14b8a6;
+  --color-primary: #be457a;
+  --color-secondary: #d4608f;
 
   /* Thang chữ thống nhất cho Manager: 11 (chú thích, nhãn) · 13 (nội dung, bảng, nút) · 14 (nhấn mạnh) · 16+ (tiêu đề) */
   --text-xs: 0.8125rem;
@@ -768,8 +780,8 @@ button:focus-visible {
   transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 .ops-theme main table tbody tr:hover {
-  background-color: rgba(240, 253, 250, 0.75);
-  box-shadow: inset 3px 0 0 #0f766e;
+  background-color: rgba(253, 244, 248, 0.85);
+  box-shadow: inset 3px 0 0 #be457a;
 }
 .ops-theme main table td :is(span, div)[class*="rounded-full"],
 .ops-theme main table td span[class*="rounded-lg"][class*="px-"],
@@ -832,10 +844,10 @@ button:focus-visible {
 
 /* Nền và chuyển động cho Manager / Superior (khác kiểu kính mờ của Admin) */
 .ops-bg {
-  background-color: #f2f5f8;
+  background-color: #fbf4f7;
   background-image:
-    radial-gradient(1100px 360px at 70% -120px, rgba(13, 148, 136, 0.1), transparent 70%),
-    radial-gradient(#dfe7ee 1px, transparent 1.3px);
+    radial-gradient(1100px 360px at 70% -120px, rgba(212, 96, 143, 0.12), transparent 70%),
+    radial-gradient(#f0dbe5 1px, transparent 1.3px);
   background-size: auto, 26px 26px;
   background-attachment: fixed;
 }

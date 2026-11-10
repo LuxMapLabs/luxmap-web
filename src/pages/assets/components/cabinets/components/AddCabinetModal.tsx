@@ -303,7 +303,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
       <AssetModalHeader
         icon={<Cpu className="w-5 h-5" />}
         accent="purple"
-        title="Khai Báo Danh Sách Tủ Điện Điều Khiển Tuyến"
+        title="Khai báo danh sách tủ điện điều khiển tuyến"
         subtitle="Thiết lập vị trí tọa độ GIS trực quan và thông tin tủ điện trên tuyến đường"
         onClose={onClose}
       />
@@ -361,7 +361,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleAddRow()}
-                    className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
+                    className="px-3 py-1.5 bg-primary hover:bg-primary/90 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
                     <span>Thêm Tủ Điện</span>
@@ -496,7 +496,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
 
           <AssetModalFooter
             onCancel={onClose}
-            submitLabel={`Lưu Danh Sách Tủ (${rows.length})`}
+            submitLabel={`Lưu danh sách tủ (${rows.length})`}
             submitIcon={<CheckCircle2 className="w-4 h-4" />}
             disabled={rows.length === 0}
           />

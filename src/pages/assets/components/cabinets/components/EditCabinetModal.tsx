@@ -145,7 +145,7 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
       <AssetModalHeader
         icon={<Zap className="w-5 h-5" />}
         accent="purple"
-        title={`Chỉnh Sửa Tủ Điện: ${cabinet.external_ref || cabinet.cabinet_id || '-'}`}
+        title={`Chỉnh sửa tủ điện: ${cabinet.external_ref || cabinet.cabinet_id || '-'}`}
         subtitle={`Mã hệ thống: ${cabinet.cabinet_id || '-'} • Địa bàn: ${cabinet.commune_name || cabinet.commune_id || '-'}`}
         onClose={onClose}
       />
@@ -283,7 +283,7 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
             </div>
 
             {/* CỘT PHẢI (~60%): BẢN ĐỒ VỆ TINH GIS ĐỊNH VỊ */}
-            <div className="md:col-span-7 h-[380px] md:h-full relative overflow-hidden bg-slate-950">
+            <div className="md:col-span-7 h-[380px] md:h-full relative overflow-hidden bg-blue-50">
               <EditCabinetMap
                 key={cabinet?.cabinet_id || cabinet?.external_ref || 'edit-cabinet-map'}
                 lat={parsedLat}
@@ -306,7 +306,7 @@ const EditCabinetModalInner: React.FC<EditCabinetModalProps & { cabinet: Cabinet
 
           <AssetModalFooter
             onCancel={onClose}
-            submitLabel="Lưu Thay Đổi"
+            submitLabel="Lưu thay đổi"
             submitIcon={<CheckCircle2 className="w-4 h-4" />}
           />
         </form>

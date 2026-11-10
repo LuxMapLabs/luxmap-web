@@ -112,7 +112,7 @@ export const EditFixtureModal: React.FC<EditFixtureModalProps> = ({
       <AssetModalHeader
         icon={<Edit3 className="w-5 h-5" />}
         accent="amber"
-        title={`Chỉnh Sửa Bộ Đèn: ${fixture.fixture_id || '-'}`}
+        title={`Chỉnh sửa bộ đèn: ${fixture.fixture_id || '-'}`}
         subtitle="Chỉnh sửa thông số kỹ thuật và vị trí cột gắn bộ đèn"
         onClose={onClose}
       />
@@ -268,7 +268,7 @@ export const EditFixtureModal: React.FC<EditFixtureModalProps> = ({
 
         <AssetModalFooter
           onCancel={onClose}
-          submitLabel="Lưu Thay Đổi"
+          submitLabel="Lưu thay đổi"
           submitIcon={<CheckCircle2 className="w-4 h-4" />}
         />
       </form>
