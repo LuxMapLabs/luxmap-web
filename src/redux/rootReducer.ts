@@ -14,6 +14,7 @@ import settingsReducer from '../feature/settings/settingsSlice'
 import adminSystemReducer from '../feature/adminSystem/adminSystemSlice'
 import adminArtifactVersionReducer from '../feature/adminArtifactVersions/artifactVersionSlice'
 import lightingReducer from '../feature/lighting/lightingSlice'
+import passwordReducer from '../feature/password/passwordSlice'
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -31,6 +32,7 @@ const rootReducer = combineReducers({
     adminSystem: adminSystemReducer,
     adminArtifactVersions: adminArtifactVersionReducer,
     lighting: lightingReducer,
+    password: passwordReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>
