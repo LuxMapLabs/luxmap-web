@@ -1,9 +1,11 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useSelector } from 'react-redux'
 import { Route, CheckCircle2 } from 'lucide-react'
 import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
-import { SegmentRouteMap } from '../../../../../components/SegmentRouteMap'
-import { calculateRouteLengthMeters } from '../../../../../utils/gis-map/routeUtils'
+import { SegmentPolePickerMap } from '../../../../../components/SegmentPolePickerMap'
+import { SegmentPoleOrderList } from '../../../../../components/SegmentPoleOrderList'
+import { toPickablePoles, useSegmentPoleSelection } from '../../../../../hooks/assets/useSegmentPoleSelection'
+import { useSegmentPoleLink } from '../../../../../hooks/assets/useSegmentPoleLink'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { RoadClass } from '../../../../../types/common/enums'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
@@ -11,7 +13,7 @@ import type { SegmentListItem } from '../../../../../types/assets/segments'
 interface AddSegmentModalProps {
   isOpen: boolean
   onClose: () => void
-  onAddSegment: (data: SegmentListItem) => void
+  onAddSegment: (data: SegmentListItem, poleIds: string[]) => void
   existingCount: number
 }
 
@@ -35,23 +37,17 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
   const segmentId = nextCode
   const [segmentName, setSegmentName] = useState('')
   const [roadClass, setRoadClass] = useState<RoadClass>('inter_commune')
-  const [lengthM, setLengthM] = useState('0')
-  const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Auto-calculate route length when user clicks/draws route coordinates on map
-  const handleRouteCoordsChange = useCallback((coords: [number, number][]) => {
-    setRouteCoords(coords)
-    if (coords.length >= 2) {
-      const calcMeters = calculateRouteLengthMeters(coords)
-      setLengthM(String(calcMeters))
-      if (calcMeters >= 5) {
-        setSubmitError(null)
-      }
-    } else {
-      setLengthM('0')
-    }
-  }, [])
+  // Chỉ hiện cột có GPS và chưa thuộc tuyến nào
+  const allPoles = useSelector((state: RootState) => state.assets?.poles || [])
+  const candidates = useMemo(() => toPickablePoles(allPoles), [allPoles])
+  const { selected, toggle, remove, move, autoSort, lastAddedId, geometry } = useSegmentPoleSelection(candidates)
+  const link = useSegmentPoleLink(lastAddedId)
+  const poleCodes = useMemo(
+    () => Object.fromEntries(candidates.map((p) => [p.id, p.code || p.id])),
+    [candidates]
+  )
 
   if (!isOpen) return null
 
@@ -59,52 +55,30 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
     e.preventDefault()
     setSubmitError(null)
 
-    // 1. Kiểm tra số điểm mốc
-    if (routeCoords.length < 2) {
-      setSubmitError('Vui lòng click vẽ tối thiểu 2 điểm mốc trên bản đồ để tạo lộ trình tuyến đường.')
+    if (!geometry || selected.length < 2) {
+      setSubmitError('Vui lòng chọn tối thiểu 2 cột đèn trên bản đồ để tạo tuyến đường.')
+      return
+    }
+    if (geometry.lengthM < 1) {
+      setSubmitError('Chiều dài tuyến đường quá ngắn. Vui lòng kiểm tra lại các cột đã chọn.')
       return
     }
 
-    // 2. Lọc bỏ các điểm trùng nhau liên tiếp (consecutive duplicates)
-    const cleanCoords: [number, number][] = []
-    routeCoords.forEach((pt) => {
-      if (cleanCoords.length === 0) {
-        cleanCoords.push(pt)
-      } else {
-        const prev = cleanCoords[cleanCoords.length - 1]
-        if (Math.abs(prev[0] - pt[0]) > 0.000001 || Math.abs(prev[1] - pt[1]) > 0.000001) {
-          cleanCoords.push(pt)
-        }
-      }
-    })
-
-    if (cleanCoords.length < 2) {
-      setSubmitError('Vui lòng click vẽ tối thiểu 2 điểm mốc trên bản đồ để tạo lộ trình tuyến đường.')
-      return
-    }
-
-    // 3. Kiểm tra chiều dài tuyến
-    const actualLen = calculateRouteLengthMeters(cleanCoords)
-    if (actualLen < 5 || parseInt(lengthM, 10) < 5) {
-      setSubmitError('Chiều dài tuyến đường quá ngắn (< 5m). Vui lòng kiểm tra lại các điểm mốc trên bản đồ.')
-      return
-    }
-
-    // Generate standard PostGIS WKT LINESTRING
-    const geomWkt = `LINESTRING(${cleanCoords.map((c) => `${c[0]} ${c[1]}`).join(', ')})`
-
-    onAddSegment({
-      segment_id: segmentId.trim() || nextCode,
-      segment_name: segmentName.trim() || `Tuyến đường ${segmentId}`,
-      road_class: roadClass,
-      length_m: actualLen,
-      pole_count: 0,
-      commune_id: managerCommuneId || null,
-      commune_name: managerCommuneName,
-      data_source: 'field',
-      geom_wkt: geomWkt,
-      updated_at: new Date().toISOString(),
-    } as SegmentListItem)
+    onAddSegment(
+      {
+        segment_id: segmentId.trim() || nextCode,
+        segment_name: segmentName.trim() || `Tuyến đường ${segmentId}`,
+        road_class: roadClass,
+        length_m: geometry.lengthM,
+        pole_count: selected.length,
+        commune_id: managerCommuneId || null,
+        commune_name: managerCommuneName,
+        data_source: 'field',
+        geom_wkt: geometry.geomWkt,
+        updated_at: new Date().toISOString(),
+      } as SegmentListItem,
+      selected.map((p) => p.id)
+    )
 
     onClose()
   }
@@ -161,42 +135,61 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                     Chiều dài tuyến (mét):
                   </label>
                   <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-900/60">
-                    Tự động đo từ bản đồ
+                    Tự động đo từ các cột đã chọn
                   </span>
                 </div>
                 <input
                   type="text"
                   readOnly
-                  value={`${Number(lengthM).toLocaleString('vi-VN')} mét`}
+                  value={`${(geometry?.lengthM ?? 0).toLocaleString('vi-VN')} mét`}
                   className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-200 cursor-not-allowed select-none focus:outline-none"
                 />
               </div>
 
               {/* Thống kê mốc tọa độ */}
               <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                <span className="font-semibold text-slate-600 dark:text-slate-400">Mốc tọa độ đã vẽ:</span>
+                <span className="font-semibold text-slate-600 dark:text-slate-400">Cột đèn đã chọn:</span>
                 <span className="px-2.5 py-0.5 rounded-full font-mono font-bold text-xs bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                  {routeCoords.length} điểm mốc
+                  {selected.length} / {candidates.length} cột
                 </span>
               </div>
+
+              <SegmentPoleOrderList
+                route={selected}
+                codes={poleCodes}
+                highlightId={link.highlightId}
+                revealId={link.revealId}
+                onHover={link.hoverFromList}
+                onFocus={link.focusPole}
+                onMove={move}
+                onRemove={remove}
+                onAutoSort={autoSort}
+              />
+
+              {candidates.length === 0 && (
+                <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300">
+                  Không còn cột đèn nào có GPS mà chưa thuộc tuyến. Hãy thêm cột mới (hoặc bỏ cột khỏi tuyến khác) rồi quay lại tạo tuyến.
+                </div>
+              )}
 
             </div>
 
             {/* CỘT PHẢI: BẢN ĐỒ VẼ LỘ TRÌNH (60% width trên md) */}
             <div className="md:col-span-7 p-4 bg-slate-950 flex flex-col justify-between min-h-[480px] relative">
               <div className="min-h-[480px] h-[480px] rounded-2xl overflow-hidden border border-slate-700/80 shadow-inner relative">
-                <SegmentRouteMap
-                  coordinates={routeCoords}
-                  height="480px"
-                  editable={true}
-                  defaultEditMode="append"
-                  hideTerminalPins={true}
+                <SegmentPolePickerMap
+                  poles={candidates}
+                  selected={selected}
+                  onTogglePole={toggle}
+                  highlightId={link.highlightId}
+                  onHoverPole={link.hoverFromMap}
+                  focusRequest={link.focusRequest}
                   communeId={managerCommuneId}
-                  onRouteCoordsChange={handleRouteCoordsChange}
+                  height="480px"
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-2 italic text-center shrink-0">
-                💡 Mẹo: Click trên bản đồ để thêm mốc nối tiếp. Bấm và kéo thả bất kỳ điểm nào để chỉnh sửa uốn cong đường đi.
+                💡 Mẹo: Click cột đèn (chấm vàng) để thêm vào tuyến, click lại để bỏ. Kéo thả trong danh sách bên trái để chỉnh thứ tự. Cột thuộc tuyến khác không hiển thị.
               </p>
             </div>
           </div>

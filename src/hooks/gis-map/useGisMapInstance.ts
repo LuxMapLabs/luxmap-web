@@ -61,7 +61,15 @@ export function useGisMapInstance() {
       setIsMapLoaded(true)
     })
 
+    // Canvas phải co giãn theo khung chứa (đổi cỡ cửa sổ, thu gọn sidebar...), nếu không sẽ lộ viền trống
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => map.resize())
+      resizeObserver.observe(mapContainerRef.current)
+    }
+
     return () => {
+      resizeObserver?.disconnect()
       map.remove()
       mapRef.current = null
       popupRef.current = null

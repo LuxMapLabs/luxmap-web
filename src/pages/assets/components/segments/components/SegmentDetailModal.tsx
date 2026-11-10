@@ -160,7 +160,6 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
               startCoord={initialStart}
               endCoord={initialEnd}
               poles={segmentPoles}
-              editable={false}
               communeId={segment.commune_id}
               height="220px"
             />

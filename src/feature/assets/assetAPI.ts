@@ -2,6 +2,7 @@ import apiClient from '../../config/apiClient'
 import type { ImportResult } from '../../types/assets/import'
 import type {
   SegmentListItemPagedResult,
+  SegmentDetail,
   CreateSegmentRequest,
   UpdateSegmentRequest,
 } from '../../types/assets/segments'
@@ -50,6 +51,15 @@ export const assetAPI = {
    */
   getSegments: async (params?: AssetQueryParams): Promise<SegmentListItemPagedResult> => {
     const response = await apiClient.get<SegmentListItemPagedResult>('/assets/segments', { params })
+    return response.data
+  },
+
+  /**
+   * Lấy chi tiết một Tuyến đường (có đường nối geom_wkt)
+   * GET /api/v1/assets/segments/{segmentId}
+   */
+  getSegmentDetail: async (segmentId: string): Promise<SegmentDetail> => {
+    const response = await apiClient.get<SegmentDetail>(`/assets/segments/${encodeURIComponent(segmentId)}`)
     return response.data
   },
 

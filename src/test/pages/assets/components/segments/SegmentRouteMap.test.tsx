@@ -1,12 +1,8 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
-import {
-  calculateDistanceMeters,
-  projectPointOnSegment,
-} from '../../../../../utils/gis-map/routeUtils'
 import { summarizeLineWkt, validateImportRow, type ValidationContext } from '../../../../../validations/assetImport.schema'
 import { EditSegmentModal } from '../../../../../pages/assets/components/segments/components/EditSegmentModal'
 import { AddSegmentModal } from '../../../../../pages/assets/components/segments/components/AddSegmentModal'
@@ -15,8 +11,19 @@ import { EditPoleModal } from '../../../../../pages/assets/components/poles/comp
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
-import assetReducer, { type AssetState } from '../../../../../feature/assets/assetSlice'
+import assetReducer, { fetchSegmentDetailSuccess, type AssetState } from '../../../../../feature/assets/assetSlice'
 import mapReducer from '../../../../../feature/map/mapSlice'
+
+// Store test không chạy saga: giả lập kết quả lấy chi tiết tuyến để form sửa hiện ra
+const settleSegmentDetail = (
+  store: { dispatch: (action: ReturnType<typeof fetchSegmentDetailSuccess>) => unknown },
+  segmentId: string | null,
+  geomWkt: string | null = null
+) => {
+  act(() => {
+    store.dispatch(fetchSegmentDetailSuccess({ segmentId: segmentId || '', geomWkt }))
+  })
+}
 
 // Mock maplibre-gl to run cleanly in jsdom environment
 const mockMapInstances: any[] = []
@@ -200,13 +207,7 @@ vi.mock('maplibre-gl', () => {
   }
 })
 
-describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () => {
-  const mockDbRoute: [number, number][] = [
-    [106.4896, 10.9701],
-    [106.4905, 10.9708],
-    [106.4915, 10.9715],
-  ]
-
+describe('Segment modals & asset forms - Field Test Cases Suite', () => {
   const mockSegment: SegmentListItem = {
     segment_id: 'SEG-TL08',
     external_ref: 'TL08-01',
@@ -292,166 +293,6 @@ describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () =>
   })
 
   // =========================================================================
-  // TC-01: Bảo toàn cột điện khi kéo ĐẦU TUYẾN (> 3m)
-  // =========================================================================
-  it('TC-01: Bảo toàn cột điện khi kéo ĐẦU TUYẾN ra xa > 3m (nối dài và giữ nguyên Cột 1)', () => {
-    const pole1 = mockDbRoute[0]
-    const newStartCoord: [number, number] = [106.48945, 10.97]
-    const dist = calculateDistanceMeters(newStartCoord, pole1)
-    expect(dist).toBeGreaterThan(3)
-
-    // Khi dist > 3m và firstPoleIdx === 0 -> prepend newStartCoord vào trước baseCoords
-    const updatedRoute: [number, number][] = [newStartCoord, ...mockDbRoute]
-
-    expect(updatedRoute.length).toBe(mockDbRoute.length + 1)
-    expect(updatedRoute[0]).toEqual(newStartCoord)
-    expect(updatedRoute[1]).toEqual(pole1) // Cột 1 bảo toàn 100% trên tuyến xanh
-  })
-
-  // =========================================================================
-  // TC-02: Bảo toàn cột điện khi kéo CUỐI TUYẾN (> 3m)
-  // =========================================================================
-  it('TC-02: Bảo toàn cột điện khi kéo CUỐI TUYẾN ra xa > 3m (nối dài từ cột cuối ra điểm mới)', () => {
-    const lastPole = mockDbRoute[mockDbRoute.length - 1]
-    const newEndCoord: [number, number] = [106.49175, 10.97165]
-    const dist = calculateDistanceMeters(newEndCoord, lastPole)
-    expect(dist).toBeGreaterThan(3)
-
-    // Khi dist > 3m và lastPoleIdx === last -> append newEndCoord
-    const updatedRoute: [number, number][] = [...mockDbRoute, newEndCoord]
-
-    expect(updatedRoute.length).toBe(mockDbRoute.length + 1)
-    expect(updatedRoute[updatedRoute.length - 2]).toEqual(lastPole) // Cột cuối vẫn nằm trên tuyến
-    expect(updatedRoute[updatedRoute.length - 1]).toEqual(newEndCoord)
-  })
-
-  // =========================================================================
-  // TC-03: Bắt dính & Thu gọn (Snap & Collapse)
-  // =========================================================================
-  it('TC-03: Bắt dính & Thu gọn (Snap & Collapse) khi kéo ghim lại gần cột điện (< 8m)', () => {
-    const pole1 = mockDbRoute[0]
-    const extendedRoute: [number, number][] = [[106.4893, 10.9698], ...mockDbRoute]
-
-    const nearPoleCoord: [number, number] = [106.48961, 10.97011]
-    const dist = calculateDistanceMeters(nearPoleCoord, pole1)
-    expect(dist).toBeLessThan(8)
-
-    // Thu gọn về đúng vị trí cột điện (collapse)
-    const collapsedRoute: [number, number][] = extendedRoute.slice(1)
-    const snappedPoint = pole1
-
-    expect(collapsedRoute[0]).toEqual(pole1)
-    expect(snappedPoint).toEqual(pole1)
-    expect(collapsedRoute.length).toBe(mockDbRoute.length) // Đoạn nối dài được thu gọn an toàn
-  })
-
-  // =========================================================================
-  // TC-04: Cột điện cố định không xê dịch (Cursor not-allowed, draggable: false)
-  // =========================================================================
-  it('TC-04: Cột điện cố định không xê dịch (Cursor not-allowed và draggable=false)', () => {
-    const isPole = true
-    const editable = true
-
-    const cursor = isPole ? 'not-allowed' : editable ? 'grab' : 'default'
-    const title = isPole
-      ? 'Vị trí cột đèn cố định (không dời)'
-      : editable
-      ? 'Kéo để điều chỉnh vị trí mốc lộ trình'
-      : ''
-    const isDraggable = editable && !isPole
-
-    expect(cursor).toBe('not-allowed')
-    expect(title).toBe('Vị trí cột đèn cố định (không dời)')
-    expect(isDraggable).toBe(false)
-  })
-
-  // =========================================================================
-  // TC-05: Kéo di chuyển điểm xanh vẽ thêm (Draggable vertex)
-  // =========================================================================
-  it('TC-05: Kéo di chuyển điểm xanh vẽ thêm (Mốc tự do có draggable=true, cursor grab)', () => {
-    const isPole = false
-    const editable = true
-
-    const cursor = isPole ? 'not-allowed' : editable ? 'grab' : 'default'
-    const ringColor = isPole ? '#0f172a' : '#0284c7'
-    const coreColor = isPole ? '#fde047' : '#ffffff'
-    const isDraggable = editable && !isPole
-
-    expect(cursor).toBe('grab')
-    expect(ringColor).toBe('#0284c7') // Viền xanh
-    expect(coreColor).toBe('#ffffff') // Tâm trắng
-    expect(isDraggable).toBe(true)
-  })
-
-  // =========================================================================
-  // TC-06: Chèn điểm uốn trên đường kẻ (projectPointOnSegment)
-  // =========================================================================
-  it('TC-06: Chèn điểm uốn trên đường kẻ tại vị trí click (projectPointOnSegment)', () => {
-    const segA: [number, number] = [106.4896, 10.9701]
-    const segB: [number, number] = [106.4915, 10.9715]
-    const clickPt: [number, number] = [106.4905, 10.9709]
-
-    const proj = projectPointOnSegment(clickPt, segA, segB)
-    expect(proj.dist).toBeGreaterThanOrEqual(0)
-    expect(proj.t).toBeGreaterThan(0)
-    expect(proj.t).toBeLessThan(1)
-
-    // Chèn điểm uốn vào giữa segA và segB
-    const newCoords = [segA, proj.point, segB]
-    expect(newCoords.length).toBe(3)
-    expect(newCoords[1]).toEqual(proj.point)
-  })
-
-  // =========================================================================
-  // TC-07: Hoàn tác an toàn (Safe Undo)
-  // =========================================================================
-  it('TC-07: Hoàn tác an toàn (Safe Undo không xóa lẹm vào cột điện DB gốc)', () => {
-    const initialRoute = [...mockDbRoute]
-    const historyStack: { coords: [number, number][] }[] = []
-
-    historyStack.push({ coords: [...initialRoute] })
-
-    // Thao tác 1: Chấm thêm điểm 1
-    const pt1: [number, number] = [106.492, 10.972]
-    const routeAfterPt1 = [...initialRoute, pt1]
-    historyStack.push({ coords: [...routeAfterPt1] })
-
-    // Thao tác 2: Chấm thêm điểm 2
-    const pt2: [number, number] = [106.4925, 10.9725]
-    historyStack.push({ coords: [...routeAfterPt1, pt2] })
-
-    // Hoàn tác bước 2: khôi phục về routeAfterPt1
-    historyStack.pop()
-    const undoStep1 = historyStack[historyStack.length - 1].coords
-    expect(undoStep1).toEqual(routeAfterPt1)
-
-    // Hoàn tác bước 1: khôi phục về DB gốc ban đầu
-    historyStack.pop()
-    const undoStep2 = historyStack[historyStack.length - 1].coords
-    expect(undoStep2).toEqual(initialRoute)
-
-    // Khi đã về gốc DB: ngăn xếp history rỗng, không cho xóa lẹm
-    expect(undoStep2.length).toBe(mockDbRoute.length)
-  })
-
-  // =========================================================================
-  // TC-08: Khôi phục gốc (Reset DB)
-  // =========================================================================
-  it('TC-08: Khôi phục gốc (Reset DB trả về 100% dữ liệu tọa độ ban đầu)', () => {
-    const initialDbRoute = [...mockDbRoute]
-    let currentCoords: [number, number][] = [
-      [106.48, 10.96],
-      ...initialDbRoute,
-      [106.5, 10.98],
-    ]
-
-    // Thao tác Reset: gán lại targetRoute = initialDbRoute
-    currentCoords = [...initialDbRoute]
-    expect(currentCoords).toEqual(initialDbRoute)
-    expect(currentCoords.length).toBe(3)
-  })
-
-  // =========================================================================
   // TC-09: Tủ điện lọc theo tuyến đường & Reset khi đổi tuyến
   // =========================================================================
   it('TC-09: Tủ điện lọc theo tuyến đường và tự động reset khi chọn tuyến khác', () => {
@@ -519,6 +360,7 @@ describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () =>
         />
       </Provider>
     )
+    settleSegmentDetail(store, mockSegment.segment_id)
 
     // Bấm nút "Lưu Thay Đổi"
     const submitBtn = screen.getByRole('button', { name: /Lưu Thay Đổi/i })
@@ -641,11 +483,48 @@ describe('SegmentRouteMap & EditSegmentModal - 11 Field Test Cases Suite', () =>
           />
         </Provider>
       )
+      settleSegmentDetail(store, mockSegment.segment_id)
 
       expect(screen.getByText(/Chỉnh Sửa Tuyến Đường:/i)).toBeInTheDocument()
       expect(screen.getByDisplayValue(mockSegment.segment_name || '')).toBeInTheDocument()
       const selects = screen.getAllByRole('combobox')
       expect(selects.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('EditSegmentModal chờ tải thứ tự cột của tuyến rồi mới hiện form', () => {
+      const store = configureStore({
+        reducer: { assets: assetReducer, map: mapReducer },
+        preloadedState: { assets: initialAssetState },
+      })
+
+      render(
+        <Provider store={store}>
+          <EditSegmentModal isOpen={true} segment={mockSegment} onClose={vi.fn()} onSave={vi.fn()} />
+        </Provider>
+      )
+
+      expect(screen.getByRole('status')).toHaveTextContent(/Đang tải thứ tự cột/)
+      expect(screen.queryByText(/Chỉnh Sửa Tuyến Đường:/i)).not.toBeInTheDocument()
+      expect(store.getState().assets.segmentDetail?.segmentId).toBe(mockSegment.segment_id)
+
+      settleSegmentDetail(store, mockSegment.segment_id)
+      expect(screen.getByText(/Chỉnh Sửa Tuyến Đường:/i)).toBeInTheDocument()
+    })
+
+    it('EditSegmentModal bỏ qua kết quả của tuyến khác (không hiện form với đường nối sai tuyến)', () => {
+      const store = configureStore({
+        reducer: { assets: assetReducer, map: mapReducer },
+        preloadedState: { assets: initialAssetState },
+      })
+
+      render(
+        <Provider store={store}>
+          <EditSegmentModal isOpen={true} segment={mockSegment} onClose={vi.fn()} onSave={vi.fn()} />
+        </Provider>
+      )
+
+      settleSegmentDetail(store, 'SEG-KHAC')
+      expect(screen.queryByText(/Chỉnh Sửa Tuyến Đường:/i)).not.toBeInTheDocument()
     })
 
     it('TC-13: AddSegmentModal hiển thị form khai báo tuyến đường mới với cấp đường quy hoạch', () => {

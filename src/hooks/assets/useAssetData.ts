@@ -283,7 +283,7 @@ export function useAssetData() {
   }
 
   // --- Segment Handlers (Redux-Saga First) ---
-  const handleAddSegment = async (data: SegmentListItem) => {
+  const handleAddSegment = async (data: SegmentListItem, poleIds: string[]) => {
     const createReq: CreateSegmentRequest = {
       external_ref: data.external_ref || data.segment_id || null,
       segment_name: data.segment_name || null,
@@ -295,12 +295,13 @@ export function useAssetData() {
           ? data.geom_wkt
           : null,
       data_source: data.data_source || 'field',
+      pole_ids: poleIds,
     }
 
     dispatch(createSegmentRequest(createReq))
   }
 
-  const handleUpdateSegment = async (updated: SegmentListItem) => {
+  const handleUpdateSegment = async (updated: SegmentListItem, poleIds: string[]) => {
     if (!updated.segment_id) {
       toast.error('Thiếu mã định danh tuyến đường để cập nhật!')
       return
@@ -316,6 +317,7 @@ export function useAssetData() {
           ? updated.geom_wkt
           : null,
       data_source: updated.data_source || 'field',
+      pole_ids: poleIds,
     }
 
     dispatch(updateSegmentRequest({ segmentId: updated.segment_id, data: updateReq }))
