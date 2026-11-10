@@ -243,7 +243,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               <span className="p-1.5 rounded-lg bg-blue-100 text-blue-600">
                 <Calendar className="w-4 h-4" />
               </span>
-              Tạo Lịch Làm Việc Mới
+              Tạo sự vụ mới
             </h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
               Phân công nhiệm vụ khảo sát, kiểm tra hoặc sửa chữa

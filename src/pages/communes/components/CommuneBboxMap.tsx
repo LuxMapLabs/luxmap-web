@@ -940,7 +940,7 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
   return (
     <div
       style={{ height, minHeight: '380px' }}
-      className="relative w-full h-full min-h-[380px] rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-sm bg-slate-900 select-none flex flex-col"
+      className="relative w-full h-full min-h-[380px] rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-sm bg-blue-50 select-none flex flex-col"
     >
       {/* Thanh công cụ phía trên bản đồ */}
       <div className="absolute top-3 left-3 right-3 z-30 flex flex-col gap-2 pointer-events-none">

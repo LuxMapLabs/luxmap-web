@@ -58,7 +58,7 @@ export const IssueCredentialModal: React.FC<IssueCredentialModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Cấp Secret Xác Thực IoT
+                Cấp secret xác thực IoT
               </h3>
               <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
                 Thiết bị: {node.node_id}
@@ -119,7 +119,7 @@ export const IssueCredentialModal: React.FC<IssueCredentialModalProps> = ({
                   className="px-4 py-2 bg-[#1f3864] hover:bg-[#1f3864]/90 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5"
                 >
                   <Key className="w-4 h-4" />
-                  <span>{isGenerating ? 'Đang tạo secret...' : 'Tạo Secret Mới'}</span>
+                  <span>{isGenerating ? 'Đang tạo secret...' : 'Tạo secret mới'}</span>
                 </button>
               </div>
             </>
@@ -163,7 +163,7 @@ export const IssueCredentialModal: React.FC<IssueCredentialModalProps> = ({
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="px-4 py-2 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 font-bold rounded-xl text-xs transition cursor-pointer"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl text-xs transition cursor-pointer"
                 >
                   Đã Lưu Xong, Đóng Hộp Thoại
                 </button>

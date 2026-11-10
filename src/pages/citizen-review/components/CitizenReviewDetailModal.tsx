@@ -237,7 +237,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
     <>
       {/* Backdrop nền mờ */}
       <div
-        className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+        className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
         onClick={onClose}
       >
         {/* Card Modal Căn Giữa (Single column layout) */}
@@ -260,7 +260,7 @@ export const CitizenReviewDetailModal: React.FC<CitizenReviewDetailModalProps> =
                   Đã duyệt
                 </span>
               ) : detail?.status === 'merged' ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 text-xs font-bold">
+                <span className="px-2.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 text-xs font-bold">
                   Đã gộp
                 </span>
               ) : detail?.status === 'rejected' ? (

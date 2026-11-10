@@ -45,7 +45,7 @@ export const AssetTabs: React.FC<AssetTabsProps> = ({ groups }) => {
                 onClick={tab.onSelect}
                 className={`group flex flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-3.5 py-2 text-xs font-bold transition-all duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 active:scale-[0.97] ${
                   tab.active
-                    ? 'bg-linear-to-br from-teal-500 to-teal-700 text-white shadow-[0_10px_20px_-10px_rgba(13,148,136,0.75)]'
+                    ? 'bg-linear-to-br from-teal-500 to-teal-700 text-white shadow-[0_10px_20px_-10px_rgba(190,69,122,0.75)]'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 hover:-translate-y-px'
                 }`}
               >

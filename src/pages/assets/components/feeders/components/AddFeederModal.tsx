@@ -55,7 +55,7 @@ export const AddFeederModal: React.FC<AddFeederModalProps> = ({
       <AssetModalHeader
         icon={<Cable className="w-5 h-5" />}
         accent="emerald"
-        title="Thêm Mạch Điện Chiếu Sáng"
+        title="Thêm mạch điện chiếu sáng"
         subtitle={'Tạo lộ xuất tuyến cấp nguồn cho các cột đèn'}
         onClose={onClose}
       />
@@ -83,7 +83,7 @@ export const AddFeederModal: React.FC<AddFeederModalProps> = ({
                 }
               }}
               placeholder="-- Chọn tủ điện đấu nối --"
-              accentColor="emerald"
+              accentColor="blue"
               allowClear={true}
               getId={(c) => c.cabinet_id || ''}
             />
@@ -138,7 +138,7 @@ export const AddFeederModal: React.FC<AddFeederModalProps> = ({
 
         <AssetModalFooter
           onCancel={onClose}
-          submitLabel="Lưu Mạch Điện"
+          submitLabel="Lưu mạch điện"
           submitIcon={<CheckCircle2 className="w-4 h-4" />}
         />
       </form>

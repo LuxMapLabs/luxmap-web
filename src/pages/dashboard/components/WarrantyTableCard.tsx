@@ -60,7 +60,7 @@ export const WarrantyTableCard: React.FC<WarrantyTableCardProps> = ({
                   return (
                     <tr
                       key={idx}
-                      className="group border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:bg-teal-50/40 hover:shadow-[inset_3px_0_0_#0f766e]"
+                      className="group border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:bg-teal-50/40 hover:shadow-[inset_3px_0_0_#be457a]"
                     >
                       <td className="py-3 px-6">
                         <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-[#f1f5f9] text-slate-700 transition-colors group-hover:bg-teal-100 group-hover:text-teal-800">

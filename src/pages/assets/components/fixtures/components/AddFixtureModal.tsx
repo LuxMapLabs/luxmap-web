@@ -135,7 +135,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
     }
 
     if (rows.length === 0) {
-      setValidationError('Danh sách bóng đèn không được để trống! Vui lòng bấm "Thêm Bộ Đèn Mới".')
+      setValidationError('Danh sách bóng đèn không được để trống! Vui lòng bấm "Thêm bộ đèn mới".')
       return
     }
 
@@ -169,7 +169,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
       <AssetModalHeader
         icon={<Lightbulb className="w-5 h-5" />}
         accent="amber"
-        title="Thêm Bộ Đèn Chiếu Sáng"
+        title="Thêm bộ đèn chiếu sáng"
         subtitle="Lựa chọn tuyến đường, cột điện và cấu hình bộ đèn gắn trên cột"
         onClose={onClose}
       />
@@ -257,10 +257,10 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                 type="button"
                 onClick={handleAddRow}
                 disabled={!selectedPoleId}
-                className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
+                className="px-3.5 py-1.5 bg-primary hover:bg-primary/90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
-                <span>Thêm Bộ Đèn Mới</span>
+                <span>Thêm bộ đèn mới</span>
               </button>
             </div>
 
@@ -294,7 +294,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                                 onClick={handleAddRow}
                                 className="text-amber-600 dark:text-amber-400 font-bold underline cursor-pointer"
                               >
-                                Thêm Bộ Đèn Mới
+                                Thêm bộ đèn mới
                               </button>{' '}
                               để tạo bộ đèn.
                             </span>
@@ -440,7 +440,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
 
         <AssetModalFooter
           onCancel={onClose}
-          submitLabel={`Xác Nhận Thêm (${rows.length} Bộ Đèn)`}
+          submitLabel={`Xác nhận thêm (${rows.length} Bộ Đèn)`}
           submitIcon={<CheckCircle2 className="w-4 h-4" />}
           disabled={rows.length === 0 || !selectedPoleId}
         />

@@ -299,7 +299,7 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner">
-      <div ref={containerRef} style={{ height, width: '100%' }} className="w-full h-full bg-slate-900" />
+      <div ref={containerRef} style={{ height, width: '100%' }} className="w-full h-full bg-blue-50" />
     </div>
   )
 }

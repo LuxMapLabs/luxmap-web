@@ -300,7 +300,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       <div
         ref={containerRef}
         style={{ height, width: '100%' }}
-        className="w-full bg-slate-900"
+        className="w-full bg-blue-50"
       />
 
       {/* Floating Control Buttons */}

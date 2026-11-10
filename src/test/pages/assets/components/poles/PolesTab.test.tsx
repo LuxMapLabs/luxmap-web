@@ -342,8 +342,8 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       const poleSelect = selects[1]
       fireEvent.change(poleSelect, { target: { value: mockPoleWithoutFixture.pole_id } })
 
-      // Bấm '+ Thêm Bộ Đèn Mới'
-      const addRowBtn = screen.getAllByText(/Thêm Bộ Đèn Mới/i)[0]
+      // Bấm '+ Thêm bộ đèn mới'
+      const addRowBtn = screen.getAllByText(/Thêm bộ đèn mới/i)[0]
       fireEvent.click(addRowBtn)
 
       // Kiểm tra ô input date hạn bảo hành có mặt

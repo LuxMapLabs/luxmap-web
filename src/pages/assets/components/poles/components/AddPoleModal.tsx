@@ -1091,7 +1091,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       <AssetModalHeader
         icon={<Layers className="w-5 h-5" />}
         accent="blue"
-        title="Thêm Cột Đèn Mới Vào Hệ Thống GIS"
+        title="Thêm cột đèn mới vào hệ thống GIS"
         subtitle="Khai báo theo Tuyến đường và Tủ điện quản lý nguồn"
         onClose={onClose}
       />
@@ -1244,7 +1244,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddRow}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer shrink-0"
+                    className="px-3 py-1.5 bg-primary hover:bg-primary/90 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer shrink-0"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
                     <span>Thêm Cột</span>
@@ -1333,13 +1333,13 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
             </div>
 
             {/* ================= CỘT PHẢI (~55%): BẢN ĐỒ GIS VỆ TINH ================= */}
-            <div className="md:col-span-7 flex flex-col h-80 md:h-auto min-h-[520px] relative bg-slate-950 border-t md:border-t-0">
+            <div className="md:col-span-7 flex flex-col h-80 md:h-auto min-h-[520px] relative bg-blue-50 border-t md:border-t-0">
               <div ref={mapContainerRef} className="w-full h-full" />
 
               {/* Map overlay legend */}
-              <div className="absolute top-3 left-3 z-10 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-2.5 shadow-lg text-[11px] text-white space-y-1.5 pointer-events-none">
-                <div className="font-bold flex items-center gap-1.5 text-xs text-amber-400">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-xl p-2.5 shadow-lg text-[11px] text-slate-800 space-y-1.5 pointer-events-none">
+                <div className="font-bold flex items-center gap-1.5 text-xs text-amber-700">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Bản Đồ Cắm Mốc Cột Đèn</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1364,10 +1364,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
               {/* Status overlays */}
               {!selectedSegmentId ? (
-                <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xs flex flex-col items-center justify-center text-center p-4 text-white z-10">
-                  <Route className="w-8 h-8 text-blue-400 mb-2 animate-bounce" />
+                <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex flex-col items-center justify-center text-center p-4 text-slate-800 z-10">
+                  <Route className="w-8 h-8 text-blue-600 mb-2 animate-bounce" />
                   <p className="font-bold text-xs">Chưa chọn tuyến đường</p>
-                  <p className="text-[11px] text-slate-300 mt-0.5 max-w-sm">
+                  <p className="text-[11px] text-slate-600 mt-0.5 max-w-sm">
                     Vui lòng chọn Tuyến đường áp dụng ở cột trái để hiển thị lộ trình tim đường và cắm mốc cột đèn trên bản đồ vệ tinh.
                   </p>
                 </div>
@@ -1382,7 +1382,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
           <AssetModalFooter
             onCancel={onClose}
-            submitLabel={`Xác Nhận Lưu (${rows.length} Cột)`}
+            submitLabel={`Xác nhận lưu (${rows.length} Cột)`}
             submitIcon={<CheckCircle2 className="w-4 h-4" />}
           />
         </form>

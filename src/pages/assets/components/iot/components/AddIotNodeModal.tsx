@@ -65,7 +65,7 @@ export const AddIotNodeModal: React.FC<AddIotNodeModalProps> = ({
       <AssetModalHeader
         icon={<Cpu className="w-5 h-5" />}
         accent="cyan"
-        title="Đăng Ký Thiết Bị IoT Mới"
+        title="Đăng ký thiết bị IoT mới"
         subtitle={'Gắn bộ điều khiển viễn trắc IoT (Tele-controller) vào tủ điện'}
         onClose={onClose}
       />
@@ -86,7 +86,7 @@ export const AddIotNodeModal: React.FC<AddIotNodeModalProps> = ({
                 setErrorMsg(null)
               }}
               placeholder="-- Chọn tủ điện gắn thiết bị --"
-              accentColor="emerald"
+              accentColor="blue"
               allowClear={true}
               getId={(c) => c.cabinet_id || ''}
               isOptionDisabled={(c) => Boolean(c.cabinet_id && occupiedCabinetIds.has(c.cabinet_id))}
@@ -111,7 +111,7 @@ export const AddIotNodeModal: React.FC<AddIotNodeModalProps> = ({
               <label
                 className={`p-3 rounded-xl border flex flex-col gap-1 cursor-pointer transition ${
                   dataSource === 'simulated'
-                    ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200'
+                    ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200'
                     : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
               >
@@ -123,7 +123,7 @@ export const AddIotNodeModal: React.FC<AddIotNodeModalProps> = ({
                     value="simulated"
                     checked={dataSource === 'simulated'}
                     onChange={() => setDataSource('simulated')}
-                    className="accent-emerald-600"
+                    className="accent-blue-600"
                   />
                 </div>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">
@@ -185,7 +185,7 @@ export const AddIotNodeModal: React.FC<AddIotNodeModalProps> = ({
 
         <AssetModalFooter
           onCancel={onClose}
-          submitLabel="Đăng Ký Thiết Bị"
+          submitLabel="Đăng ký thiết bị"
           submitIcon={<CheckCircle2 className="w-4 h-4" />}
         />
       </form>

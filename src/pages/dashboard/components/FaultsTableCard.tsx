@@ -235,8 +235,8 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                         }
                       }}
                       style={{ '--i': idx } as React.CSSProperties}
-                      className={`ops-rise group cursor-pointer border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:shadow-[inset_3px_0_0_#0f766e] ${
-                        isUnassigned ? 'bg-rose-50/50 hover:bg-rose-50' : 'hover:bg-teal-50/40'
+                      className={`ops-rise group cursor-pointer border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:shadow-[inset_3px_0_0_#be457a] ${
+                        isUnassigned ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-teal-50/40'
                       }`}
                       title={
                         isUnassigned
@@ -325,8 +325,8 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
           <strong className="text-slate-800 tabular-nums">{faults.length}</strong> sự cố
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-xs border border-rose-200 bg-rose-50" />
-          Hàng nền hồng là sự cố chưa phân lịch, bấm để tạo lịch
+          <span className="h-2.5 w-2.5 rounded-xs border border-amber-200 bg-amber-50" />
+          Hàng nền vàng là sự cố chưa phân lịch, bấm để tạo lịch
         </span>
       </div>
     </OpsCard>

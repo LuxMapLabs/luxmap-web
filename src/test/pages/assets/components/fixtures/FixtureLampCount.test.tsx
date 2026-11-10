@@ -338,7 +338,7 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
     expect(screen.getByText('Ngày Tháo Dỡ')).toBeInTheDocument()
 
     // Bấm xác nhận tháo dỡ
-    const submitBtn = screen.getByText('Xác Nhận Tháo Dỡ')
+    const submitBtn = screen.getByText('Xác nhận tháo dỡ')
     fireEvent.click(submitBtn)
 
     expect(onConfirmMock).toHaveBeenCalledTimes(1)

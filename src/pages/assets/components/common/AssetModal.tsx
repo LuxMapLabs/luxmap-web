@@ -5,22 +5,22 @@ import { X, AlertCircle, Loader2 } from 'lucide-react'
 /**
  * Bộ khung chung cho mọi modal Thêm/Sửa của trang Tài sản,
  * để header, footer, nút bấm và thông báo lỗi đồng bộ với nhau.
- * Màu chủ đề của từng loại tài sản chỉ thể hiện ở ô icon trên header.
+ * Ô icon trên header dùng chung một tông màu theme để các modal đồng bộ.
  */
 
 export type AssetModalAccent = 'purple' | 'amber' | 'blue' | 'indigo' | 'emerald' | 'cyan'
 
+// Theme Manager dùng một tông hồng duy nhất; các tên accent giữ lại để không phải đổi chỗ gọi.
+const ACCENT_TILE =
+  'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/60'
+
 const ACCENT_CLASSES: Record<AssetModalAccent, string> = {
-  purple:
-    'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/60',
-  amber:
-    'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60',
-  blue: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/60',
-  indigo:
-    'bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-900/60',
-  emerald:
-    'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60',
-  cyan: 'bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-900/60',
+  purple: ACCENT_TILE,
+  amber: ACCENT_TILE,
+  blue: ACCENT_TILE,
+  indigo: ACCENT_TILE,
+  emerald: ACCENT_TILE,
+  cyan: ACCENT_TILE,
 }
 
 interface AssetModalFrameProps {
