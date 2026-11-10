@@ -2,6 +2,8 @@ import { apiClient } from '../../config/apiClient'
 import type { FixtureStatusStatistics } from '../../types/statistics/fixture-status'
 import type { RepairTimelinessStatistics } from '../../types/statistics/repair-timeliness'
 import type { WarrantyList, WarrantyItem } from '../../types/statistics/warranty'
+import type { CitizenFeedbackStatistics } from '../../types/statistics/citizen-feedback'
+import type { WorkOrderStatusStatistics } from '../../types/statistics/work-orders'
 import type { FaultItem, FaultItemPagedResult } from '../../types/faults/faults'
 
 export type { WarrantyItem }
@@ -154,10 +156,72 @@ export async function fetchFaultsList(params: {
 }
 
 /**
- * 5. Tải file báo cáo CSV từ Backend (tận dụng format=csv)
+ * 5. Thống kê phản ánh người dân (Citizen Feedback)
+ * GET /api/v1/statistics/citizen-feedback
+ */
+export async function fetchCitizenFeedbackStatistics(params: {
+  commune_id?: string
+  segment_id?: string
+  data_source?: string
+  from?: string
+  to?: string
+  group_by?: string
+}): Promise<CitizenFeedbackStatistics> {
+  try {
+    const cleanParams: Record<string, any> = {}
+    if (params.commune_id) cleanParams.commune_id = params.commune_id
+    if (params.segment_id) cleanParams.segment_id = params.segment_id
+    if (params.data_source) cleanParams.data_source = params.data_source
+    if (params.from) cleanParams.from = params.from
+    if (params.to) cleanParams.to = params.to
+    if (params.group_by) cleanParams.group_by = params.group_by
+
+    const res = await apiClient.get<CitizenFeedbackStatistics>('/statistics/citizen-feedback', { params: cleanParams })
+    if (res.data && res.data.rows) {
+      return res.data
+    }
+    return { as_of: new Date().toISOString(), group_by: [], rows: [] }
+  } catch (error) {
+    console.warn('[DashboardAPI] Fetch citizen feedback failed:', error)
+    return { as_of: new Date().toISOString(), group_by: [], rows: [] }
+  }
+}
+
+/**
+ * 6. Thống kê phiếu công việc (Work Orders) theo phân loại và trạng thái
+ * GET /api/v1/statistics/work-orders
+ */
+export async function fetchWorkOrderStatistics(params: {
+  commune_id?: string
+  segment_id?: string
+  from?: string
+  to?: string
+  group_by?: string
+}): Promise<WorkOrderStatusStatistics> {
+  try {
+    const cleanParams: Record<string, any> = {}
+    if (params.commune_id) cleanParams.commune_id = params.commune_id
+    if (params.segment_id) cleanParams.segment_id = params.segment_id
+    if (params.from) cleanParams.from = params.from
+    if (params.to) cleanParams.to = params.to
+    if (params.group_by) cleanParams.group_by = params.group_by
+
+    const res = await apiClient.get<WorkOrderStatusStatistics>('/statistics/work-orders', { params: cleanParams })
+    if (res.data && res.data.rows) {
+      return res.data
+    }
+    return { as_of: new Date().toISOString(), group_by: [], rows: [] }
+  } catch (error) {
+    console.warn('[DashboardAPI] Fetch work orders statistics failed:', error)
+    return { as_of: new Date().toISOString(), group_by: [], rows: [] }
+  }
+}
+
+/**
+ * 7. Tải file báo cáo CSV từ Backend (tận dụng format=csv)
  */
 export async function downloadStatisticsCsv(
-  endpoint: 'fixture-status' | 'repair-timeliness' | 'warranty',
+  endpoint: 'fixture-status' | 'repair-timeliness' | 'warranty' | 'citizen-feedback' | 'work-orders',
   params: Record<string, any>,
   fileName: string
 ): Promise<void> {

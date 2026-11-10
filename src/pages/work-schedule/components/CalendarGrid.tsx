@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Plus, User, FileText, AlertTriangle } from 'lucide-react'
 import { ScheduleCase } from '../../../types/workSchedule'
 import { WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
+import type { SurveyRecurringItem } from '../../../types/work-schedule/recurring'
 
 interface CalendarGridProps {
   currentMonth: number
@@ -12,6 +13,10 @@ interface CalendarGridProps {
   onAddOnDate: (dateStr: string) => void
   /** Lệnh công tác được làm nổi bật (khi đến từ thông báo) */
   highlightedWorkOrderId?: string | null
+  /** Danh sách cấu hình lịch khảo sát định kỳ tuần */
+  recurringSchedules?: SurveyRecurringItem[]
+  /** Callback mở modal quản lý lịch định kỳ khi click vào thẻ dự kiến */
+  onOpenRecurringSurveyModal?: () => void
 }
 
 const WEEKDAYS = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật']
@@ -24,6 +29,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   onSelectCase,
   onAddOnDate,
   highlightedWorkOrderId = null,
+  recurringSchedules = [],
+  onOpenRecurringSurveyModal,
 }) => {
   // Tính toán số ngày và padding của tháng
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay()
@@ -103,6 +110,42 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const todayMonth = today.getMonth()
   const todayYear = today.getFullYear()
 
+  // Tính toán phạm vi trọn vẹn tuần kế tiếp (Thứ Hai đến Chủ Nhật) theo mốc chốt 17:00 Thứ Năm
+  const previewWindow = useMemo(() => {
+    const todayObj = new Date(todayYear, todayMonth, todayDate)
+    const jsDay = todayObj.getDay() // 0 = Chủ Nhật, 1 = Thứ Hai ... 6 = Thứ Bảy
+    const daysFromMonday = (jsDay + 6) % 7 // 0 = T2 ... 6 = CN
+    const currentWeekMonday = new Date(todayYear, todayMonth, todayDate - daysFromMonday)
+    currentWeekMonday.setHours(0, 0, 0, 0)
+
+    // Thứ Hai và Chủ Nhật của tuần kế tiếp
+    const nextWeekMonday = new Date(currentWeekMonday)
+    nextWeekMonday.setDate(currentWeekMonday.getDate() + 7)
+
+    const nextWeekSunday = new Date(nextWeekMonday)
+    nextWeekSunday.setDate(nextWeekMonday.getDate() + 6)
+    nextWeekSunday.setHours(23, 59, 59, 999)
+
+    // Nếu đã qua mốc 17:00 Thứ Năm của tuần này, kỳ áp dụng mới sẽ dời sang tuần sau nữa (tuần + 2)
+    const now = new Date()
+    const currentHour = now.getHours()
+    const isPastThursdayCutoff =
+      jsDay > 4 || (jsDay === 4 && currentHour >= 17) || jsDay === 0
+
+    const effectiveWindowEnd = new Date(nextWeekSunday)
+    if (isPastThursdayCutoff) {
+      effectiveWindowEnd.setDate(effectiveWindowEnd.getDate() + 7)
+    }
+
+    const formatYMD = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+    return {
+      startDateStr: formatYMD(todayObj),
+      endDateStr: formatYMD(effectiveWindowEnd),
+    }
+  }, [todayYear, todayMonth, todayDate])
+
   return (
     <div className="ops-rise bg-white rounded-[20px] shadow-ops overflow-x-auto">
       {/* Header thứ trong tuần */}
@@ -137,6 +180,37 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             currentMonth === todayMonth &&
             currentYear === todayYear
           const dayEvents = eventsByDate[dateStr] || []
+
+          const dObj = new Date(currentYear, currentMonth, day)
+          const jsDay = dObj.getDay()
+          const isoDayOfWeek = jsDay === 0 ? 7 : jsDay
+          const isWithinPreviewWindow =
+            dateStr >= previewWindow.startDateStr && dateStr <= previewWindow.endDateStr
+
+          // Lọc các cấu hình khảo sát định kỳ tuần cần vẽ thẻ dự kiến (trong chu kỳ tuần áp dụng)
+          const dayPreviews =
+            isWithinPreviewWindow && (filterPhase === 'all' || filterPhase === 'survey')
+              ? recurringSchedules.filter((sched) => {
+                  if (!sched.is_active || sched.day_of_week !== isoDayOfWeek) return false
+                  const startEffectiveDate = sched.first_occurrence_date || sched.starts_on_week
+                  if (startEffectiveDate && dateStr < startEffectiveDate) return false
+
+                  // Chống trùng: Nếu ngày này đã có phiếu khảo sát thật cho tuyến này thì không vẽ thẻ dự kiến
+                  const segmentName = (sched.segment_name || '').toLowerCase()
+                  const segmentId = (sched.segment_id || '').toLowerCase()
+                  const alreadyHasSurveyOrder = dayEvents.some((e) => {
+                    if (e.phase.phaseType !== 'survey') return false
+                    const caseSeg = (e.caseItem.segment || '').toLowerCase()
+                    const caseTitle = (e.caseItem.title || '').toLowerCase()
+                    return (
+                      (segmentId && (caseSeg.includes(segmentId) || caseTitle.includes(segmentId))) ||
+                      (segmentName && (caseSeg.includes(segmentName) || caseTitle.includes(segmentName)))
+                    )
+                  })
+
+                  return !alreadyHasSurveyOrder
+                })
+              : []
 
           return (
             <div
@@ -272,6 +346,48 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     </div>
                   )
                 })}
+
+                {/* Thẻ dự kiến Khảo sát Định kỳ tuần (Hiển thị trước 1 tuần tới) */}
+                {dayPreviews.map((sched) => (
+                  <div
+                    key={`recurring-preview-${sched.schedule_id}-${dateStr}`}
+                    onClick={() => onOpenRecurringSurveyModal && onOpenRecurringSurveyModal()}
+                    className="p-2 rounded-xl border border-dashed border-teal-400/90 bg-teal-50/70 hover:bg-teal-100/80 text-xs cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] select-none group/recurring"
+                    title="Lịch khảo sát định kỳ dự kiến tuần tới. Click để xem hoặc quản lý cấu hình lịch định kỳ."
+                  >
+                    {/* Dòng trên: Mã cấu hình & Nhãn [Định kỳ] */}
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="font-mono font-bold text-[10px] text-teal-700 tracking-tight">
+                        {sched.schedule_id}
+                      </span>
+                      <span className="text-[9.5px] font-bold text-teal-800 bg-teal-100/90 px-1.5 py-0.2 rounded-full border border-teal-200/80 shrink-0">
+                        Định kỳ tuần
+                      </span>
+                    </div>
+
+                    {/* Tiêu đề vụ việc */}
+                    <div className="font-bold text-slate-800 line-clamp-1 leading-snug">
+                      Khảo sát - {sched.segment_name || sched.segment_id}
+                    </div>
+
+                    {/* Thông tin phụ: Tuyến đường */}
+                    <div className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                      📍 {sched.segment_name || sched.segment_id}
+                    </div>
+
+                    {/* Dòng dưới: Kỹ sư & Nhãn (Dự kiến) */}
+                    <div className="flex items-center justify-between mt-1.5 text-[10px] text-teal-800 gap-1 font-medium">
+                      <span className="flex items-center gap-1 truncate max-w-24 sm:max-w-28">
+                        <User className="w-3 h-3 text-teal-600 shrink-0" />
+                        <span className="truncate">{sched.assigned_to_name || 'Tự động phân bổ'}</span>
+                      </span>
+
+                      <span className="text-[9.5px] text-teal-600 font-mono italic shrink-0">
+                        (Dự kiến)
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )
@@ -312,6 +428,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           <span className="flex items-center gap-1.5 font-medium text-slate-400">
             <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 border border-slate-300" />
             <span>Đã kết thúc</span>
+          </span>
+          <span className="flex items-center gap-1.5 font-medium text-teal-800">
+            <span className="w-2.5 h-2.5 rounded-sm bg-teal-50 border border-dashed border-teal-400" />
+            <span>Định kỳ (dự kiến tuần tới)</span>
           </span>
         </div>
       </div>

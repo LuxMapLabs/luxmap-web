@@ -82,11 +82,11 @@ export const SuperiorMainCharts: React.FC<SuperiorMainChartsProps> = ({
   return (
     <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
       {/* BIỂU ĐỒ 1 (Trái - 7 phần): Stacked Bar Chart Hiện trạng chiếu sáng */}
-      <div id="superior-lighting-chart" className="lg:col-span-7 bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between scroll-mt-6">
+      <div id="superior-lighting-chart" className="lg:col-span-7 bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 sm:p-6 flex flex-col justify-between scroll-mt-6">
         <div className="flex-1 flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
-              <h3 className="text-[15px] font-extrabold text-slate-900 leading-tight">
+              <h3 className="text-base font-extrabold text-slate-900 leading-tight">
                 Phân Bố Chất Lượng Chiếu Sáng & Độ Phủ Trong Xã
               </h3>
               <p className="text-xs text-slate-500 mt-1">
@@ -98,12 +98,12 @@ export const SuperiorMainCharts: React.FC<SuperiorMainChartsProps> = ({
 
             <div className="flex items-center gap-2 flex-wrap">
               {/* Chuyển đổi Số lượng (Cột) vs Tỷ lệ (%) */}
-              <div className="inline-flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs shrink-0">
+              <div className="inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 text-xs shrink-0">
                 <button
                   type="button"
                   onClick={() => setViewMode('count')}
-                  className={`px-2 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                    viewMode === 'count' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    viewMode === 'count' ? 'bg-white text-teal-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                   title="Hiển thị theo số lượng cột thực tế"
                 >
@@ -112,8 +112,8 @@ export const SuperiorMainCharts: React.FC<SuperiorMainChartsProps> = ({
                 <button
                   type="button"
                   onClick={() => setViewMode('percent')}
-                  className={`px-2 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                    viewMode === 'percent' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    viewMode === 'percent' ? 'bg-white text-teal-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                   title="Hiển thị chuẩn hóa theo tỷ lệ % 100"
                 >
@@ -122,13 +122,13 @@ export const SuperiorMainCharts: React.FC<SuperiorMainChartsProps> = ({
               </div>
 
               {/* Chuyển tab Tuyến đường vs Nguồn dữ liệu */}
-              <div className="inline-flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs shrink-0">
+              <div className="inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 text-xs shrink-0">
                 <button
                   type="button"
                   onClick={() => setBarDimension('segment')}
                   className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
                     barDimension === 'segment'
-                      ? 'bg-white text-slate-900 font-bold shadow-xs'
+                      ? 'bg-white text-teal-700 font-bold shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -139,7 +139,7 @@ export const SuperiorMainCharts: React.FC<SuperiorMainChartsProps> = ({
                   onClick={() => setBarDimension('datasource')}
                   className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
                     barDimension === 'datasource'
-                      ? 'bg-white text-slate-900 font-bold shadow-xs'
+                      ? 'bg-white text-teal-700 font-bold shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -266,10 +266,10 @@ export const SuperiorMainCharts: React.FC<SuperiorMainChartsProps> = ({
       </div>
 
       {/* BIỂU ĐỒ 2 (Phải - 5 phần): Đánh giá SLA Sửa chữa Đúng hạn / Trễ hạn của Xã */}
-      <div id="superior-sla-chart" className="lg:col-span-5 bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between scroll-mt-6">
+      <div id="superior-sla-chart" className="lg:col-span-5 bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 sm:p-6 flex flex-col justify-between scroll-mt-6">
         <div className="flex-1 flex flex-col">
           <div className="mb-4">
-            <h3 className="text-[15px] font-extrabold text-slate-900 leading-tight">
+            <h3 className="text-base font-extrabold text-slate-900 leading-tight">
               Đánh Giá Tuân Thủ SLA Sửa Chữa Đêm
             </h3>
             <p className="text-xs text-slate-500 mt-1">

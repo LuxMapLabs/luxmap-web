@@ -13,7 +13,21 @@ import type {
   ReviewWorkOrderRequest,
   FollowUpWorkOrderRequest,
   StartWorkOrderRequest,
+  PolePhotoItem,
+  PolePhotoItemPagedResult,
+  PolePhotoDecisionRequest,
 } from '../../types/workorders/orders'
+import type {
+  AutoDispatchPreview,
+  AutoDispatchRequest,
+  BatchCreateWorkOrdersResponse,
+} from '../../types/work-schedule/autoDispatch'
+import type {
+  SurveyRecurringItem,
+  SurveyRecurringPagedResult,
+  CreateSurveyRecurringRequest,
+  PatchSurveyRecurringRequest,
+} from '../../types/work-schedule/recurring'
 
 export interface GetWorkOrdersFilter {
   scheduled_from?: string
@@ -256,5 +270,179 @@ export const workScheduleAPI = {
       })
       return response.data
     }
+  },
+
+  /**
+   * Lấy danh sách ảnh chụp từng cột đèn trong lệnh công tác (kèm phân loại AI và review của kỹ sư)
+   * GET /api/v1/work-orders/{id}/pole-photos
+   */
+  async getWorkOrderPolePhotos(
+    id: string,
+    params?: { pole_id?: string; page?: number; page_size?: number }
+  ): Promise<PolePhotoItemPagedResult> {
+    try {
+      const response = await apiClient.get<PolePhotoItemPagedResult>(`/work-orders/${id}/pole-photos`, {
+        params: { page_size: 100, ...params },
+      })
+      return (
+        response.data || {
+          items: [],
+          total: 0,
+          page: 1,
+          page_size: 100,
+        }
+      )
+    } catch (error) {
+      console.warn(`[WorkScheduleAPI] getWorkOrderPolePhotos failed for ${id}:`, error)
+      return { items: [], total: 0, page: 1, page_size: 100 }
+    }
+  },
+
+  /**
+   * Lấy chi tiết một ảnh cột đèn
+   * GET /api/v1/work-orders/{id}/pole-photos/{photo_id}
+   */
+  async getPolePhotoDetail(id: string, photoId: string): Promise<PolePhotoItem> {
+    const response = await apiClient.get<PolePhotoItem>(`/work-orders/${id}/pole-photos/${photoId}`)
+    return response.data
+  },
+
+  /**
+   * Tải ảnh cột đèn qua Blob URL (tự động kèm Authorization Bearer token)
+   * GET /api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail | /original
+   */
+  async fetchPolePhotoBlob(workOrderId: string, photoId: string, original = false): Promise<string> {
+    const variant = original ? 'original' : 'thumbnail'
+    const endpoint = `/work-orders/${encodeURIComponent(workOrderId)}/pole-photos/${encodeURIComponent(photoId)}/${variant}`
+    const response = await apiClient.get<Blob>(endpoint, {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(response.data)
+  },
+
+  /**
+   * Quản lý phê duyệt (confirm / reject) một ảnh khảo sát cột đèn
+   * POST /api/v1/work-orders/{id}/pole-photos/{photo_id}/decision
+   */
+  async decidePolePhoto(
+    workOrderId: string,
+    photoId: string,
+    payload: PolePhotoDecisionRequest
+  ): Promise<PolePhotoItem> {
+    const response = await apiClient.post<PolePhotoItem>(
+      `/work-orders/${workOrderId}/pole-photos/${photoId}/decision`,
+      payload
+    )
+    return response.data
+  },
+
+  /**
+   * Tự động xác nhận toàn bộ các ảnh cột đèn chưa duyệt trong ca khảo sát
+   * Gọi khi Quản lý bấm Duyệt báo cáo khảo sát hoặc Tạo lịch tiếp theo
+   */
+  async confirmAllPendingPolePhotos(workOrderId: string): Promise<void> {
+    try {
+      const photosRes = await this.getWorkOrderPolePhotos(workOrderId)
+      const items = photosRes.items || []
+      // Lọc các ảnh chưa có quyết định decision
+      const pendingItems = items.filter((p) => p.photo_id && !p.decision && p.decision !== 'confirm')
+      if (pendingItems.length === 0) return
+
+      // Xác nhận song song các ảnh để Backend chuyển cột thành out và tạo fault detected
+      await Promise.allSettled(
+        pendingItems.map((p) =>
+          this.decidePolePhoto(workOrderId, p.photo_id!, {
+            decision: 'confirm',
+            note: 'Quản lý duyệt báo cáo khảo sát hiện trường.',
+          })
+        )
+      )
+    } catch (err) {
+      console.warn(`[WorkScheduleAPI] confirmAllPendingPolePhotos error for ${workOrderId}:`, err)
+    }
+  },
+
+  // =========================================================================
+  // 1. TÍNH NĂNG SMART AUTO-DISPATCH (XEM TRƯỚC ĐỀ XUẤT & TẠO HÀNG LOẠT)
+  // =========================================================================
+
+  /**
+   * Lấy đề xuất phân ca kiểm tra tự động từ Backend (WO-AUTODISPATCH-1)
+   * POST /api/v1/work-orders/auto-dispatch/preview
+   */
+  async getAutoDispatchPreview(request?: AutoDispatchRequest): Promise<AutoDispatchPreview> {
+    const response = await apiClient.post<AutoDispatchPreview>(
+      '/work-orders/auto-dispatch/preview',
+      request || {}
+    )
+    return response.data
+  },
+
+  /**
+   * Tạo hàng loạt ca công tác trong một transaction duy nhất (WO-BATCH-1)
+   * POST /api/v1/work-orders/batch
+   */
+  async createBatchWorkOrders(items: CreateWorkOrderRequest[]): Promise<BatchCreateWorkOrdersResponse> {
+    const response = await apiClient.post<BatchCreateWorkOrdersResponse>(
+      '/work-orders/batch',
+      { items }
+    )
+    return response.data
+  },
+
+  // =========================================================================
+  // 2. TÍNH NĂNG KHẢO SÁT ĐỊNH KỲ TUẦN (WEEKLY RECURRING SURVEY SCHEDULES)
+  // =========================================================================
+
+  /**
+   * Lấy danh sách cấu hình lịch khảo sát định kỳ tuần
+   * GET /api/v1/survey-schedules/recurring
+   */
+  async getRecurringSurveySchedules(communeId?: string): Promise<SurveyRecurringPagedResult> {
+    const params: Record<string, any> = { page_size: 100 }
+    if (communeId) params.commune_id = communeId
+
+    const response = await apiClient.get<SurveyRecurringPagedResult>(
+      '/survey-schedules/recurring',
+      { params }
+    )
+    return response.data || { items: [], total: 0, page: 1, page_size: 100 }
+  },
+
+  /**
+   * Tạo mới lịch khảo sát định kỳ tuần (Mốc chốt 17:00 Thứ Năm)
+   * POST /api/v1/survey-schedules/recurring
+   */
+  async createRecurringSurveySchedule(
+    payload: CreateSurveyRecurringRequest
+  ): Promise<SurveyRecurringItem> {
+    const response = await apiClient.post<SurveyRecurringItem>(
+      '/survey-schedules/recurring',
+      payload
+    )
+    return response.data
+  },
+
+  /**
+   * Cập nhật lịch khảo sát định kỳ tuần (Bật/Tắt is_active, đổi người, ghi chú)
+   * PATCH /api/v1/survey-schedules/recurring/{id}
+   */
+  async patchRecurringSurveySchedule(
+    id: string,
+    payload: PatchSurveyRecurringRequest
+  ): Promise<SurveyRecurringItem> {
+    const response = await apiClient.patch<SurveyRecurringItem>(
+      `/survey-schedules/recurring/${encodeURIComponent(id)}`,
+      payload
+    )
+    return response.data
+  },
+
+  /**
+   * Xóa cấu hình lịch khảo sát định kỳ tuần
+   * DELETE /api/v1/survey-schedules/recurring/{id}
+   */
+  async deleteRecurringSurveySchedule(id: string): Promise<void> {
+    await apiClient.delete(`/survey-schedules/recurring/${encodeURIComponent(id)}`)
   },
 }
