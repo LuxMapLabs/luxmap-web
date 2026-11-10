@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../../redux/store'
 import * as maplibregl from 'maplibre-gl'
@@ -40,7 +40,30 @@ export function useFeederLinesLayer({
 }: UseFeederLinesLayerProps) {
   const dispatch = useDispatch<AppDispatch>()
   const { cabinetTopologyEdges, allTopologyEdges, cabinets: mapCabinets } = useSelector((state: RootState) => state.map)
-  const { cabinets: assetCabinets, feeders: assetFeeders } = useSelector((state: RootState) => state.assets)
+  const {
+    cabinets: assetCabinets,
+    feeders: assetFeeders,
+    poles: assetPoles,
+    segments: assetSegments,
+  } = useSelector((state: RootState) => state.assets)
+
+  // Cạnh topology từ backend chỉ mang id nội bộ; tooltip phải hiện mã hiển thị (external_ref) như các tooltip khác.
+  const displayLookupRef = useRef<(p: any) => any>((p) => p)
+  displayLookupRef.current = (p: any) => {
+    const poleRef = new Map<string, string>()
+    ;(assetPoles || []).forEach((x: any) => x.pole_id && x.external_ref && poleRef.set(x.pole_id, x.external_ref))
+    const cab = (assetCabinets || []).find((x: any) => x.cabinet_id === (p.cabinet_id || p.from_id))
+    const fdr = (assetFeeders || []).find((x: any) => x.feeder_id === p.feeder_id)
+    const seg = (assetSegments || []).find((x: any) => x.segment_id === p.segment_id)
+    return {
+      ...p,
+      external_ref: fdr?.external_ref || p.external_ref,
+      cabinet_external_ref: cab?.external_ref || p.cabinet_external_ref,
+      segment_name: seg?.segment_name || p.segment_name,
+      from_code: poleRef.get(p.from_id) || cab?.external_ref || p.from_code,
+      to_pole_code: poleRef.get(p.to_pole_id) || p.to_pole_code,
+    }
+  }
   // 1. Add Sources & Layers on Map Load
   useEffect(() => {
     if (!map || !isMapLoaded) return
@@ -223,7 +246,7 @@ export function useFeederLinesLayer({
 
       if (popupRef.current) {
         activeHoverSourceRef.current = 'feeder'
-        const html = getFeederTooltipHtml({ featureProps: p })
+        const html = getFeederTooltipHtml({ featureProps: displayLookupRef.current(p) })
         popupRef.current.setLngLat(e.lngLat).setHTML(html).addTo(map)
       }
     }

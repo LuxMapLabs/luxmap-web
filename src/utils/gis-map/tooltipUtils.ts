@@ -120,8 +120,8 @@ export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): 
   const segName = p.segment_name || p.segment_id || 'Tuyến đường'
   const branch = p.branch != null ? `Nhánh ${p.branch}` : undefined
   const order = p.order != null ? `Cạnh thứ ${p.order}` : undefined
-  const fromId = p.from_id
-  const toPoleId = p.to_pole_id
+  const fromId = p.from_code || p.from_id
+  const toPoleId = p.to_pole_code || p.to_pole_id
 
   return `
     <div class="bg-white/98 dark:bg-slate-900/98 text-slate-800 dark:text-slate-100 p-3 rounded-2xl shadow-xl border border-slate-200/90 dark:border-slate-700 backdrop-blur-md min-w-60 font-sans">
