@@ -17,6 +17,17 @@ import type {
   PolePhotoItemPagedResult,
   PolePhotoDecisionRequest,
 } from '../../types/workorders/orders'
+import type {
+  AutoDispatchPreview,
+  AutoDispatchRequest,
+  BatchCreateWorkOrdersResponse,
+} from '../../types/work-schedule/autoDispatch'
+import type {
+  SurveyRecurringItem,
+  SurveyRecurringPagedResult,
+  CreateSurveyRecurringRequest,
+  PatchSurveyRecurringRequest,
+} from '../../types/work-schedule/recurring'
 
 export interface GetWorkOrdersFilter {
   scheduled_from?: string
@@ -349,5 +360,89 @@ export const workScheduleAPI = {
     } catch (err) {
       console.warn(`[WorkScheduleAPI] confirmAllPendingPolePhotos error for ${workOrderId}:`, err)
     }
+  },
+
+  // =========================================================================
+  // 1. TÍNH NĂNG SMART AUTO-DISPATCH (XEM TRƯỚC ĐỀ XUẤT & TẠO HÀNG LOẠT)
+  // =========================================================================
+
+  /**
+   * Lấy đề xuất phân ca kiểm tra tự động từ Backend (WO-AUTODISPATCH-1)
+   * POST /api/v1/work-orders/auto-dispatch/preview
+   */
+  async getAutoDispatchPreview(request?: AutoDispatchRequest): Promise<AutoDispatchPreview> {
+    const response = await apiClient.post<AutoDispatchPreview>(
+      '/work-orders/auto-dispatch/preview',
+      request || {}
+    )
+    return response.data
+  },
+
+  /**
+   * Tạo hàng loạt ca công tác trong một transaction duy nhất (WO-BATCH-1)
+   * POST /api/v1/work-orders/batch
+   */
+  async createBatchWorkOrders(items: CreateWorkOrderRequest[]): Promise<BatchCreateWorkOrdersResponse> {
+    const response = await apiClient.post<BatchCreateWorkOrdersResponse>(
+      '/work-orders/batch',
+      { items }
+    )
+    return response.data
+  },
+
+  // =========================================================================
+  // 2. TÍNH NĂNG KHẢO SÁT ĐỊNH KỲ TUẦN (WEEKLY RECURRING SURVEY SCHEDULES)
+  // =========================================================================
+
+  /**
+   * Lấy danh sách cấu hình lịch khảo sát định kỳ tuần
+   * GET /api/v1/survey-schedules/recurring
+   */
+  async getRecurringSurveySchedules(communeId?: string): Promise<SurveyRecurringPagedResult> {
+    const params: Record<string, any> = { page_size: 100 }
+    if (communeId) params.commune_id = communeId
+
+    const response = await apiClient.get<SurveyRecurringPagedResult>(
+      '/survey-schedules/recurring',
+      { params }
+    )
+    return response.data || { items: [], total: 0, page: 1, page_size: 100 }
+  },
+
+  /**
+   * Tạo mới lịch khảo sát định kỳ tuần (Mốc chốt 17:00 Thứ Năm)
+   * POST /api/v1/survey-schedules/recurring
+   */
+  async createRecurringSurveySchedule(
+    payload: CreateSurveyRecurringRequest
+  ): Promise<SurveyRecurringItem> {
+    const response = await apiClient.post<SurveyRecurringItem>(
+      '/survey-schedules/recurring',
+      payload
+    )
+    return response.data
+  },
+
+  /**
+   * Cập nhật lịch khảo sát định kỳ tuần (Bật/Tắt is_active, đổi người, ghi chú)
+   * PATCH /api/v1/survey-schedules/recurring/{id}
+   */
+  async patchRecurringSurveySchedule(
+    id: string,
+    payload: PatchSurveyRecurringRequest
+  ): Promise<SurveyRecurringItem> {
+    const response = await apiClient.patch<SurveyRecurringItem>(
+      `/survey-schedules/recurring/${encodeURIComponent(id)}`,
+      payload
+    )
+    return response.data
+  },
+
+  /**
+   * Xóa cấu hình lịch khảo sát định kỳ tuần
+   * DELETE /api/v1/survey-schedules/recurring/{id}
+   */
+  async deleteRecurringSurveySchedule(id: string): Promise<void> {
+    await apiClient.delete(`/survey-schedules/recurring/${encodeURIComponent(id)}`)
   },
 }

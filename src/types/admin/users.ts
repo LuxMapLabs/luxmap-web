@@ -39,6 +39,7 @@ export interface UserAccountItem {
     status?: string | null
     created_at?: string | null
     password_set_at?: string | null
+    avatar_url?: string | null
 }
 
 export interface UserAccountItemPagedResult {

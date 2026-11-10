@@ -61,7 +61,7 @@ export type Severity = 'low' | 'medium' | 'high' | 'critical'
 
 export type SourceChannel = 'cv' | 'iot' | 'field_report'
 
-export type StorageBucket = 'survey' | 'evidence' | 'video' | 'citizen'
+export type StorageBucket = 'survey' | 'evidence' | 'video' | 'citizen' | 'avatar'
 
 export type SurveyRawKind = 'gps_track' | 'lux_log' | 'capture_config'
 

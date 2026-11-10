@@ -12,6 +12,7 @@ export interface CreateSegmentRequest {
     geom_wkt: string | null
     commune_id: string | null
     data_source: DataSource
+    pole_ids?: string[]
 }
 
 export interface SegmentDetail {
@@ -65,5 +66,6 @@ export interface UpdateSegmentRequest {
     length_m: number
     geom_wkt: string | null
     data_source: DataSource
+    pole_ids?: string[]
 }
 
