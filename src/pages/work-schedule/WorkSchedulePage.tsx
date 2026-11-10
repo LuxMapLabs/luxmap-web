@@ -28,8 +28,12 @@ import { CalendarGrid } from './components/CalendarGrid'
 import { CaseDetailModal } from './components/CaseDetailModal'
 import { CreateNextPhaseModal } from './components/CreateNextPhaseModal'
 import { CreateManualModal } from './components/CreateManualModal'
+import { AutoDispatchModal } from './components/AutoDispatchModal'
+import { RecurringSurveyModal } from './components/RecurringSurveyModal'
+import { fetchFaultsList } from '../../feature/dashboard/dashboardAPI'
 import { NOTIFICATION_TARGET_PARAMS } from '../../utils/notifications/notificationRoute'
 import { formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
+import type { SurveyRecurringItem } from '../../types/work-schedule/recurring'
 
 export const WorkSchedulePage: React.FC = () => {
   const dispatch = useDispatch()
@@ -45,7 +49,10 @@ export const WorkSchedulePage: React.FC = () => {
     isLoadingWorkOrders,
   } = useSelector((state: RootState) => state.workSchedule)
   const currentUser = useSelector((state: RootState) => state.auth.user)
-  const activeCommuneId = currentUser?.commune_ids?.[0] || ''
+  const activeCommuneId =
+    currentUser?.communes?.[0]?.commune_id ||
+    (currentUser?.commune_ids?.[0] !== '*' ? currentUser?.commune_ids?.[0] : '') ||
+    ''
 
   // Tự động tải danh sách lịch làm việc và danh sách kỹ sư từ máy chủ theo tháng được chọn
   useEffect(() => {
@@ -75,8 +82,65 @@ export const WorkSchedulePage: React.FC = () => {
 
   // Modals state
   const [isCreateManualOpen, setIsCreateManualOpen] = useState(false)
+  const [isAutoDispatchOpen, setIsAutoDispatchOpen] = useState(false)
+  const [isRecurringSurveyOpen, setIsRecurringSurveyOpen] = useState(false)
+  const [unassignedFaultsCount, setUnassignedFaultsCount] = useState(0)
   const [manualDefaultDate, setManualDefaultDate] = useState(getTodayStr)
   const [isDateLockedFromCell, setIsDateLockedFromCell] = useState(false)
+  const [recurringSchedules, setRecurringSchedules] = useState<SurveyRecurringItem[]>([])
+
+  // Tải danh sách cấu hình lịch khảo sát định kỳ tuần
+  const loadRecurringSchedules = async () => {
+    try {
+      const res = await workScheduleAPI.getRecurringSurveySchedules(activeCommuneId || undefined)
+      if (res && res.items) {
+        setRecurringSchedules(res.items.filter((s) => s.is_active))
+      }
+    } catch (err) {
+      console.warn('[WorkSchedule] Load recurring schedules failed:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadRecurringSchedules()
+  }, [activeCommuneId])
+
+  // Tải số lượng sự cố chưa phân lịch để hiển thị huy hiệu trên nút Phân lịch tự động
+  const loadUnassignedFaults = async () => {
+    try {
+      const faults = await fetchFaultsList({
+        commune_id: activeCommuneId || undefined,
+        status: 'detected',
+        page_size: 100,
+      })
+      const unassigned = faults.filter((f) => !f.work_order_id && f.fault_status === 'detected')
+      setUnassignedFaultsCount(unassigned.length)
+    } catch (err) {
+      console.warn('[WorkSchedule] Load unassigned faults count failed:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadUnassignedFaults()
+  }, [activeCommuneId])
+
+  const refreshScheduleData = () => {
+    const startOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate()
+    const endOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(
+      lastDay
+    ).padStart(2, '0')}`
+
+    dispatch(
+      fetchWorkOrdersRequest({
+        scheduled_from: startOfMonth,
+        scheduled_to: endOfMonth,
+        commune_id: activeCommuneId ? [activeCommuneId] : undefined,
+      })
+    )
+    loadUnassignedFaults()
+    loadRecurringSchedules()
+  }
 
   // Context điền sẵn dữ liệu khi chuyển từ Dashboard sang tạo lịch
   const [prefillContext, setPrefillContext] = useState<{
@@ -533,6 +597,9 @@ export const WorkSchedulePage: React.FC = () => {
             }}
             onFilterChange={(phase) => dispatch(setFilterPhase(phase))}
             onOpenCreateModal={() => handleOpenCreateManual()}
+            onOpenAutoDispatchModal={() => setIsAutoDispatchOpen(true)}
+            onOpenRecurringSurveyModal={() => setIsRecurringSurveyOpen(true)}
+            unassignedFaultsCount={unassignedFaultsCount}
           />
         </div>
 
@@ -545,6 +612,8 @@ export const WorkSchedulePage: React.FC = () => {
           onSelectCase={(code, phaseIndex) => dispatch(openCaseDetail({ code, phaseIndex }))}
           onAddOnDate={(dateStr) => handleOpenCreateManual(dateStr)}
           highlightedWorkOrderId={highlightedWoId}
+          recurringSchedules={recurringSchedules}
+          onOpenRecurringSurveyModal={() => setIsRecurringSurveyOpen(true)}
         />
       </div>
 
@@ -613,6 +682,24 @@ export const WorkSchedulePage: React.FC = () => {
           handleCreateNewCaseSubmit(payload)
           setPrefillContext(null)
         }}
+      />
+
+      {/* Modal 4: Phân lịch kiểm tra tự động thông minh (Clustering, <= 8 cột, cân bằng ca) */}
+      <AutoDispatchModal
+        isOpen={isAutoDispatchOpen}
+        onClose={() => setIsAutoDispatchOpen(false)}
+        onSuccess={refreshScheduleData}
+        communeId={activeCommuneId}
+        assignees={assignees}
+      />
+
+      {/* Modal 5: Quản lý & Tạo lịch khảo sát định kỳ tuần (Mốc 17:00 Thứ Năm) */}
+      <RecurringSurveyModal
+        isOpen={isRecurringSurveyOpen}
+        onClose={() => setIsRecurringSurveyOpen(false)}
+        onSuccess={refreshScheduleData}
+        communeId={activeCommuneId}
+        assignees={assignees}
       />
     </div>
   )

@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Zap,
 } from 'lucide-react'
 import { WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
 import { ScheduleCase } from '../../../types/workSchedule'
@@ -20,6 +21,9 @@ interface ScheduleFilterBarProps {
   onResetToday: () => void
   onFilterChange: (phase: WorkScheduleState['filterPhase']) => void
   onOpenCreateModal: () => void
+  onOpenAutoDispatchModal?: () => void
+  onOpenRecurringSurveyModal?: () => void
+  unassignedFaultsCount?: number
 }
 
 const MONTH_NAMES = [
@@ -48,6 +52,9 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
   onResetToday,
   onFilterChange,
   onOpenCreateModal,
+  onOpenAutoDispatchModal,
+  onOpenRecurringSurveyModal,
+  unassignedFaultsCount,
 }) => {
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const [viewingYear, setViewingYear] = useState(currentYear)
@@ -274,8 +281,8 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
         </div>
       )}
 
-      {/* Cụm bộ lọc & Nút tạo sự vụ */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Cụm bộ lọc & Nút hành động */}
+      <div className="flex items-center gap-2.5 flex-wrap">
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 hover:border-slate-300 transition-colors">
           <Filter className="w-3.5 h-3.5 text-slate-400" />
           <select
@@ -291,13 +298,45 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
           </select>
         </div>
 
+        {/* Nút 1: Khảo sát định kỳ tuần */}
+        {onOpenRecurringSurveyModal && (
+          <button
+            type="button"
+            onClick={onOpenRecurringSurveyModal}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 hover:text-blue-700 border border-slate-200/90 text-xs font-bold rounded-xl shadow-2xs hover:shadow-sm hover:-translate-y-0.5 transition cursor-pointer active:scale-95"
+            title="Quản lý và thiết lập lịch khảo sát camera AI định kỳ theo tuần"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">Khảo sát định kỳ</span>
+          </button>
+        )}
+
+        {/* Nút 2: Phân lịch kiểm tra tự động */}
+        {onOpenAutoDispatchModal && (
+          <button
+            type="button"
+            onClick={onOpenAutoDispatchModal}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow-md hover:-translate-y-0.5 transition cursor-pointer active:scale-95"
+            title="Tự động gom sự cố theo tuyến và đề xuất phân ca kiểm tra thông minh"
+          >
+            <Zap className="w-3.5 h-3.5 fill-white/20" />
+            <span>Phân lịch tự động</span>
+            {unassignedFaultsCount != null && unassignedFaultsCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white text-amber-700 font-extrabold font-mono ml-0.5">
+                {unassignedFaultsCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Nút 3: Tạo sự vụ mới thủ công */}
         <button
           type="button"
           onClick={onOpenCreateModal}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition cursor-pointer active:scale-95"
         >
           <Plus className="w-4 h-4" />
-          <span>Tạo sự vụ mới</span>
+          <span>Tạo sự vụ</span>
         </button>
       </div>
     </div>

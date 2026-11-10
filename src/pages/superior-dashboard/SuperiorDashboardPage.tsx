@@ -8,14 +8,18 @@ import {
   fetchRepairTimelinessStatistics,
   fetchWarrantyStatistics,
   fetchFaultsList,
+  fetchCitizenFeedbackStatistics,
+  fetchWorkOrderStatistics,
   downloadStatisticsCsv,
 } from '../../feature/dashboard/dashboardAPI'
 import type { SegmentListItem } from '../../types/assets/segments'
 import type { RepairTimelinessStatistics } from '../../types/statistics/repair-timeliness'
 import type { WarrantyList } from '../../types/statistics/warranty'
 import type { FaultItem } from '../../types/faults/faults'
+import type { CitizenFeedbackStatistics } from '../../types/statistics/citizen-feedback'
+import type { WorkOrderStatusStatistics } from '../../types/statistics/work-orders'
 
-import { SuperiorToolbar } from './components/SuperiorToolbar'
+import { SuperiorToolbar, type SuperiorCsvExportType } from './components/SuperiorToolbar'
 import { SuperiorKpiGrid, type SuperiorKpiData } from './components/SuperiorKpiGrid'
 import { SuperiorMainCharts, type FixtureBarItem, type SlaBreakdownData } from './components/SuperiorMainCharts'
 import {
@@ -40,11 +44,13 @@ export const SuperiorDashboardPage: React.FC = () => {
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>('all')
   const [selectedPeriodDays, setSelectedPeriodDays] = useState<7 | 30 | 90>(30)
 
-  // State dữ liệu từ APIs
+  // State dữ liệu từ APIs Backend
   const [segments, setSegments] = useState<SegmentListItem[]>([])
   const [slaStats, setSlaStats] = useState<RepairTimelinessStatistics | null>(null)
   const [warrantyData, setWarrantyData] = useState<WarrantyList | null>(null)
   const [faults, setFaults] = useState<FaultItem[]>([])
+  const [citizenFeedbackStats, setCitizenFeedbackStats] = useState<CitizenFeedbackStatistics | null>(null)
+  const [workOrderStats, setWorkOrderStats] = useState<WorkOrderStatusStatistics | null>(null)
 
   const [loading, setLoading] = useState<boolean>(true)
   const [refreshing, setRefreshing] = useState<boolean>(false)
@@ -75,25 +81,27 @@ export const SuperiorDashboardPage: React.FC = () => {
     dispatch(fetchDashboardDataRequest())
   }, [dispatch])
 
-  // Hàm tải dữ liệu toàn diện
+  // Hàm tải dữ liệu toàn diện kết nối tất cả các API Backend
   const loadDashboardData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true)
     else setRefreshing(true)
 
     try {
-      // Tính ngày from..to cho chu kỳ SLA
+      // Tính ngày from..to cho chu kỳ SLA và thống kê
       const today = new Date()
       const fromDate = new Date()
       fromDate.setDate(today.getDate() - selectedPeriodDays)
       const toStr = today.toISOString().split('T')[0]
       const fromStr = fromDate.toISOString().split('T')[0]
 
-      // Gọi đồng thời tất cả các API (fetchFaultsList gọi không giới hạn commune để khớp với Manager)
+      // Gọi đồng thời tất cả 6 nguồn dữ liệu từ Backend
       const [
         segmentsRes,
         slaRes,
         warrantyRes,
         faultsRes,
+        citizenRes,
+        workOrderRes,
       ] = await Promise.allSettled([
         fetchSegmentsList(),
         fetchRepairTimelinessStatistics({
@@ -111,12 +119,26 @@ export const SuperiorDashboardPage: React.FC = () => {
           sort: '-detected_at',
           page_size: 100,
         }),
+        fetchCitizenFeedbackStatistics({
+          commune_id: communeId,
+          from: fromStr,
+          to: toStr,
+          group_by: 'segment',
+        }),
+        fetchWorkOrderStatistics({
+          commune_id: communeId,
+          from: fromStr,
+          to: toStr,
+          group_by: 'task_kind',
+        }),
       ])
 
       if (segmentsRes.status === 'fulfilled' && segmentsRes.value.length > 0) setSegments(segmentsRes.value)
       if (slaRes.status === 'fulfilled') setSlaStats(slaRes.value)
       if (warrantyRes.status === 'fulfilled') setWarrantyData(warrantyRes.value)
       if (faultsRes.status === 'fulfilled' && faultsRes.value.length > 0) setFaults(faultsRes.value)
+      if (citizenRes.status === 'fulfilled') setCitizenFeedbackStats(citizenRes.value)
+      if (workOrderRes.status === 'fulfilled') setWorkOrderStats(workOrderRes.value)
 
       if (isSilent) {
         toast.success(`Đã làm mới số liệu giám sát của ${communeName}`)
@@ -134,8 +156,8 @@ export const SuperiorDashboardPage: React.FC = () => {
     loadDashboardData()
   }, [loadDashboardData])
 
-  // Thao tác xuất file CSV
-  const handleExportCsv = async (type: 'fixture-status' | 'repair-timeliness' | 'warranty') => {
+  // Thao tác xuất file CSV cho cả 5 endpoint của Backend
+  const handleExportCsv = async (type: SuperiorCsvExportType) => {
     const todayStr = new Date().toISOString().split('T')[0]
     const fileName = `${type}-${communeCode}-${todayStr}.csv`
     const toastId = toast.loading(`Đang kết xuất báo cáo CSV ${type}...`)
@@ -144,7 +166,7 @@ export const SuperiorDashboardPage: React.FC = () => {
       const params: Record<string, any> = { commune_id: communeId }
       if (selectedSegmentId !== 'all') params.segment_id = selectedSegmentId
       if (type === 'warranty') params.within_days = 90
-      if (type === 'repair-timeliness') {
+      if (type === 'repair-timeliness' || type === 'citizen-feedback' || type === 'work-orders') {
         const fromDate = new Date()
         fromDate.setDate(new Date().getDate() - selectedPeriodDays)
         params.from = fromDate.toISOString().split('T')[0]
@@ -164,6 +186,16 @@ export const SuperiorDashboardPage: React.FC = () => {
     if (reduxDashboard?.segmentsList?.length > 0) return reduxDashboard.segmentsList
     return []
   }, [segments, reduxDashboard?.segmentsList])
+
+  const segmentNameMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    effectiveSegments.forEach((s) => {
+      if (s.segment_id) {
+        map[s.segment_id] = s.segment_name || s.segment_id
+      }
+    })
+    return map
+  }, [effectiveSegments])
 
   const effectiveFaults = useMemo(() => {
     if (faults.length > 0) return faults
@@ -231,7 +263,6 @@ export const SuperiorDashboardPage: React.FC = () => {
       }).length
 
       // 3. Số bóng hoạt động đạt chuẩn (Normal) - ĐỒNG BỘ 100% VỚI MANAGER DASHBOARD
-      // Mọi bóng đèn không gặp lỗi mất sáng hay sáng yếu đều là bóng sáng bình thường đạt chuẩn
       const normal = Math.max(0, poleCount - out - dim)
       const unknown = 0
 
@@ -252,7 +283,7 @@ export const SuperiorDashboardPage: React.FC = () => {
 
   // --- TÍNH TOÁN DỮ LIỆU BỘ CHỈ SỐ KPI VĨ MÔ DỰA TRÊN DỮ LIỆU THỰC TẾ ---
   const kpiData: SuperiorKpiData = useMemo(() => {
-    // 1. Tình trạng chiếu sáng (lấy từ dữ liệu thực tế của các tuyến đang chọn)
+    // 1. Tình trạng chiếu sáng
     const normal = segmentChartData.reduce((acc, s) => acc + s.normal, 0)
     const dim = segmentChartData.reduce((acc, s) => acc + s.dim, 0)
     const out = segmentChartData.reduce((acc, s) => acc + s.out, 0)
@@ -260,7 +291,7 @@ export const SuperiorDashboardPage: React.FC = () => {
     const total = normal + dim + out + unknown || (selectedSegmentId === 'all' ? totalPolesCount || 103 : 46)
     const normalPct = total > 0 ? (normal / total) * 100 : 0
 
-    // 2. Dữ liệu từ SLA repair timeliness (Sử dụng nullish check chính xác, không dùng || tránh nuốt số 0)
+    // 2. Dữ liệu từ SLA repair timeliness
     const slaRow = slaStats?.rows?.[0]
     const slaRate = slaRow?.on_time_rate != null ? slaRow.on_time_rate * 100 : 100.0
     const slaOnTime = slaRow?.on_time != null ? slaRow.on_time : 3
@@ -268,29 +299,25 @@ export const SuperiorDashboardPage: React.FC = () => {
     const slaLate = slaRow?.late != null ? slaRow.late : 0
     const slaOverdue = slaRow?.open_overdue != null ? slaRow.open_overdue : 6
 
-    // 3. Dữ liệu từ danh sách sự cố (theo tuyến đang lọc)
-    // Đồng bộ 100% logic trạng thái tiến độ xử lý với Manager Dashboard (getFaultProgressInfo)
+    // 3. Dữ liệu từ danh sách sự cố
     const openFaults = filteredFaults.filter(
       (f) => f.fault_status !== 'verified' && f.fault_status !== 'rejected'
     )
     const criticalFaults = openFaults.filter((f) => String(f.severity).toLowerCase() === 'critical')
 
-    // Đang sửa chữa: status in_progress hoặc resolved (chờ nghiệm thu)
     const inRepairFaults = openFaults.filter(
       (f) => f.fault_status === 'in_progress' || f.fault_status === 'resolved'
     )
 
-    // Chờ sửa chữa: status confirmed hoặc detected có kèm mã Work Order
     const waitingRepairFaults = openFaults.filter(
       (f) => f.fault_status === 'confirmed' || (f.fault_status === 'detected' && Boolean(f.work_order_id))
     )
 
-    // Chưa phân lịch (Chưa giao việc): status detected và chưa có Work Order
     const unassignedFaults = openFaults.filter(
       (f) => f.fault_status === 'detected' && !f.work_order_id
     )
 
-    // 4. Dữ liệu từ Warranty (Đồng bộ 100% với Redux Store và Database)
+    // 4. Dữ liệu từ Warranty
     const filteredWItems =
       selectedSegmentId === 'all'
         ? effectiveWarrantyItems
@@ -307,7 +334,6 @@ export const SuperiorDashboardPage: React.FC = () => {
     )
     const alertCount = expiredItems.length + expiringItems.length
 
-    // Tỷ lệ phân bổ theo số lượng cột nếu warranty API chưa có dữ liệu chi tiết
     const ratio = selectedSegmentId === 'all' ? 1 : total / (totalPolesCount || 103)
 
     return {
@@ -343,7 +369,6 @@ export const SuperiorDashboardPage: React.FC = () => {
     const totalOut = segmentChartData.reduce((acc, s) => acc + s.out, 0)
     const totalUnknown = segmentChartData.reduce((acc, s) => acc + s.unknown, 0)
 
-    // Phân bổ theo nguồn thu thập chuẩn hóa (bỏ mã code hệ thống trong ngoặc đơn)
     return [
       {
         id: 'field_survey',
@@ -407,8 +432,8 @@ export const SuperiorDashboardPage: React.FC = () => {
 
     return {
       channelData: [
-        { name: 'Camera AI Quét', value: aiCount || Math.max(1, Math.round(29 * ratio)), color: '#2563eb' },
-        { name: 'Node IoT / Tủ', value: iotCount || Math.max(1, Math.round(16 * ratio)), color: '#8b5cf6' },
+        { name: 'Camera AI Quét', value: aiCount || Math.max(1, Math.round(29 * ratio)), color: '#0ea5e9' },
+        { name: 'Node IoT / Tủ', value: iotCount || Math.max(1, Math.round(16 * ratio)), color: '#6366f1' },
         { name: 'Dân quét mã QR', value: qrCount || Math.max(1, Math.round(9 * ratio)), color: '#10b981' },
         { name: 'Kỹ sư hiện trường', value: manualCount || Math.max(1, Math.round(4 * ratio)), color: '#f59e0b' },
       ],
@@ -451,7 +476,7 @@ export const SuperiorDashboardPage: React.FC = () => {
         { name: 'Chưa rõ / Chưa lắp', value: unknown || Math.max(1, Math.round(12 * ratio)), color: '#cbd5e1' },
       ],
       fixtureTypeData: [
-        { name: 'Đèn LED Cao áp', value: kpiData.totalPoles, color: '#2563eb' },
+        { name: 'Đèn LED Cao áp', value: kpiData.totalPoles, color: '#0ea5e9' },
       ],
       activeCount: active || Math.max(1, Math.round(243 * ratio)),
       expiringCount: expiring || Math.max(1, Math.round(16 * ratio)),
@@ -459,32 +484,95 @@ export const SuperiorDashboardPage: React.FC = () => {
     }
   }, [selectedSegmentId, kpiData.totalPoles, totalPolesCount, effectiveWarrantyItems])
 
+  // --- KẾT NỐI DỮ LIỆU THỰC TẾ TỪ statistics/work-orders & statistics/citizen-feedback ---
   const subWorkOrderData: WorkOrderChartData = useMemo(() => {
-    const rawCitizenData = [
-      { id: 'SEG-001', segment: 'Tuyến A - Tỉnh Lộ 8', confirmed: 8, merged: 3, rejected: 1 },
-      { id: 'SEG-002', segment: 'Tuyến B - Nguyễn Văn Ni', confirmed: 5, merged: 2, rejected: 0 },
-      { id: 'SEG-003', segment: 'Tuyến C - Huỳnh Văn Cọ', confirmed: 6, merged: 2, rejected: 1 },
-    ]
-
-    const filteredCitizenData =
-      selectedSegmentId === 'all'
-        ? rawCitizenData
-        : rawCitizenData.filter((c) => c.id === selectedSegmentId || c.segment.includes(selectedSegmentId))
-
     const ratio = selectedSegmentId === 'all' ? 1 : kpiData.totalPoles / (totalPolesCount || 103)
 
-    return {
-      woByKindData: [
-        { kind: 'Sửa chữa', completed: Math.max(1, Math.round(24 * ratio)), inProgress: Math.max(1, Math.round(5 * ratio)), pending: Math.round(2 * ratio) },
-        { kind: 'Kiểm tra', completed: Math.max(1, Math.round(11 * ratio)), inProgress: Math.round(3 * ratio), pending: Math.round(1 * ratio) },
-        { kind: 'Khảo sát', completed: Math.max(1, Math.round(7 * ratio)), inProgress: Math.round(1 * ratio), pending: Math.round(1 * ratio) },
-      ],
-      citizenBySegmentData: filteredCitizenData.length > 0 ? filteredCitizenData : rawCitizenData,
-      totalAccepted: Math.max(1, Math.round(42 * ratio)),
-      totalExecuting: Math.max(1, Math.round(9 * ratio)),
-      citizenResolutionRate: 93.8,
+    // 1. Dữ liệu lệnh công tác theo phân loại thực tế từ Backend (workOrderStats)
+    const woRows = workOrderStats?.rows || []
+    const repairRow = woRows.find((r) => String(r.task_kind).toLowerCase() === 'repair')
+    const inspectionRow = woRows.find((r) => String(r.task_kind).toLowerCase() === 'inspection')
+    const surveyRow = woRows.find((r) => String(r.task_kind).toLowerCase() === 'survey')
+
+    const hasRealWoData = woRows.length > 0
+    const woByKindData = [
+      {
+        kind: 'Sửa chữa',
+        completed: hasRealWoData ? (repairRow?.done || 0) + (repairRow?.verified || 0) : Math.max(1, Math.round(24 * ratio)),
+        inProgress: hasRealWoData ? (repairRow?.in_progress || 0) + (repairRow?.assigned || 0) : Math.max(1, Math.round(5 * ratio)),
+        pending: hasRealWoData ? (repairRow?.open || 0) : Math.round(2 * ratio),
+      },
+      {
+        kind: 'Kiểm tra',
+        completed: hasRealWoData ? (inspectionRow?.done || 0) + (inspectionRow?.verified || 0) : Math.max(1, Math.round(11 * ratio)),
+        inProgress: hasRealWoData ? (inspectionRow?.in_progress || 0) + (inspectionRow?.assigned || 0) : Math.round(3 * ratio),
+        pending: hasRealWoData ? (inspectionRow?.open || 0) : Math.round(1 * ratio),
+      },
+      {
+        kind: 'Khảo sát',
+        completed: hasRealWoData ? (surveyRow?.done || 0) + (surveyRow?.verified || 0) : Math.max(1, Math.round(7 * ratio)),
+        inProgress: hasRealWoData ? (surveyRow?.in_progress || 0) + (surveyRow?.assigned || 0) : Math.round(1 * ratio),
+        pending: hasRealWoData ? (surveyRow?.open || 0) : Math.round(1 * ratio),
+      },
+    ]
+
+    const totalAccepted = woByKindData.reduce((sum, item) => sum + item.completed, 0)
+    const totalExecuting = woByKindData.reduce((sum, item) => sum + item.inProgress, 0)
+
+    // 2. Dữ liệu phản ánh người dân từ Backend (citizenFeedbackStats)
+    const feedbackRows = citizenFeedbackStats?.rows || []
+    let citizenBySegmentData = feedbackRows.map((r) => {
+      const segName = r.segment_id ? (segmentNameMap[r.segment_id] || r.segment_id) : 'Toàn địa bàn'
+      return {
+        id: r.segment_id || '',
+        segment: segName.length > 15 ? segName.substring(0, 14) + '...' : segName,
+        confirmed: r.accepted || 0,
+        merged: r.merged || 0,
+        rejected: r.rejected || 0,
+      }
+    })
+
+    if (selectedSegmentId !== 'all') {
+      citizenBySegmentData = citizenBySegmentData.filter((c) => c.id === selectedSegmentId)
     }
-  }, [selectedSegmentId, kpiData.totalPoles, totalPolesCount])
+
+    if (citizenBySegmentData.length === 0) {
+      // Dữ liệu dự phòng đồng bộ theo tuyến
+      citizenBySegmentData = displaySegments.map((s) => ({
+        id: s.segment_id || '',
+        segment: (s.segment_name || s.segment_id || '').substring(0, 14),
+        confirmed: Math.max(1, Math.round(6 * ratio)),
+        merged: Math.round(2 * ratio),
+        rejected: Math.round(1 * ratio),
+      }))
+    }
+
+    // Tỷ lệ giải quyết phản ánh người dân thực tế
+    let citizenResolutionRate = 93.8
+    if (feedbackRows.length > 0) {
+      const totalFeedback = feedbackRows.reduce((sum, r) => sum + (r.total || 0), 0)
+      const resolvedFeedback = feedbackRows.reduce((sum, r) => sum + (r.accepted + r.merged + r.rejected || 0), 0)
+      if (totalFeedback > 0) {
+        citizenResolutionRate = Number(((resolvedFeedback / totalFeedback) * 100).toFixed(1))
+      }
+    }
+
+    return {
+      woByKindData,
+      citizenBySegmentData,
+      totalAccepted,
+      totalExecuting,
+      citizenResolutionRate,
+    }
+  }, [
+    workOrderStats,
+    citizenFeedbackStats,
+    selectedSegmentId,
+    kpiData.totalPoles,
+    totalPolesCount,
+    segmentNameMap,
+    displaySegments,
+  ])
 
   // --- CÁC HÀM XỬ LÝ ONCLICK TỪ KPI CARD CUỘN TỚI BIỂU ĐỒ TƯƠNG ỨNG ---
   const handleScrollToLighting = () => {
@@ -504,49 +592,55 @@ export const SuperiorDashboardPage: React.FC = () => {
   }
 
   return (
-    <div className={`w-full h-full overflow-y-auto bg-slate-50/60 p-4 sm:p-6 lg:p-7 flex flex-col gap-5 custom-scrollbar ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50' : ''}`}>
-      {/* TẦNG 1: EXECUTIVE FILTER & EXPORT TOOLBAR */}
-      <SuperiorToolbar
-        communeName={communeName}
-        communeCode={communeCode}
-        totalPolesCount={totalPolesCount}
-        segments={effectiveSegments}
-        selectedSegmentId={selectedSegmentId}
-        onSelectSegment={setSelectedSegmentId}
-        selectedPeriodDays={selectedPeriodDays}
-        onChangePeriod={setSelectedPeriodDays}
-        onExportCsv={handleExportCsv}
-        onRefresh={() => loadDashboardData(true)}
-        isRefreshing={refreshing}
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={toggleFullscreen}
-      />
+    <div
+      className={`w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto text-slate-800 custom-scrollbar select-none ${
+        isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 p-4 sm:p-6' : ''
+      }`}
+    >
+      <div className="px-1 pb-6 space-y-5 flex flex-col">
+        {/* TẦNG 1: EXECUTIVE FILTER & EXPORT TOOLBAR */}
+        <SuperiorToolbar
+          communeName={communeName}
+          communeCode={communeCode}
+          totalPolesCount={totalPolesCount}
+          segments={effectiveSegments}
+          selectedSegmentId={selectedSegmentId}
+          onSelectSegment={setSelectedSegmentId}
+          selectedPeriodDays={selectedPeriodDays}
+          onChangePeriod={setSelectedPeriodDays}
+          onExportCsv={handleExportCsv}
+          onRefresh={() => loadDashboardData(true)}
+          isRefreshing={refreshing}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+        />
 
-      {/* TẦNG 2: 4 THẺ CHỈ SỐ VĨ MÔ CỦA XÃ (KPI CARDS - HỖ TRỢ ONCLICK CUỘN TỚI CHART) */}
-      <SuperiorKpiGrid
-        data={kpiData}
-        loading={loading}
-        isSegmentFiltered={selectedSegmentId !== 'all'}
-        onClickLighting={handleScrollToLighting}
-        onClickSla={handleScrollToSla}
-        onClickFaults={handleScrollToFaults}
-        onClickWarranty={handleScrollToWarranty}
-      />
+        {/* TẦNG 2: 4 THẺ CHỈ SỐ VĨ MÔ CỦA XÃ (KPI CARDS - HỖ TRỢ ONCLICK CUỘN TỚI CHART) */}
+        <SuperiorKpiGrid
+          data={kpiData}
+          loading={loading}
+          isSegmentFiltered={selectedSegmentId !== 'all'}
+          onClickLighting={handleScrollToLighting}
+          onClickSla={handleScrollToSla}
+          onClickFaults={handleScrollToFaults}
+          onClickWarranty={handleScrollToWarranty}
+        />
 
-      {/* TẦNG 3: HÀNG BIỂU ĐỒ CHÍNH (7 CỘT : 5 CỘT) */}
-      <SuperiorMainCharts
-        segmentChartData={segmentChartData}
-        dataSourceChartData={dataSourceChartData}
-        slaData={slaBreakdown}
-        communeName={communeName}
-      />
+        {/* TẦNG 3: HÀNG BIỂU ĐỒ CHÍNH (7 CỘT : 5 CỘT) */}
+        <SuperiorMainCharts
+          segmentChartData={segmentChartData}
+          dataSourceChartData={dataSourceChartData}
+          slaData={slaBreakdown}
+          communeName={communeName}
+        />
 
-      {/* TẦNG 4: HÀNG 3 BIỂU ĐỒ PHÂN TÍCH CHUYÊN SÂU */}
-      <SuperiorSubCharts
-        faultData={subFaultData}
-        warrantyData={subWarrantyData}
-        workOrderData={subWorkOrderData}
-      />
+        {/* TẦNG 4: HÀNG 3 BIỂU ĐỒ PHÂN TÍCH CHUYÊN SÂU */}
+        <SuperiorSubCharts
+          faultData={subFaultData}
+          warrantyData={subWarrantyData}
+          workOrderData={subWorkOrderData}
+        />
+      </div>
     </div>
   )
 }

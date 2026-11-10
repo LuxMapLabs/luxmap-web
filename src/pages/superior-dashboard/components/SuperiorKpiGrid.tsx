@@ -1,5 +1,6 @@
 import React from 'react'
 import { Lightbulb, Clock, AlertTriangle, ShieldCheck, ArrowUpRight } from 'lucide-react'
+import { useCountUp } from '../../../hooks/useCountUp'
 
 export interface SuperiorKpiData {
   // KPI 1: Chiếu sáng đạt chuẩn
@@ -50,6 +51,12 @@ export const SuperiorKpiGrid: React.FC<SuperiorKpiGridProps> = ({
   onClickFaults,
   onClickWarranty,
 }) => {
+  // Animated numbers
+  const animNormalPct = useCountUp(data.normalPct)
+  const animSlaRate = useCountUp(data.slaRate)
+  const animOpenFaults = useCountUp(data.openFaultsCount)
+  const animWarrantyAlert = useCountUp(data.warrantyAlertCount)
+
   // Tính toán tỷ lệ phần trăm các dải màu progress bar
   const normalWidth = data.totalPoles > 0 ? (data.normalCount / data.totalPoles) * 100 : 0
   const dimWidth = data.totalPoles > 0 ? (data.dimCount / data.totalPoles) * 100 : 0
@@ -68,13 +75,16 @@ export const SuperiorKpiGrid: React.FC<SuperiorKpiGridProps> = ({
     return (
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs animate-pulse flex flex-col justify-between h-40">
+          <div
+            key={i}
+            className="bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 animate-pulse flex flex-col justify-between h-44"
+          >
             <div className="flex justify-between items-center">
               <div className="h-4 w-28 bg-slate-200 rounded" />
-              <div className="w-9 h-9 bg-slate-200 rounded-xl" />
+              <div className="w-11 h-11 bg-slate-200 rounded-[14px]" />
             </div>
-            <div className="h-8 w-20 bg-slate-200 rounded" />
-            <div className="h-2 w-full bg-slate-200 rounded-full" />
+            <div className="h-9 w-24 bg-slate-200 rounded" />
+            <div className="h-1.5 w-full bg-slate-200 rounded-full" />
             <div className="h-3 w-32 bg-slate-200 rounded" />
           </div>
         ))}
@@ -85,48 +95,48 @@ export const SuperiorKpiGrid: React.FC<SuperiorKpiGridProps> = ({
   return (
     <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* KPI 1: Tỷ lệ chiếu sáng đạt chuẩn */}
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         onClick={onClickLighting}
-        onKeyDown={(e) => e.key === 'Enter' && onClickLighting?.()}
-        className="group relative overflow-hidden bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-emerald-400 cursor-pointer text-left"
+        style={{ '--i': 0 } as React.CSSProperties}
+        className="ops-rise group relative overflow-hidden bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-ops-hover cursor-pointer text-left"
       >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-500 group-hover:text-emerald-700 transition-colors">
+          <span className="text-[12.5px] font-semibold text-slate-500 group-hover:text-emerald-700 transition-colors">
             Tỷ lệ chiếu sáng đạt chuẩn
           </span>
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-semibold text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
               Xem biểu đồ <ArrowUpRight className="w-3.5 h-3.5 ml-0.5" />
             </span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 group-hover:scale-105 transition-all">
+            <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-emerald-50 text-emerald-600 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
               <Lightbulb className="w-5 h-5 fill-emerald-600/20" />
-            </div>
+            </span>
           </div>
         </div>
 
-        <div className="flex items-baseline justify-between gap-2 my-2.5">
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-mono">
-              {data.normalPct.toFixed(1)}%
+        <div className="my-2.5 flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between">
+            <strong className="text-[32px] leading-[1.15] font-extrabold tracking-tight tabular-nums text-slate-900">
+              {animNormalPct.toFixed(1)}%
+            </strong>
+            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-200/50">
+              ▲ +2.4% tuần
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+          </div>
+          <div className="flex items-center">
+            <span className="whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
               {data.normalCount} / {data.totalPoles} cột
             </span>
           </div>
-          {/* Badge xu hướng */}
-          <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-200/50 hidden sm:inline">
-            ▲ +2.4% tuần
-          </span>
         </div>
 
-        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex mb-2.5 shadow-2xs">
-          <div style={{ width: `${normalWidth}%` }} className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full transition-all duration-300" />
-          <div style={{ width: `${dimWidth}%` }} className="bg-gradient-to-r from-amber-400 to-amber-500 h-full transition-all duration-300" />
-          <div style={{ width: `${outWidth}%` }} className="bg-gradient-to-r from-rose-400 to-rose-600 h-full transition-all duration-300" />
-          <div style={{ width: `${unknownWidth}%` }} className="bg-slate-300 h-full transition-all duration-300" />
-        </div>
+        <span className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 mb-2.5">
+          <span style={{ width: `${normalWidth}%` }} className="ops-grow ops-shine bg-emerald-500 h-full" />
+          <span style={{ width: `${dimWidth}%` }} className="ops-grow ops-shine bg-amber-500 h-full" />
+          <span style={{ width: `${outWidth}%` }} className="ops-grow ops-shine bg-rose-500 h-full" />
+          <span style={{ width: `${unknownWidth}%` }} className="ops-grow ops-shine bg-slate-300 h-full" />
+        </span>
 
         <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">
           <span>
@@ -136,46 +146,49 @@ export const SuperiorKpiGrid: React.FC<SuperiorKpiGridProps> = ({
             Chưa quét: <strong className="text-slate-600">{data.unknownCount} cột</strong>
           </span>
         </div>
-      </div>
+      </button>
 
       {/* KPI 2: Chỉ số Tuân thủ SLA Sửa chữa */}
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         onClick={onClickSla}
-        onKeyDown={(e) => e.key === 'Enter' && onClickSla?.()}
-        className="group relative overflow-hidden bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-blue-400 cursor-pointer text-left"
+        style={{ '--i': 1 } as React.CSSProperties}
+        className="ops-rise group relative overflow-hidden bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-ops-hover cursor-pointer text-left"
       >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-500 group-hover:text-blue-700 transition-colors">
+          <span className="text-[12.5px] font-semibold text-slate-500 group-hover:text-blue-700 transition-colors">
             Tỷ lệ sửa chữa đúng hạn (SLA)
           </span>
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
               Xem SLA <ArrowUpRight className="w-3.5 h-3.5 ml-0.5" />
             </span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 group-hover:scale-105 transition-all">
+            <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-blue-50 text-blue-600 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
               <Clock className="w-5 h-5" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-baseline justify-between gap-2 my-2.5">
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-2xl sm:text-3xl font-black text-blue-700 tracking-tight font-mono">
-              {data.slaRate.toFixed(1)}%
             </span>
           </div>
-          {/* Badge định mức SLA */}
-          <span className="text-[10.5px] font-bold text-blue-700 bg-blue-50/80 px-2 py-0.5 rounded-md border border-blue-200/50 hidden sm:inline">
-            {data.slaRate >= 95 ? 'Đạt chuẩn ≥95%' : 'Cần cải thiện'}
-          </span>
         </div>
 
-        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex mb-2.5 shadow-2xs">
-          <div style={{ width: `${slaOntimeWidth}%` }} className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full transition-all duration-300" />
-          <div style={{ width: `${slaLateWidth}%` }} className="bg-gradient-to-r from-amber-400 to-amber-500 h-full transition-all duration-300" />
+        <div className="my-2.5 flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between">
+            <strong className="text-[32px] leading-[1.15] font-extrabold tracking-tight tabular-nums text-blue-700">
+              {animSlaRate.toFixed(1)}%
+            </strong>
+            <span className="text-[10.5px] font-bold text-blue-700 bg-blue-50/80 px-2 py-0.5 rounded-md border border-blue-200/50">
+              {data.slaRate >= 95 ? 'Đạt chuẩn ≥95%' : 'Cần cải thiện'}
+            </span>
+          </div>
+          <div className="flex items-center">
+            <span className="whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+              {data.slaOnTimeCount} / {data.slaTotalFinished} lệnh đúng hạn
+            </span>
+          </div>
         </div>
+
+        <span className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 mb-2.5">
+          <span style={{ width: `${slaOntimeWidth}%` }} className="ops-grow ops-shine bg-blue-600 h-full" />
+          <span style={{ width: `${slaLateWidth}%` }} className="ops-grow ops-shine bg-amber-500 h-full" />
+        </span>
 
         <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">
           <span>
@@ -185,76 +198,77 @@ export const SuperiorKpiGrid: React.FC<SuperiorKpiGridProps> = ({
             Quá hạn mở: <strong className="text-rose-600 font-bold">{data.slaOverdueCount} lệnh</strong>
           </span>
         </div>
-      </div>
+      </button>
 
       {/* KPI 3: Sự cố đang mở */}
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         onClick={onClickFaults}
-        onKeyDown={(e) => e.key === 'Enter' && onClickFaults?.()}
-        className="group relative overflow-hidden bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-rose-400 cursor-pointer text-left"
+        style={{ '--i': 2 } as React.CSSProperties}
+        className="ops-rise group relative overflow-hidden bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-ops-hover cursor-pointer text-left"
       >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-500 group-hover:text-rose-700 transition-colors">
+          <span className="text-[12.5px] font-semibold text-slate-500 group-hover:text-rose-700 transition-colors">
             {isSegmentFiltered ? 'Sự cố đang mở trên tuyến' : 'Sự cố đang mở trong xã'}
           </span>
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-semibold text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
               Xem sự cố <ArrowUpRight className="w-3.5 h-3.5 ml-0.5" />
             </span>
-            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:bg-rose-100 group-hover:scale-105 transition-all">
+            <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-red-50 text-red-600 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
               <AlertTriangle className="w-5 h-5" />
-            </div>
+            </span>
           </div>
         </div>
 
-        <div className="flex items-baseline justify-between gap-2 my-2.5">
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight font-mono">
-              {data.openFaultsCount}
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
+        <div className="my-2.5 flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between">
+            <strong className="text-[32px] leading-[1.15] font-extrabold tracking-tight tabular-nums text-red-600">
+              {Math.round(animOpenFaults)}
+            </strong>
+            {data.detectedFaultsCount > 0 ? (
+              <span className="text-[10.5px] font-bold text-rose-700 bg-rose-50/80 px-2 py-0.5 rounded-md border border-rose-200/50">
+                Cần giao việc
+              </span>
+            ) : (
+              <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-200/50">
+                Đã giao hết
+              </span>
+            )}
+          </div>
+          <div className="flex items-center">
+            <span className="whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
               {data.criticalFaultsCount} nghiêm trọng
             </span>
           </div>
-          {data.detectedFaultsCount > 0 ? (
-            <span className="text-[10.5px] font-bold text-rose-700 bg-rose-50/80 px-2 py-0.5 rounded-md border border-rose-200/50 hidden sm:inline">
-              Cần giao việc
-            </span>
-          ) : (
-            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-200/50 hidden sm:inline">
-              Đã giao hết
-            </span>
-          )}
         </div>
 
-        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex mb-2.5 shadow-2xs">
-          <div
+        <span className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 mb-2.5">
+          <span
             style={{
               width: data.openFaultsCount > 0 ? `${(data.inRepairFaultsCount / data.openFaultsCount) * 100}%` : '50%',
             }}
-            className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full transition-all duration-300"
+            className="ops-grow ops-shine bg-indigo-500 h-full"
             title={`Đang sửa chữa: ${data.inRepairFaultsCount}`}
           />
-          <div
+          <span
             style={{
               width:
                 data.openFaultsCount > 0
                   ? `${((data.waitingRepairFaultsCount || 0) / data.openFaultsCount) * 100}%`
                   : '20%',
             }}
-            className="bg-gradient-to-r from-blue-400 to-blue-500 h-full transition-all duration-300"
+            className="ops-grow ops-shine bg-blue-500 h-full"
             title={`Chờ sửa chữa: ${data.waitingRepairFaultsCount || 0}`}
           />
-          <div
+          <span
             style={{
               width: data.openFaultsCount > 0 ? `${(data.detectedFaultsCount / data.openFaultsCount) * 100}%` : '30%',
             }}
-            className="bg-gradient-to-r from-rose-400 to-rose-600 h-full transition-all duration-300"
+            className="ops-grow ops-shine bg-rose-500 h-full"
             title={`Chưa phân lịch: ${data.detectedFaultsCount}`}
           />
-        </div>
+        </span>
 
         <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">
           <span>
@@ -267,49 +281,50 @@ export const SuperiorKpiGrid: React.FC<SuperiorKpiGridProps> = ({
             Chưa phân lịch: <strong className="text-rose-600 font-bold">{data.detectedFaultsCount} sự cố</strong>
           </span>
         </div>
-      </div>
+      </button>
 
       {/* KPI 4: Cảnh báo bảo hành thiết bị */}
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         onClick={onClickWarranty}
-        onKeyDown={(e) => e.key === 'Enter' && onClickWarranty?.()}
-        className="group relative overflow-hidden bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-amber-400 cursor-pointer text-left"
+        style={{ '--i': 3 } as React.CSSProperties}
+        className="ops-rise group relative overflow-hidden bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-ops-hover cursor-pointer text-left"
       >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-500 group-hover:text-amber-700 transition-colors">
+          <span className="text-[12.5px] font-semibold text-slate-500 group-hover:text-amber-700 transition-colors">
             Cảnh báo bảo hành (≤ 90 ngày)
           </span>
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-semibold text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
               Xem bảo hành <ArrowUpRight className="w-3.5 h-3.5 ml-0.5" />
             </span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-100 group-hover:scale-105 transition-all">
+            <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-amber-50 text-amber-600 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
               <ShieldCheck className="w-5 h-5" />
-            </div>
+            </span>
           </div>
         </div>
 
-        <div className="flex items-baseline justify-between gap-2 my-2.5">
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight font-mono">
-              {data.warrantyAlertCount}
+        <div className="my-2.5 flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between">
+            <strong className="text-[32px] leading-[1.15] font-extrabold tracking-tight tabular-nums text-amber-600">
+              {Math.round(animWarrantyAlert)}
+            </strong>
+            <span className="text-[10.5px] font-bold text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded-md border border-amber-200/50">
+              Theo dõi Quý
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
+          </div>
+          <div className="flex items-center">
+            <span className="whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
               Cần lập dự toán
             </span>
           </div>
-          <span className="text-[10.5px] font-bold text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded-md border border-amber-200/50 hidden sm:inline">
-            Theo dõi Quý
-          </span>
         </div>
 
-        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex mb-2.5 shadow-2xs">
-          <div style={{ width: `${activeWWidth}%` }} className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full" />
-          <div style={{ width: `${expiringWWidth}%` }} className="bg-gradient-to-r from-amber-400 to-amber-500 h-full" />
-          <div style={{ width: `${expiredWWidth}%` }} className="bg-gradient-to-r from-rose-400 to-rose-600 h-full" />
-        </div>
+        <span className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 mb-2.5">
+          <span style={{ width: `${activeWWidth}%` }} className="ops-grow ops-shine bg-emerald-500 h-full" />
+          <span style={{ width: `${expiringWWidth}%` }} className="ops-grow ops-shine bg-amber-500 h-full" />
+          <span style={{ width: `${expiredWWidth}%` }} className="ops-grow ops-shine bg-rose-500 h-full" />
+        </span>
 
         <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2 font-medium">
           <span>
@@ -319,9 +334,7 @@ export const SuperiorKpiGrid: React.FC<SuperiorKpiGridProps> = ({
             Sắp hết hạn: <strong className="text-amber-600 font-bold">{data.warrantyExpiringCount} bóng</strong>
           </span>
         </div>
-      </div>
+      </button>
     </section>
   )
 }
-
-

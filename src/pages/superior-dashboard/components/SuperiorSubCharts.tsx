@@ -69,7 +69,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
   return (
     <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
       {/* BIỂU ĐỒ 3: Kênh phát hiện & Loại sự cố */}
-      <div id="superior-faults-chart" className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between scroll-mt-6">
+      <div id="superior-faults-chart" className="bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 sm:p-6 flex flex-col justify-between scroll-mt-6">
         <div className="flex-1 flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
@@ -81,12 +81,12 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
               </p>
             </div>
 
-            <div className="inline-flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs shrink-0">
+            <div className="inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 text-xs shrink-0">
               <button
                 type="button"
                 onClick={() => setFaultMode('channel')}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  faultMode === 'channel' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  faultMode === 'channel' ? 'bg-white text-teal-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Kênh
@@ -95,7 +95,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
                 type="button"
                 onClick={() => setFaultMode('type')}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  faultMode === 'type' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  faultMode === 'type' ? 'bg-white text-teal-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Loại lỗi
@@ -148,7 +148,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
       </div>
 
       {/* BIỂU ĐỒ 4: Vòng đời bảo hành & Chủng loại đèn */}
-      <div id="superior-warranty-chart" className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between scroll-mt-6">
+      <div id="superior-warranty-chart" className="bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 sm:p-6 flex flex-col justify-between scroll-mt-6">
         <div className="flex-1 flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
@@ -160,12 +160,12 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
               </p>
             </div>
 
-            <div className="inline-flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs shrink-0">
+            <div className="inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 text-xs shrink-0">
               <button
                 type="button"
                 onClick={() => setWarrantyMode('status')}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  warrantyMode === 'status' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  warrantyMode === 'status' ? 'bg-white text-teal-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Hạn BH
@@ -174,7 +174,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
                 type="button"
                 onClick={() => setWarrantyMode('fixture')}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  warrantyMode === 'fixture' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  warrantyMode === 'fixture' ? 'bg-white text-teal-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Loại bóng
@@ -233,7 +233,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
       </div>
 
       {/* BIỂU ĐỒ 5: Cơ cấu lệnh công tác & Phản ánh QR */}
-      <div id="superior-workorder-chart" className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between scroll-mt-6">
+      <div id="superior-workorder-chart" className="bg-white rounded-[20px] shadow-ops border border-slate-200/80 p-5 sm:p-6 flex flex-col justify-between scroll-mt-6">
         <div className="flex-1 flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
@@ -245,12 +245,12 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
               </p>
             </div>
 
-            <div className="inline-flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs shrink-0">
+            <div className="inline-flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 text-xs shrink-0">
               <button
                 type="button"
                 onClick={() => setWorkMode('workorders')}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  workMode === 'workorders' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  workMode === 'workorders' ? 'bg-white text-teal-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Lệnh việc
@@ -259,7 +259,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
                 type="button"
                 onClick={() => setWorkMode('citizen')}
                 className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  workMode === 'citizen' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  workMode === 'citizen' ? 'bg-white text-teal-700 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Phản ánh QR
@@ -279,7 +279,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
                     contentStyle={{ backgroundColor: '#0f172a', borderRadius: '10px', border: 'none', color: '#fff', fontSize: '12px', padding: '8px 12px' }}
                   />
                   <Bar dataKey="completed" name="Đã nghiệm thu" stackId="wo" fill="#10b981" maxBarSize={36} />
-                  <Bar dataKey="inProgress" name="Đang thực hiện" stackId="wo" fill="#3b82f6" maxBarSize={36} />
+                  <Bar dataKey="inProgress" name="Đang thực hiện" stackId="wo" fill="#0ea5e9" maxBarSize={36} />
                   <Bar dataKey="pending" name="Chờ duyệt / Mở" stackId="wo" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={36} />
                 </BarChart>
               ) : (
@@ -291,7 +291,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
                     contentStyle={{ backgroundColor: '#0f172a', borderRadius: '10px', border: 'none', color: '#fff', fontSize: '12px', padding: '8px 12px' }}
                   />
                   <Bar dataKey="confirmed" name="Đã duyệt tạo lỗi" stackId="cr" fill="#10b981" maxBarSize={36} />
-                  <Bar dataKey="merged" name="Gộp vào lỗi sẵn" stackId="cr" fill="#3b82f6" maxBarSize={36} />
+                  <Bar dataKey="merged" name="Gộp vào lỗi sẵn" stackId="cr" fill="#0ea5e9" maxBarSize={36} />
                   <Bar dataKey="rejected" name="Từ chối / Trùng" stackId="cr" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={36} />
                 </BarChart>
               )}
@@ -306,7 +306,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
             <div className="text-[11px] font-semibold text-slate-500">Đã nghiệm thu</div>
           </div>
           <div>
-            <div className="text-base font-black font-mono text-blue-600">{workOrderData.totalExecuting}</div>
+            <div className="text-base font-black font-mono text-teal-600">{workOrderData.totalExecuting}</div>
             <div className="text-[11px] font-semibold text-slate-500">Đang thực hiện</div>
           </div>
           <div>

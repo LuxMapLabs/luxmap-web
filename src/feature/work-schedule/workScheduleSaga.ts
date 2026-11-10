@@ -11,6 +11,7 @@ import type {
   FollowUpWorkOrderRequest,
 } from '../../types/workorders/orders'
 import type { RootState } from '../../redux/rootReducer'
+import { fetchDashboardDataRequest } from '../dashboard/dashboardSlice'
 import {
   fetchWorkOrdersRequest,
   fetchWorkOrdersSuccess,
@@ -184,11 +185,16 @@ function* handleFollowUpWorkOrder(
 ) {
   const { parentWorkOrderId, payload, nextPhaseLabel } = action.payload
   try {
+    // 1. Nếu mở từ ca khảo sát, tự động xác nhận toàn bộ ảnh cột đèn sang backend để tạo lỗi detected
+    yield call([workScheduleAPI, workScheduleAPI.confirmAllPendingPolePhotos], parentWorkOrderId)
+
     yield call(workScheduleAPI.followUpWorkOrder, parentWorkOrderId, payload)
     yield put(followUpWorkOrderSuccess())
     yield put(closeCaseDetail())
     toast.success(`✓ Đã mở tiếp ${nextPhaseLabel || 'giai đoạn tiếp theo'} cho mã lệnh công tác trên máy chủ!`)
     yield put(fetchWorkOrdersRequest(undefined))
+    // Đồng bộ lại dữ liệu lỗi và bản đồ GIS
+    yield put(fetchDashboardDataRequest())
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể mở giai đoạn tiếp theo trên máy chủ')
     yield put(followUpWorkOrderFailure(errorMsg))
@@ -208,6 +214,10 @@ function* handleVerifyWorkOrder(
 ) {
   const { workOrderId, note, materials_note } = action.payload
   try {
+    // 1. Tự động xác nhận ảnh khảo sát cột đèn (nếu có) để Backend kích hoạt chuyển cột thành 'out' và tạo fault 'detected'
+    yield call([workScheduleAPI, workScheduleAPI.confirmAllPendingPolePhotos], workOrderId)
+
+    // 2. Nghiệm thu lệnh công tác trên Backend (Inspection -> faults thành confirmed; Repair -> faults thành resolved/verified)
     yield call(workScheduleAPI.verifyWorkOrder, workOrderId, { note, materials_note })
     yield put(verifyWorkOrderSuccess())
     if (materials_note) {
@@ -217,6 +227,8 @@ function* handleVerifyWorkOrder(
       toast.success('🎉 Đã duyệt nghiệm thu báo cáo công tác thành công!')
     }
     yield put(fetchWorkOrdersRequest(undefined))
+    // Đồng bộ lại dữ liệu lỗi và bản đồ GIS
+    yield put(fetchDashboardDataRequest())
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể duyệt nghiệm thu trên máy chủ')
     yield put(verifyWorkOrderFailure(errorMsg))

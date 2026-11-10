@@ -37,6 +37,27 @@ export interface AssignWorkOrderRequest {
     scheduled_date?: any
 }
 
+export interface AutoDispatchPreview {
+    start_date?: string | null
+    fault_count?: number
+    order_count?: number
+    proposals?: DispatchProposal[]
+    skipped?: DispatchSkipped[]
+}
+
+export interface AutoDispatchRequest {
+    commune_id?: string | null
+}
+
+export interface BatchCreateWorkOrdersRequest {
+    items?: CreateWorkOrderRequest[]
+}
+
+export interface BatchCreateWorkOrdersResponse {
+    count?: number
+    created_items?: WorkOrderDetail[]
+}
+
 export interface CompleteWorkOrderRequest {
     report_note: string | null
     materials_used?: string | null
@@ -56,6 +77,29 @@ export interface CreateWorkOrderRequest {
     note?: string | null
     materials_note?: string | null
     commune_id?: string | null
+}
+
+export interface DispatchProposal {
+    task_kind?: TaskKind
+    title?: string | null
+    scheduled_date?: string | null
+    due_date?: string | null
+    assigned_to?: string | null
+    fault_ids?: string[]
+    note?: string | null
+    commune_id?: string | null
+    segment_id?: string | null
+    segment_name?: string | null
+    assigned_to_name?: string | null
+    pole_ids?: string[]
+    pole_count?: number
+    max_severity?: Severity
+    unassigned_reason?: string | null
+}
+
+export interface DispatchSkipped {
+    fault_id?: string | null
+    reason?: string | null
 }
 
 export interface EvidenceItem {
@@ -167,6 +211,14 @@ export interface PolePhotoVideoItem {
     viewed_by?: string | null
     viewed_at?: string | null
     video_url?: string | null
+}
+
+export interface ProblemDetails {
+    type?: string | null
+    title?: string | null
+    status?: number
+    detail?: string | null
+    instance?: string | null
 }
 
 export interface RejectCancellationRequest {

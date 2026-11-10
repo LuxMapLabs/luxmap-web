@@ -4,6 +4,10 @@
  */
 import type { CommuneBbox, MapCenter } from '../admin/communes'
 
+export interface AvatarResponse {
+    avatar_url?: string | null
+}
+
 export interface CommuneSummary {
     commune_id?: string | null
     name?: string | null
@@ -20,6 +24,7 @@ export interface CurrentUserResponse {
     commune_ids?: string[]
     communes?: CommuneSummary[]
     map_bounds?: MapBounds
+    avatar_url?: string | null
 }
 
 export interface MapBounds {
