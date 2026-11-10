@@ -490,7 +490,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
 
   return (
     <div className="relative w-full h-full min-h-[480px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner group">
-      <div ref={containerRef} style={{ height, width: '100%' }} className="w-full h-full min-h-[480px] bg-slate-900" />
+      <div ref={containerRef} style={{ height, width: '100%' }} className="w-full h-full min-h-[480px] bg-blue-50" />
 
       <div className="absolute top-2 right-2 z-50 flex flex-col gap-1">
         <button

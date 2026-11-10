@@ -70,7 +70,7 @@ export const EditFeederModal: React.FC<EditFeederModalProps> = ({
       <AssetModalHeader
         icon={<Cable className="w-5 h-5" />}
         accent="emerald"
-        title="Chỉnh Sửa Mạch Điện"
+        title="Chỉnh sửa mạch điện"
         subtitle={`Mã mạch: ${feeder.external_ref || feeder.feeder_id}`}
         onClose={onClose}
       />
@@ -88,7 +88,7 @@ export const EditFeederModal: React.FC<EditFeederModalProps> = ({
               value={cabinetId}
               onChange={(newCabId) => setCabinetId(newCabId)}
               placeholder="-- Chưa đấu nối vào tủ điện --"
-              accentColor="amber"
+              accentColor="blue"
               allowClear={true}
               getId={(c) => c.cabinet_id || ''}
             />
@@ -136,7 +136,7 @@ export const EditFeederModal: React.FC<EditFeederModalProps> = ({
 
         <AssetModalFooter
           onCancel={onClose}
-          submitLabel="Lưu Thay Đổi"
+          submitLabel="Lưu thay đổi"
           submitIcon={<CheckCircle2 className="w-4 h-4" />}
         />
       </form>

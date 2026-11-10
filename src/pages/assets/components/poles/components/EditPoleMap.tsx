@@ -556,12 +556,12 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   }, [currentCabinet])
 
   return (
-    <div className="md:col-span-7 flex flex-col h-80 md:h-auto min-h-[360px] relative bg-slate-950">
+    <div className="md:col-span-7 flex flex-col h-80 md:h-auto min-h-[360px] relative bg-blue-50">
       <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Map overlay legend */}
-      <div className="absolute top-3 left-3 z-10 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-2.5 shadow-lg text-[11px] text-white space-y-1.5 pointer-events-none">
-        <div className="font-bold flex items-center gap-1.5 text-xs text-amber-400">
+      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-xl p-2.5 shadow-lg text-[11px] text-slate-800 space-y-1.5 pointer-events-none">
+        <div className="font-bold flex items-center gap-1.5 text-xs text-amber-700">
           <Layers className="w-3.5 h-3.5" />
           <span>Bản Đồ Ngữ Cảnh Tuyến</span>
         </div>

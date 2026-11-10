@@ -50,7 +50,7 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
               </tr>
             ) : (
               segments.map((seg) => (
-                <tr key={seg.external_ref || seg.segment_id || Math.random()} className="hover:bg-teal-50/40 dark:hover:bg-slate-800/80 hover:shadow-[inset_3px_0_0_#0f766e] transition-all">
+                <tr key={seg.external_ref || seg.segment_id || Math.random()} className="hover:bg-teal-50/40 dark:hover:bg-slate-800/80 hover:shadow-[inset_3px_0_0_#be457a] transition-all">
                   <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
                     {seg.external_ref || seg.segment_id}
                   </td>

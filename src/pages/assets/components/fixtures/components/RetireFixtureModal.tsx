@@ -130,7 +130,7 @@ export const RetireFixtureModal: React.FC<RetireFixtureModalProps> = ({
               className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
               <Check className="w-4 h-4" />
-              <span>Xác Nhận Tháo Dỡ</span>
+              <span>Xác nhận tháo dỡ</span>
             </button>
           </div>
         </form>

@@ -109,7 +109,7 @@ const renderStatusBadge = (status: CitizenReportStatus) => {
       )
     case 'merged':
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-[11px] font-bold">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-[11px] font-bold">
           <GitMerge className="w-3 h-3" />
           <span>Đã gộp</span>
         </span>

@@ -215,7 +215,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     expect(screen.queryByText('IOT-NODE-001')).not.toBeInTheDocument()
   })
 
-  it('3. Mở modal Đăng Ký Thiết Bị IoT mới khi click nút', () => {
+  it('3. Mở modal Đăng ký thiết bị IoT mới khi click nút', () => {
     render(
       <IotNodesTab
         iotNodes={mockIotNodes}
@@ -232,7 +232,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     const addBtn = screen.getByText('Thêm thiết bị IoT')
     fireEvent.click(addBtn)
 
-    expect(screen.getByText('Đăng Ký Thiết Bị IoT Mới')).toBeInTheDocument()
+    expect(screen.getByText('Đăng ký thiết bị IoT mới')).toBeInTheDocument()
     expect(screen.getByDisplayValue('-- Chọn tủ điện gắn thiết bị --')).toBeInTheDocument()
   })
 
@@ -268,10 +268,10 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
       />
     )
 
-    expect(screen.getByText('Cấp Secret Xác Thực IoT')).toBeInTheDocument()
+    expect(screen.getByText('Cấp secret xác thực IoT')).toBeInTheDocument()
     expect(screen.getByText('Cảnh báo bảo mật quan trọng:')).toBeInTheDocument()
 
-    const generateBtn = screen.getByText('Tạo Secret Mới')
+    const generateBtn = screen.getByText('Tạo secret mới')
     fireEvent.click(generateBtn)
 
     expect(handleIssue).toHaveBeenCalledWith('IOT-NODE-001', expect.any(Function))
@@ -308,7 +308,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     const wiredOption = Array.from(selectEl.options).find(o => o.value === 'FDR-001')
     expect(wiredOption?.disabled).toBe(true)
 
-    const submitBtn = screen.getByText('Lưu Rơ-le Này')
+    const submitBtn = screen.getByText('Lưu rơ-le này')
     fireEvent.click(submitBtn)
 
     // Rơ-le #2 tự động chọn mạch còn trống tiếp theo (FDR-001-B) và không cho nối trùng vào FDR-001
@@ -337,7 +337,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Xóa thiết bị/ }))
 
     // Kiểm tra modal xác nhận xóa xuất hiện
-    expect(screen.getByText('Xác Nhận Xóa Thiết Bị IoT')).toBeInTheDocument()
+    expect(screen.getByText('Xác nhận xóa thiết bị IoT')).toBeInTheDocument()
     expect(screen.getByText(/Thao tác này sẽ gỡ bỏ thiết bị khỏi tủ điện/)).toBeInTheDocument()
 
     // Click nút "Xác Nhận Xóa"

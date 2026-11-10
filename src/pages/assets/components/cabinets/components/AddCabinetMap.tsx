@@ -506,12 +506,12 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
   }, [segmentCoords])
 
   return (
-    <div className="relative w-full h-full min-h-[380px] md:min-h-[500px] bg-slate-900 overflow-hidden rounded-2xl md:rounded-r-3xl md:rounded-l-none border border-slate-700/60 shadow-inner">
+    <div className="relative w-full h-full min-h-[380px] md:min-h-[500px] bg-blue-50 overflow-hidden rounded-2xl md:rounded-r-3xl md:rounded-l-none border border-blue-200 shadow-inner">
       <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Legend & Chú thích */}
-      <div className="absolute top-3 left-3 z-10 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 shadow-lg text-[11px] text-white max-w-[270px] space-y-1.5 select-none pointer-events-none">
-        <div className="flex items-center gap-1.5 font-bold text-amber-300 pb-1 border-b border-slate-700/60">
+      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-xl p-3 shadow-lg text-[11px] text-slate-800 max-w-[270px] space-y-1.5 select-none pointer-events-none">
+        <div className="flex items-center gap-1.5 font-bold text-amber-700 pb-1 border-b border-blue-100">
           <Layers className="w-3.5 h-3.5" />
           <span>Bản Đồ Định Vị Tủ Điện GIS</span>
         </div>
@@ -519,9 +519,9 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
           <div className="w-5 h-5 rounded-md bg-purple-600 border border-white flex items-center justify-center text-[10px] text-yellow-300 font-bold shrink-0">
             ⚡A
           </div>
-          <span className="text-slate-200 font-medium">Tủ điện mới khai báo (Kéo để chỉnh)</span>
+          <span className="text-slate-700 font-medium">Tủ điện mới khai báo (Kéo để chỉnh)</span>
         </div>
-        <p className="text-[10px] text-purple-200/80 pt-1 italic border-t border-slate-800">
+        <p className="text-[10px] text-blue-700 pt-1 italic border-t border-blue-100">
           💡 Click trên ảnh vệ tinh để tự động gán tọa độ cho tủ đang chọn.
         </p>
       </div>

@@ -60,7 +60,7 @@ export const EditIotNodeModal: React.FC<EditIotNodeModalProps> = ({
       <AssetModalHeader
         icon={<Cpu className="w-5 h-5" />}
         accent="cyan"
-        title="Chỉnh Sửa Thiết Bị IoT"
+        title="Chỉnh sửa thiết bị IoT"
         subtitle={node.node_id}
         onClose={onClose}
       />
@@ -93,7 +93,7 @@ export const EditIotNodeModal: React.FC<EditIotNodeModalProps> = ({
               <label
                 className={`p-3 rounded-xl border flex flex-col gap-1 cursor-pointer transition ${
                   dataSource === 'simulated'
-                    ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200'
+                    ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200'
                     : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
               >
@@ -105,7 +105,7 @@ export const EditIotNodeModal: React.FC<EditIotNodeModalProps> = ({
                     value="simulated"
                     checked={dataSource === 'simulated'}
                     onChange={() => setDataSource('simulated')}
-                    className="accent-emerald-600"
+                    className="accent-blue-600"
                   />
                 </div>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">
@@ -162,7 +162,7 @@ export const EditIotNodeModal: React.FC<EditIotNodeModalProps> = ({
 
         <AssetModalFooter
           onCancel={onClose}
-          submitLabel="Lưu Thay Đổi"
+          submitLabel="Lưu thay đổi"
           submitIcon={<CheckCircle2 className="w-4 h-4" />}
         />
       </form>

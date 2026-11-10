@@ -287,7 +287,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
               <button
                 type="button"
                 onClick={onClose}
-                className={`px-5 h-9 rounded-xl ${isAdmin ? 'bg-primary hover:bg-primary/90' : 'bg-slate-900 hover:bg-slate-800'} text-white text-xs font-bold cursor-pointer`}
+                className={`px-5 h-9 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold cursor-pointer`}
               >
                 Đóng
               </button>

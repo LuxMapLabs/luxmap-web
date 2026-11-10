@@ -39,7 +39,7 @@ describe('ExportAssetModal Component', () => {
       />
     )
 
-    expect(screen.getByText('Xuất Dữ Liệu Tài Sản Ra CSV')).toBeInTheDocument()
+    expect(screen.getByText('Xuất dữ liệu tài sản ra CSV')).toBeInTheDocument()
     expect(screen.getByText('Cột điện chiếu sáng')).toBeInTheDocument()
     expect(screen.getByText('Tủ điện điều khiển')).toBeInTheDocument()
     expect(screen.getByText('Tuyến đường chiếu sáng')).toBeInTheDocument()
@@ -65,26 +65,26 @@ describe('ExportAssetModal Component', () => {
     )
 
     // Ban đầu poles được chọn do initialCategory="poles"
-    expect(screen.getByText(/Xác Nhận Xuất \(1 tệp CSV\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Xác nhận xuất \(1 tệp CSV\)/i)).toBeInTheDocument()
 
     // Click chọn thêm Tủ điện
     const cabinetBtn = screen.getByText('Tủ điện điều khiển').closest('button')!
     fireEvent.click(cabinetBtn)
 
     // Bây giờ cả 2 tệp đều được chọn
-    expect(screen.getByText(/Xác Nhận Xuất \(2 tệp CSV\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Xác nhận xuất \(2 tệp CSV\)/i)).toBeInTheDocument()
 
     // Click tiếp chọn Tuyến đường
     const segmentBtn = screen.getByText('Tuyến đường chiếu sáng').closest('button')!
     fireEvent.click(segmentBtn)
 
-    expect(screen.getByText(/Xác Nhận Xuất \(3 tệp CSV\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Xác nhận xuất \(3 tệp CSV\)/i)).toBeInTheDocument()
 
     // Bỏ chọn cột điện
     const poleBtn = screen.getByText('Cột điện chiếu sáng').closest('button')!
     fireEvent.click(poleBtn)
 
-    expect(screen.getByText(/Xác Nhận Xuất \(2 tệp CSV\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Xác nhận xuất \(2 tệp CSV\)/i)).toBeInTheDocument()
   })
 
   it('hoạt động chính xác với nút Chọn tất cả và Bỏ chọn tất cả', () => {
@@ -105,19 +105,19 @@ describe('ExportAssetModal Component', () => {
     fireEvent.click(selectAllBtn)
 
     // Đã chọn tất cả 5 tệp
-    expect(screen.getByText(/Xác Nhận Xuất \(5 tệp CSV\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Xác nhận xuất \(5 tệp CSV\)/i)).toBeInTheDocument()
 
     // Nút đổi thành "Bỏ chọn tất cả"
     const deselectAllBtn = screen.getByText('Bỏ chọn tất cả')
     fireEvent.click(deselectAllBtn)
 
     // Không còn tệp nào được chọn
-    expect(screen.getByText('Xác Nhận Xuất File')).toBeInTheDocument()
-    const confirmBtn = screen.getByText('Xác Nhận Xuất File').closest('button')!
+    expect(screen.getByText('Xác nhận xuất File')).toBeInTheDocument()
+    const confirmBtn = screen.getByText('Xác nhận xuất File').closest('button')!
     expect(confirmBtn).toBeDisabled()
   })
 
-  it('gọi downloadCsvWithBom tuần tự khi nhấn Xác Nhận Xuất', async () => {
+  it('gọi downloadCsvWithBom tuần tự khi nhấn Xác nhận xuất', async () => {
     render(
       <ExportAssetModal
         isOpen={true}
@@ -135,7 +135,7 @@ describe('ExportAssetModal Component', () => {
     const poleBtn = screen.getByText('Cột điện chiếu sáng').closest('button')!
     fireEvent.click(poleBtn)
 
-    const confirmBtn = screen.getByText(/Xác Nhận Xuất \(2 tệp CSV\)/i).closest('button')!
+    const confirmBtn = screen.getByText(/Xác nhận xuất \(2 tệp CSV\)/i).closest('button')!
     fireEvent.click(confirmBtn)
 
     await waitFor(() => {

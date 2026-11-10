@@ -116,7 +116,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
       />
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {filteredFeeders.length > 0 && (
         <TablePagination
           currentListLength={filteredFeeders.length}
           currentPage={currentPage}
