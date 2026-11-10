@@ -6,6 +6,7 @@ import type { ImportResult } from '../../types/assets/import'
 import type {
   SegmentListItemPagedResult,
   CreateSegmentRequest,
+  SegmentDetail,
 } from '../../types/assets/segments'
 import type {
   CabinetListItemPagedResult,
@@ -38,6 +39,9 @@ import {
   createFeedersBulkRequest,
   updateFeederRequest,
   deleteFeederRequest,
+  fetchSegmentDetailRequest,
+  fetchSegmentDetailSuccess,
+  fetchSegmentDetailFailure,
   createSegmentRequest,
   updateSegmentRequest,
   deleteSegmentRequest,
@@ -438,6 +442,17 @@ function* handleDeleteSegment(action: PayloadAction<string>) {
   }
 }
 
+// Không báo lỗi bằng toast: form sửa tuyến tự rơi về thứ tự suy ra và đã có lời nhắc cho người dùng.
+function* handleFetchSegmentDetail(action: PayloadAction<string>) {
+  const segmentId = action.payload
+  try {
+    const detail = (yield call(assetAPI.getSegmentDetail, segmentId)) as SegmentDetail
+    yield put(fetchSegmentDetailSuccess({ segmentId, geomWkt: detail.geom_wkt }))
+  } catch {
+    yield put(fetchSegmentDetailFailure(segmentId))
+  }
+}
+
 function* handleCreateSegment(action: PayloadAction<CreateSegmentRequest>) {
   try {
     const data = action.payload
@@ -613,6 +628,7 @@ export default function* assetSaga() {
   yield takeLatest(createFeedersBulkRequest.type, handleCreateFeedersBulk)
   yield takeLatest(updateFeederRequest.type, handleUpdateFeeder)
   yield takeLatest(deleteFeederRequest.type, handleDeleteFeeder)
+  yield takeLatest(fetchSegmentDetailRequest.type, handleFetchSegmentDetail)
   yield takeLatest(createSegmentRequest.type, handleCreateSegment)
   yield takeLatest(updateSegmentRequest.type, handleUpdateSegment)
   yield takeLatest(deleteSegmentRequest.type, handleDeleteSegment)

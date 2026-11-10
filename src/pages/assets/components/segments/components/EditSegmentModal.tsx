@@ -1,9 +1,24 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react'
-import { useSelector } from 'react-redux'
-import { Route, CheckCircle2, MapPin, RotateCcw } from 'lucide-react'
-import { AssetModalFrame, AssetModalHeader, AssetModalFooter } from '../../common/AssetModal'
-import { SegmentRouteMap, SegmentPoleItem } from '../../../../../components/SegmentRouteMap'
-import { calculateRouteLengthMeters, extractSegmentCoordinates } from '../../../../../utils/gis-map/routeUtils'
+import React, { useEffect, useState, useMemo } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Route, CheckCircle2, AlertTriangle } from 'lucide-react'
+import {
+  AssetModalFrame,
+  AssetModalHeader,
+  AssetModalFooter,
+  AssetModalError,
+} from '../../common/AssetModal'
+import { SegmentPolePickerMap } from '../../../../../components/SegmentPolePickerMap'
+import { SegmentPoleOrderList } from '../../../../../components/SegmentPoleOrderList'
+import {
+  toPickablePoles,
+  useSegmentPoleSelection,
+} from '../../../../../hooks/assets/useSegmentPoleSelection'
+import { useSegmentPoleLink } from '../../../../../hooks/assets/useSegmentPoleLink'
+import { deriveInitialOrder } from '../../../../../utils/gis-map/segmentPoleOrder'
+import {
+  fetchSegmentDetailRequest,
+  clearSegmentDetail,
+} from '../../../../../feature/assets/assetSlice'
 
 import type { RoadClass } from '../../../../../types/common/enums'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
@@ -13,21 +28,23 @@ export interface EditSegmentModalProps {
   isOpen: boolean
   segment: SegmentListItem | null
   onClose: () => void
-  onSave: (updated: SegmentListItem) => void
+  onSave: (updated: SegmentListItem, poleIds: string[]) => void
 }
 
 interface EditSegmentModalContentProps {
   segment: SegmentListItem
+  /** Đường nối đang lưu của tuyến; null khi không lấy được (khi đó thứ tự cột được suy ra). */
+  geomWkt: string | null
   onClose: () => void
-  onSave: (updated: SegmentListItem) => void
+  onSave: (updated: SegmentListItem, poleIds: string[]) => void
 }
 
 const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   segment,
+  geomWkt,
   onClose,
   onSave,
 }) => {
-  // Lấy danh sách cột thực tế từ Redux Store
   const allPoles = useSelector((state: RootState) => state.assets?.poles || [])
   const currentUser = useSelector((state: RootState) => state.auth?.user)
   const activeCommuneId =
@@ -36,123 +53,61 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
     currentUser?.commune_ids?.[0] ||
     ''
 
-  // Lọc danh sách cột đèn thực tế thuộc tuyến đường này
-  const segmentPoles = useMemo<SegmentPoleItem[]>(() => {
-    if (!segment.segment_id) return []
-    return allPoles
-      .filter(
-        (p) =>
-          p.segment_id === segment.segment_id &&
-          p.location &&
-          Number.isFinite(p.location.lat) &&
-          Number.isFinite(p.location.lng)
-      )
-      .sort((a, b) =>
-        (a.external_ref || '').localeCompare(b.external_ref || '', undefined, { numeric: true })
-      )
-      .map((p) => ({
-        id: p.pole_id || p.external_ref || 'unknown',
-        code: p.external_ref || p.pole_id || undefined,
-        coord: [p.location.lng, p.location.lat] as [number, number],
-        status: p.active_fixture ? 'normal' : 'unknown',
-        atlas: p.active_fixture?.fixture_type,
-      }))
-  }, [allPoles, segment.segment_id])
+  // Cột chọn được: chưa thuộc tuyến nào hoặc đang thuộc tuyến này (cột của tuyến khác bị ẩn)
+  const candidates = useMemo(
+    () => toPickablePoles(allPoles, segment.segment_id),
+    [allPoles, segment.segment_id]
+  )
 
-  // Trích xuất tọa độ điểm đầu, điểm cuối và lộ trình thực tế từ hình học hoặc cột đèn
-  const { initialStart, initialEnd, initialCoords } = useMemo(() => {
-    return extractSegmentCoordinates(segment, segmentPoles)
-  }, [segment, segmentPoles])
+  // Thứ tự ban đầu của các cột đang thuộc tuyến này (chỉ tính một lần khi mở form)
+  const initial = useMemo(() => {
+    const ownIds = new Set(
+      allPoles.filter((p) => p.segment_id === segment.segment_id).map((p) => p.pole_id)
+    )
+    const own = candidates.filter((c) => ownIds.has(c.id))
+    return deriveInitialOrder(
+      own.map((p) => ({ id: p.id, coord: p.coord })),
+      geomWkt
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [segmentName, setSegmentName] = useState(segment.segment_name || '')
   const [roadClass, setRoadClass] = useState<RoadClass>(
     (segment.road_class as RoadClass) || 'inter_commune'
   )
-  const [lengthM, setLengthM] = useState<number>(segment.length_m || 1000)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Coordinate States initialized with extracted coordinates
-  const [startLat, setStartLat] = useState<number>(initialStart[1])
-  const [startLng, setStartLng] = useState<number>(initialStart[0])
-  const [endLat, setEndLat] = useState<number>(initialEnd[1])
-  const [endLng, setEndLng] = useState<number>(initialEnd[0])
-  const [routeCoords, setRouteCoords] = useState<[number, number][]>(initialCoords)
-
-  const originalStartRef = useRef<[number, number]>(initialStart)
-  const originalEndRef = useRef<[number, number]>(initialEnd)
-  const originalRouteCoordsRef = useRef<[number, number][]>([...initialCoords])
-
-  // Start coordinate handlers
-  const handleStartCoordChange = useCallback((coord: [number, number]) => {
-    setStartLng(coord[0])
-    setStartLat(coord[1])
-  }, [])
-
-  const handleStartLatChange = (val: number) => {
-    setStartLat(val)
-  }
-
-  const handleStartLngChange = (val: number) => {
-    setStartLng(val)
-  }
-
-  // End coordinate handlers
-  const handleEndCoordChange = useCallback((coord: [number, number]) => {
-    setEndLng(coord[0])
-    setEndLat(coord[1])
-  }, [])
-
-  const handleEndLatChange = (val: number) => {
-    setEndLat(val)
-  }
-
-  const handleEndLngChange = (val: number) => {
-    setEndLng(val)
-  }
-
-  // Handle full route geometry changes from routing/trimming
-  const handleRouteCoordsChange = useCallback((coords: [number, number][]) => {
-    setRouteCoords(coords)
-    const newLen = calculateRouteLengthMeters(coords)
-    if (newLen > 0) {
-      setLengthM(newLen)
-    }
-  }, [])
-
-  // Reset to original handlers
-  const handleResetStart = () => {
-    if (originalStartRef.current) {
-      handleStartCoordChange(originalStartRef.current)
-      if (endLng === originalEndRef.current[0] && endLat === originalEndRef.current[1]) {
-        handleRouteCoordsChange([...originalRouteCoordsRef.current])
-      }
-    }
-  }
-
-  const handleResetEnd = () => {
-    if (originalEndRef.current) {
-      handleEndCoordChange(originalEndRef.current)
-      if (startLng === originalStartRef.current[0] && startLat === originalStartRef.current[1]) {
-        handleRouteCoordsChange([...originalRouteCoordsRef.current])
-      }
-    }
-  }
+  const { selected, toggle, remove, move, autoSort, lastAddedId, geometry } =
+    useSegmentPoleSelection(candidates, initial.ordered)
+  const link = useSegmentPoleLink(lastAddedId)
+  const poleCodes = useMemo(
+    () => Object.fromEntries(candidates.map((p) => [p.id, p.code || p.id])),
+    [candidates]
+  )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const geomWkt =
-      routeCoords.length >= 2
-        ? `LINESTRING(${routeCoords.map((c) => `${c[0]} ${c[1]}`).join(', ')})`
-        : (segment as SegmentListItem & { geom_wkt?: string | null }).geom_wkt || null
+    setSubmitError(null)
 
-    onSave({
-      ...segment,
-      segment_name: segmentName.trim() || segment.segment_id,
-      road_class: roadClass,
-      length_m: lengthM,
-      commune_id: activeCommuneId || null,
-      geom_wkt: geomWkt,
-      updated_at: new Date().toISOString(),
-    } as SegmentListItem)
+    if (!geometry || selected.length < 2) {
+      setSubmitError('Tuyến đường cần tối thiểu 2 cột đèn.')
+      return
+    }
+
+    onSave(
+      {
+        ...segment,
+        segment_name: segmentName.trim() || segment.segment_id,
+        road_class: roadClass,
+        length_m: geometry.lengthM,
+        pole_count: selected.length,
+        commune_id: activeCommuneId || null,
+        geom_wkt: geometry.geomWkt,
+        updated_at: new Date().toISOString(),
+      } as SegmentListItem,
+      selected.map((p) => p.id)
+    )
     onClose()
   }
 
@@ -166,14 +121,15 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
         onClose={onClose}
       />
 
-      {/* Form Body - 2 Columns Layout */}
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+        <AssetModalError message={submitError} />
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
-          {/* CỘT TRÁI (40% width trên md) */}
+          {/* CỘT TRÁI */}
           <div className="md:col-span-5 p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
-            {/* Tên tuyến đường */}
             <div className="space-y-1">
-              <label className="font-bold text-slate-700 dark:text-slate-300">Tên tuyến đường:</label>
+              <label className="font-bold text-slate-700 dark:text-slate-300">
+                Tên tuyến đường:
+              </label>
               <input
                 type="text"
                 value={segmentName}
@@ -182,11 +138,11 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
               />
             </div>
 
-            {/* Cấp đường & Chiều dài */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 dark:text-slate-300">Cấp đường quy hoạch:</label>
-
+                <label className="font-bold text-slate-700 dark:text-slate-300">
+                  Cấp đường quy hoạch:
+                </label>
                 <select
                   value={roadClass}
                   onChange={(e) => setRoadClass(e.target.value as RoadClass)}
@@ -197,136 +153,68 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 dark:text-slate-300">Chiều dài tuyến (mét):</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300">
+                  Chiều dài tuyến (mét):
+                </label>
                 <input
-                  type="number"
-                  value={lengthM}
-                  onChange={(e) => setLengthM(Number(e.target.value))}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none"
+                  type="text"
+                  readOnly
+                  value={`${(geometry?.lengthM ?? 0).toLocaleString('vi-VN')} mét`}
+                  className="w-full p-2.5 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-200 cursor-not-allowed select-none focus:outline-none"
                 />
               </div>
             </div>
 
-            {/* Tọa độ Điểm đầu & Điểm cuối GPS */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
-              <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Tọa độ Điểm Đầu & Điểm Cuối Tuyến (WGS84):</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2.5 text-[11px]">
-                {/* Điểm đầu */}
-                <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900/60 shadow-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      <span>🟢 Điểm đầu (Start GPS):</span>
-                    </div>
-                    {originalStartRef.current ? (
-                      <button
-                        type="button"
-                        onClick={handleResetStart}
-                        title="Khôi phục điểm đầu ban đầu"
-                        className="text-[10px] text-slate-400 hover:text-amber-500 flex items-center gap-0.5 cursor-pointer"
-                      >
-                        <RotateCcw className="w-2.5 h-2.5" />
-                        <span>Đặt lại</span>
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5 font-mono">
-                    <div>
-                      <label className="text-[9px] text-slate-400 font-medium block">Vĩ độ (Lat)</label>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        value={startLat}
-                        onChange={(e) => handleStartLatChange(parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-emerald-500 text-[11px]"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-slate-400 font-medium block">Kinh độ (Lng)</label>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        value={startLng}
-                        onChange={(e) => handleStartLngChange(parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-emerald-500 text-[11px]"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Điểm cuối */}
-                <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/60 shadow-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                      <span>🔴 Điểm cuối (End GPS):</span>
-                    </div>
-                    {originalEndRef.current ? (
-                      <button
-                        type="button"
-                        onClick={handleResetEnd}
-                        title="Khôi phục điểm cuối ban đầu"
-                        className="text-[10px] text-slate-400 hover:text-amber-500 flex items-center gap-0.5 cursor-pointer"
-                      >
-                        <RotateCcw className="w-2.5 h-2.5" />
-                        <span>Đặt lại</span>
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5 font-mono">
-                    <div>
-                      <label className="text-[9px] text-slate-400 font-medium block">Vĩ độ (Lat)</label>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        value={endLat}
-                        onChange={(e) => handleEndLatChange(parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-rose-500 text-[11px]"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-slate-400 font-medium block">Kinh độ (Lng)</label>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        value={endLng}
-                        onChange={(e) => handleEndLngChange(parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:border-rose-500 text-[11px]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <span className="font-semibold text-slate-600 dark:text-slate-400">
+                Cột đèn thuộc tuyến:
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full font-mono font-bold text-xs bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                {selected.length} / {candidates.length} cột
+              </span>
             </div>
+
+            <SegmentPoleOrderList
+              route={selected}
+              codes={poleCodes}
+              highlightId={link.highlightId}
+              revealId={link.revealId}
+              onHover={link.hoverFromList}
+              onFocus={link.focusPole}
+              onMove={move}
+              onRemove={remove}
+              onAutoSort={autoSort}
+            />
+
+            {!initial.exact && (
+              <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 flex gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  Thứ tự ban đầu của các cột được suy ra tự động. Hãy xem đường nối xanh trên bản đồ
+                  có đi đúng dọc tuyến không; nếu sai, kéo thả trong danh sách để chỉnh.
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* CỘT PHẢI: BẢN ĐỒ TUYẾN ĐƯỜNG THỰC ĐỊA (60% width trên md) */}
+          {/* CỘT PHẢI: BẢN ĐỒ */}
           <div className="md:col-span-7 p-4 bg-slate-950 flex flex-col justify-between min-h-[480px] relative">
             <div className="min-h-[480px] h-[480px] rounded-2xl overflow-hidden border border-slate-700/80 shadow-inner relative">
-              <SegmentRouteMap
-                coordinates={routeCoords}
-                originalRouteCoords={originalRouteCoordsRef.current}
-                startCoord={[startLng, startLat]}
-                endCoord={[endLng, endLat]}
-                originalStartCoord={originalStartRef.current}
-                originalEndCoord={originalEndRef.current}
-                editable={true}
+              <SegmentPolePickerMap
+                poles={candidates}
+                selected={selected}
+                onTogglePole={toggle}
+                highlightId={link.highlightId}
+                onHoverPole={link.hoverFromMap}
+                focusRequest={link.focusRequest}
                 communeId={activeCommuneId}
-                onStartCoordChange={handleStartCoordChange}
-                onEndCoordChange={handleEndCoordChange}
-                onRouteCoordsChange={handleRouteCoordsChange}
-                poles={segmentPoles}
                 height="480px"
               />
             </div>
             <p className="text-[10px] text-slate-400 mt-2 italic text-center shrink-0">
-              💡 Mẹo: Bấm và kéo ghim xanh (Điểm đầu) / ghim đỏ (Điểm cuối) hoặc nhấp vào line để chỉnh lộ trình.
+              💡 Mẹo: Chấm xanh là cột thuộc tuyến, chấm vàng là cột chưa thuộc tuyến nào. Click để
+              thêm hoặc bỏ cột; cột thêm mới tự chèn vào chỗ hợp lý, kéo thả trong danh sách bên
+              trái nếu cần đổi.
             </p>
           </div>
         </div>
@@ -347,16 +235,38 @@ export const EditSegmentModal: React.FC<EditSegmentModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const dispatch = useDispatch()
+  const segmentId = isOpen ? segment?.segment_id : null
+  const detail = useSelector((state: RootState) => state.assets?.segmentDetail)
+
+  // Lấy đường nối đang lưu để danh sách hiện đúng thứ tự đã lưu thay vì đoán
+  useEffect(() => {
+    if (!segmentId) return
+    dispatch(fetchSegmentDetailRequest(segmentId))
+    return () => {
+      dispatch(clearSegmentDetail())
+    }
+  }, [dispatch, segmentId])
+
   if (!isOpen || !segment) return null
+
+  const isReady = detail?.segmentId === segment.segment_id && detail.isSettled
 
   return (
     <AssetModalFrame widthClass="max-w-5xl">
-      <EditSegmentModalContent
-        key={segment.segment_id}
-        segment={segment}
-        onClose={onClose}
-        onSave={onSave}
-      />
+      {!isReady ? (
+        <div className="p-10 text-center text-xs text-slate-500 dark:text-slate-400" role="status">
+          Đang tải thứ tự cột của tuyến...
+        </div>
+      ) : (
+        <EditSegmentModalContent
+          key={segment.segment_id}
+          segment={segment}
+          geomWkt={detail.geomWkt}
+          onClose={onClose}
+          onSave={onSave}
+        />
+      )}
     </AssetModalFrame>
   )
 }

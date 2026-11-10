@@ -14,6 +14,14 @@ import type {
   IotNodeCredential,
 } from '../../types/assets/iot-nodes'
 
+export interface SegmentDetailState {
+  segmentId: string | null
+  geomWkt: string | null
+  isLoading: boolean
+  /** true khi đã có kết quả (thành công hoặc lỗi) cho segmentId hiện tại */
+  isSettled: boolean
+}
+
 export interface AssetState {
   // Asset Collections from Backend API
   poles: PoleListItem[]
@@ -23,6 +31,9 @@ export interface AssetState {
   iotNodes: IotNodeItem[]
   isLoadingAssets: boolean
   loadAssetsError: string | null
+
+  // Chi tiết tuyến đang mở ở form sửa (lấy đường nối gốc để biết đúng thứ tự cột)
+  segmentDetail?: SegmentDetailState
 
   // Mutation State (Create / Update / Retire)
   isMutating: boolean
@@ -45,6 +56,8 @@ const initialState: AssetState = {
   iotNodes: [],
   isLoadingAssets: false,
   loadAssetsError: null,
+
+  segmentDetail: { segmentId: null, geomWkt: null, isLoading: false, isSettled: false },
 
   isMutating: false,
   mutationError: null,
@@ -199,6 +212,20 @@ const assetSlice = createSlice({
       state.isMutating = true
       state.mutationError = null
     },
+    fetchSegmentDetailRequest: (state, action: PayloadAction<string>) => {
+      state.segmentDetail = { segmentId: action.payload, geomWkt: null, isLoading: true, isSettled: false }
+    },
+    fetchSegmentDetailSuccess: (state, action: PayloadAction<{ segmentId: string; geomWkt: string | null }>) => {
+      if (state.segmentDetail?.segmentId !== action.payload.segmentId) return
+      state.segmentDetail = { segmentId: action.payload.segmentId, geomWkt: action.payload.geomWkt, isLoading: false, isSettled: true }
+    },
+    fetchSegmentDetailFailure: (state, action: PayloadAction<string>) => {
+      if (state.segmentDetail?.segmentId !== action.payload) return
+      state.segmentDetail = { segmentId: action.payload, geomWkt: null, isLoading: false, isSettled: true }
+    },
+    clearSegmentDetail: (state) => {
+      state.segmentDetail = { segmentId: null, geomWkt: null, isLoading: false, isSettled: false }
+    },
     createSegmentRequest: (state, action: PayloadAction<CreateSegmentRequest>) => {
       void action
       state.isMutating = true
@@ -315,6 +342,10 @@ export const {
   createFeedersBulkRequest,
   updateFeederRequest,
   deleteFeederRequest,
+  fetchSegmentDetailRequest,
+  fetchSegmentDetailSuccess,
+  fetchSegmentDetailFailure,
+  clearSegmentDetail,
   createSegmentRequest,
   updateSegmentRequest,
   deleteSegmentRequest,

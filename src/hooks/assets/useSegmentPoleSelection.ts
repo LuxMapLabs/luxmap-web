@@ -1,0 +1,73 @@
+import { useCallback, useMemo, useState } from 'react'
+import type { PoleListItem } from '../../types/assets/poles'
+import type { PickablePole } from '../../components/SegmentPolePickerMap'
+import {
+  buildSegmentGeometry,
+  insertPoleInRoute,
+  movePole,
+  orderPolesByChain,
+  removePole,
+  type OrderedPole,
+} from '../../utils/gis-map/segmentPoleOrder'
+
+/**
+ * Cột được phép chọn vào tuyến: có GPS và chưa thuộc tuyến nào,
+ * hoặc đang thuộc chính tuyến đang sửa. Cột của tuyến khác bị ẩn.
+ */
+export const toPickablePoles = (poles: PoleListItem[], currentSegmentId?: string | null): PickablePole[] =>
+  poles
+    .filter((p) => {
+      if (!p.pole_id) return false
+      if (!p.location || !Number.isFinite(p.location.lat) || !Number.isFinite(p.location.lng)) return false
+      return !p.segment_id || p.segment_id === currentSegmentId
+    })
+    .map((p) => ({
+      id: p.pole_id as string,
+      code: p.external_ref || p.pole_id || undefined,
+      coord: [p.location.lng, p.location.lat] as [number, number],
+    }))
+
+/**
+ * Danh sách cột của tuyến theo thứ tự dọc tuyến.
+ * Click cột trên bản đồ: thêm (tự chèn vào chỗ hợp lý) hoặc bỏ. Người dùng chỉnh thứ tự bằng
+ * `move` (kéo thả). `lastAddedId` cho danh sách biết cột vừa thêm để cuộn tới và tô sáng.
+ */
+export const useSegmentPoleSelection = (candidates: PickablePole[], initial: OrderedPole[] = []) => {
+  const [selected, setSelected] = useState<OrderedPole[]>(initial)
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null)
+
+  const toggle = useCallback(
+    (poleId: string) => {
+      const exists = selected.some((p) => p.id === poleId)
+      const pole = candidates.find((p) => p.id === poleId)
+      if (!exists && !pole) return
+      setSelected((prev) =>
+        prev.some((p) => p.id === poleId)
+          ? removePole(prev, poleId)
+          : pole
+          ? insertPoleInRoute(prev, { id: pole.id, coord: pole.coord })
+          : prev
+      )
+      setLastAddedId(exists ? null : poleId)
+    },
+    [candidates, selected]
+  )
+
+  const remove = useCallback((poleId: string) => {
+    setSelected((prev) => removePole(prev, poleId))
+    setLastAddedId(null)
+  }, [])
+
+  const move = useCallback((from: number, to: number) => {
+    setSelected((prev) => movePole(prev, from, to))
+  }, [])
+
+  /** Sắp lại theo chuỗi gần nhất, dùng khi danh sách bị xáo trộn nhiều. */
+  const autoSort = useCallback(() => {
+    setSelected((prev) => orderPolesByChain(prev))
+  }, [])
+
+  const geometry = useMemo(() => buildSegmentGeometry(selected), [selected])
+
+  return { selected, toggle, remove, move, autoSort, lastAddedId, geometry }
+}
