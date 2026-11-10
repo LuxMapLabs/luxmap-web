@@ -12,8 +12,8 @@ import { TablePagination } from '../common/TablePagination'
 export interface SegmentsTabProps {
   segments: SegmentListItem[]
   isLoading?: boolean
-  onAddSegment: (data: SegmentListItem) => void
-  onUpdateSegment: (updated: SegmentListItem) => void
+  onAddSegment: (data: SegmentListItem, poleIds: string[]) => void
+  onUpdateSegment: (updated: SegmentListItem, poleIds: string[]) => void
   onDeleteSegment?: (segmentId: string) => void
   onOpenImport: () => void
 }
@@ -66,8 +66,8 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
     return filteredSegments.slice(start, start + pageSize)
   }, [filteredSegments, currentPage, pageSize])
 
-  const handleSaveSegment = (updated: SegmentListItem) => {
-    onUpdateSegment(updated)
+  const handleSaveSegment = (updated: SegmentListItem, poleIds: string[]) => {
+    onUpdateSegment(updated, poleIds)
     if (detailSegment && detailSegment.segment_id === updated.segment_id) {
       setDetailSegment(updated)
     }
@@ -158,8 +158,8 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
         <AddSegmentModal
           isOpen={isAddSegmentModalOpen}
           onClose={() => setIsAddSegmentModalOpen(false)}
-          onAddSegment={(data) => {
-            onAddSegment(data)
+          onAddSegment={(data, poleIds) => {
+            onAddSegment(data, poleIds)
             setCurrentPage(1)
           }}
           existingCount={segments.length}
