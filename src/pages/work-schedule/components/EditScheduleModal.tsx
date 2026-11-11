@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Edit3, Calendar, User, MapPin, FileText, Wrench, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ScheduleCase, SchedulePhase, WorkOrderAssignee } from '../../../types/workSchedule'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 interface EditScheduleModalProps {
   isOpen: boolean
@@ -184,21 +185,28 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               <User className="w-3.5 h-3.5 text-blue-600" />
               Kỹ sư hiện trường phụ trách
             </label>
-            <select
+            <OpsSelect
               value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition cursor-pointer"
-            >
-              {assignees.length === 0 ? (
-                <option value="">Chưa có kỹ sư thuộc địa bàn này</option>
-              ) : (
-                assignees.map((a) => (
-                  <option key={a.user_id || ''} value={a.user_id || ''}>
-                    {a.full_name || a.user_id || ''}
-                  </option>
-                ))
-              )}
-            </select>
+              onChange={(val) => setAssigneeId(val)}
+              icon={<User className="w-3.5 h-3.5" />}
+              headerLabel="Kỹ sư hiện trường"
+              headerBadge={`${assignees.length} kỹ sư`}
+              ariaLabel="Kỹ sư hiện trường phụ trách"
+              className="w-full"
+              triggerClassName="w-full min-h-[42px] px-3 py-2"
+              popoverClassName="w-full"
+              showTriggerBadge={false}
+              options={
+                assignees.length === 0
+                  ? [{ value: '', label: 'Chưa có kỹ sư thuộc địa bàn này' }]
+                  : assignees.map((a) => ({
+                      value: a.user_id || '',
+                      label: a.full_name || a.user_id || '',
+                      nativeLabel: a.full_name || a.user_id || '',
+                      dotColor: 'bg-blue-500',
+                    }))
+              }
+            />
           </div>
 
           {/* Ghi chú vật tư / yêu cầu kỹ thuật */}

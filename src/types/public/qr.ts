@@ -5,6 +5,8 @@
 export interface PublicQrInfo {
     segment_name: string | null
     commune_name: string | null
+    can_report: boolean
+    reason: string | null
 }
 
 export interface PublicQrLookupRequest {

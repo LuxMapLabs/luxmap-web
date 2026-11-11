@@ -20,8 +20,9 @@ import { ProposalFaultsModal } from './ProposalFaultsModal'
 import type {
   AutoDispatchPreview,
   DispatchProposal,
-} from '../../../types/work-schedule/autoDispatch'
-import type { WorkOrderAssignee } from '../../../types/workorders/orders'
+  WorkOrderAssignee,
+} from '../../../types/workorders/orders'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 interface AutoDispatchModalProps {
   isOpen: boolean
@@ -364,7 +365,7 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
                         </label>
                         <input
                           type="date"
-                          value={item.scheduled_date}
+                          value={item.scheduled_date || ''}
                           onChange={(e) =>
                             handleUpdateProposal(idx, {
                               scheduled_date: e.target.value,
@@ -381,25 +382,34 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
                           <User className="w-3.5 h-3.5 text-slate-400" />
                           Kỹ sư phụ trách:
                         </label>
-                        <select
+                        <OpsSelect
                           value={item.assigned_to || ''}
-                          onChange={(e) => {
-                            const val = e.target.value || null
-                            const eng = engineers.find((en) => en.user_id === val)
+                          onChange={(val) => {
+                            const nextVal = val || null
+                            const eng = engineers.find((en) => en.user_id === nextVal)
                             handleUpdateProposal(idx, {
-                              assigned_to: val,
+                              assigned_to: nextVal,
                               assigned_to_name: eng?.full_name || null,
                             })
                           }}
-                          className="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-2 outline-none focus:border-teal-500 focus:bg-white transition cursor-pointer"
-                        >
-                          <option value="">-- Chưa gán (Mở để nhận sau) --</option>
-                          {engineers.map((eng) => (
-                            <option key={eng.user_id || ''} value={eng.user_id || ''}>
-                              {eng.full_name || eng.user_id}
-                            </option>
-                          ))}
-                        </select>
+                          icon={<User className="w-3.5 h-3.5" />}
+                          headerLabel="Kỹ sư hiện trường"
+                          headerBadge={`${engineers.length} kỹ sư`}
+                          ariaLabel="Kỹ sư phụ trách"
+                          className="w-full"
+                          triggerClassName="w-full min-h-[38px] px-3 py-1.5"
+                          popoverClassName="w-full"
+                          showTriggerBadge={false}
+                          options={[
+                            { value: '', label: '-- Chưa gán (Mở để nhận sau) --' },
+                            ...engineers.map((eng) => ({
+                              value: eng.user_id || '',
+                              label: eng.full_name || eng.user_id || '',
+                              nativeLabel: eng.full_name || eng.user_id || '',
+                              dotColor: 'bg-blue-500',
+                            })),
+                          ]}
+                        />
                         {isOverQuota && (
                           <span className="text-[10px] font-bold text-amber-600 flex items-center gap-1 mt-0.5">
                             <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
@@ -525,8 +535,8 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
         <ProposalFaultsModal
           isOpen={!!viewingFaultsProposal}
           onClose={() => setViewingFaultsProposal(null)}
-          proposalTitle={viewingFaultsProposal.title}
-          segmentName={viewingFaultsProposal.segment_name || viewingFaultsProposal.segment_id}
+          proposalTitle={viewingFaultsProposal.title || ''}
+          segmentName={viewingFaultsProposal.segment_name || viewingFaultsProposal.segment_id || ''}
           faultIds={viewingFaultsProposal.fault_ids || []}
           poleIds={viewingFaultsProposal.pole_ids || []}
         />

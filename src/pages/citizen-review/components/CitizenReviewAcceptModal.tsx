@@ -4,6 +4,7 @@ import { CheckCircle2, X, Loader2 } from 'lucide-react'
 import type { FaultType } from '../../../types/common/enums'
 import { faultTypeLabel } from '../../../utils/citizen-report/citizenReviewFormat'
 import type { AcceptCitizenReportRequest } from '../../../types/citizen-reports/citizen-reports'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 export interface CitizenReviewAcceptModalProps {
   isOpen: boolean
@@ -83,17 +84,23 @@ export const CitizenReviewAcceptModal: React.FC<CitizenReviewAcceptModalProps> =
             <label className="font-bold text-slate-800 dark:text-slate-200">
               Loại sự cố chuyển hóa <span className="text-rose-500">*</span>
             </label>
-            <select
+            <OpsSelect
               value={faultType}
-              onChange={(e) => setFaultType(e.target.value as FaultType)}
-              className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition cursor-pointer"
-            >
-              {acceptableFaultTypes.map((ft) => (
-                <option key={ft} value={ft}>
-                  {faultTypeLabel(ft)}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setFaultType(val as FaultType)}
+              icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+              headerLabel="Loại sự cố kỹ thuật"
+              ariaLabel="Loại sự cố chuyển hóa"
+              className="w-full"
+              triggerClassName="w-full min-h-[40px] px-3 py-2"
+              popoverClassName="w-full"
+              showTriggerBadge={false}
+              options={acceptableFaultTypes.map((ft) => ({
+                value: ft,
+                label: faultTypeLabel(ft),
+                nativeLabel: faultTypeLabel(ft),
+                dotColor: 'bg-emerald-500',
+              }))}
+            />
             <p className="text-[10.5px] text-slate-400">
               * Chỉ hiển thị các loại sự cố phù hợp với nội dung người dân đã báo.
             </p>

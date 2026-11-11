@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, CheckCircle, UserCheck, Ban, AlertTriangle, Calendar, ArrowRight } from 'lucide-react'
 import { WorkOrderAssignee } from '../../../types/workorders/orders'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 interface ApproveCancellationModalProps {
   isOpen: boolean
@@ -212,24 +213,38 @@ export const ApproveCancellationModal: React.FC<ApproveCancellationModalProps> =
                 <label className="text-xs font-bold text-slate-700">
                   Chỉ định Kỹ sư hiện trường tiếp quản (*):
                 </label>
-                <select
-                  required
+                <OpsSelect
                   value={newAssigneeId}
-                  onChange={(e) => setNewAssigneeId(e.target.value)}
-                  className="p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Chọn kỹ sư tiếp quản nhiệm vụ --</option>
-                  {currentAssigneeName && (
-                    <option value="__current__" className="text-blue-700 font-bold">
-                      🔄 Giữ nguyên: {currentAssigneeName.replace(/^Kỹ sư\s+/i, '')}
-                    </option>
-                  )}
-                  {(availableAssignees.length > 0 ? availableAssignees : assignees).map((a) => (
-                    <option key={a.user_id} value={a.user_id || ''}>
-                      👤 {a.full_name} ({a.user_id})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setNewAssigneeId(val)}
+                  icon={<UserCheck className="w-3.5 h-3.5" />}
+                  headerLabel="Kỹ sư tiếp quản nhiệm vụ"
+                  ariaLabel="Chỉ định Kỹ sư hiện trường tiếp quản"
+                  className="w-full"
+                  triggerClassName="w-full min-h-[42px] px-3 py-2"
+                  popoverClassName="w-full"
+                  showTriggerBadge={false}
+                  options={[
+                    { value: '', label: '-- Chọn kỹ sư tiếp quản nhiệm vụ --' },
+                    ...(currentAssigneeName
+                      ? [
+                          {
+                            value: '__current__',
+                            label: `Giữ nguyên: ${currentAssigneeName.replace(/^Kỹ sư\s+/i, '')}`,
+                            nativeLabel: `🔄 Giữ nguyên: ${currentAssigneeName.replace(/^Kỹ sư\s+/i, '')}`,
+                            dotColor: 'bg-amber-400',
+                          },
+                        ]
+                      : []),
+                    ...(availableAssignees.length > 0 ? availableAssignees : assignees).map(
+                      (a) => ({
+                        value: a.user_id || '',
+                        label: `${a.full_name} (${a.user_id})`,
+                        nativeLabel: `👤 ${a.full_name} (${a.user_id})`,
+                        dotColor: 'bg-blue-500',
+                      })
+                    ),
+                  ]}
+                />
               </div>
 
               {/* Chọn Ngày làm việc mới (Phương án B: 1 ô chọn duy nhất, tự động đồng bộ hạn chót) */}

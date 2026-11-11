@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import rootReducer from '../../../../../redux/rootReducer'
 import { PolesTab } from '../../../../../pages/assets/components/poles/PolesTab'
+import { BulkPoleQrPrintModal } from '../../../../../pages/assets/components/poles/components/BulkPoleQrPrintModal'
+import { qrCodeAPI } from '../../../../../feature/qr-code/qrCodeAPI'
 import { StatusBadge } from '../../../../../components/StatusBadge'
 import { PoleTable } from '../../../../../pages/assets/components/poles/components/PoleTable'
 import { PoleDetailModal } from '../../../../../pages/assets/components/poles/components/PoleDetailModal'
@@ -569,6 +571,67 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       fireEvent.click(confirmBtn)
 
       expect(mockDelete).toHaveBeenCalledWith(mockPoleWithActiveWarranty.pole_id)
+    })
+
+    it('BulkPoleQrPrintModal xử lý đủ 2 trường hợp: cột đã có QR thì lấy luôn, cột chưa có QR thì tự động cấp mới', async () => {
+      const getQrSpy = vi.spyOn(qrCodeAPI, 'getQrCodes').mockImplementation(async (params) => {
+        if (params?.pole_id === mockPoleWithActiveWarranty.pole_id) {
+          return {
+            items: [
+              {
+                qr_id: 'qr_existing_01',
+                code: 'QR-EXIST-01',
+                url: 'https://luxmap.vn/r/QR-EXIST-01',
+                pole_id: mockPoleWithActiveWarranty.pole_id,
+                commune_id: 'commune_tl8',
+                active: true,
+                created_at: '2026-10-12T00:00:00Z',
+                created_by: 'manager',
+                revoked_at: null,
+                revoked_by: null,
+              },
+            ],
+            total: 1,
+            page: 1,
+            page_size: 1,
+          }
+        }
+        return { items: [], total: 0, page: 1, page_size: 1 }
+      })
+
+      const issueQrSpy = vi.spyOn(qrCodeAPI, 'issueQrCode').mockResolvedValue({
+        qr_id: 'qr_new_02',
+        code: 'QR-NEW-02',
+        url: 'https://luxmap.vn/r/QR-NEW-02',
+        pole_id: mockPoleWithExpiringWarranty.pole_id,
+        commune_id: 'commune_tl8',
+        active: true,
+        created_at: '2026-10-12T00:00:00Z',
+        created_by: 'manager',
+        revoked_at: null,
+        revoked_by: null,
+      })
+
+      render(
+        <BulkPoleQrPrintModal
+          isOpen={true}
+          poles={[mockPoleWithActiveWarranty, mockPoleWithExpiringWarranty]}
+          segments={[mockSegment]}
+          onClose={vi.fn()}
+        />
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('QR-EXIST-01')).toBeInTheDocument()
+        expect(screen.getByText('QR-NEW-02')).toBeInTheDocument()
+      })
+
+      expect(getQrSpy).toHaveBeenCalledTimes(2)
+      expect(issueQrSpy).toHaveBeenCalledTimes(1)
+      expect(issueQrSpy).toHaveBeenCalledWith({ pole_id: mockPoleWithExpiringWarranty.pole_id })
+
+      getQrSpy.mockRestore()
+      issueQrSpy.mockRestore()
     })
   })
 })

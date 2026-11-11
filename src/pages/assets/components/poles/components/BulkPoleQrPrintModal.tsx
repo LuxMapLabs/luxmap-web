@@ -52,7 +52,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
     return map
   }, [segments])
 
-  // Chỉ đọc mã QR đang hiệu lực của các cột được chọn, KHÔNG tự cấp mã mới
+  // Tự động lấy mã QR đang hiệu lực (Trường hợp 1) hoặc tự động cấp mã QR mới nếu cột chưa có (Trường hợp 2)
   useEffect(() => {
     if (!isOpen || poles.length === 0) {
       setDecals([])
@@ -70,6 +70,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
       const results: DecalItem[] = []
       const skippedItems: SkippedPole[] = []
       const total = poles.length
+      let newlyIssuedCount = 0
 
       for (let i = 0; i < total; i++) {
         if (isCancelled) return
@@ -82,10 +83,10 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
         const comName = pole.commune_name || pole.commune_id || 'Địa bàn chung'
 
         try {
-          // 1. Kiểm tra mã QR active của cột đèn từ Backend
           let activeQrUrl = ''
           let activeQrCode = ''
 
+          // Trường hợp 1: Kiểm tra cột đèn đã có mã QR đang hiệu lực từ Backend hay chưa
           const listRes = await qrCodeAPI.getQrCodes({
             pole_id: pole.pole_id,
             active: true,
@@ -96,6 +97,16 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
           if (listRes.items && listRes.items.length > 0 && listRes.items[0]?.url) {
             activeQrUrl = listRes.items[0].url
             activeQrCode = listRes.items[0].code || ''
+          } else if (pole.pole_id) {
+            // Trường hợp 2: Cột chưa có mã QR đang hiệu lực -> Tự động cấp mã QR mới
+            const issuedRes = await qrCodeAPI.issueQrCode({
+              pole_id: pole.pole_id,
+            })
+            if (issuedRes?.url) {
+              activeQrUrl = issuedRes.url
+              activeQrCode = issuedRes.code || ''
+              newlyIssuedCount++
+            }
           }
 
           if (activeQrUrl) {
@@ -117,11 +128,11 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
               qrCodeText: activeQrCode,
             })
           } else {
-            skippedItems.push({ poleCode, reason: 'Chưa có mã QR đang hiệu lực' })
+            skippedItems.push({ poleCode, reason: 'Không thể cấp hoặc tải mã QR' })
           }
         } catch (err) {
-          console.error(`Lỗi tải mã QR cho cột ${poleCode}:`, err)
-          skippedItems.push({ poleCode, reason: 'Không tải được mã QR' })
+          console.error(`Lỗi tải/cấp mã QR cho cột ${poleCode}:`, err)
+          skippedItems.push({ poleCode, reason: 'Không thể tải hoặc cấp mới mã QR' })
         }
 
         setProgress(Math.round(((i + 1) / total) * 100))
@@ -132,10 +143,16 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
         setSkipped(skippedItems)
         setIsGenerating(false)
         if (results.length > 0) {
-          toast.success(`Đã chuẩn bị ${results.length} tem QR để in.`)
+          if (newlyIssuedCount > 0) {
+            toast.success(
+              `Đã chuẩn bị ${results.length} tem QR để in (tự động cấp mới ${newlyIssuedCount} mã).`
+            )
+          } else {
+            toast.success(`Đã chuẩn bị ${results.length} tem QR để in.`)
+          }
         }
         if (skippedItems.length > 0) {
-          toast.warning(`${skippedItems.length} cột chưa có mã QR nên không được in.`)
+          toast.warning(`${skippedItems.length} cột gặp lỗi nên không thể in tem QR.`)
         }
       }
     }
@@ -312,7 +329,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
           <div className="px-5 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-100 dark:border-blue-900/40 flex items-center justify-between text-xs text-blue-700 dark:text-blue-300 shrink-0 print:hidden">
             <div className="flex items-center gap-2 font-medium">
               <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              <span>Đang tải mã QR đã cấp của {poles.length} cột đèn đã chọn...</span>
+              <span>Đang tải hoặc tự động cấp mã QR cho {poles.length} cột đèn đã chọn...</span>
             </div>
             <div className="w-36 bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
               <div
@@ -332,7 +349,7 @@ export const BulkPoleQrPrintModal: React.FC<BulkPoleQrPrintModalProps> = ({
                 <span>{skipped.length} cột không được in tem</span>
               </div>
               <p className="mt-1 text-amber-700 dark:text-amber-300">
-                Hệ thống không tự cấp mã QR khi in. Hãy cấp mã cho các cột này trước (ở phần chi tiết cột), rồi chọn lại để in.
+                Không thể tải hoặc tự động cấp mã QR cho các cột dưới đây. Vui lòng kiểm tra kết nối và thử lại.
               </p>
               <ul className="mt-2 flex flex-wrap gap-1.5">
                 {skipped.map((item) => (

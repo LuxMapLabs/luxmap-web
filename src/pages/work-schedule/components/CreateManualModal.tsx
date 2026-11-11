@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, MapPin, User, FileText } from 'lucide-react'
+import { X, Calendar, MapPin, User, FileText, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
 import { PoleSelector } from './PoleSelector'
 import { FaultSelector } from './FaultSelector'
 import { assetAPI } from '../../../feature/assets/assetAPI'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 interface CreateManualModalProps {
   isOpen: boolean
@@ -265,15 +266,41 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
             {/* Giai đoạn khởi đầu */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-700">Khởi động tại giai đoạn (*):</label>
-              <select
+              <OpsSelect
                 value={initPhase}
-                onChange={(e) => setInitPhase(e.target.value as TaskKind)}
-                className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="survey">🟡 1. Khảo sát</option>
-                <option value="inspection">🔵 2. Kiểm tra</option>
-                <option value="repair">🟢 3. Sửa chữa</option>
-              </select>
+                onChange={(val) => setInitPhase(val as TaskKind)}
+                icon={<Layers className="w-3.5 h-3.5" />}
+                headerLabel="Giai đoạn khởi động"
+                headerBadge="3 giai đoạn"
+                ariaLabel="Khởi động tại giai đoạn"
+                className="w-full"
+                triggerClassName="w-full min-h-[42px] px-3 py-2"
+                popoverClassName="w-full"
+                showTriggerBadge={false}
+                options={[
+                  {
+                    value: 'survey',
+                    label: '1. Khảo sát',
+                    nativeLabel: '🟡 1. Khảo sát',
+                    subLabel: 'Rà quét camera AI & đo kiểm toàn tuyến ban đêm',
+                    dotColor: 'bg-amber-400',
+                  },
+                  {
+                    value: 'inspection',
+                    label: '2. Kiểm tra',
+                    nativeLabel: '🔵 2. Kiểm tra',
+                    subLabel: 'Kiểm tra xác minh thực địa các cột có sự cố',
+                    dotColor: 'bg-blue-500',
+                  },
+                  {
+                    value: 'repair',
+                    label: '3. Sửa chữa',
+                    nativeLabel: '🟢 3. Sửa chữa',
+                    subLabel: 'Khắc phục & thay thế thiết bị cho sự cố đã xác nhận',
+                    dotColor: 'bg-emerald-500',
+                  },
+                ]}
+              />
             </div>
 
             {/* Tiêu đề vụ việc */}
@@ -295,17 +322,24 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 <MapPin className="w-3.5 h-3.5 text-slate-500" />
                 Tuyến đường (*):
               </label>
-              <select
+              <OpsSelect
                 value={segment}
-                onChange={(e) => setSegment(e.target.value)}
-                className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {segmentsList.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSegment(val)}
+                icon={<MapPin className="w-3.5 h-3.5" />}
+                headerLabel="Danh sách tuyến đường"
+                headerBadge={`${segmentsList.length} tuyến`}
+                ariaLabel="Tuyến đường"
+                className="w-full"
+                triggerClassName="w-full min-h-[42px] px-3 py-2"
+                popoverClassName="w-full"
+                showTriggerBadge={false}
+                options={segmentsList.map((s) => ({
+                  value: s,
+                  label: s,
+                  nativeLabel: s,
+                  dotColor: 'bg-teal-500',
+                }))}
+              />
             </div>
 
             {/* 2. Với Kiểm tra: Chọn cột đèn có sự cố trên tuyến */}
@@ -339,21 +373,28 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 <User className="w-3.5 h-3.5 text-slate-500" />
                 Kỹ sư hiện trường phụ trách (*):
               </label>
-              <select
+              <OpsSelect
                 value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-                className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {assignees.length === 0 ? (
-                  <option value="">Chưa có kỹ sư thuộc địa bàn này</option>
-                ) : (
-                  assignees.map((a) => (
-                    <option key={a.user_id || ''} value={a.user_id || ''}>
-                      {a.full_name || a.user_id || ''}
-                    </option>
-                  ))
-                )}
-              </select>
+                onChange={(val) => setAssigneeId(val)}
+                icon={<User className="w-3.5 h-3.5" />}
+                headerLabel="Kỹ sư hiện trường"
+                headerBadge={`${assignees.length} kỹ sư`}
+                ariaLabel="Kỹ sư hiện trường phụ trách"
+                className="w-full"
+                triggerClassName="w-full min-h-[42px] px-3 py-2"
+                popoverClassName="w-full"
+                showTriggerBadge={false}
+                options={
+                  assignees.length === 0
+                    ? [{ value: '', label: 'Chưa có kỹ sư thuộc địa bàn này' }]
+                    : assignees.map((a) => ({
+                        value: a.user_id || '',
+                        label: a.full_name || a.user_id || '',
+                        nativeLabel: a.full_name || a.user_id || '',
+                        dotColor: 'bg-blue-500',
+                      }))
+                }
+              />
             </div>
 
             {/* Ngày thực hiện - Không khóa, luôn cho phép chọn trực tiếp */}

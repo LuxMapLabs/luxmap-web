@@ -1,7 +1,7 @@
 import apiClient from '../../config/apiClient'
 import type {
   CabinetPropertiesFeatureCollection,
-  CabinetTopologyEdgePropertiesFeatureCollection,
+  CabinetTopology,
 } from '../../types/map/cabinets'
 import type {
   PolePropertiesFeatureCollection,
@@ -55,8 +55,8 @@ export const mapAPI = {
    */
   getCabinetTopology: async (
     cabinetId: string
-  ): Promise<CabinetTopologyEdgePropertiesFeatureCollection> => {
-    const response = await apiClient.get<CabinetTopologyEdgePropertiesFeatureCollection>(
+  ): Promise<CabinetTopology> => {
+    const response = await apiClient.get<CabinetTopology>(
       `/map/cabinets/${encodeURIComponent(cabinetId)}/topology`
     )
     return response.data

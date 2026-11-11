@@ -32,3 +32,7 @@ export interface MapBounds {
     center?: MapCenter
 }
 
+export interface UpdateProfileRequest {
+    full_name?: string | null
+}
+

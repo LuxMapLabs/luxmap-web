@@ -33,7 +33,7 @@ import { RecurringSurveyModal } from './components/RecurringSurveyModal'
 import { fetchFaultsList } from '../../feature/dashboard/dashboardAPI'
 import { NOTIFICATION_TARGET_PARAMS } from '../../utils/notifications/notificationRoute'
 import { formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
-import type { SurveyRecurringItem } from '../../types/work-schedule/recurring'
+import type { SurveyRecurringItem } from '../../types/survey-schedules/recurring'
 
 export const WorkSchedulePage: React.FC = () => {
   const dispatch = useDispatch()

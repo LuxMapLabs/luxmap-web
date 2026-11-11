@@ -85,7 +85,7 @@ export const OpsSelect: React.FC<OpsSelectProps> = ({
   }, [isOpen])
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : ''} ${className}`}>
       {/* Thẻ select ẩn giữ nguyên khả năng tương thích với form và các bộ test tự động */}
       <select
         aria-label={ariaLabel || headerLabel}

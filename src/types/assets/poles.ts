@@ -40,6 +40,7 @@ export interface PoleListItem {
     near_sensitive_poi: boolean
     location: AssetLocation
     active_fixture?: ActiveFixture
+    active_fixtures?: ActiveFixture[]
     note?: string | null
     updated_at: string | null
     updated_by?: string | null
