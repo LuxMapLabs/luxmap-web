@@ -6,6 +6,7 @@ import type { RootState } from '../../../redux/rootReducer'
 import type { UserAccountItem, UpdateUserRequest } from '../../../types/admin/users'
 import type { UserRole } from '../../../types/common/enums'
 import { USER_ROLE_LABELS } from '../../../constants/enums'
+import { UserAvatar } from '../../../components/UserAvatar'
 
 export interface EditUserModalProps {
   isOpen: boolean
@@ -108,9 +109,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         {/* Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white/50 dark:bg-slate-950/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-secondary/10 dark:bg-primary text-primary dark:text-secondary flex items-center justify-center shadow-2xs">
-              <User className="w-5 h-5" />
-            </div>
+            <UserAvatar
+              avatarUrl={user.avatar_url}
+              initials={<User className="w-5 h-5" />}
+              alt={user.full_name || user.username || ''}
+              className="w-10 h-10 rounded-2xl bg-secondary/10 dark:bg-primary text-primary dark:text-secondary flex items-center justify-center shadow-2xs"
+            />
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">
                 Cập Nhật Thông Tin Tài Khoản

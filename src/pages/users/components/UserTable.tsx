@@ -15,6 +15,7 @@ import type { RootState } from '../../../redux/rootReducer'
 import type { UserAccountItem } from '../../../types/admin/users'
 import { getUserRoleBadge } from '../../../constants/enums'
 import { UserTableSkeleton } from './UserTableSkeleton'
+import { UserAvatar } from '../../../components/UserAvatar'
 
 export interface UserTableProps {
   users: UserAccountItem[]
@@ -173,11 +174,12 @@ export const UserTable: React.FC<UserTableProps> = ({
                     {/* User Info */}
                     <td className="py-2.5 px-3.5">
                       <div className="flex items-center gap-2.5">
-                        <div
+                        <UserAvatar
+                          avatarUrl={user.avatar_url}
+                          initials={initials}
+                          alt={user.full_name || user.username || ''}
                           className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] font-mono tracking-tight shrink-0 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700 shadow-2xs"
-                        >
-                          {initials}
-                        </div>
+                        />
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-900 dark:text-white truncate">
                             {user.full_name || user.username}

@@ -21,6 +21,7 @@ import { openExportModal } from '../feature/assets/assetSlice'
 import type { CurrentUserResponse } from '../types/auth/me'
 import { getRoleName, isAdmin, isManagementAgency, isMaintenanceEngineer, isFieldCrew } from '../utils/roleUtils'
 import { ProfileModal } from './ProfileModal'
+import { UserAvatar } from './UserAvatar'
 import { NotificationBell } from './NotificationBell'
 
 export interface HeaderProps {
@@ -228,9 +229,12 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               {/* Avatar with deep sapphire gradient */}
-              <div className="w-9 h-9 rounded-2xl bg-linear-to-tr from-blue-600 via-indigo-600 to-blue-500 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20 ring-2 ring-blue-100 group-hover:scale-105 group-hover:ring-blue-200 transition-all duration-200">
-                {effectiveInitials}
-              </div>
+              <UserAvatar
+                avatarUrl={user?.avatar_url}
+                initials={effectiveInitials}
+                alt={effectiveName}
+                className="w-9 h-9 rounded-2xl bg-linear-to-tr from-blue-600 via-indigo-600 to-blue-500 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20 ring-2 ring-blue-100 group-hover:scale-105 group-hover:ring-blue-200 transition-all duration-200"
+              />
 
               <ChevronDown
                 className={`w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-transform duration-200 hidden sm:block ${
@@ -245,9 +249,12 @@ export const Header: React.FC<HeaderProps> = ({
                 {/* Header Section */}
                 <div className="px-4 py-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-linear-to-tr from-blue-600 via-indigo-600 to-blue-500 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-sm">
-                      {effectiveInitials}
-                    </div>
+                    <UserAvatar
+                      avatarUrl={user?.avatar_url}
+                      initials={effectiveInitials}
+                      alt={effectiveName}
+                      className="w-11 h-11 rounded-2xl bg-linear-to-tr from-blue-600 via-indigo-600 to-blue-500 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-sm"
+                    />
                     <div className="min-w-0 flex-1">
                       <h4 className="font-extrabold text-sm text-slate-900 truncate">
                         {effectiveName}

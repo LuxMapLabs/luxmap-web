@@ -68,6 +68,9 @@ const authSlice = createSlice({
     refreshProfileFailure: (state) => {
       state.isRefreshingProfile = false
     },
+    setAvatarUrl: (state, action: PayloadAction<string | null>) => {
+      if (state.user) state.user.avatar_url = action.payload
+    },
   },
 })
 
@@ -83,6 +86,7 @@ export const {
   refreshProfileRequest,
   refreshProfileSuccess,
   refreshProfileFailure,
+  setAvatarUrl,
 } = authSlice.actions
 
 export default authSlice.reducer

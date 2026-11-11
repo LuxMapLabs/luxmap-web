@@ -1,28 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Shield, Mail, MapPin, Globe, X, Camera, Pencil, User as UserIcon, Info } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Shield, Mail, MapPin, Globe, X, Camera, Pencil, User as UserIcon, Info, Trash2, Loader2 } from 'lucide-react'
 import type { CurrentUserResponse } from '../types/auth/me'
+import type { RootState } from '../redux/rootReducer'
+import { uploadAvatarRequest, removeAvatarRequest } from '../feature/avatar/avatarSlice'
+import { UserAvatar } from './UserAvatar'
 import { getRoleName, isAdmin as checkIsAdmin, isManagementAgency, isMaintenanceEngineer, isFieldCrew } from '../utils/roleUtils'
 
 export interface ProfileModalProps {
   isOpen: boolean
   onClose: () => void
   user: CurrentUserResponse | null
-  /**
-   * Lưu hồ sơ. Chưa truyền (backend chưa có PATCH /auth/me) thì nút Lưu bị khóa.
-   * `avatarFile` là ảnh đại diện mới (nếu có chọn).
-   */
-  onSave?: (data: { full_name: string; email: string; avatarFile?: File | null }) => void
+  /** Lưu hồ sơ. Chưa truyền (backend chưa có PATCH /auth/me) thì nút Lưu bị khóa. Ảnh đại diện được lưu riêng qua API avatar. */
+  onSave?: (data: { full_name: string; email: string }) => void
   isSaving?: boolean
 }
 
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024
+// Backend chỉ nhận JPEG, tối đa 1 MB
+const MAX_AVATAR_BYTES = 1024 * 1024
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, user, onSave, isSaving = false }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const dispatch = useDispatch()
+  const isAvatarSubmitting = useSelector((state: RootState) => state.avatar.isSubmitting)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -32,17 +34,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     setIsEditing(false)
     setFullName(user?.full_name || '')
     setEmail(user?.email || '')
-    setAvatarFile(null)
-    setAvatarPreview(null)
     setAvatarError(null)
   }, [isOpen, user?.user_id, user?.full_name, user?.email])
-
-  // Giải phóng URL xem trước ảnh
-  useEffect(() => {
-    return () => {
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-    }
-  }, [avatarPreview])
 
   // Escape: thoát chế độ sửa trước, rồi mới đóng hộp thoại
   useEffect(() => {
@@ -78,9 +71,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
       .join('')
       .toUpperCase() || 'U'
 
-  // Backend chưa trả ảnh đại diện; khi có sẽ là avatar_url
-  const avatarUrl = avatarPreview || (user as { avatar_url?: string | null }).avatar_url || null
-
   const hasAllCommunes = isAdmin || (user.commune_ids && user.commune_ids.includes('*'))
   const communeLabels: string[] =
     user.communes && user.communes.length > 0
@@ -91,17 +81,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      setAvatarError('Vui lòng chọn tệp ảnh.')
+    if (file.type !== 'image/jpeg') {
+      setAvatarError('Chỉ chấp nhận ảnh JPEG (.jpg).')
       return
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      setAvatarError('Ảnh tối đa 2 MB.')
+      setAvatarError('Ảnh tối đa 1 MB.')
       return
     }
     setAvatarError(null)
-    setAvatarFile(file)
-    setAvatarPreview(URL.createObjectURL(file))
+    dispatch(uploadAvatarRequest(file))
   }
 
   const nameInvalid = fullName.trim().length === 0
@@ -109,7 +98,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
 
   const handleSave = () => {
     if (!onSave || nameInvalid) return
-    onSave({ full_name: fullName.trim(), email: email.trim(), avatarFile })
+    onSave({ full_name: fullName.trim(), email: email.trim() })
   }
 
   return (
@@ -136,32 +125,44 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
           {/* Danh tính */}
           <div className="px-6 pt-8 pb-5 flex flex-col items-center text-center border-b border-slate-100">
             <div className="relative">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={displayName}
-                  className="w-24 h-24 rounded-full object-cover ring-4 ring-slate-100"
-                />
-              ) : (
-                <div className={`w-24 h-24 rounded-full ${isAdmin ? 'bg-gradient-to-br from-secondary to-primary' : 'bg-gradient-to-br from-blue-500 to-indigo-600'} text-white text-3xl font-bold flex items-center justify-center ring-4 ring-slate-100`}>
-                  {initials}
+              <UserAvatar
+                avatarUrl={user.avatar_url}
+                initials={initials}
+                alt={displayName}
+                className={`w-24 h-24 rounded-full ${isAdmin ? 'bg-gradient-to-br from-secondary to-primary' : 'bg-gradient-to-br from-blue-500 to-indigo-600'} text-white text-3xl font-bold flex items-center justify-center ring-4 ring-slate-100`}
+              />
+              {isAvatarSubmitting && (
+                <div className="absolute inset-0 rounded-full bg-white/70 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-600" />
                 </div>
               )}
               {isEditing && (
                 <>
                   <button
                     type="button"
+                    disabled={isAvatarSubmitting}
                     onClick={() => fileRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center border-2 border-white hover:bg-slate-700 transition cursor-pointer"
+                    className="disabled:opacity-50 absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center border-2 border-white hover:bg-slate-700 transition cursor-pointer"
                     title="Đổi ảnh đại diện"
                     aria-label="Đổi ảnh đại diện"
                   >
                     <Camera className="w-4 h-4" />
                   </button>
-                  <input ref={fileRef} type="file" accept="image/*" onChange={handlePickAvatar} className="hidden" />
+                  <input ref={fileRef} type="file" accept="image/jpeg" onChange={handlePickAvatar} className="hidden" />
                 </>
               )}
             </div>
+            {isEditing && user.avatar_url && (
+              <button
+                type="button"
+                disabled={isAvatarSubmitting}
+                onClick={() => dispatch(removeAvatarRequest())}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
+              >
+                <Trash2 className="w-3 h-3" />
+                Gỡ ảnh đại diện
+              </button>
+            )}
             {avatarError && <p className="mt-2 text-[11px] text-rose-600 font-medium">{avatarError}</p>}
 
             {!isEditing && (
@@ -209,7 +210,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
               {!onSave && (
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11.5px] text-amber-800">
                   <Info className="w-4 h-4 shrink-0 mt-px" />
-                  <span>Chức năng lưu hồ sơ và ảnh đại diện sẽ dùng được khi hệ thống bổ sung API tương ứng.</span>
+                  <span>Ảnh đại diện (JPEG, tối đa 1 MB) được lưu ngay khi chọn. Chức năng lưu họ tên và email sẽ dùng được khi hệ thống bổ sung API tương ứng.</span>
                 </div>
               )}
             </div>

@@ -4,6 +4,7 @@ import { LogOut } from 'lucide-react'
 import type { CurrentUserResponse } from '../types/auth/me'
 import { getRoleName } from '../utils/roleUtils'
 import { ProfileModal } from './ProfileModal'
+import { UserAvatar } from './UserAvatar'
 
 interface SidebarAccountProps {
   user: CurrentUserResponse | null
@@ -48,11 +49,12 @@ export const SidebarAccount: React.FC<SidebarAccountProps> = ({
             collapsed ? 'mx-auto h-12 w-12 justify-center' : 'min-w-0 flex-1 gap-2.5 p-2 text-left'
           }`}
         >
-          <span
+          <UserAvatar
+            avatarUrl={user?.avatar_url}
+            initials={initials}
+            alt={displayName}
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ring-2 ring-white ${avatarClassName}`}
-          >
-            {initials}
-          </span>
+          />
           {!collapsed && (
             <span className="min-w-0 flex-1 leading-tight">
               <span className="block truncate text-[13px] font-bold text-slate-800">{displayName}</span>
