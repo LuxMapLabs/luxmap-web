@@ -133,9 +133,10 @@ export const OpsSelect: React.FC<OpsSelectProps> = ({
             />
           )}
 
-          <span className="truncate font-bold text-slate-800 dark:text-slate-100">
-            {selectedOption?.label}
-          </span>
+          <span
+            data-label={selectedOption?.label}
+            className="truncate font-bold text-slate-800 dark:text-slate-100 after:content-[attr(data-label)]"
+          />
 
           {showTriggerBadge && selectedOption?.badge !== undefined && (
             <span
