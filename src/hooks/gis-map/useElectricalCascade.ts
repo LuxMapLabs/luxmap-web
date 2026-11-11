@@ -10,6 +10,7 @@ import {
 } from '../../utils/gis-map/gisSearchUtils'
 import { fetchMapLayersRequest } from '../../feature/map/mapSlice'
 import { fetchAssetsRequest } from '../../feature/assets/assetSlice'
+import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
 import { showToast } from '../../utils/toastUtils'
 import { toBboxParam } from '../../utils/gis-map/mapUtils'
 
@@ -38,7 +39,9 @@ export function useElectricalCascade({
     poles: assetPoles,
     cabinets: assetCabinets,
     feeders: assetFeeders,
+    segments: assetSegments,
   } = useSelector((state: RootState) => state.assets)
+  const dashboardSegments = useSelector((state: RootState) => state.dashboard?.segmentsList || [])
   const activeFeederModes = useSelector((state: RootState) => state.lighting?.activeFeederModes || {})
 
   // Load map layers for the account's communes (the saga reads map_bounds from the profile); reload if that frame changes.
@@ -47,12 +50,15 @@ export function useElectricalCascade({
     dispatch(fetchMapLayersRequest())
   }, [dispatch, boundsKey])
 
-  // Tự động nạp dữ liệu kiểm kê tài sản (assets) để lấy external_ref nếu chưa có
+  // Tự động nạp dữ liệu kiểm kê tài sản (assets) và danh mục tuyến đường để đảm bảo luôn có đủ tuyến cho cả Manager & Superior
   useEffect(() => {
     if (!assetPoles || assetPoles.length === 0) {
       dispatch(fetchAssetsRequest())
     }
-  }, [dispatch, assetPoles])
+    if (!dashboardSegments || dashboardSegments.length === 0) {
+      dispatch(fetchDashboardDataRequest())
+    }
+  }, [dispatch, assetPoles, dashboardSegments])
 
   // Local state for Cabinet Trip/Restore (Simulation)
   const [cabinets, setCabinets] = useState<any[]>([])
@@ -276,19 +282,11 @@ export function useElectricalCascade({
     })
   }, [rawPoles, cabinets, assetPoles, assetFeeders, assetCabinets, feederStatusMap])
 
-  // Calculate Dynamic Segments List & Info from rawSegments (API)
+  // Calculate Dynamic Segments List & Info from rawSegments (API) merged with dashboardSegments / assetSegments
   const segmentsList = useMemo(() => {
-    return rawSegments.map((f: SegmentPropertiesFeature, idx: number) => {
-      const p = (f.properties || {}) as any
-      const segId = p.segment_id || `SEG-00${idx + 1}`
+    const byId = new Map<string, SegmentInfo>()
 
-      const isFault = Boolean(p.has_active_segment_fault)
-
-      const poleCount =
-        effectivePoles.filter((pole: PoleFeature) => pole.properties?.segment_id === segId).length ||
-        p.pole_count ||
-        0
-
+    const formatCleanName = (segId: string, segName?: string | null) => {
       let cleanName =
         segId === 'SEG-001'
           ? 'Tuyến A'
@@ -297,26 +295,84 @@ export function useElectricalCascade({
           : segId === 'SEG-003'
           ? 'Tuyến C'
           : segId
-      if (p.segment_name) {
-        const raw = p.segment_name.split(' - ')[0]
+      if (segName) {
+        const raw = segName.split(' - ')[0]
         if (raw.toLowerCase().includes('tuyen a')) cleanName = 'Tuyến A'
         else if (raw.toLowerCase().includes('tuyen b')) cleanName = 'Tuyến B'
         else if (raw.toLowerCase().includes('tuyen c')) cleanName = 'Tuyến C'
         else cleanName = raw
       }
+      return cleanName
+    }
 
-      return {
+    rawSegments.forEach((f: SegmentPropertiesFeature, idx: number) => {
+      const p = (f.properties || {}) as any
+      const segId = p.segment_id || `SEG-00${idx + 1}`
+      const isFault = Boolean(p.has_active_segment_fault)
+      const poleCount =
+        effectivePoles.filter((pole: PoleFeature) => pole.properties?.segment_id === segId).length ||
+        p.pole_count ||
+        0
+      const cleanName = formatCleanName(segId, p.segment_name)
+
+      byId.set(segId, {
         id: segId,
         name: cleanName,
+        fullName: p.segment_name || cleanName,
+        externalRef: p.external_ref || undefined,
         cabinet: (p.controller_node_ids && p.controller_node_ids[0]) || `NODE-00${idx + 1}-CTRL`,
-        road: cleanName,
+        road: p.segment_name || cleanName,
         poleCount,
         lengthM: p.length_m || 0,
-        hasActiveSegmentFault: isFault || Boolean(p.has_active_segment_fault),
+        hasActiveSegmentFault: isFault,
         iotStatus: isFault ? 'offline' : 'online',
-      } as SegmentInfo
+      } as SegmentInfo)
     })
-  }, [rawSegments, cabinets, effectivePoles])
+
+    // Bổ sung các tuyến từ danh mục tài sản / dashboard nếu lớp LineString (/map/segments) chưa trả về hoặc thiếu
+    const fallbackCatalog = [
+      ...(dashboardSegments || []),
+      ...(assetSegments || []),
+    ]
+    fallbackCatalog.forEach((s, idx) => {
+      const segId = s.segment_id
+      if (!segId) return
+      const existing = byId.get(segId)
+      const poleCount =
+        effectivePoles.filter((pole: PoleFeature) => pole.properties?.segment_id === segId).length ||
+        s.pole_count ||
+        existing?.poleCount ||
+        0
+      const cleanName = formatCleanName(segId, s.segment_name)
+      if (!existing) {
+        byId.set(segId, {
+          id: segId,
+          name: cleanName,
+          fullName: s.segment_name || cleanName,
+          externalRef: s.external_ref || undefined,
+          cabinet: `NODE-00${idx + 1}-CTRL`,
+          road: s.segment_name || cleanName,
+          poleCount,
+          lengthM: s.length_m || 0,
+          hasActiveSegmentFault: false,
+          iotStatus: 'online',
+        } as SegmentInfo)
+      } else {
+        if (s.segment_name && (!existing.fullName || existing.fullName === existing.name)) {
+          existing.fullName = s.segment_name
+          existing.road = s.segment_name
+        }
+        if (s.external_ref && !existing.externalRef) {
+          existing.externalRef = s.external_ref
+        }
+        if (!existing.poleCount && poleCount > 0) {
+          existing.poleCount = poleCount
+        }
+      }
+    })
+
+    return Array.from(byId.values())
+  }, [rawSegments, dashboardSegments, assetSegments, cabinets, effectivePoles])
 
   const segmentInfoMap: Record<string, SegmentInfo> = useMemo(() => {
     const map: Record<string, SegmentInfo> = {}

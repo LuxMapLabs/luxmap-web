@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Button } from '../../../../components/Button'
-import { Search, Plus, Upload, Filter } from 'lucide-react'
+import { Search, Plus, Upload, MapPin } from 'lucide-react'
+import { OpsSelect } from '../../../../components/ops/OpsSelect'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../types/assets/segments'
 import { CabinetTable } from './components/CabinetTable'
@@ -111,10 +112,24 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
     }
   }
 
+  const geoCounts = useMemo(() => {
+    let withGeo = 0
+    let noGeo = 0
+    cabinets.forEach((cab) => {
+      if (cab.location?.lat && cab.location?.lng) withGeo++
+      else noGeo++
+    })
+    return {
+      all: cabinets.length,
+      withGeo,
+      noGeo,
+    }
+  }, [cabinets])
+
   return (
     <>
       {/* Search & Dynamic Filter Bar */}
-      <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
+      <div className="ops-rise relative z-20 bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
         {/* Left: Filters */}
         <div className="flex flex-1 flex-wrap items-center gap-3">
           {/* Search Box */}
@@ -133,21 +148,40 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
           </div>
 
           {/* Filter Status */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
-            >
-              <option value="all">Tất cả trạng thái định vị</option>
-              <option value="with_geo">Đã định vị GIS</option>
-              <option value="no_geo">Chưa định vị</option>
-            </select>
-          </div>
+          <OpsSelect
+            value={statusFilter}
+            onChange={(val) => {
+              setStatusFilter(val)
+              setCurrentPage(1)
+            }}
+            icon={<MapPin className="w-3.5 h-3.5" />}
+            headerLabel="Trạng thái định vị GIS"
+            headerBadge={`${geoCounts.all} tủ`}
+            triggerClassName="min-w-[215px]"
+            popoverClassName="w-68"
+            options={[
+              {
+                value: 'all',
+                label: 'Tất cả trạng thái định vị',
+                subLabel: 'Hiển thị toàn bộ tủ điều khiển',
+                badge: `${geoCounts.all} tủ`,
+              },
+              {
+                value: 'with_geo',
+                label: 'Đã định vị GIS',
+                subLabel: 'Đã gắn tọa độ GPS trên bản đồ',
+                dotColor: 'bg-emerald-500',
+                badge: `${geoCounts.withGeo} tủ`,
+              },
+              {
+                value: 'no_geo',
+                label: 'Chưa định vị',
+                subLabel: 'Thiếu tọa độ thực địa (cần cập nhật)',
+                dotColor: 'bg-amber-500',
+                badge: `${geoCounts.noGeo} tủ`,
+              },
+            ]}
+          />
         </div>
 
         {/* Right: Actions */}

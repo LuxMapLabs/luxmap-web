@@ -206,7 +206,7 @@ export const ManagerLayout: React.FC = () => {
 
       <div className="flex-1 min-w-0 flex flex-col gap-4">
         {(!isGis || isMobile) && (
-          <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-x-3 gap-y-2 rounded-3xl bg-white/80 px-5 py-3 shadow-ops backdrop-blur-sm shrink-0">
+          <div className="relative z-30 flex flex-wrap md:flex-nowrap items-center justify-between gap-x-3 gap-y-2 rounded-3xl bg-white/80 px-5 py-3 shadow-ops backdrop-blur-sm shrink-0">
             {isMobile && (
               <button
                 type="button"
