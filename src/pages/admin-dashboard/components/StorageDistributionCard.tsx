@@ -23,7 +23,7 @@ export const StorageDistributionCard: React.FC<StorageDistributionCardProps> = (
   const animatedFree = useCountUp(parseFloat(freeValue) || 0)
 
   const donutData = [
-    { name: 'Đã dùng', value: diskUsed, fill: disk?.low ? '#d64545' : '#3e86c9' },
+    { name: 'Đã dùng', value: diskUsed, fill: disk?.low ? '#d64545' : 'var(--color-secondary)' },
     { name: 'Trống', value: diskFree, fill: 'rgba(29, 36, 51, 0.1)' },
   ]
 
