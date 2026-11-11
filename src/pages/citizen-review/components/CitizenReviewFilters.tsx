@@ -80,7 +80,7 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
               onStatusChange(statusVal ? [statusVal] : [])
             }}
             icon={<Filter className="w-3.5 h-3.5" />}
-            headerLabel="Trạng thái thẩm định"
+            headerLabel="Trạng thái phản ánh"
             headerBadge={pendingCount > 0 ? `${pendingCount} chờ duyệt` : undefined}
             align="right"
             triggerClassName="w-full min-h-[40px]"

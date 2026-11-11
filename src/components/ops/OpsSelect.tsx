@@ -107,7 +107,7 @@ export const OpsSelect: React.FC<OpsSelectProps> = ({
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        title={title || headerLabel || selectedOption?.label}
+        title={title || selectedOption?.label}
         className={`group flex items-center justify-between gap-2.5 rounded-xl border px-2.5 py-1.5 min-h-[38px] text-xs transition-all duration-150 cursor-pointer select-none shadow-2xs ${triggerClassName} ${
           isOpen
             ? 'border-blue-500 bg-white dark:bg-slate-900 text-blue-700 dark:text-sky-300 ring-2 ring-blue-500/20 shadow-sm'
