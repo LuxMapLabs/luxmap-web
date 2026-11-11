@@ -12,7 +12,7 @@ interface BackgroundJobsCardProps {
 const stateColor = (state: JobStatusItem['state']): string => {
   if (state === 'failing') return '#d64545'
   if (state === 'stalled') return '#e9a23b'
-  return '#3e86c9'
+  return 'var(--color-secondary)'
 }
 
 export const BackgroundJobsCard: React.FC<BackgroundJobsCardProps> = ({ jobs, onSelectJob }) => {
