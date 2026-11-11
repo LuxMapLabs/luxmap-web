@@ -1,26 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
   RotateCcw,
-  Filter,
+  RefreshCw,
   Calendar,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Search,
-  MapPin,
 } from 'lucide-react'
 
 interface ReportFilterBarProps {
   currentMonth: number
   currentYear: number
   filterPhase: string
-  filterCommune: string
   searchQuery: string
   onSelectMonthYear: (month: number, year: number) => void
   onResetToday: () => void
   onFilterPhaseChange: (phase: string) => void
-  onFilterCommuneChange: (commune: string) => void
   onSearchChange: (query: string) => void
+  onRefresh: () => void
+  isLoading: boolean
 }
 
 const MONTH_NAMES = [
@@ -38,20 +37,33 @@ const MONTH_NAMES = [
   'Tháng 12',
 ]
 
+const PHASE_OPTIONS = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'survey', label: 'Khảo sát' },
+  { value: 'inspection', label: 'Kiểm tra' },
+  { value: 'repair', label: 'Sửa chữa' },
+]
+
 const YEAR_OPTIONS = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030]
 
 export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
   currentMonth,
   currentYear,
   filterPhase,
-  filterCommune,
   searchQuery,
   onSelectMonthYear,
   onResetToday,
   onFilterPhaseChange,
-  onFilterCommuneChange,
   onSearchChange,
+  onRefresh,
+  isLoading,
 }) => {
+  // Icon làm mới luôn xoay trọn vòng, chỉ dừng khi hết một vòng sau lúc tải xong
+  const [spinning, setSpinning] = useState(false)
+  useEffect(() => {
+    if (isLoading) setSpinning(true)
+  }, [isLoading])
+
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const [viewingYear, setViewingYear] = useState(currentYear)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -79,9 +91,9 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
   )
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3.5 sm:p-4 mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div className="rounded-[20px] border border-[#DCE8F3] bg-white p-3 sm:p-4 shadow-[0_8px_24px_-14px_rgba(59,99,133,0.25)] flex flex-wrap items-center gap-3">
       {/* CỤM 1: CHỌN THÁNG & NĂM ĐỒNG BỘ 100% VỚI WORK-SCHEDULE CỦA QUẢN LÝ */}
-      <div className="flex items-center gap-2.5">
+      <div className="order-2 flex items-center gap-2.5">
         <div className="relative" ref={dropdownRef}>
           <button
             type="button"
@@ -89,20 +101,20 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
               setViewingYear(currentYear)
               setIsPickerOpen(!isPickerOpen)
             }}
-            className={`flex items-center gap-2 px-3.5 py-2 bg-slate-50 border rounded-xl font-extrabold text-xs sm:text-sm text-slate-800 hover:bg-slate-100 hover:border-blue-400 transition-all cursor-pointer shadow-2xs ${
+            className={`flex items-center gap-2 px-3.5 py-2 bg-slate-50 border rounded-xl font-extrabold text-xs sm:text-sm text-slate-800 hover:bg-slate-100 hover:border-[#8FB8DA] transition-all cursor-pointer shadow-2xs ${
               isPickerOpen
-                ? 'border-blue-500 ring-2 ring-blue-500/20 bg-white text-blue-700'
+                ? 'border-[#8FB8DA] ring-2 ring-[#8FB8DA]/30 bg-white text-[#3B6385]'
                 : 'border-slate-200'
             }`}
             title="Bấm để chọn tháng và năm"
           >
-            <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+            <Calendar className="w-4 h-4 text-[#4A7AA3] shrink-0" />
             <span>
               {MONTH_NAMES[currentMonth]} / {currentYear}
             </span>
             <ChevronDown
               className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-                isPickerOpen ? 'rotate-180 text-blue-600' : ''
+                isPickerOpen ? 'rotate-180 text-[#4A7AA3]' : ''
               }`}
             />
           </button>
@@ -114,7 +126,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
                 <button
                   type="button"
                   onClick={() => setViewingYear((y) => y - 1)}
-                  className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-100 transition cursor-pointer active:scale-90"
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-[#4A7AA3] hover:bg-slate-100 transition cursor-pointer active:scale-90"
                   title="Năm trước"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -137,7 +149,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
                 <button
                   type="button"
                   onClick={() => setViewingYear((y) => y + 1)}
-                  className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-100 transition cursor-pointer active:scale-90"
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-[#4A7AA3] hover:bg-slate-100 transition cursor-pointer active:scale-90"
                   title="Năm tiếp theo"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -158,8 +170,8 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
                       }}
                       className={`py-2 px-1.5 rounded-xl text-xs font-bold transition-all text-center cursor-pointer active:scale-95 ${
                         isSelected
-                          ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20'
-                          : 'text-slate-700 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 border border-slate-200/60'
+                          ? 'bg-[#4A7AA3] text-white shadow-sm ring-2 ring-[#8FB8DA]/30'
+                          : 'text-slate-700 bg-slate-50 hover:bg-[#F3F8FC] hover:text-[#4A7AA3] border border-slate-200/60'
                       }`}
                     >
                       {name}
@@ -183,70 +195,69 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
                     onResetToday()
                     setIsPickerOpen(false)
                   }}
-                  className="text-blue-600 hover:text-blue-700 font-bold px-2.5 py-1 rounded-lg hover:bg-blue-50 transition cursor-pointer flex items-center gap-1"
+                  className="text-[#4A7AA3] hover:text-[#3B6385] font-bold px-2.5 py-1 rounded-lg hover:bg-[#F3F8FC] transition cursor-pointer flex items-center gap-1"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span>Hôm nay</span>
+                  <span>Tháng này</span>
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={onResetToday}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer active:scale-95"
-          title="Về tháng hiện tại"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Hôm nay</span>
-        </button>
       </div>
 
       {/* CỤM 2: Ô TÌM KIẾM THEO MÃ LỆNH & CÁC BỘ LỌC ĐỒNG BỘ */}
-      <div className="flex items-center gap-3 flex-wrap flex-1 justify-end">
+      <div className="contents">
         {/* Tìm kiếm theo mã lệnh công tác, tuyến đường, người phụ trách */}
-        <div className="relative min-w-[240px] max-w-[320px] flex-1">
+        <div className="relative order-1 min-w-[220px] flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Tìm mã lệnh, tuyến đường, quản lý..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all"
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:bg-white focus:border-[#8FB8DA] focus:ring-2 focus:ring-[#8FB8DA]/30 transition-all"
           />
         </div>
 
-        {/* BỘ LỌC LOẠI CÔNG TÁC ĐỒNG BỘ 100% VỚI SCHEDULE CỦA QUẢN LÝ */}
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 hover:border-slate-300 transition-colors">
-          <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <select
-            value={filterPhase}
-            onChange={(e) => onFilterPhaseChange(e.target.value)}
-            className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer"
-          >
-            <option value="all">Tất cả các giai đoạn</option>
-            <option value="survey">🟡 1. Khảo sát</option>
-            <option value="inspection">🔵 2. Kiểm tra</option>
-            <option value="repair">🟢 3. Sửa chữa</option>
-          </select>
+        {/* Lọc theo loại công tác */}
+        <div className="order-3 flex items-center gap-1 rounded-xl bg-[#EEF4FA] p-1" role="group" aria-label="Loại công tác">
+          {PHASE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onFilterPhaseChange(opt.value)}
+              aria-pressed={filterPhase === opt.value}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                filterPhase === opt.value
+                  ? 'bg-white text-[#3B6385] shadow-[0_2px_8px_-3px_rgba(59,99,133,0.4)]'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
 
-        {/* LỌC THEO ĐỊA BÀN XÃ */}
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 hover:border-slate-300 transition-colors">
-          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <select
-            value={filterCommune}
-            onChange={(e) => onFilterCommuneChange(e.target.value)}
-            className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer"
-          >
-            <option value="all">Tất cả xã / địa bàn</option>
-            <option value="COM-001">Xã Phước Hậu</option>
-            <option value="COM-002">Xã An Hải</option>
-            <option value="COM-003">Xã Phước Dinh</option>
-          </select>
-        </div>
+
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={isLoading}
+          title="Làm mới danh sách"
+          aria-label="Làm mới danh sách"
+          className="group order-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DCE8F3] bg-white text-[#3B6385] hover:bg-[#F3F8FC] active:scale-95 transition cursor-pointer disabled:opacity-60"
+        >
+          <RefreshCw
+            onAnimationIteration={() => {
+              if (!isLoading) setSpinning(false)
+            }}
+            className={`h-[18px] w-[18px] ${
+              spinning ? 'animate-spin' : 'transition-transform duration-500 group-hover:rotate-180 motion-reduce:transition-none'
+            }`}
+          />
+        </button>
       </div>
     </div>
   )
