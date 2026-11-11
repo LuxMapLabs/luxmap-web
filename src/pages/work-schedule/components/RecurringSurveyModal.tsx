@@ -19,9 +19,10 @@ import { toast } from 'sonner'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import { fetchSegmentsList } from '../../../feature/dashboard/dashboardAPI'
 import { assetAPI } from '../../../feature/assets/assetAPI'
-import type { SurveyRecurringItem } from '../../../types/work-schedule/recurring'
+import type { SurveyRecurringItem } from '../../../types/survey-schedules/recurring'
 import type { SegmentListItem } from '../../../types/assets/segments'
 import type { WorkOrderAssignee } from '../../../types/workorders/orders'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 interface RecurringSurveyModalProps {
   isOpen: boolean
@@ -291,6 +292,7 @@ export const RecurringSurveyModal: React.FC<RecurringSurveyModalProps> = ({
 
   // Bật/Tắt trạng thái hoạt động của lịch định kỳ
   const handleToggleActive = async (item: SurveyRecurringItem) => {
+    if (!item.schedule_id) return
     try {
       const newStatus = !item.is_active
       await workScheduleAPI.patchRecurringSurveySchedule(item.schedule_id, {
@@ -323,7 +325,7 @@ export const RecurringSurveyModal: React.FC<RecurringSurveyModalProps> = ({
 
   // Xác nhận xóa cấu hình lịch định kỳ
   const confirmDeleteSchedule = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget?.schedule_id) return
     setIsDeleting(true)
     try {
       await workScheduleAPI.deleteRecurringSurveySchedule(deleteTarget.schedule_id)
@@ -535,19 +537,28 @@ export const RecurringSurveyModal: React.FC<RecurringSurveyModalProps> = ({
                     <Route className="w-4 h-4 text-blue-600" />
                     Tuyến đường khảo sát: <span className="text-rose-500">*</span>
                   </label>
-                  <select
+                  <OpsSelect
                     value={selectedSegmentId}
-                    onChange={(e) => setSelectedSegmentId(e.target.value)}
-                    required
-                    className="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200/90 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-500 focus:bg-white transition cursor-pointer"
-                  >
-                    <option value="">-- Chọn tuyến đường --</option>
-                    {segments.map((seg) => (
-                      <option key={seg.segment_id} value={seg.segment_id || ''}>
-                        {seg.segment_name || seg.segment_id} ({seg.pole_count || 0} cột)
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedSegmentId(val)}
+                    icon={<Route className="w-3.5 h-3.5" />}
+                    headerLabel="Tuyến đường khảo sát"
+                    headerBadge={`${segments.length} tuyến`}
+                    ariaLabel="Tuyến đường khảo sát"
+                    className="w-full"
+                    triggerClassName="w-full min-h-[42px] px-3 py-2"
+                    popoverClassName="w-full"
+                    showTriggerBadge={false}
+                    options={[
+                      { value: '', label: '-- Chọn tuyến đường --' },
+                      ...segments.map((seg) => ({
+                        value: seg.segment_id || '',
+                        label: `${seg.segment_name || seg.segment_id} (${seg.pole_count || 0} cột)`,
+                        nativeLabel: `${seg.segment_name || seg.segment_id} (${seg.pole_count || 0} cột)`,
+                        badge: `${seg.pole_count || 0} cột`,
+                        dotColor: 'bg-teal-500',
+                      })),
+                    ]}
+                  />
                 </div>
 
                 {/* Chọn Thứ trong tuần (Hỗ trợ đa chọn Multi-select) */}
@@ -599,18 +610,30 @@ export const RecurringSurveyModal: React.FC<RecurringSurveyModalProps> = ({
                     <User className="w-4 h-4 text-blue-600" />
                     Kỹ sư phụ trách (Tùy chọn):
                   </label>
-                  <select
+                  <OpsSelect
                     value={selectedAssignee}
-                    onChange={(e) => setSelectedAssignee(e.target.value)}
-                    className="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200/90 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-500 focus:bg-white transition cursor-pointer"
-                  >
-                    <option value="">-- Để trống (Tự động chọn kỹ sư ít việc nhất) --</option>
-                    {engineers.map((eng) => (
-                      <option key={eng.user_id || ''} value={eng.user_id || ''}>
-                        {eng.full_name || eng.user_id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedAssignee(val)}
+                    icon={<User className="w-3.5 h-3.5" />}
+                    headerLabel="Kỹ sư hiện trường"
+                    headerBadge={`${engineers.length} kỹ sư`}
+                    ariaLabel="Kỹ sư phụ trách"
+                    className="w-full"
+                    triggerClassName="w-full min-h-[42px] px-3 py-2"
+                    popoverClassName="w-full"
+                    showTriggerBadge={false}
+                    options={[
+                      {
+                        value: '',
+                        label: '-- Để trống (Tự động chọn kỹ sư ít việc nhất) --',
+                      },
+                      ...engineers.map((eng) => ({
+                        value: eng.user_id || '',
+                        label: eng.full_name || eng.user_id || '',
+                        nativeLabel: eng.full_name || eng.user_id || '',
+                        dotColor: 'bg-blue-500',
+                      })),
+                    ]}
+                  />
                   <p className="text-[11px] text-slate-400">
                     Nếu để trống, hệ thống sẽ tự động chỉ định kỹ sư có ít ca nhất trong tuần chạy khảo sát.
                   </p>

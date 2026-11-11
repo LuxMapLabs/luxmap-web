@@ -39,6 +39,8 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
   const mockPublicQr: PublicQrInfo = {
     segment_name: 'Đường Tỉnh Lộ 8 (Đoạn Cầu Tân Quy)',
     commune_name: 'Xã Tân Thạnh Đông',
+    can_report: true,
+    reason: null,
   }
 
   const mockReceipt: PublicReportReceipt = {

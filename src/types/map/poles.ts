@@ -21,6 +21,7 @@ export interface PoleMapDetail {
     commune_id: string | null
     location: PoleMapLocation
     fixture?: PoleMapFixture
+    fixtures?: PoleMapFixture[]
     current_status: PoleMapStatus
     iot_node?: PoleMapIotNode
     luminance_baseline?: PoleMapBaseline
@@ -33,6 +34,7 @@ export interface PoleMapDetail {
 }
 
 export interface PoleMapFixture {
+    fixture_id: string | null
     fixture_type?: FixtureType
     power_source?: PowerSource
     lamp_watt?: number
@@ -105,6 +107,7 @@ export interface PoleProperties {
     fixture_type?: FixtureType
     lamp_watt?: number
     lamp_count?: number
+    fixture_count?: number
     install_date?: string | null
     warranty_expiry?: string | null
     warranty_status: WarrantyStatus

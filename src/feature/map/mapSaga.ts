@@ -6,7 +6,7 @@ import type { PayloadAction } from '@reduxjs/toolkit'
 import mapAPI from './mapAPI'
 import type {
   CabinetPropertiesFeatureCollection,
-  CabinetTopologyEdgePropertiesFeatureCollection,
+  CabinetTopology,
   CabinetTopologyEdgePropertiesFeature,
 } from '../../types/map/cabinets'
 import type { PolePropertiesFeatureCollection, PoleMapDetail } from '../../types/map/poles'
@@ -65,11 +65,11 @@ function* handleFetchMapLayers(
     let allTopologyEdges: CabinetTopologyEdgePropertiesFeature[] = []
     if (cabinetIds.length > 0) {
       try {
-        const topologyResults: (CabinetTopologyEdgePropertiesFeatureCollection | null)[] = yield all(
+        const topologyResults: (CabinetTopology | null)[] = yield all(
           cabinetIds.map((cabId) =>
             call(function* () {
               try {
-                const res: CabinetTopologyEdgePropertiesFeatureCollection = yield call(
+                const res: CabinetTopology = yield call(
                   mapAPI.getCabinetTopology,
                   cabId
                 )
@@ -109,7 +109,7 @@ function* handleFetchMapLayers(
 function* handleFetchCabinetTopology(action: PayloadAction<string>) {
   const cabinetId = action.payload
   try {
-    const topologyRes: CabinetTopologyEdgePropertiesFeatureCollection = yield call(
+    const topologyRes: CabinetTopology = yield call(
       mapAPI.getCabinetTopology,
       cabinetId
     )

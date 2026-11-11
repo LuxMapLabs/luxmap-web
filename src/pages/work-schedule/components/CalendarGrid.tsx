@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import { Plus, User, FileText, AlertTriangle } from 'lucide-react'
 import { ScheduleCase } from '../../../types/workSchedule'
 import { WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
-import type { SurveyRecurringItem } from '../../../types/work-schedule/recurring'
+import type { SurveyRecurringItem } from '../../../types/survey-schedules/recurring'
 
 interface CalendarGridProps {
   currentMonth: number

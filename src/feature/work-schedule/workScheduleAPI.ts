@@ -16,18 +16,16 @@ import type {
   PolePhotoItem,
   PolePhotoItemPagedResult,
   PolePhotoDecisionRequest,
-} from '../../types/workorders/orders'
-import type {
   AutoDispatchPreview,
   AutoDispatchRequest,
   BatchCreateWorkOrdersResponse,
-} from '../../types/work-schedule/autoDispatch'
+} from '../../types/workorders/orders'
 import type {
   SurveyRecurringItem,
-  SurveyRecurringPagedResult,
+  SurveyRecurringItemPagedResult,
   CreateSurveyRecurringRequest,
   PatchSurveyRecurringRequest,
-} from '../../types/work-schedule/recurring'
+} from '../../types/survey-schedules/recurring'
 
 export interface GetWorkOrdersFilter {
   scheduled_from?: string
@@ -398,11 +396,11 @@ export const workScheduleAPI = {
    * Lấy danh sách cấu hình lịch khảo sát định kỳ tuần
    * GET /api/v1/survey-schedules/recurring
    */
-  async getRecurringSurveySchedules(communeId?: string): Promise<SurveyRecurringPagedResult> {
+  async getRecurringSurveySchedules(communeId?: string): Promise<SurveyRecurringItemPagedResult> {
     const params: Record<string, any> = { page_size: 100 }
     if (communeId) params.commune_id = communeId
 
-    const response = await apiClient.get<SurveyRecurringPagedResult>(
+    const response = await apiClient.get<SurveyRecurringItemPagedResult>(
       '/survey-schedules/recurring',
       { params }
     )
