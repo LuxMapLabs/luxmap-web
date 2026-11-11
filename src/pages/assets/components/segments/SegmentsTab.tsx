@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { Button } from '../../../../components/Button'
-import { Search, Plus, Upload, Filter } from 'lucide-react'
+import { Search, Plus, Upload, Route } from 'lucide-react'
+import { OpsSelect } from '../../../../components/ops/OpsSelect'
 import type { SegmentListItem } from '../../../../types/assets/segments'
 import { SegmentTable } from './components/SegmentTable'
 import { AddSegmentModal } from './components/AddSegmentModal'
@@ -73,10 +74,25 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
     }
   }
 
+  // Thống kê nhanh theo cấp đường
+  const roadClassCounts = useMemo(() => {
+    let interCommune = 0
+    let interVillage = 0
+    segments.forEach((seg) => {
+      if (seg.road_class === 'inter_commune') interCommune++
+      else if (seg.road_class === 'inter_village') interVillage++
+    })
+    return {
+      all: segments.length,
+      interCommune,
+      interVillage,
+    }
+  }, [segments])
+
   return (
     <>
       {/* Search & Dynamic Filter Bar */}
-      <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
+      <div className="ops-rise relative z-20 bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
         {/* Left: Filters */}
         <div className="flex flex-1 flex-wrap items-center gap-3">
           {/* Search Box */}
@@ -95,21 +111,40 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
           </div>
 
           {/* Filter Road Class */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
-            <select
-              value={roadClassFilter}
-              onChange={(e) => {
-                setRoadClassFilter(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
-            >
-              <option value="all">Tất cả cấp đường</option>
-              <option value="inter_commune">Đường liên xã</option>
-              <option value="inter_village">Đường liên thôn</option>
-            </select>
-          </div>
+          <OpsSelect
+            value={roadClassFilter}
+            onChange={(val) => {
+              setRoadClassFilter(val)
+              setCurrentPage(1)
+            }}
+            icon={<Route className="w-3.5 h-3.5" />}
+            headerLabel="Phân loại cấp đường"
+            headerBadge={`${roadClassCounts.all} tuyến`}
+            triggerClassName="min-w-[195px]"
+            popoverClassName="w-68"
+            options={[
+              {
+                value: 'all',
+                label: 'Tất cả cấp đường',
+                subLabel: 'Hiển thị toàn bộ các tuyến quản lý',
+                badge: `${roadClassCounts.all} tuyến`,
+              },
+              {
+                value: 'inter_commune',
+                label: 'Đường liên xã',
+                subLabel: 'Trục giao thông chính kết nối liên xã',
+                dotColor: 'bg-blue-500',
+                badge: `${roadClassCounts.interCommune} tuyến`,
+              },
+              {
+                value: 'inter_village',
+                label: 'Đường liên thôn',
+                subLabel: 'Tuyến nhánh nội bộ thôn, ấp, khu dân cư',
+                dotColor: 'bg-teal-500',
+                badge: `${roadClassCounts.interVillage} tuyến`,
+              },
+            ]}
+          />
         </div>
 
         {/* Right: Actions */}

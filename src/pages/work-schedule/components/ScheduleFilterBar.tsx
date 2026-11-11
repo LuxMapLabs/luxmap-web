@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
 import { ScheduleCase } from '../../../types/workSchedule'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 interface ScheduleFilterBarProps {
   currentMonth: number
@@ -66,6 +67,9 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
     let pendingReport = 0
     let inProgress = 0
     let ended = 0
+    let survey = 0
+    let inspection = 0
+    let repair = 0
 
     ;(cases || []).forEach((c) => {
       ;(c?.phases || []).forEach((p) => {
@@ -73,12 +77,18 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
         const isEnded = p.status === 'ended' || c.isTerminated
         if (isEnded) {
           ended++
-        } else if (p.cancellationRequest?.status === 'pending') {
-          pendingCancel++
-        } else if (p.status === 'reported') {
-          pendingReport++
         } else {
-          inProgress++
+          if (p.phaseType === 'survey') survey++
+          else if (p.phaseType === 'inspection') inspection++
+          else if (p.phaseType === 'repair') repair++
+
+          if (p.cancellationRequest?.status === 'pending') {
+            pendingCancel++
+          } else if (p.status === 'reported') {
+            pendingReport++
+          } else {
+            inProgress++
+          }
         }
       })
     })
@@ -88,6 +98,9 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
       pendingReport,
       inProgress,
       ended,
+      survey,
+      inspection,
+      repair,
       total: pendingCancel + pendingReport + inProgress + ended,
     }
   }, [cases])
@@ -117,7 +130,7 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
   )
 
   return (
-    <div className="ops-rise bg-white rounded-[20px] shadow-ops p-3.5 sm:p-4 mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div className="ops-rise relative z-20 bg-white rounded-[20px] shadow-ops p-3.5 sm:p-4 mb-5 flex flex-wrap items-center justify-between gap-4">
       {/* Cụm chọn Tháng & Năm bằng Popover chuyên nghiệp (Chỉ chọn Tháng và Năm, không có ngày) */}
       <div className="flex items-center gap-2.5">
         <div className="relative" ref={dropdownRef}>
@@ -283,20 +296,57 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
 
       {/* Cụm bộ lọc & Nút hành động */}
       <div className="flex items-center gap-2.5 flex-wrap">
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 hover:border-slate-300 transition-colors">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <select
-            value={filterPhase === 'has_report' || filterPhase === 'has_cancel' ? 'all' : filterPhase}
-            onChange={(e) => onFilterChange(e.target.value as any)}
-            className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer"
-          >
-            <option value="all">Tất cả ({metrics.total})</option>
-            <option value="survey">🟡 1. Khảo sát</option>
-            <option value="inspection">🔵 2. Kiểm tra</option>
-            <option value="repair">🟢 3. Sửa chữa</option>
-            <option value="ended">⚪ Đã kết thúc ({metrics.ended})</option>
-          </select>
-        </div>
+        <OpsSelect
+          value={filterPhase === 'has_report' || filterPhase === 'has_cancel' ? 'all' : filterPhase}
+          onChange={(val) => onFilterChange(val as WorkScheduleState['filterPhase'])}
+          icon={<Filter className="w-3.5 h-3.5" />}
+          headerLabel="Giai đoạn ca công tác"
+          headerBadge={`${metrics.total} ca`}
+          align="right"
+          triggerClassName="min-w-[180px]"
+          popoverClassName="w-68"
+          options={[
+            {
+              value: 'all',
+              label: 'Tất cả giai đoạn',
+              nativeLabel: `Tất cả (${metrics.total})`,
+              subLabel: 'Hiển thị toàn bộ lịch trong tháng',
+              badge: `${metrics.total} ca`,
+            },
+            {
+              value: 'survey',
+              label: '1. Khảo sát',
+              nativeLabel: '🟡 1. Khảo sát',
+              subLabel: 'Ca quét camera AI & thu thập dữ liệu',
+              dotColor: 'bg-amber-400',
+              badge: metrics.survey,
+            },
+            {
+              value: 'inspection',
+              label: '2. Kiểm tra',
+              nativeLabel: '🔵 2. Kiểm tra',
+              subLabel: 'Ca kiểm tra xác minh sự cố hiện trường',
+              dotColor: 'bg-blue-500',
+              badge: metrics.inspection,
+            },
+            {
+              value: 'repair',
+              label: '3. Sửa chữa',
+              nativeLabel: '🟢 3. Sửa chữa',
+              subLabel: 'Ca khắc phục & thay thế thiết bị',
+              dotColor: 'bg-emerald-500',
+              badge: metrics.repair,
+            },
+            {
+              value: 'ended',
+              label: 'Đã kết thúc',
+              nativeLabel: `⚪ Đã kết thúc (${metrics.ended})`,
+              subLabel: 'Ca đã hoàn thành hoặc đóng hồ sơ',
+              dotColor: 'bg-slate-400',
+              badge: metrics.ended,
+            },
+          ]}
+        />
 
         {/* Nút 1: Khảo sát định kỳ tuần */}
         {onOpenRecurringSurveyModal && (

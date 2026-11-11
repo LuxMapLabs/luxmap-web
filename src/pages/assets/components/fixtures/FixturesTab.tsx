@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Button } from '../../../../components/Button'
-import { Search, Plus, Upload, Filter } from 'lucide-react'
+import { Search, Plus, Upload, Filter, Zap } from 'lucide-react'
+import { OpsSelect } from '../../../../components/ops/OpsSelect'
 import type { CreateFixtureRequest, RetireFixtureRequest } from '../../../../types/assets/fixtures'
 import type { ManagedFixture } from '../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../types/assets/poles'
@@ -125,10 +126,30 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
 
   const totalPages = Math.ceil(filteredFixtures.length / pageSize) || 1
 
+  const fixtureCounts = useMemo(() => {
+    const watts: Record<string, number> = { '60': 0, '100': 0, '120': 0, '150': 0 }
+    let active = 0
+    let retired = 0
+
+    fixtures.forEach((f) => {
+      const w = String(f.lamp_watt)
+      if (watts[w] !== undefined) watts[w]++
+      if (f.removed_date) retired++
+      else active++
+    })
+
+    return {
+      all: fixtures.length,
+      watts,
+      active,
+      retired,
+    }
+  }, [fixtures])
+
   return (
     <div className="space-y-4">
       {/* Search & Dynamic Filter Bar */}
-      <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
+      <div className="ops-rise relative z-20 bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
         {/* Left: Filters */}
         <div className="flex flex-1 flex-wrap items-center gap-3">
           {/* Search Box */}
@@ -147,39 +168,86 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
           </div>
 
           {/* Watt Filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
-            <select
-              value={wattFilter}
-              onChange={(e) => {
-                setWattFilter(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
-            >
-              <option value="all">Tất cả công suất</option>
-              <option value="60">60 W</option>
-              <option value="100">100 W</option>
-              <option value="120">120 W</option>
-              <option value="150">150 W</option>
-            </select>
-          </div>
+          <OpsSelect
+            value={wattFilter}
+            onChange={(val) => {
+              setWattFilter(val)
+              setCurrentPage(1)
+            }}
+            icon={<Zap className="w-3.5 h-3.5" />}
+            headerLabel="Công suất định mức"
+            headerBadge={`${fixtureCounts.all} bóng`}
+            triggerClassName="min-w-[175px]"
+            popoverClassName="w-64"
+            options={[
+              {
+                value: 'all',
+                label: 'Tất cả công suất',
+                subLabel: 'Mọi mức công suất đèn LED',
+                badge: `${fixtureCounts.all} bóng`,
+              },
+              {
+                value: '60',
+                label: '60 W',
+                subLabel: 'Đèn nhánh / ngõ xóm tiết kiệm điện',
+                badge: `${fixtureCounts.watts['60']} bóng`,
+              },
+              {
+                value: '100',
+                label: '100 W',
+                subLabel: 'Đèn đường liên thôn tiêu chuẩn',
+                badge: `${fixtureCounts.watts['100']} bóng`,
+              },
+              {
+                value: '120',
+                label: '120 W',
+                subLabel: 'Đèn trục chính công suất trung bình',
+                badge: `${fixtureCounts.watts['120']} bóng`,
+              },
+              {
+                value: '150',
+                label: '150 W',
+                subLabel: 'Đèn cao áp trục liên xã / tỉnh lộ',
+                badge: `${fixtureCounts.watts['150']} bóng`,
+              },
+            ]}
+          />
 
           {/* Status Filter */}
-          <div className="flex items-center gap-1.5">
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as 'all' | 'active' | 'retired')
-                setCurrentPage(1)
-              }}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Đang hoạt động</option>
-              <option value="retired">Đã tháo dỡ</option>
-            </select>
-          </div>
+          <OpsSelect
+            value={statusFilter}
+            onChange={(val) => {
+              setStatusFilter(val as 'all' | 'active' | 'retired')
+              setCurrentPage(1)
+            }}
+            icon={<Filter className="w-3.5 h-3.5" />}
+            headerLabel="Vòng đời thiết bị"
+            headerBadge={`${fixtureCounts.all} bóng`}
+            triggerClassName="min-w-[175px]"
+            popoverClassName="w-64"
+            options={[
+              {
+                value: 'all',
+                label: 'Tất cả trạng thái',
+                subLabel: 'Toàn bộ lịch sử lắp đặt bộ đèn',
+                badge: `${fixtureCounts.all} bóng`,
+              },
+              {
+                value: 'active',
+                label: 'Đang hoạt động',
+                subLabel: 'Đang gắn trên cột và vận hành',
+                dotColor: 'bg-emerald-500',
+                badge: `${fixtureCounts.active} bóng`,
+              },
+              {
+                value: 'retired',
+                label: 'Đã tháo dỡ',
+                subLabel: 'Đã thu hồi hoặc thay thế mới',
+                dotColor: 'bg-slate-400',
+                badge: `${fixtureCounts.retired} bóng`,
+              },
+            ]}
+          />
         </div>
 
         {/* Right: Actions */}

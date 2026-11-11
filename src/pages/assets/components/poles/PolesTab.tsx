@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { Button } from '../../../../components/Button'
 import { useDispatch, useSelector } from 'react-redux'
 import { Search, Plus, Upload, Filter, Printer } from 'lucide-react'
+import { OpsSelect } from '../../../../components/ops/OpsSelect'
 import type { RootState } from '../../../../redux/rootReducer'
 import { fetchMapLayersRequest } from '../../../../feature/map/mapSlice'
 import type { FixtureStatus } from '../../../../types/common/enums'
@@ -218,10 +219,45 @@ export const PolesTab: React.FC<PolesTabProps> = ({
     }
   }
 
+  const poleStatusCounts = useMemo(() => {
+    let normal = 0
+    let dim = 0
+    let out = 0
+    let unknown = 0
+    let noFixture = 0
+
+    poles.forEach((pole) => {
+      const hasFixture = Boolean(pole.active_fixture)
+      if (!hasFixture) {
+        noFixture++
+        return
+      }
+      const currentStatus: FixtureStatus =
+        (pole.pole_id && poleStatusMap.get(pole.pole_id)) ||
+        (pole.external_ref &&
+          (poleStatusMap.get(pole.external_ref) ||
+            poleStatusMap.get(pole.external_ref.toLowerCase()))) ||
+        'unknown'
+      if (currentStatus === 'normal') normal++
+      else if (currentStatus === 'dim') dim++
+      else if (currentStatus === 'out') out++
+      else unknown++
+    })
+
+    return {
+      all: poles.length,
+      normal,
+      dim,
+      out,
+      unknown,
+      noFixture,
+    }
+  }, [poles, poleStatusMap])
+
   return (
     <>
       {/* Action Toolbar */}
-      <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
+      <div className="ops-rise relative z-20 bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-1 flex-wrap items-center gap-3">
           {/* Search Box - Chiều dài co giãn giống tab Bóng đèn */}
           <div className="flex-1 min-w-60 relative">
@@ -239,24 +275,66 @@ export const PolesTab: React.FC<PolesTabProps> = ({
           </div>
 
           {/* Filter Status Dropdown */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 cursor-pointer focus:outline-none focus:border-[#1f3864] dark:focus:border-blue-500 transition"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="normal">🟢 Sáng tốt</option>
-              <option value="dim">🟡 Sáng yếu</option>
-              <option value="out">🔴 Mất sáng</option>
-              <option value="unknown">⚪ Chưa quét</option>
-              <option value="no_fixture">⚫ Chưa gắn bóng</option>
-            </select>
-          </div>
+          <OpsSelect
+            value={statusFilter}
+            onChange={(val) => {
+              setStatusFilter(val)
+              setCurrentPage(1)
+            }}
+            icon={<Filter className="w-3.5 h-3.5" />}
+            headerLabel="Trạng thái chiếu sáng"
+            headerBadge={`${poleStatusCounts.all} cột`}
+            triggerClassName="min-w-[185px]"
+            popoverClassName="w-68"
+            options={[
+              {
+                value: 'all',
+                label: 'Tất cả trạng thái',
+                subLabel: 'Hiển thị toàn bộ cột đèn trên địa bàn',
+                badge: `${poleStatusCounts.all} cột`,
+              },
+              {
+                value: 'normal',
+                label: 'Sáng tốt',
+                nativeLabel: '🟢 Sáng tốt',
+                subLabel: 'Bóng đèn hoạt động bình thường',
+                dotColor: 'bg-emerald-500',
+                badge: poleStatusCounts.normal,
+              },
+              {
+                value: 'dim',
+                label: 'Sáng yếu',
+                nativeLabel: '🟡 Sáng yếu',
+                subLabel: 'Độ rọi suy giảm, cần kiểm tra',
+                dotColor: 'bg-amber-400',
+                badge: poleStatusCounts.dim,
+              },
+              {
+                value: 'out',
+                label: 'Mất sáng',
+                nativeLabel: '🔴 Mất sáng',
+                subLabel: 'Bóng đèn tắt hoặc gặp sự cố',
+                dotColor: 'bg-rose-500',
+                badge: poleStatusCounts.out,
+              },
+              {
+                value: 'unknown',
+                label: 'Chưa quét',
+                nativeLabel: '⚪ Chưa quét',
+                subLabel: 'Chưa có dữ liệu khảo sát gần đây',
+                dotColor: 'bg-slate-300',
+                badge: poleStatusCounts.unknown,
+              },
+              {
+                value: 'no_fixture',
+                label: 'Chưa gắn bóng',
+                nativeLabel: '⚫ Chưa gắn bóng',
+                subLabel: 'Cột đèn chưa lắp đặt bộ đèn',
+                dotColor: 'bg-slate-700',
+                badge: poleStatusCounts.noFixture,
+              },
+            ]}
+          />
         </div>
 
         {/* Action Buttons: Add, Bulk QR Print & Import */}

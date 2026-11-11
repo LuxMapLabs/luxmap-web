@@ -187,7 +187,7 @@ export const SuperiorLayout: React.FC = () => {
 
       <div className="flex-1 min-w-0 flex flex-col gap-4">
         {(!isGis || isMobile) && (
-          <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-x-3 gap-y-2 rounded-3xl bg-linear-to-r from-[#D6E6F4] via-[#E8F1F9] to-[#F3F8FC] px-5 py-3 shadow-[0_12px_32px_-16px_rgba(59,99,133,0.25)] shrink-0">
+          <div className="relative z-30 flex flex-wrap md:flex-nowrap items-center justify-between gap-x-3 gap-y-2 rounded-3xl bg-linear-to-r from-[#D6E6F4] via-[#E8F1F9] to-[#F3F8FC] px-5 py-3 shadow-[0_12px_32px_-16px_rgba(59,99,133,0.25)] shrink-0">
             {isMobile && (
               <button
                 type="button"

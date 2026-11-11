@@ -1,5 +1,6 @@
 import React from 'react'
-import { Search } from 'lucide-react'
+import { Filter, MapPin, Search } from 'lucide-react'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 import type { CitizenReportStatus } from '../../../types/common/enums'
 
 export interface CitizenReviewFiltersProps {
@@ -28,7 +29,7 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
   const currentStatus = statusFilter.length === 1 ? statusFilter[0] : ''
 
   return (
-    <div className="ops-rise bg-white dark:bg-slate-900 border border-[#e2e8f0] dark:border-slate-800 rounded-xl p-4">
+    <div className="ops-rise relative z-20 bg-white dark:bg-slate-900 border border-[#e2e8f0] dark:border-slate-800 rounded-xl p-4">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         {/* 1. Tìm kiếm theo mã cột đèn (hỗ trợ cả POLE-xxxx và external_ref) */}
         <div className="relative flex-1 min-w-[200px]">
@@ -44,43 +45,80 @@ export const CitizenReviewFilters: React.FC<CitizenReviewFiltersProps> = ({
 
         {/* 2. Dropdown lọc theo Xã / Phường (chỉ khi phụ trách từ 2 xã trở lên; Manager chỉ có 1 xã) */}
         {availableCommunes.length > 1 && (
-          <div className="w-full sm:w-56 shrink-0">
-            <select
+          <div className="w-full sm:w-60 shrink-0">
+            <OpsSelect
               value={communeFilter[0] || ''}
-              onChange={(e) => {
-                const val = e.target.value
-                onCommuneChange(val ? [val] : [])
-              }}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-850 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition cursor-pointer font-medium"
-            >
-              <option value="">Tất cả địa bàn / Xã, Phường</option>
-              {availableCommunes.map((communeId) => (
-                <option key={communeId} value={communeId}>
-                  {communeNames[communeId] || communeId}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => onCommuneChange(val ? [val] : [])}
+              icon={<MapPin className="w-3.5 h-3.5" />}
+              headerLabel="Địa bàn quản lý"
+              headerBadge={`${availableCommunes.length} xã`}
+              triggerClassName="w-full min-h-[40px]"
+              popoverClassName="w-68"
+              options={[
+                {
+                  value: '',
+                  label: 'Tất cả địa bàn / Xã, Phường',
+                  subLabel: 'Hiển thị phản ánh trên toàn địa bàn',
+                },
+                ...availableCommunes.map((communeId) => ({
+                  value: communeId,
+                  label: communeNames[communeId] || communeId,
+                  subLabel: `Mã địa bàn: ${communeId}`,
+                  dotColor: 'bg-blue-500',
+                })),
+              ]}
+            />
           </div>
         )}
 
         {/* 3. Dropdown lọc theo Trạng thái phản ánh (Ngang hàng với ô tìm kiếm) */}
-        <div className="w-full sm:w-48 shrink-0">
-          <select
+        <div className="w-full sm:w-56 shrink-0">
+          <OpsSelect
             value={currentStatus}
-            onChange={(e) => {
-              const val = e.target.value as CitizenReportStatus | ''
-              onStatusChange(val ? [val] : [])
+            onChange={(val) => {
+              const statusVal = val as CitizenReportStatus | ''
+              onStatusChange(statusVal ? [statusVal] : [])
             }}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-850 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition cursor-pointer font-medium"
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="pending">
-              Chờ duyệt {pendingCount > 0 ? `(${pendingCount})` : ''}
-            </option>
-            <option value="accepted">Đã duyệt (Fault)</option>
-            <option value="merged">Đã gộp</option>
-            <option value="rejected">Đã từ chối</option>
-          </select>
+            icon={<Filter className="w-3.5 h-3.5" />}
+            headerLabel="Trạng thái thẩm định"
+            headerBadge={pendingCount > 0 ? `${pendingCount} chờ duyệt` : undefined}
+            align="right"
+            triggerClassName="w-full min-h-[40px]"
+            popoverClassName="w-68"
+            options={[
+              {
+                value: '',
+                label: 'Tất cả trạng thái',
+                subLabel: 'Toàn bộ phản ánh từ người dân',
+              },
+              {
+                value: 'pending',
+                label: 'Chờ duyệt',
+                nativeLabel: `Chờ duyệt ${pendingCount > 0 ? `(${pendingCount})` : ''}`.trim(),
+                subLabel: 'Phản ánh mới cần quản lý thẩm định',
+                dotColor: 'bg-amber-400',
+                badge: pendingCount > 0 ? pendingCount : undefined,
+              },
+              {
+                value: 'accepted',
+                label: 'Đã duyệt (Fault)',
+                subLabel: 'Đã tạo hồ sơ sự cố kỹ thuật',
+                dotColor: 'bg-emerald-500',
+              },
+              {
+                value: 'merged',
+                label: 'Đã gộp',
+                subLabel: 'Gộp vào sự cố đang mở trên cùng cột',
+                dotColor: 'bg-blue-500',
+              },
+              {
+                value: 'rejected',
+                label: 'Đã từ chối',
+                subLabel: 'Báo cáo trùng lặp hoặc không hợp lệ',
+                dotColor: 'bg-rose-500',
+              },
+            ]}
+          />
         </div>
 
         {/* 4. Huy hiệu cảnh báo có phản ánh chờ duyệt nếu pendingCount > 0 */}

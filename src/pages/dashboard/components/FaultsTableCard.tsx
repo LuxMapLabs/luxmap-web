@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
-import { AlertCircle, ChevronDown } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { OpsCard } from '../../../components/ops/OpsCard'
+import { OpsSelect } from '../../../components/ops/OpsSelect'
 import { OpsTabs } from '../../../components/ops/OpsTabs'
 import type { FaultItem } from '../../../types/faults/faults'
 
@@ -144,25 +145,61 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
   return (
     <OpsCard
       index={3}
-      className="h-full"
+      className="h-full relative z-20"
       title="Sự cố bóng đèn"
       description="Tổng hợp từ xe quét AI, khảo sát, cảm biến IoT và người dân quét QR"
       actions={
-        <label className="relative flex items-center">
-          <span className="sr-only">Lọc theo tiến độ xử lý</span>
-          <select
-            value={progressFilter}
-            onChange={(e) => setProgressFilter(e.target.value as ProgressFilterType)}
-            className="h-8 appearance-none rounded-lg border border-[#e2e8f0] bg-white pl-3 pr-8 text-xs font-semibold text-slate-700 outline-hidden cursor-pointer transition-all hover:border-teal-300 hover:bg-slate-50 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-          >
-            <option value="all">Tiến độ: Tất cả ({faults.length})</option>
-            <option value="unassigned">Chưa phân lịch ({progressCounts.unassigned})</option>
-            <option value="waiting_repair">Chờ sửa chữa ({progressCounts.waitingRepair})</option>
-            <option value="in_progress">Đang sửa chữa ({progressCounts.inProgress})</option>
-            <option value="verified">Đã nghiệm thu ({progressCounts.verified})</option>
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-slate-400" />
-        </label>
+        <OpsSelect
+          value={progressFilter}
+          onChange={(val) => setProgressFilter(val as ProgressFilterType)}
+          headerLabel="Tiến độ xử lý sự cố"
+          headerBadge={`${faults.length} sự cố`}
+          align="right"
+          ariaLabel="Lọc theo tiến độ xử lý"
+          triggerClassName="min-w-[180px] min-h-[34px] py-1"
+          popoverClassName="w-68"
+          options={[
+            {
+              value: 'all',
+              label: 'Tiến độ: Tất cả',
+              nativeLabel: `Tiến độ: Tất cả (${faults.length})`,
+              subLabel: 'Toàn bộ sự cố ghi nhận trên địa bàn',
+              badge: faults.length,
+            },
+            {
+              value: 'unassigned',
+              label: 'Chưa phân lịch',
+              nativeLabel: `Chưa phân lịch (${progressCounts.unassigned})`,
+              subLabel: 'Mới phát hiện, chờ giao ca kiểm tra',
+              dotColor: 'bg-rose-500',
+              badge: progressCounts.unassigned,
+            },
+            {
+              value: 'waiting_repair',
+              label: 'Chờ sửa chữa',
+              nativeLabel: `Chờ sửa chữa (${progressCounts.waitingRepair})`,
+              subLabel: 'Đã kiểm tra xác minh, chờ ca sửa chữa',
+              dotColor: 'bg-amber-400',
+              badge: progressCounts.waitingRepair,
+            },
+            {
+              value: 'in_progress',
+              label: 'Đang sửa chữa',
+              nativeLabel: `Đang sửa chữa (${progressCounts.inProgress})`,
+              subLabel: 'Kỹ sư đang xử lý tại hiện trường',
+              dotColor: 'bg-blue-500',
+              badge: progressCounts.inProgress,
+            },
+            {
+              value: 'verified',
+              label: 'Đã nghiệm thu',
+              nativeLabel: `Đã nghiệm thu (${progressCounts.verified})`,
+              subLabel: 'Đã hoàn tất khắc phục & xác nhận sáng',
+              dotColor: 'bg-emerald-500',
+              badge: progressCounts.verified,
+            },
+          ]}
+        />
       }
       flush
     >

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   Search,
   Zap,
@@ -8,6 +8,8 @@ import {
   Route,
   X,
   Lightbulb,
+  ChevronDown,
+  Check,
 } from 'lucide-react'
 import type { SegmentInfo, GisStats } from '../GisMapPage'
 import type { SearchResultItem } from '../../../utils/gis-map/gisSearchUtils'
@@ -47,6 +49,35 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
   segmentsList,
   isPanelOpen = false,
 }) => {
+  const [isSegmentOpen, setIsSegmentOpen] = useState(false)
+  const segmentDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isSegmentOpen) return
+    const handleMouseDown = (e: MouseEvent) => {
+      if (segmentDropdownRef.current && !segmentDropdownRef.current.contains(e.target as Node)) {
+        setIsSegmentOpen(false)
+      }
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsSegmentOpen(false)
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isSegmentOpen])
+
+  const selectedSegmentObj =
+    selectedSegment === 'all'
+      ? null
+      : segmentsList.find((s) => s.id === selectedSegment) || null
+
+  const totalPolesInSegments =
+    segmentsList.reduce((sum, s) => sum + (s.poleCount || 0), 0) || stats.total
+
   // Reusable Search Input Node
   const searchInputNode = (widthClass: string) => (
     <div className={`relative ${widthClass} bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md border border-slate-200 dark:border-slate-700/80 rounded-xl overflow-visible`}>
@@ -285,24 +316,201 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
   )
 
   // Reusable Tools Node (Segment Selector)
-  const toolsNode = (maxDropdownWidth: string) => (
-    <div className="flex items-center gap-1.5 shrink-0">
-      {/* Segment Filter Dropdown */}
-      <div className="flex items-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md border border-slate-200 dark:border-slate-700/80 rounded-xl px-2.5 py-1.5 gap-1.5 text-xs shrink-0">
-        <Route className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-        <select
-          value={selectedSegment}
-          onChange={(e) => handleSegmentSelect(e.target.value)}
-          className={`bg-transparent text-slate-800 dark:text-slate-100 font-bold focus:outline-none cursor-pointer pr-1 ${maxDropdownWidth} truncate`}
+  const toolsNode = (maxDropdownWidth: string, alignPopover: 'left' | 'right' = 'right') => (
+    <div ref={segmentDropdownRef} className="relative flex items-center gap-1.5 shrink-0 select-none">
+      {/* Hidden native select for accessibility & test compatibility */}
+      <select
+        tabIndex={-1}
+        aria-hidden="true"
+        value={selectedSegment}
+        onChange={(e) => handleSegmentSelect(e.target.value)}
+        className="sr-only absolute pointer-events-none opacity-0 w-0 h-0 -z-50"
+      >
+        <option value="all">Tất cả tuyến</option>
+        {segmentsList.map((seg) => (
+          <option key={seg.id} value={seg.id}>
+            {seg.fullName || seg.name} ({seg.poleCount} cột)
+          </option>
+        ))}
+      </select>
+
+      {/* Segment Filter Trigger Button */}
+      <button
+        type="button"
+        onClick={() => {
+          setIsSegmentOpen((prev) => !prev)
+          setIsSearchFocused(false)
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={isSegmentOpen}
+        title="Lọc bản đồ theo tuyến đường"
+        className={`group flex items-center justify-between gap-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md border rounded-xl px-2.5 py-1.5 text-xs transition-all duration-200 cursor-pointer shrink-0 ${
+          isSegmentOpen
+            ? 'border-blue-400 ring-2 ring-blue-500/20 bg-white dark:bg-slate-900 shadow-lg'
+            : 'border-slate-200/80 dark:border-slate-700/80 hover:border-blue-300 dark:hover:border-slate-600 hover:bg-white'
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 ${
+              isSegmentOpen || selectedSegment !== 'all'
+                ? 'bg-blue-600 text-white shadow-2xs'
+                : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 group-hover:bg-blue-100/80'
+            }`}
+          >
+            <Route className="w-3.5 h-3.5" />
+          </span>
+
+          <span
+            className={`font-bold text-slate-800 dark:text-slate-100 truncate ${maxDropdownWidth}`}
+          >
+            {selectedSegmentObj
+              ? selectedSegmentObj.fullName || selectedSegmentObj.name
+              : 'Tất cả tuyến'}
+          </span>
+
+          <span
+            className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold shrink-0 transition-colors ${
+              selectedSegmentObj
+                ? 'bg-blue-100/90 text-blue-800 dark:bg-blue-900/80 dark:text-blue-200'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            {selectedSegmentObj
+              ? `${selectedSegmentObj.poleCount} cột`
+              : segmentsList.length}
+          </span>
+        </div>
+
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${
+            isSegmentOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : 'group-hover:text-slate-600'
+          }`}
+        />
+      </button>
+
+      {/* Segment Filter Popover Menu */}
+      {isSegmentOpen && (
+        <div
+          role="listbox"
+          aria-label="Lọc theo tuyến đường"
+          className={`absolute ${
+            alignPopover === 'left' ? 'left-0' : 'right-0'
+          } top-full mt-2 w-74 sm:w-82 bg-white/98 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-700 rounded-2xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150`}
         >
-          <option value="all" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Tất cả tuyến</option>
-          {segmentsList.map((seg) => (
-            <option key={seg.id} value={seg.id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
-              {seg.name} - {seg.id} ({seg.poleCount} cột)
-            </option>
-          ))}
-        </select>
-      </div>
+          <div className="px-2.5 py-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 mb-1">
+            <span>Phạm vi tuyến đường</span>
+            <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800/60">
+              {segmentsList.length} tuyến · {totalPolesInSegments} cột
+            </span>
+          </div>
+
+          <div className="max-h-68 overflow-y-auto custom-scrollbar space-y-1 p-0.5">
+            {/* Option 1: Tất cả tuyến */}
+            <button
+              type="button"
+              role="option"
+              aria-selected={selectedSegment === 'all'}
+              onClick={() => {
+                handleSegmentSelect('all')
+                setIsSegmentOpen(false)
+              }}
+              className={`w-full p-2 rounded-xl flex items-center justify-between gap-2.5 text-left transition-all duration-150 cursor-pointer border ${
+                selectedSegment === 'all'
+                  ? 'bg-blue-50/90 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800 shadow-2xs'
+                  : 'border-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/70'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                    selectedSegment === 'all'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  <Route className="w-3.5 h-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold truncate">
+                    Tất cả các tuyến ({segmentsList.length})
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    Hiển thị toàn cảnh {totalPolesInSegments} cột đèn
+                  </div>
+                </div>
+              </div>
+
+              {selectedSegment === 'all' && (
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                </span>
+              )}
+            </button>
+
+            {/* Danh sách từng tuyến */}
+            {segmentsList.map((seg) => {
+              const isSelected = selectedSegment === seg.id
+              const displayTitle = seg.fullName || seg.name
+              const codeLabel = seg.externalRef || seg.id
+              return (
+                <button
+                  key={seg.id}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => {
+                    handleSegmentSelect(seg.id)
+                    setIsSegmentOpen(false)
+                  }}
+                  className={`w-full p-2 rounded-xl flex items-center justify-between gap-2.5 text-left transition-all duration-150 cursor-pointer border ${
+                    isSelected
+                      ? 'bg-blue-50/90 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800 shadow-2xs'
+                      : 'border-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/70'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400'
+                      }`}
+                    >
+                      <Route className="w-3.5 h-3.5" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold truncate">{displayTitle}</div>
+                      {codeLabel && codeLabel !== displayTitle && (
+                        <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate">
+                          Mã tuyến: {codeLabel}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-semibold font-mono ${
+                        isSelected
+                          ? 'bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-200'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {seg.poleCount} cột
+                    </span>
+                    {isSelected && (
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      </span>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -314,7 +522,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
         {/* Left Column: Search Box on top, Tools directly underneath */}
         <div className="flex flex-col gap-2 pointer-events-auto shrink-0">
           {searchInputNode('w-64 sm:w-72 md:w-80')}
-          {toolsNode('max-w-[150px] sm:max-w-[180px]')}
+          {toolsNode('max-w-[160px] sm:max-w-[190px]', 'left')}
         </div>
 
         {/* Right side on Row 1: Status Filter Pills */}
@@ -335,7 +543,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
       </div>
 
       <div className="pointer-events-auto shrink-0">
-        {toolsNode('max-w-[190px] lg:max-w-[230px]')}
+        {toolsNode('max-w-[190px] lg:max-w-[230px]', 'right')}
       </div>
     </div>
   )
