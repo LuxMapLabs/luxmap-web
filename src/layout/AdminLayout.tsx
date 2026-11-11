@@ -94,7 +94,7 @@ export const AdminLayout: React.FC = () => {
         }`}
       >
         <div className={`flex items-center gap-2.5 pb-5 pt-5 ${collapsed ? 'justify-center' : 'px-5'}`}>
-          <div className="flex items-center gap-2.5 overflow-hidden cursor-default flex-1">
+          <div className={`flex items-center gap-2.5 overflow-hidden cursor-default flex-1 ${collapsed ? 'justify-center' : ''}`}>
             <div className="h-9 w-9 text-white flex items-center justify-center shrink-0 rounded-[12px] bg-linear-to-tr from-blue-600 via-blue-700 to-indigo-700 shadow-md shadow-blue-600/25">
               <Lightbulb className="h-[18px] w-[18px] fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
             </div>
@@ -104,7 +104,7 @@ export const AdminLayout: React.FC = () => {
 
         {!collapsed && <p className="px-6 pb-1.5 text-[11px] font-bold text-slate-500">Quản trị</p>}
 
-        <nav className="flex-1 pb-4 px-3.5 space-y-1 overflow-y-auto custom-scrollbar">
+        <nav className={`flex-1 pb-4 space-y-1 overflow-y-auto overflow-x-hidden custom-scrollbar ${collapsed ? 'px-3' : 'px-3.5'}`}>
           {NAV_ITEMS.map((item) => {
             const active = item.isActive(location.pathname)
             const Icon = item.icon
