@@ -62,6 +62,7 @@ export async function fetchFixtureStatusStatistics(params: {
  */
 export async function fetchRepairTimelinessStatistics(params: {
   commune_id?: string
+  segment_id?: string
   from?: string
   to?: string
   group_by?: string
@@ -69,6 +70,7 @@ export async function fetchRepairTimelinessStatistics(params: {
   try {
     const cleanParams: Record<string, any> = {}
     if (params.commune_id) cleanParams.commune_id = params.commune_id
+    if (params.segment_id) cleanParams.segment_id = params.segment_id
     if (params.from) cleanParams.from = params.from
     if (params.to) cleanParams.to = params.to
     if (params.group_by) cleanParams.group_by = params.group_by
