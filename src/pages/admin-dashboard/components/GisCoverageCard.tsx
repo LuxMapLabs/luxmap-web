@@ -12,9 +12,6 @@ export const GisCoverageCard: React.FC<GisCoverageCardProps> = ({ communes }) =>
   const withBbox = communes.filter(
     (c) => Boolean(c.bbox && c.bbox.min_lat !== undefined && c.bbox.min_lat !== null)
   ).length
-  const withCenter = communes.filter(
-    (c) => Boolean(c.center && c.center.lat !== undefined && c.center.lat !== null)
-  ).length
 
   const coverageRatio = total > 0 ? Math.round((withBbox / total) * 100) : 0
   const isComplete = total > 0 && coverageRatio === 100
@@ -38,7 +35,7 @@ export const GisCoverageCard: React.FC<GisCoverageCardProps> = ({ communes }) =>
               )}
             </div>
             <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">
-              {withBbox}/{total} địa bàn đã số hóa ranh giới. {withCenter}/{total} địa bàn có tọa độ tâm.
+              {withBbox}/{total} địa bàn đã số hóa ranh giới.
             </p>
           </div>
         </>

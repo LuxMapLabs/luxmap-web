@@ -72,11 +72,11 @@ export const RbacOverviewCard: React.FC<RbacOverviewCardProps> = ({ users }) => 
                 <PolarRadiusAxis domain={[0, maxCount]} tick={false} axisLine={false} />
                 <Radar
                   dataKey="count"
-                  stroke="#3e86c9"
+                  stroke="var(--color-secondary)"
                   strokeWidth={2}
-                  fill="#3e86c9"
+                  fill="var(--color-secondary)"
                   fillOpacity={0.28}
-                  dot={{ r: 3, fill: '#3e86c9', stroke: '#fff', strokeWidth: 1.5 }}
+                  dot={{ r: 3, fill: 'var(--color-secondary)', stroke: '#fff', strokeWidth: 1.5 }}
                   animationDuration={1100}
                 />
               </RadarChart>

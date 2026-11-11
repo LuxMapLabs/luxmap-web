@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
-import { Printer, Download, X, ShieldCheck, Loader2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Printer, Download, X, ShieldCheck, Loader2, FileText } from 'lucide-react'
 import type { SuperiorReportItem } from '../../../types/reports/report'
 import { exportReportToPdf } from '../../../utils/reports/reportPdfGenerator'
 import { EvidenceImage } from '../../work-schedule/components/EvidenceImage'
@@ -39,8 +40,8 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
   const beforePhoto = report.evidencePhotos?.find((p) => p.kind === 'before') || report.evidencePhotos?.[0]
   const afterPhoto = report.evidencePhotos?.find((p) => p.kind === 'after') || report.evidencePhotos?.[1]
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-50 font-ops antialiased flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div
         className="w-full max-w-4xl max-h-[92vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
@@ -48,15 +49,15 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
         {/* TOPBAR MODAL */}
         <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 select-none">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0">
-              📜
+            <div className="w-10 h-10 rounded-xl bg-[#EEF4FA] text-[#4A7AA3] flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-extrabold text-slate-900">
                 Biên Bản Nghiệm Thu Kỹ Thuật
               </h2>
               <p className="text-xs text-slate-500 font-medium">
-                Mã lệnh công tác: <strong className="text-blue-700 font-mono">{report.workOrderId}</strong> • {report.communeName}
+                Mã lệnh công tác: <strong className="text-[#3B6385] font-mono">{report.workOrderId}</strong> • {report.communeName}
               </p>
             </div>
           </div>
@@ -75,7 +76,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
               type="button"
               disabled={isExporting}
               onClick={handleExportPdf}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-rose-600/20 cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#4A7AA3] hover:bg-[#3B6385] disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#4A7AA3]/25 cursor-pointer active:scale-95"
             >
               {isExporting ? (
                 <>
@@ -147,7 +148,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
 
             {/* PHẦN I: THÔNG TIN LỆNH CÔNG TÁC */}
             <div className="mb-6">
-              <h3 className="text-xs font-extrabold uppercase text-blue-700 pb-1.5 border-b border-blue-100 flex items-center gap-2 mb-3">
+              <h3 className="text-xs font-extrabold uppercase text-[#3B6385] pb-1.5 border-b border-[#DCE8F3] flex items-center gap-2 mb-3">
                 <span>I. THÔNG TIN LỆNH CÔNG TÁC</span>
               </h3>
 
@@ -156,7 +157,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                   <span className="font-semibold text-slate-500 min-w-[130px] shrink-0">
                     Mã lệnh công tác:
                   </span>
-                  <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  <span className="font-mono font-bold text-[#3B6385] bg-[#EEF4FA] px-2 py-0.5 rounded border border-[#DCE8F3]">
                     {report.workOrderId}
                   </span>
                 </div>
@@ -218,7 +219,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
 
             {/* PHẦN II: HIỆN TRẠNG SỰ CỐ & KẾT QUẢ KHẮC PHỤC */}
             <div className="mb-6">
-              <h3 className="text-xs font-extrabold uppercase text-blue-700 pb-1.5 border-b border-blue-100 flex items-center gap-2 mb-3">
+              <h3 className="text-xs font-extrabold uppercase text-[#3B6385] pb-1.5 border-b border-[#DCE8F3] flex items-center gap-2 mb-3">
                 <span>II. HIỆN TRẠNG SỰ CỐ & KẾT QUẢ KHẮC PHỤC</span>
               </h3>
 
@@ -242,7 +243,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
             {/* PHẦN III: MINH CHỨNG HÌNH ẢNH HIỆN TRƯỜNG */}
             {report.evidencePhotos && report.evidencePhotos.length > 0 && (
               <div className="mb-6">
-                <h3 className="text-xs font-extrabold uppercase text-blue-700 pb-1.5 border-b border-blue-100 flex items-center gap-2 mb-3">
+                <h3 className="text-xs font-extrabold uppercase text-[#3B6385] pb-1.5 border-b border-[#DCE8F3] flex items-center gap-2 mb-3">
                   <span>III. MINH CHỨNG HÌNH ẢNH HIỆN TRƯỜNG</span>
                 </h3>
 
@@ -290,7 +291,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
 
             {/* PHẦN IV: Ý KIẾN THẨM DUYỆT CỦA CÁN BỘ QUẢN LÝ */}
             <div className="mb-6">
-              <h3 className="text-xs font-extrabold uppercase text-blue-700 pb-1.5 border-b border-blue-100 flex items-center gap-2 mb-3">
+              <h3 className="text-xs font-extrabold uppercase text-[#3B6385] pb-1.5 border-b border-[#DCE8F3] flex items-center gap-2 mb-3">
                 <span>IV. Ý KIẾN THẨM DUYỆT CỦA CÁN BỘ QUẢN LÝ</span>
               </h3>
 
@@ -334,9 +335,9 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                 </p>
 
                 <div className="h-16 flex items-center justify-center my-2">
-                  <div className="border border-dashed border-blue-500 text-blue-700 bg-blue-50/70 px-3 py-1 rounded-md text-[10px] font-bold">
+                  <div className="border border-dashed border-[#4A7AA3] text-[#3B6385] bg-[#EEF4FA]/70 px-3 py-1 rounded-md text-[10px] font-bold">
                     <span>✔ ĐÃ TIẾP NHẬN HỒ SƠ</span>
-                    <span className="block text-[9px] text-blue-600 font-normal">
+                    <span className="block text-[9px] text-[#4A7AA3] font-normal">
                       Phòng Kinh tế & Hạ tầng
                     </span>
                   </div>
@@ -348,6 +349,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -372,16 +372,12 @@ button:focus-visible {
 .admin-glass-root {
   position: relative;
   isolation: isolate;
-  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
-  background:
-    radial-gradient(900px 520px at 8% 4%, rgba(250, 236, 214, 0.9), transparent 62%),
-    radial-gradient(800px 560px at 96% 10%, rgba(176, 208, 238, 0.85), transparent 62%),
-    radial-gradient(700px 500px at 50% 100%, rgba(233, 162, 59, 0.18), transparent 60%),
-    linear-gradient(180deg, #e9eef5 0%, #e3e1dc 100%);
+  font-family: var(--font-ops);
+  background: linear-gradient(180deg, #eef0f8 0%, #e8ebf5 100%);
   background-attachment: local;
 }
 
-/* Vầng sáng hổ phách như ánh đèn đường: một chuyển động duy nhất khi tải trang */
+/* Vầng sáng tím than: một chuyển động duy nhất khi tải trang */
 .admin-glass-root::before {
   content: '';
   position: absolute;
@@ -390,7 +386,7 @@ button:focus-visible {
   width: 260px;
   height: 260px;
   border-radius: 50%;
-  background: #ffc27a;
+  background: #aab0e0;
   filter: blur(70px);
   opacity: 0;
   pointer-events: none;
@@ -401,12 +397,8 @@ button:focus-visible {
 /* Khung Admin: DefaultLayout gắn class này chỉ khi người dùng là Admin.
    Sidebar và Header được làm kính mờ bằng selector lồng nên role khác không đổi. */
 .admin-shell {
-  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
-  background:
-    radial-gradient(900px 520px at 8% 4%, rgba(250, 236, 214, 0.9), transparent 62%),
-    radial-gradient(800px 560px at 96% 10%, rgba(176, 208, 238, 0.85), transparent 62%),
-    radial-gradient(700px 500px at 50% 100%, rgba(233, 162, 59, 0.18), transparent 60%),
-    linear-gradient(180deg, #e9eef5 0%, #e3e1dc 100%);
+  font-family: var(--font-ops);
+  background: linear-gradient(180deg, #eef0f8 0%, #e8ebf5 100%);
 }
 
 .admin-shell .admin-glass-root {
@@ -415,23 +407,21 @@ button:focus-visible {
 
 /* Sidebar và header nổi như hai tấm kính, cùng ngôn ngữ với tấm kính nội dung */
 .admin-shell > aside {
-  height: calc(100vh - 24px);
-  margin: 12px 0 12px 12px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(28px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 30px 70px -30px rgba(72, 84, 110, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  height: calc(100vh - 32px);
+  margin: 16px 0 16px 16px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #dfe2f1 0%, #eef0f8 55%, #ffffff 100%);
+  border: 0;
+  box-shadow: var(--shadow-ops);
 }
 
 .admin-shell > div > header {
-  height: 56px;
-  margin: 12px 12px 0;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(28px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 20px 50px -30px rgba(72, 84, 110, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  height: auto;
+  margin: 16px 16px 0;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 0;
+  box-shadow: var(--shadow-ops);
 }
 
 .admin-shell > aside .border-b,
@@ -439,13 +429,7 @@ button:focus-visible {
   border-color: rgba(29, 36, 51, 0.08);
 }
 
-/* Hạ độ bão hòa: xanh dương chói đổi sang xanh navy của dự án */
-.admin-shell > aside .bg-blue-600 {
-  background: var(--color-primary);
-  box-shadow: 0 10px 22px -12px rgba(31, 56, 100, 0.7);
-}
-
-.admin-shell > aside a:not(.bg-blue-600):hover {
+.admin-shell > aside a:hover {
   background: rgba(255, 255, 255, 0.7);
 }
 
@@ -460,34 +444,33 @@ button:focus-visible {
 .admin-shell > aside .bg-gradient-to-tr,
 .admin-shell > div > header .bg-linear-to-tr {
   background-image: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  box-shadow: 0 8px 18px -10px rgba(31, 56, 100, 0.7);
+  box-shadow: 0 8px 18px -10px rgba(59, 63, 107, 0.7);
 }
 
 .admin-shell > div > header .bg-blue-50 {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(255, 255, 255, 0.9);
+  background: #eef0f8;
+  border-color: transparent;
   color: var(--color-primary);
 }
 
 .admin-display {
-  font-family: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, sans-serif;
+  font-family: var(--font-ops);
   letter-spacing: -0.02em;
 }
 
 .glass-slab {
   position: relative;
-  border-radius: 32px;
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(34px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 40px 90px -30px rgba(72, 84, 110, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  background: #ffffff;
+  border: 0;
+  box-shadow: var(--shadow-ops);
 }
 
 .glass-tile {
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 10px 30px -18px rgba(72, 84, 110, 0.35);
+  border-radius: 20px;
+  background: #f6f7fc;
+  border: 1px solid rgba(29, 36, 51, 0.05);
+  box-shadow: none;
 }
 
 /* Chuyển động: lò xo nhẹ khi nhấc card, xuất hiện lần lượt khi tải trang */
@@ -520,8 +503,8 @@ button:focus-visible {
 
 .glass-lift:hover {
   transform: translateY(-5px);
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 26px 46px -24px rgba(72, 84, 110, 0.5);
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(15, 27, 45, 0.05), 0 18px 34px -14px rgba(59, 63, 107, 0.28);
 }
 
 .glass-chip {
@@ -532,8 +515,8 @@ button:focus-visible {
 
 .glass-item {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: #ffffff;
+  border: 1px solid rgba(29, 36, 51, 0.06);
 }
 
 .glass-track {
@@ -711,6 +694,73 @@ button:focus-visible {
   --font-mono: var(--font-ops);
 }
 
+/* Superior: đè dải màu hồng của ops-theme bằng xanh sương hồ (nhạt, ít bão hòa). Phải đứng sau .ops-theme. */
+.superior-theme {
+  --color-blue-50: #f3f8fc;
+  --color-blue-100: #e4eff8;
+  --color-blue-200: #cce0f0;
+  --color-blue-300: #b8d4ea;
+  --color-blue-400: #8fb8da;
+  --color-blue-500: #6b9bc4;
+  --color-blue-600: #4a7aa3;
+  --color-blue-700: #3b6385;
+  --color-blue-800: #324f6b;
+  --color-blue-900: #2a4158;
+  --color-blue-950: #182836;
+  --color-indigo-50: #f3f8fc;
+  --color-indigo-100: #e4eff8;
+  --color-indigo-200: #cce0f0;
+  --color-indigo-300: #b8d4ea;
+  --color-indigo-400: #8fb8da;
+  --color-indigo-500: #6b9bc4;
+  --color-indigo-600: #4a7aa3;
+  --color-indigo-700: #3b6385;
+  --color-indigo-800: #324f6b;
+  --color-indigo-900: #2a4158;
+  --color-indigo-950: #182836;
+  --color-teal-50: #f3f8fc;
+  --color-teal-100: #e4eff8;
+  --color-teal-200: #cce0f0;
+  --color-teal-300: #b8d4ea;
+  --color-teal-400: #8fb8da;
+  --color-teal-500: #6b9bc4;
+  --color-teal-600: #4a7aa3;
+  --color-teal-700: #3b6385;
+  --color-teal-800: #324f6b;
+  --color-teal-900: #2a4158;
+  --color-teal-950: #182836;
+  --color-primary: #4a7aa3;
+  --color-secondary: #6b9bc4;
+}
+
+/* Admin: dải màu slate-tím than, tách khỏi xanh sương hồ của Superior và hồng của Manager. Phải đứng sau .superior-theme. */
+.admin-theme {
+  --color-blue-50: #f4f5fa;
+  --color-blue-100: #e7e9f4;
+  --color-blue-200: #d0d4e8;
+  --color-blue-300: #aeb4d4;
+  --color-blue-400: #7f87b5;
+  --color-blue-500: #5a609a;
+  --color-blue-600: #3b3f6b;
+  --color-blue-700: #2f3358;
+  --color-blue-800: #262a47;
+  --color-blue-900: #1e2138;
+  --color-blue-950: #12142a;
+  --color-indigo-50: #f4f5fa;
+  --color-indigo-100: #e7e9f4;
+  --color-indigo-200: #d0d4e8;
+  --color-indigo-300: #aeb4d4;
+  --color-indigo-400: #7f87b5;
+  --color-indigo-500: #5a609a;
+  --color-indigo-600: #3b3f6b;
+  --color-indigo-700: #2f3358;
+  --color-indigo-800: #262a47;
+  --color-indigo-900: #1e2138;
+  --color-indigo-950: #12142a;
+  --color-primary: #3b3f6b;
+  --color-secondary: #5a609a;
+}
+
 /* Các cỡ chữ lẻ (8–11.5px) gom về cỡ chú thích 11px, (12–13.5px) gom về cỡ nội dung 13px */
 .ops-theme .text-\[8px\],
 .ops-theme .text-\[9px\],
@@ -783,6 +833,11 @@ button:focus-visible {
   background-color: rgba(253, 244, 248, 0.85);
   box-shadow: inset 3px 0 0 #be457a;
 }
+/* Superior dùng dải xanh sương, không dùng vệt hồng của Manager */
+.superior-theme main table tbody tr:hover {
+  background-color: rgba(243, 248, 252, 0.95);
+  box-shadow: inset 3px 0 0 #4a7aa3;
+}
 .ops-theme main table td :is(span, div)[class*="rounded-full"],
 .ops-theme main table td span[class*="rounded-lg"][class*="px-"],
 .ops-theme main table td span[class*="rounded-md"][class*="px-"] {
@@ -851,6 +906,13 @@ button:focus-visible {
   background-size: auto, 26px 26px;
   background-attachment: fixed;
 }
+/* Nền sương hồ của Superior: xanh nhạt, một vệt nắng đào ở góc trên */
+.superior-bg {
+  background-color: #eaf2f9;
+  background-image:
+    radial-gradient(900px 420px at 80% -140px, rgba(246, 205, 176, 0.35), transparent 70%),
+    radial-gradient(800px 500px at 0% 100%, rgba(184, 212, 234, 0.55), transparent 70%);
+}
 @keyframes ops-rise {
   from { opacity: 0; transform: translateY(14px) scale(0.985); }
   to { opacity: 1; transform: none; }
@@ -905,6 +967,21 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .download-trigger:hover .download-arrow,
   .download-trigger:focus-visible .download-arrow { animation: none; }
+}
+/* Nút xuất báo cáo: tờ giấy đứng yên, mũi tên bên trong trượt xuống rồi rơi lại từ trên */
+@keyframes arrow-report {
+  0% { transform: translateY(0); opacity: 1; }
+  40% { transform: translateY(4px); opacity: 0; }
+  41% { transform: translateY(-4px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.report-trigger:hover .report-arrow,
+.report-trigger:focus-visible .report-arrow {
+  animation: arrow-report 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .report-trigger:hover .report-arrow,
+  .report-trigger:focus-visible .report-arrow { animation: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .bell-trigger:hover .bell-icon,
