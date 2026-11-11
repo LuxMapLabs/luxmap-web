@@ -34,13 +34,6 @@ export interface CabinetPropertiesFeatureCollection {
     features: CabinetPropertiesFeature[]
 }
 
-export interface CabinetTopology {
-    type?: string | null
-    crs_note?: string | null
-    unlocated_pole_count: number
-    features: CabinetTopologyEdgePropertiesFeature[]
-}
-
 export interface CabinetTopologyEdgeProperties {
     feeder_id: string | null
     segment_id: string | null
@@ -55,5 +48,11 @@ export interface CabinetTopologyEdgePropertiesFeature {
     type?: string | null
     geometry: Geometry
     properties: CabinetTopologyEdgeProperties
+}
+
+export interface CabinetTopologyEdgePropertiesFeatureCollection {
+    type?: string | null
+    crs_note?: string | null
+    features: CabinetTopologyEdgePropertiesFeature[]
 }
 
