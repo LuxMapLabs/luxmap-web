@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
@@ -8,13 +8,13 @@ import {
   Compass,
   Cpu,
   SlidersHorizontal,
-  ChevronLeft,
-  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   type LucideIcon,
 } from 'lucide-react'
 import type { RootState } from '../redux/rootReducer'
 import { logout } from '../feature/auth/authSlice'
-import { UserMenu } from '../components/UserMenu'
+import { SidebarAccount } from '../components/SidebarAccount'
 import { useModalEscape } from '../hooks/useModalEscape'
 
 interface AdminNavItem {
@@ -63,6 +63,9 @@ const NAV_ITEMS: AdminNavItem[] = [
   },
 ]
 
+const formatToday = (): string =>
+  new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+
 // Layout riêng cho Quản trị viên: sidebar + header kiểu kính mờ
 export const AdminLayout: React.FC = () => {
   const dispatch = useDispatch()
@@ -71,8 +74,17 @@ export const AdminLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false)
   useModalEscape()
 
+  // admin-theme đổi dải màu sang slate-tím than, gắn lên html để cả modal render qua portal cũng nhận
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.add('admin-theme')
+    return () => root.classList.remove('admin-theme')
+  }, [])
+
   const current = NAV_ITEMS.find((item) => item.isActive(location.pathname))
-  const CurrentIcon = current?.icon ?? ShieldCheck
+  const displayName = user?.full_name || user?.username || 'bạn'
+  const headerTitle =
+    current?.to === '/admin/dashboard' ? `Xin chào, ${displayName}` : (current?.title ?? 'Quản trị hệ thống')
 
   return (
     <div className="admin-shell h-screen w-screen flex overflow-hidden font-sans antialiased text-slate-900">
@@ -81,27 +93,18 @@ export const AdminLayout: React.FC = () => {
           collapsed ? 'w-18' : 'w-60'
         }`}
       >
-        <div
-          className={`h-16 flex items-center border-b border-slate-200/80 px-4 ${collapsed ? 'justify-center' : ''}`}
-        >
-          <div className="flex items-center gap-3 overflow-hidden cursor-default">
-            <div className="w-10 h-10 text-white flex items-center justify-center shrink-0 rounded-2xl bg-linear-to-tr from-blue-600 via-blue-700 to-indigo-700 shadow-md shadow-blue-600/25 ring-4 ring-blue-50">
-              <Lightbulb className="w-5 h-5 text-amber-300 fill-amber-300/90 drop-shadow-[0_0_8px_rgba(252,211,77,0.5)]" />
+        <div className={`flex items-center gap-2.5 pb-5 pt-5 ${collapsed ? 'justify-center' : 'px-5'}`}>
+          <div className="flex items-center gap-2.5 overflow-hidden cursor-default flex-1">
+            <div className="h-9 w-9 text-white flex items-center justify-center shrink-0 rounded-[12px] bg-linear-to-tr from-blue-600 via-blue-700 to-indigo-700 shadow-md shadow-blue-600/25">
+              <Lightbulb className="h-[18px] w-[18px] fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
             </div>
-            {!collapsed && (
-              <div className="flex flex-col min-w-0 pr-2">
-                <span className="font-black text-sm tracking-wider text-slate-900 uppercase leading-none whitespace-nowrap">
-                  LUXMAP
-                </span>
-                <p className="text-[11px] text-slate-500 font-medium leading-none mt-1 whitespace-nowrap">
-                  Quản lý Chiếu sáng
-                </p>
-              </div>
-            )}
+            {!collapsed && <span className="flex-1 text-[15px] font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
           </div>
         </div>
 
-        <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto custom-scrollbar">
+        {!collapsed && <p className="px-6 pb-1.5 text-[11px] font-bold text-slate-500">Quản trị</p>}
+
+        <nav className="flex-1 pb-4 px-3.5 space-y-1 overflow-y-auto custom-scrollbar">
           {NAV_ITEMS.map((item) => {
             const active = item.isActive(location.pathname)
             const Icon = item.icon
@@ -110,29 +113,35 @@ export const AdminLayout: React.FC = () => {
                 key={item.to}
                 to={item.to}
                 title={item.label}
-                className={`relative flex items-center rounded-xl text-xs font-semibold transition-all duration-200 group active:scale-[0.98] ${
-                  collapsed ? 'justify-center w-11 h-11 mx-auto' : 'px-3.5 py-2.5 gap-3 w-full'
+                className={`relative flex items-center rounded-2xl text-[13px] font-semibold transition-all duration-200 group active:scale-[0.98] ${
+                  collapsed ? 'justify-center w-12 h-12 mx-auto' : 'px-3 py-2.5 gap-3 w-full'
                 } ${
                   active
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                    ? 'bg-white text-blue-700 shadow-[0_6px_16px_-8px_rgba(59,63,107,0.4)]'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
                 }`}
               >
-                <Icon
-                  className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 ${
-                    active ? 'scale-110 text-white' : 'text-slate-400 group-hover:text-slate-700'
-                  }`}
-                />
-                {!collapsed && <span className="flex-1 tracking-tight whitespace-nowrap">{item.label}</span>}
-                {!collapsed && active && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse ml-2" />
-                )}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+                  <Icon
+                    className={`w-[18px] h-[18px] transition-transform duration-200 ${
+                      active ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-800'
+                    }`}
+                  />
+                </span>
+                {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
               </NavLink>
             )
           })}
         </nav>
 
-        <div className="p-3 border-t border-slate-200/80 flex items-center justify-center">
+        <div className="mx-3.5 mb-3.5 mt-2 border-t border-slate-200/80 pt-3 space-y-1">
+          <SidebarAccount
+            user={user ?? null}
+            collapsed={collapsed}
+            onLogout={() => dispatch(logout())}
+            avatarClassName="bg-linear-to-br from-blue-500 to-blue-700 text-white"
+            logoutHoverClassName="hover:text-rose-600"
+          />
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
@@ -140,11 +149,11 @@ export const AdminLayout: React.FC = () => {
             title={collapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
           >
             {collapsed ? (
-              <ChevronRight className="w-4 h-4" />
+              <ChevronsRight className="w-4 h-4" />
             ) : (
               <>
-                <ChevronLeft className="w-4 h-4" />
-                <span className="text-xs font-medium whitespace-nowrap">Thu gọn menu</span>
+                <ChevronsLeft className="w-4 h-4" />
+                Thu gọn
               </>
             )}
           </button>
@@ -152,16 +161,13 @@ export const AdminLayout: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        <header className="h-16 px-6 flex items-center justify-between shrink-0 select-none z-30 text-slate-900 bg-white/85 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 flex items-center justify-center shrink-0 rounded-xl bg-blue-50 text-blue-600 border border-blue-100/80 shadow-2xs">
-              <CurrentIcon className="w-4.5 h-4.5" />
-            </div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight truncate">
-              {current?.title ?? 'Quản trị hệ thống'}
+        <header className="px-5 py-3 flex items-center gap-3 shrink-0 select-none z-30 text-slate-900 bg-white/85 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-[23px] font-extrabold tracking-tight text-slate-900 leading-tight truncate">
+              {headerTitle}
             </h1>
+            <p className="text-[13px] text-slate-500 mt-0.5 truncate">{formatToday()}</p>
           </div>
-          <UserMenu user={user ?? null} variant="admin" onLogout={() => dispatch(logout())} />
         </header>
 
         <main className="flex-1 overflow-hidden relative w-full h-full">
