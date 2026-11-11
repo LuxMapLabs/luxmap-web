@@ -3,7 +3,6 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   Lightbulb,
-  LogOut,
   LayoutDashboard,
   Map,
   CalendarDays,
@@ -19,8 +18,8 @@ import {
 import type { RootState } from '../redux/rootReducer'
 import { logout } from '../feature/auth/authSlice'
 import { openExportModal } from '../feature/assets/assetSlice'
-import { canAccessTab, getRoleName, isMaintenanceEngineer, isManagementAgency } from '../utils/roleUtils'
-import { ProfileModal } from '../components/ProfileModal'
+import { canAccessTab, isMaintenanceEngineer, isManagementAgency } from '../utils/roleUtils'
+import { SidebarAccount } from '../components/SidebarAccount'
 import { NotificationBell } from '../components/NotificationBell'
 import { DownloadIcon } from '../components/ops/DownloadIcon'
 import { useModalEscape } from '../hooks/useModalEscape'
@@ -54,7 +53,6 @@ export const ManagerLayout: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth)
   const [userCollapsed, setUserCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
   const isMobile = useMediaQuery('(max-width: 767px)')
   const isTablet = useMediaQuery('(max-width: 1023px)')
   // Máy tính bảng luôn dùng thanh icon thu gọn; điện thoại dùng ngăn kéo đầy đủ
@@ -81,15 +79,6 @@ export const ManagerLayout: React.FC = () => {
   const path = location.pathname
 
   const displayName = user?.full_name || user?.username || 'bạn'
-  const initials =
-    displayName
-      .trim()
-      .split(/\s+/)
-      .map((word) => word.charAt(0))
-      .slice(-2)
-      .join('')
-      .toUpperCase() || 'U'
-  const roleName = user ? getRoleName(user.role).replace(/\s*\([^)]*\)\s*$/, '') : ''
 
   const isGis = path.startsWith('/gis-map')
   const isAssets = path.startsWith('/assets')
@@ -128,12 +117,12 @@ export const ManagerLayout: React.FC = () => {
         className={`flex flex-col bg-linear-to-b from-blue-100/80 via-blue-50 to-white rounded-3xl shadow-ops p-3.5 select-none transition-[width,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isMobile
             ? `fixed inset-y-2 left-2 z-50 w-64 max-w-[85vw] ${mobileOpen ? 'translate-x-0' : '-translate-x-[110%]'}`
-            : `h-full shrink-0 z-40 ${collapsed ? 'w-[76px]' : 'w-58'}`
+            : `h-full shrink-0 z-40 ${collapsed ? 'w-[76px]' : 'w-60'}`
         }`}
       >
         <div className={`flex items-center gap-2.5 pb-5 pt-1 ${collapsed ? 'justify-center' : 'px-2'}`}>
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-linear-to-br from-teal-400 to-teal-600 shadow-[0_8px_16px_-6px_rgba(190,69,122,0.55)]">
-            <Lightbulb className="h-[18px] w-[18px] fill-amber-200 text-amber-200 drop-shadow-[0_0_6px_rgba(245,165,36,0.9)]" />
+            <Lightbulb className="h-[18px] w-[18px] fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
           </div>
           {!collapsed && <span className="flex-1 text-[15px] font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
           {isMobile && (
@@ -196,39 +185,13 @@ export const ManagerLayout: React.FC = () => {
         </nav>
 
         <div className="mt-2 space-y-1 border-t border-blue-200/60 pt-3">
-          {/* Một hàng duy nhất cho tài khoản: bấm vào người dùng mở hồ sơ, icon bên cạnh để đăng xuất */}
-          <div className={collapsed ? 'space-y-1' : 'flex items-center gap-1'}>
-            <button
-              type="button"
-              onClick={() => setProfileOpen(true)}
-              title={`${displayName} · ${roleName} (xem hồ sơ cá nhân)`}
-              aria-label={`Hồ sơ cá nhân của ${displayName}`}
-              className={`group flex items-center rounded-2xl transition-colors duration-200 cursor-pointer hover:bg-white/60 ${
-                collapsed ? 'mx-auto h-12 w-12 justify-center' : 'min-w-0 flex-1 gap-2.5 p-2 text-left'
-              }`}
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-400 to-blue-600 text-xs font-extrabold text-white shadow-ops ring-2 ring-white">
-                {initials}
-              </span>
-              {!collapsed && (
-                <span className="min-w-0 flex-1 leading-tight">
-                  <span className="block truncate text-[13px] font-bold text-slate-800">{displayName}</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">{roleName}</span>
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => dispatch(logout())}
-              title="Đăng xuất"
-              aria-label="Đăng xuất"
-              className={`group flex shrink-0 items-center justify-center rounded-2xl text-slate-500 transition-colors duration-200 cursor-pointer hover:bg-white/60 hover:text-rose-600 ${
-                collapsed ? 'mx-auto h-12 w-12' : 'h-11 w-11'
-              }`}
-            >
-              <LogOut className="h-[18px] w-[18px]" />
-            </button>
-          </div>
+          <SidebarAccount
+            user={user ?? null}
+            collapsed={collapsed}
+            onLogout={() => dispatch(logout())}
+            avatarClassName="bg-linear-to-br from-blue-400 to-blue-600 text-white shadow-ops"
+            logoutHoverClassName="hover:text-rose-600"
+          />
           <button
             type="button"
             onClick={() => setUserCollapsed((v) => !v)}
@@ -240,7 +203,6 @@ export const ManagerLayout: React.FC = () => {
         </div>
       </aside>
 
-      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} user={user ?? null} />
 
       <div className="flex-1 min-w-0 flex flex-col gap-4">
         {(!isGis || isMobile) && (
