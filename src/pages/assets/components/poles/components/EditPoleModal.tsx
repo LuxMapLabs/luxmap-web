@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   CheckCircle2,
   Edit3,
@@ -12,7 +12,13 @@ import type { RootState } from '../../../../../redux/rootReducer'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
-import { parseLineStringWkt, resolveNonOverlappingRoutePoint } from '../../../../../utils/gis-map/routeUtils'
+import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
+import {
+  buildSegmentGeometry,
+  orderedPolesOfSegment,
+  reconcileRoute,
+} from '../../../../../utils/gis-map/segmentPoleOrder'
+import { clearSegmentDetail, fetchSegmentDetailRequest } from '../../../../../feature/assets/assetSlice'
 import { DEFAULT_MAP_CENTER } from '../../../../../utils/gis-map/mapUtils'
 import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
 import { EditPoleMap } from './EditPoleMap'
@@ -35,8 +41,7 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
   onClose,
   onSave,
 }) => {
-  // Lấy danh sách layer tuyến đường PostGIS và mapBounds từ Redux store
-  const mapSegments = useSelector((state: RootState) => state?.map?.segments ?? [])
+  // Lấy mapBounds từ Redux store
   const mapBounds = useSelector((state: RootState) => state?.auth?.user?.map_bounds)
 
   const fallbackLat =
@@ -69,6 +74,8 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
   const [latStr, setLatStr] = useState<string>(initialLat.toFixed(6))
   const [lngStr, setLngStr] = useState<string>(initialLng.toFixed(6))
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // Cột chưa có GPS chỉ hiện bản đồ khi người dùng chủ động bấm gắn vị trí
+  const [hasPosition, setHasPosition] = useState<boolean>(Boolean(pole.location))
 
   // Danh sách mạch điện từ Redux store
   const allFeeders = useSelector((state: RootState) => state.assets.feeders)
@@ -95,57 +102,30 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
     }
   }, [pole])
 
-  // Trích xuất tuyến đường chiếu sáng (Polyline Coordinates)
+  // Hình tuyến đang lưu của tuyến được chọn (kèm điểm uốn), lấy từ Backend
+  const dispatch = useDispatch()
+  const segmentDetail = useSelector((state: RootState) => state.assets?.segmentDetail)
+  useEffect(() => {
+    if (!segmentId) return
+    dispatch(fetchSegmentDetailRequest(segmentId))
+    return () => {
+      dispatch(clearSegmentDetail())
+    }
+  }, [dispatch, segmentId])
+  const storedGeomWkt =
+    segmentDetail?.segmentId === segmentId && segmentDetail.isSettled ? segmentDetail.geomWkt : null
+
+  // Đường xem trước: hình tuyến đang lưu + các cột của tuyến, với cột này ở vị trí đang chọn.
+  // Cột đặt tự do nên đường chạy theo cột (điểm uốn đã đặt được giữ); chỉ để xem, hình tuyến thật được cập nhật khi lưu.
   const segmentCoords = useMemo<[number, number][]>(() => {
     if (!segmentId) return []
-
-    // 1. ƯU TIÊN SỐ 1: Lấy LineString chuẩn từ PostGIS Backend (state.map.segments)
-    const mapSeg = mapSegments.find(
-      (s) => s.properties?.segment_id === segmentId
-    )
-    if (
-      mapSeg &&
-      mapSeg.geometry?.type === 'LineString' &&
-      Array.isArray(mapSeg.geometry.coordinates)
-    ) {
-      const valid = mapSeg.geometry.coordinates.filter(
-        (c) => Array.isArray(c) && c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])
-      ) as [number, number][]
-      if (valid.length >= 2) return valid
-    }
-
-    // 2. Nếu segment có trường geom_wkt
-    const found = segments.find(
-      (s) => s.segment_id === segmentId || s.external_ref === segmentId
-    )
-    if (found && 'geom_wkt' in found && typeof found.geom_wkt === 'string') {
-      const parsed = parseLineStringWkt(found.geom_wkt)
-      if (parsed.length >= 2) return parsed
-    }
-
-    // 3. Fallback: Nếu phải nối qua cột đèn, BẮT BUỘC SẮP XẾP tăng dần theo số hiệu cột
-    // (TUYỆT ĐỐI không nối mảng lộn xộn gây đan chéo hình lưới mạng nhện)
-    const segPoles = allPoles
-      .filter(
-        (p) =>
-          p.segment_id === segmentId &&
-          p.location &&
-          Number.isFinite(p.location.lat) &&
-          Number.isFinite(p.location.lng)
-      )
-      .sort((a, b) =>
-        (a.external_ref || a.pole_id || '').localeCompare(
-          b.external_ref || b.pole_id || '',
-          undefined,
-          { numeric: true }
-        )
-      )
-      .map((p) => [p.location.lng, p.location.lat] as [number, number])
-
-    if (segPoles.length >= 2) return segPoles
-
-    return []
-  }, [segmentId, mapSegments, segments, allPoles])
+    const poleId = pole.pole_id
+    const previous = orderedPolesOfSegment(allPoles, segmentId)
+    const current = orderedPolesOfSegment(allPoles, segmentId, poleId)
+    if (hasPosition && poleId) current.push({ id: poleId, coord: [lng, lat] })
+    const geometry = buildSegmentGeometry(reconcileRoute(previous, storedGeomWkt, current))
+    return geometry ? parseLineStringWkt(geometry.geomWkt) : []
+  }, [allPoles, segmentId, pole.pole_id, hasPosition, lng, lat, storedGeomWkt])
 
   // Trích xuất các cột khác trên cùng tuyến đường (GeoJSON FeatureCollection)
   const otherPolesGeoJSON = useMemo<FeatureCollection>(() => {
@@ -270,21 +250,7 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
     }
   }, [availableFeeders, selectedFeederId])
 
-  // Danh sách các cột khác cùng tuyến để né va chạm
-  const obstaclePoints = useMemo<[number, number][]>(() => {
-    return allPoles
-      .filter(
-        (p) =>
-          p.segment_id === segmentId &&
-          (p.pole_id || p.external_ref) !== (pole.pole_id || pole.external_ref) &&
-          p.location &&
-          Number.isFinite(p.location.lat) &&
-          Number.isFinite(p.location.lng)
-      )
-      .map((p) => [p.location!.lng, p.location!.lat] as [number, number])
-  }, [allPoles, segmentId, pole.pole_id, pole.external_ref])
-
-  // Validate và chuẩn hóa tọa độ (hỗ trợ snap bám tim đường và né đè cột như trên bản đồ)
+  // Validate và chuẩn hóa tọa độ (cột đặt tự do, không bám tim đường)
   const validateAndFormatCoords = (rawLngStr: string, rawLatStr: string): { lng: number; lat: number } | null => {
     const trimmedLat = rawLatStr.trim()
     const trimmedLng = rawLngStr.trim()
@@ -307,18 +273,8 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
       return null
     }
 
-    let finalLng = Number(parsedNLng.toFixed(6))
-    let finalLat = Number(parsedNLat.toFixed(6))
-
-    // Nếu thuộc tuyến đường, áp dụng thuật toán snap bám tim đường và né va chạm cột y như thao tác trên bản đồ
-    if (segmentCoords.length >= 2) {
-      const snapped = resolveNonOverlappingRoutePoint(parsedNLng, parsedNLat, segmentCoords, obstaclePoints, 2)
-      finalLng = Number(snapped[0].toFixed(6))
-      finalLat = Number(snapped[1].toFixed(6))
-    }
-
     setErrorMsg(null)
-    return { lng: finalLng, lat: finalLat }
+    return { lng: Number(parsedNLng.toFixed(6)), lat: Number(parsedNLat.toFixed(6)) }
   }
 
   const handleCoordBlur = () => {
@@ -335,8 +291,8 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
     e.preventDefault()
     setErrorMsg(null)
 
-    const validatedCoords = validateAndFormatCoords(lngStr, latStr)
-    if (!validatedCoords) {
+    const validatedCoords = hasPosition ? validateAndFormatCoords(lngStr, latStr) : null
+    if (hasPosition && !validatedCoords) {
       return
     }
 
@@ -359,7 +315,10 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
       cabinet_name: selectedCab?.cabinet_name || null,
       near_sensitive_poi: nearSensitivePoi,
       note: noteText.trim() ? noteText.trim() : null,
-      location: { lat: validatedCoords.lat, lng: validatedCoords.lng },
+      // Kiểu sinh từ BE chưa cho location null, nhưng cột chưa có GPS thì BE trả null
+      location: validatedCoords
+        ? { lat: validatedCoords.lat, lng: validatedCoords.lng }
+        : (null as unknown as PoleListItem['location']),
       updated_at: new Date().toISOString(),
     }
 
@@ -524,6 +483,31 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
               </div>
 
               {/* Dòng 4: Tọa độ số hiển thị & cho phép nhập tay */}
+              {!hasPosition ? (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2">
+                    <div className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>Cột chưa có GPS</span>
+                    </div>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                      Cột chưa hiện trên bản đồ. Khi đã biết vị trí, bấm nút bên dưới để chọn trên bản đồ.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLatStr('')
+                        setLngStr('')
+                        setHasPosition(true)
+                      }}
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg cursor-pointer"
+                    >
+                      Gắn vị trí cho cột
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
                 <div className="flex items-center justify-between font-bold text-slate-700 dark:text-slate-300">
                   <span className="flex items-center gap-1.5">
@@ -569,12 +553,15 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-400 italic">
-                  💡 Nhập tay tọa độ hoặc kéo ghim màu cam / click trực tiếp trên bản đồ để định vị lại.
+                  💡 Nhập tay tọa độ hoặc kéo ghim màu cam / click trực tiếp trên bản đồ để định vị lại. Đường tuyến sẽ chạy theo vị trí cột.
                 </p>
               </div>
+                </>
+              )}
             </div>
 
             {/* CỘT PHẢI: BẢN ĐỒ GIS THEO NGỮ CẢNH (58% width trên md) */}
+            {hasPosition ? (
             <EditPoleMap
               key={pole.pole_id || pole.external_ref || 'edit-pole-map'}
               lat={lat}
@@ -591,6 +578,7 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
                 setErrorMsg(null)
               }}
             />
+            ) : null}
           </div>
 
           <AssetModalFooter

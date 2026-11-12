@@ -18,13 +18,11 @@ import {
   isPointInBounds,
   OUTSIDE_MANAGED_AREA_MESSAGE,
 } from '../../../../../utils/gis-map/mapUtils'
-import {
-  resolveNonOverlappingRoutePoint,
-} from '../../../../../utils/gis-map/routeUtils'
 
 export interface EditPoleMapProps {
   lat: number
   lng: number
+  /** Hình tuyến xem trước (dựng từ các cột của tuyến + vị trí cột đang sửa); chỉ để vẽ, không ép cột bám theo. */
   segmentCoords: [number, number][]
   otherPolesGeoJSON: FeatureCollection
   currentCabinet?: CabinetListItem | null
@@ -72,32 +70,6 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
   const onChangeCoordsRef = useRef(onChangeCoords)
   onChangeCoordsRef.current = onChangeCoords
-
-  // Helper trích xuất các điểm cột khác làm chướng ngại vật
-  const getObstaclePoints = (): [number, number][] => {
-    const features = otherPolesGeoJSONRef.current?.features || []
-    const points: [number, number][] = []
-    features.forEach((feat) => {
-      if (feat.geometry && feat.geometry.type === 'Point' && Array.isArray(feat.geometry.coordinates)) {
-        const coord = feat.geometry.coordinates
-        if (coord.length >= 2 && Number.isFinite(coord[0]) && Number.isFinite(coord[1])) {
-          points.push([coord[0], coord[1]])
-        }
-      }
-    })
-    return points
-  }
-
-  // Helper tính vị trí snap an toàn (tránh đè cột khác)
-  const getSnappedSafeCoord = (rawLng: number, rawLat: number): [number, number] => {
-    const coords = segmentCoordsRef.current
-    if (!coords || coords.length < 2) return [rawLng, rawLat]
-    const obstacles = getObstaclePoints()
-    return resolveNonOverlappingRoutePoint(rawLng, rawLat, coords, obstacles, 2)
-  }
-
-  const getSnappedSafeCoordRef = useRef(getSnappedSafeCoord)
-  getSnappedSafeCoordRef.current = getSnappedSafeCoord
 
   // Khởi tạo MapLibre
   useEffect(() => {
@@ -187,19 +159,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       isUserInteractingRef.current = true
       const pos = marker.getLngLat()
       if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) return
-      if (segmentCoordsRef.current.length >= 2) {
-        const snappedPoint = getSnappedSafeCoordRef.current(pos.lng, pos.lat)
-        marker.setLngLat(snappedPoint)
-        onChangeCoordsRef.current({
-          lng: Number(snappedPoint[0].toFixed(6)),
-          lat: Number(snappedPoint[1].toFixed(6)),
-        })
-      } else {
-        onChangeCoordsRef.current({
-          lng: Number(pos.lng.toFixed(6)),
-          lat: Number(pos.lat.toFixed(6)),
-        })
-      }
+      onChangeCoordsRef.current({
+        lng: Number(pos.lng.toFixed(6)),
+        lat: Number(pos.lat.toFixed(6)),
+      })
     }
 
     marker.on('drag', handleMarkerDrag)
@@ -217,28 +180,16 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       handleMarkerDrag()
     })
 
-    // Click bản đồ để dời vị trí ghim (bám tim đường & tránh đè cột)
+    // Click bản đồ để dời vị trí ghim (cột đặt tự do, không bám tim đường)
     map.on('click', (e: maplibregl.MapMouseEvent) => {
       if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
         toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
         return
       }
       isUserInteractingRef.current = true
-      if (segmentCoordsRef.current.length >= 2) {
-        const snappedPoint = getSnappedSafeCoordRef.current(e.lngLat.lng, e.lngLat.lat)
-        marker.setLngLat(snappedPoint)
-        onChangeCoordsRef.current({
-          lng: Number(snappedPoint[0].toFixed(6)),
-          lat: Number(snappedPoint[1].toFixed(6)),
-        })
-      } else {
-        const newPos: [number, number] = [
-          Number(e.lngLat.lng.toFixed(6)),
-          Number(e.lngLat.lat.toFixed(6)),
-        ]
-        marker.setLngLat(newPos)
-        onChangeCoordsRef.current({ lng: newPos[0], lat: newPos[1] })
-      }
+      const newPos: [number, number] = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))]
+      marker.setLngLat(newPos)
+      onChangeCoordsRef.current({ lng: newPos[0], lat: newPos[1] })
     })
 
     map.on('load', () => {
@@ -459,19 +410,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     }
   }, [lng, lat])
 
-  const prevSegmentCoordsKeyRef = useRef<string>('')
-
-  // 1. Cập nhật Route Line khi tuyến đường (segmentCoords) thay đổi (giữ nguyên tọa độ cột, không tự ý snap đè)
+  // 1. Vẽ lại đường xem trước mỗi khi nó đổi (đổi tuyến, kéo cột, nhập tay tọa độ)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-
-    const coordsKey = segmentCoords.length > 0
-      ? `${segmentCoords[0][0]},${segmentCoords[0][1]}-${segmentCoords.length}`
-      : ''
-    const isSegmentChanged = coordsKey !== prevSegmentCoordsKeyRef.current
-    if (!isSegmentChanged) return
-    prevSegmentCoordsKeyRef.current = coordsKey
 
     const updateRouteLayer = () => {
       const routeSource = map.getSource('edit-segment-route') as maplibregl.GeoJSONSource | undefined
@@ -489,12 +431,12 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       // Giữ camera tập trung vào vị trí cột đang sửa, không zoom out theo tuyến
     }
 
-    if (map.isStyleLoaded()) {
+    if (map.getSource('edit-segment-route') || map.isStyleLoaded()) {
       updateRouteLayer()
     } else {
       map.once('load', updateRouteLayer)
     }
-  }, [segmentCoords, lat, lng])
+  }, [segmentCoords])
 
   // 2. Cập nhật Other Poles layer khi danh sách cột khác thay đổi (tuyệt đối KHÔNG gọi fitBounds)
   useEffect(() => {
@@ -508,7 +450,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       }
     }
 
-    if (map.isStyleLoaded()) {
+    if (map.getSource('other-segment-poles') || map.isStyleLoaded()) {
       updatePolesLayer()
     } else {
       map.once('load', updatePolesLayer)
@@ -567,7 +509,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-orange-500 ring-2 ring-white"></span>
-          <span>Cột đang sửa (Kéo để dời vị trí)</span>
+          <span>Cột đang sửa (kéo hoặc click để đặt vị trí)</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-yellow-300 ring-1 ring-slate-900"></span>
@@ -575,7 +517,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="w-4 h-1 bg-sky-400 rounded-full"></span>
-          <span>Tim đường chiếu sáng</span>
+          <span>Hình tuyến (xem trước)</span>
         </div>
         {currentCabinet && (
           <div className="flex items-center gap-2">

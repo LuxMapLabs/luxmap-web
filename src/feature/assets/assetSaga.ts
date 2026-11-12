@@ -1,4 +1,4 @@
-import { all, call, put, takeLatest } from 'redux-saga/effects'
+import { all, call, put, select, takeLatest } from 'redux-saga/effects'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
 import assetAPI from './assetAPI'
@@ -13,7 +13,14 @@ import type {
   CreateCabinetRequest,
 } from '../../types/assets/cabinets'
 import type { FeederListItemPagedResult, CreateFeederRequest } from '../../types/assets/feeders'
-import type { PoleListItemPagedResult } from '../../types/assets/poles'
+import type { PoleListItem, PoleListItemPagedResult } from '../../types/assets/poles'
+import type { RootState } from '../../redux/rootReducer'
+import {
+  buildSegmentGeometry,
+  isSameLine,
+  orderedPolesOfSegment,
+  reconcileRoute,
+} from '../../utils/gis-map/segmentPoleOrder'
 import type { CreateFixtureRequest } from '../../types/assets/fixtures'
 import type {
   IotNodeItemPagedResult,
@@ -45,6 +52,7 @@ import {
   createSegmentRequest,
   updateSegmentRequest,
   deleteSegmentRequest,
+  drawSegmentRequest,
   createFixtureRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
@@ -210,14 +218,73 @@ function* handleImportAsset(action: PayloadAction<ImportAssetPayload>) {
 // MUTATION WORKER SAGAS (REDUX-SAGA FIRST ARCHITECTURE)
 // ====================================================
 
+/**
+ * Cột không còn bị ép nằm trên đường, nên sau khi cột được tạo / dời / đổi tuyến, hình tuyến phải dựng lại
+ * từ các cột của nó (giữ điểm uốn đã có). Backend không tự vẽ lại. Cột đã lưu rồi thì lỗi ở đây không hoàn tác được,
+ * chỉ báo để người dùng mở "Sửa tuyến" lưu lại. Trả về true nếu có tuyến không cập nhật được.
+ *
+ * `before`: danh sách cột trước khi lưu (vị trí cũ, để nhận ra đỉnh nào của đường cũ là cột nào).
+ */
+function* syncSegmentGeometries(segmentIds: string[], before: PoleListItem[]) {
+  let failed = false
+  const ids = [...new Set(segmentIds.filter(Boolean))]
+  if (ids.length === 0) return failed
+
+  let after: PoleListItem[] = []
+  try {
+    const res = (yield call(assetAPI.getPoles, { page_size: 1000 })) as PoleListItemPagedResult
+    after = res.items ?? []
+  } catch {
+    return true
+  }
+
+  for (const segmentId of ids) {
+    try {
+      const detail = (yield call(assetAPI.getSegmentDetail, segmentId)) as SegmentDetail
+      const route = reconcileRoute(
+        orderedPolesOfSegment(before, segmentId),
+        detail.geom_wkt,
+        orderedPolesOfSegment(after, segmentId)
+      )
+      const geometry = buildSegmentGeometry(route)
+      // Chưa đủ 2 cột có GPS thì chưa dựng được đường; đường không đổi thì khỏi gọi API
+      if (!geometry || isSameLine(geometry.geomWkt, detail.geom_wkt)) continue
+
+      const seg = detail.segment
+      yield call(assetAPI.updateSegment, segmentId, {
+        external_ref: seg.external_ref,
+        segment_name: seg.segment_name,
+        road_class: seg.road_class,
+        // Có hình thì chiều dài lấy theo hình đo được, thay cho số khai theo sổ sách
+        length_m: geometry.lengthM,
+        geom_wkt: geometry.geomWkt,
+        data_source: seg.data_source,
+      })
+    } catch {
+      failed = true
+    }
+  }
+  return failed
+}
+
+const warnSegmentNotSynced = () =>
+  toast.warning('Cột đã lưu nhưng hình tuyến chưa cập nhật. Mở "Sửa tuyến" và lưu lại để vẽ lại đường.')
+
 function* handleCreatePole(action: PayloadAction<CreatePolePayload>) {
   try {
     const { pole, fixture } = action.payload
+    const before: PoleListItem[] = yield select((state: RootState) => state.assets.poles)
     yield call(assetAPI.createPole, pole)
 
     if (fixture) {
       yield call(assetAPI.createFixture, fixture)
     }
+
+    const failed: boolean = yield* syncSegmentGeometries(
+      pole.segment_id && pole.geom_wkt ? [pole.segment_id] : [],
+      before
+    )
+    if (failed) warnSegmentNotSynced()
 
     yield put(mutationSuccess())
     toast.success(`Đã lưu thành công cột đèn "${pole.external_ref || 'mới'}" vào Hệ thống!`)
@@ -232,12 +299,20 @@ function* handleCreatePole(action: PayloadAction<CreatePolePayload>) {
 function* handleCreatePolesBulk(action: PayloadAction<CreatePolePayload[]>) {
   try {
     const list = action.payload
+    const before: PoleListItem[] = yield select((state: RootState) => state.assets.poles)
     for (const item of list) {
       yield call(assetAPI.createPole, item.pole)
       if (item.fixture) {
         yield call(assetAPI.createFixture, item.fixture)
       }
     }
+
+    // Mỗi tuyến chỉ cập nhật hình một lần sau khi đã thêm xong cả loạt cột
+    const failed: boolean = yield* syncSegmentGeometries(
+      list.flatMap((item) => (item.pole.segment_id && item.pole.geom_wkt ? [item.pole.segment_id] : [])),
+      before
+    )
+    if (failed) warnSegmentNotSynced()
 
     yield put(mutationSuccess())
     toast.success(`Đã lưu thành công ${list.length} cột đèn vào Hệ thống!`)
@@ -252,7 +327,17 @@ function* handleCreatePolesBulk(action: PayloadAction<CreatePolePayload[]>) {
 function* handleUpdatePole(action: PayloadAction<UpdatePolePayload>) {
   try {
     const { poleId, data } = action.payload
+    const before: PoleListItem[] = yield select((state: RootState) => state.assets.poles)
+    const old = before.find((p) => p.pole_id === poleId)
     yield call(assetAPI.updatePole, poleId, data)
+
+    // Tuyến cũ (nếu cột đã có GPS) mất / dời cột, tuyến mới (nếu cột có GPS) nhận cột
+    const affected = [
+      old?.location && old.segment_id ? old.segment_id : '',
+      data.segment_id && data.geom_wkt ? data.segment_id : '',
+    ]
+    const failed: boolean = yield* syncSegmentGeometries(affected, before)
+    if (failed) warnSegmentNotSynced()
 
     yield put(mutationSuccess())
     toast.success(`Đã cập nhật thông số cột đèn "${data.external_ref || poleId}"!`)
@@ -439,6 +524,23 @@ function* handleDeleteSegment(action: PayloadAction<string>) {
     const errorMsg = getErrorMessage(error, 'Không thể xóa tuyến đường')
     yield put(mutationFailure(errorMsg))
     toast.error(`Lỗi khi xóa tuyến đường: ${errorMsg}`)
+  }
+}
+
+function* handleDrawSegment(action: PayloadAction<string>) {
+  try {
+    const segmentId = action.payload
+    const before: PoleListItem[] = yield select((state: RootState) => state.assets.poles)
+    const failed: boolean = yield* syncSegmentGeometries([segmentId], before)
+    if (failed) throw new Error('Không vẽ được hình tuyến từ các cột hiện có')
+
+    yield put(mutationSuccess())
+    toast.success('Đã vẽ hình tuyến từ các cột có GPS!')
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể vẽ hình tuyến')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi khi vẽ tuyến: ${errorMsg}`)
   }
 }
 
@@ -632,6 +734,7 @@ export default function* assetSaga() {
   yield takeLatest(createSegmentRequest.type, handleCreateSegment)
   yield takeLatest(updateSegmentRequest.type, handleUpdateSegment)
   yield takeLatest(deleteSegmentRequest.type, handleDeleteSegment)
+  yield takeLatest(drawSegmentRequest.type, handleDrawSegment)
   yield takeLatest(createFixtureRequest.type, handleCreateFixture)
   yield takeLatest(createFixturesBulkRequest.type, handleCreateFixturesBulk)
   yield takeLatest(retireFixtureRequest.type, handleRetireFixture)

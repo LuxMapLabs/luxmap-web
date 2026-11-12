@@ -2,6 +2,7 @@
  * Thứ tự cột dọc tuyến đường. Backend chỉ nhận TẬP `pole_ids` (không lưu thứ tự) nên FE tự giữ thứ tự
  * ngầm rồi nối tọa độ các cột theo thứ tự đó thành `geom_wkt`.
  */
+import type { PoleListItem } from '../../types/assets/poles'
 import {
   calculateDistanceMeters,
   calculateRouteLengthMeters,
@@ -12,7 +13,58 @@ import {
 export interface OrderedPole {
   id: string
   coord: [number, number] // [lng, lat]
+  /** Điểm uốn do người dùng đặt trên đường (đường cong, góc rẽ): không phải cột, chỉ góp vào hình tuyến. */
+  bend?: boolean
 }
+
+export const isBend = (item: OrderedPole): boolean => item.bend === true
+
+/** Chỉ các cột (bỏ điểm uốn). */
+export const polesOf = (route: OrderedPole[]): OrderedPole[] => route.filter((p) => !isBend(p))
+
+let bendSeq = 0
+export const makeBend = (coord: [number, number]): OrderedPole => ({
+  id: `bend-${++bendSeq}`,
+  coord,
+  bend: true,
+})
+
+/** Dời một điểm uốn tới tọa độ mới. */
+export const moveBend = (route: OrderedPole[], bendId: string, coord: [number, number]): OrderedPole[] =>
+  route.map((p) => (p.id === bendId && isBend(p) ? { ...p, coord } : p))
+
+/** Bỏ điểm uốn nằm ngoài cột đầu / cột cuối: đầu và cuối tuyến luôn là cột. */
+export const dropEdgeBends = (route: OrderedPole[]): OrderedPole[] => {
+  const first = route.findIndex((p) => !isBend(p))
+  if (first === -1) return []
+  let last = route.length - 1
+  while (isBend(route[last])) last--
+  return route.slice(first, last + 1)
+}
+
+/**
+ * Đặt điểm uốn vào giữa hai cột liền nhau, chỗ làm đường dài thêm ít nhất.
+ * Chưa đủ 2 cột thì không đặt được (không có "giữa").
+ */
+export const insertBendInRoute = (route: OrderedPole[], bend: OrderedPole): OrderedPole[] => {
+  const trimmed = dropEdgeBends(route)
+  if (polesOf(trimmed).length < 2) return route
+  const dist = (a: OrderedPole, b: OrderedPole) => calculateDistanceMeters(a.coord, b.coord)
+  let at = 1
+  let bestCost = Infinity
+  for (let i = 0; i < trimmed.length - 1; i++) {
+    const cost = dist(trimmed[i], bend) + dist(bend, trimmed[i + 1]) - dist(trimmed[i], trimmed[i + 1])
+    if (cost < bestCost) {
+      bestCost = cost
+      at = i + 1
+    }
+  }
+  return [...trimmed.slice(0, at), bend, ...trimmed.slice(at)]
+}
+
+/** Sắp lại các cột theo chuỗi gần nhất; mỗi điểm uốn được đặt lại vào giữa hai cột, chỗ làm đường dài thêm ít nhất. */
+export const autoSortRoute = (route: OrderedPole[]): OrderedPole[] =>
+  route.filter(isBend).reduce(insertBendInRoute, orderPolesByChain(polesOf(route)))
 
 // Đỉnh của đường cũ coi như trùng cột nếu cách nhau không quá ngần này (mét)
 const VERTEX_MATCH_METERS = 3
@@ -129,28 +181,86 @@ export const deriveInitialOrder = (
   const line = typeof geomWkt === 'string' ? parseLineStringWkt(geomWkt) : []
   if (line.length < 2) return { ordered: orderPolesByChain(poles), exact: false }
 
-  if (line.length === poles.length) {
-    const remaining = [...poles]
-    const ordered: OrderedPole[] = []
-    for (const vertex of line) {
-      const at = remaining.findIndex((p) => calculateDistanceMeters(p.coord, vertex) <= VERTEX_MATCH_METERS)
-      if (at === -1) break
+  // Đỉnh trùng một cột thì là cột đó; đỉnh còn lại là điểm uốn (đường cong, góc rẽ)
+  const remaining = [...poles]
+  const ordered: OrderedPole[] = []
+  for (const vertex of line) {
+    const at = remaining.findIndex((p) => calculateDistanceMeters(p.coord, vertex) <= VERTEX_MATCH_METERS)
+    if (at !== -1) {
       ordered.push(remaining.splice(at, 1)[0])
+      continue
     }
-    if (ordered.length === poles.length) return { ordered, exact: true }
+    const last = ordered[ordered.length - 1]
+    if (last && calculateDistanceMeters(last.coord, vertex) <= VERTEX_MATCH_METERS) continue
+    ordered.push(makeBend(vertex))
   }
+  if (remaining.length === 0) return { ordered: dropEdgeBends(ordered), exact: true }
 
   return { ordered: orderPolesAlongLine(poles, line), exact: false }
 }
 
-/** `geom_wkt` (kinh độ trước) và `length_m` từ danh sách cột đã sắp thứ tự. Cần tối thiểu 2 cột. */
+/** `geom_wkt` (kinh độ trước) và `length_m` từ danh sách cột đã sắp thứ tự. Cần tối thiểu 2 cột (điểm uốn không tính). */
 export const buildSegmentGeometry = (
   route: OrderedPole[]
 ): { geomWkt: string; lengthM: number } | null => {
-  if (route.length < 2) return null
+  if (polesOf(route).length < 2) return null
   const coords = route.map((p) => p.coord)
   return {
     geomWkt: `LINESTRING(${coords.map((c) => `${c[0]} ${c[1]}`).join(', ')})`,
     lengthM: calculateRouteLengthMeters(coords),
   }
 }
+
+/**
+ * Đặt cột vào tuyến theo vị trí hiện tại của nó: cột đã có thì gỡ ra rồi đặt lại (kéo cột sang chỗ khác thì thứ tự đổi theo),
+ * điểm uốn đã đặt được giữ nguyên.
+ */
+export const upsertPoleInRoute = (current: OrderedPole[], pole: OrderedPole): OrderedPole[] => {
+  const route = current.some((p) => p.id === pole.id && !isBend(p)) ? removePole(current, pole.id) : current
+  if (route.length < 2) return insertPoleInRoute(route, pole)
+  // Cột nằm bên cạnh đường: xếp theo chỗ nó chiếu xuống đường, chỉ nối vào đầu / cuối khi nó vượt ra ngoài đầu / cuối
+  const near = projectOnLine(pole.coord, route.map((p) => p.coord))
+  const last = route.length - 2
+  if (near.idx === 0 && near.t <= 0) return [pole, ...route]
+  if (near.idx === last && near.t >= 1) return [...route, pole]
+  return dropEdgeBends([...route.slice(0, near.idx + 1), pole, ...route.slice(near.idx + 1)])
+}
+
+/** Bỏ cột khỏi tuyến; điểm uốn rơi ra đầu / cuối thì bị bỏ theo. */
+export const removePoleFromRoute = (route: OrderedPole[], poleId: string): OrderedPole[] =>
+  dropEdgeBends(removePole(route, poleId))
+
+/**
+ * Hình tuyến sau khi các cột của nó đổi: lấy cấu trúc cũ (thứ tự + điểm uốn) từ `geomWkt` và vị trí cũ của cột,
+ * rồi cập nhật theo danh sách cột hiện tại (`current`): cột mất thì bỏ, cột mới thì chèn, cột đổi vị trí thì dời.
+ */
+export const reconcileRoute = (
+  previous: OrderedPole[],
+  geomWkt: string | null | undefined,
+  current: OrderedPole[]
+): OrderedPole[] => {
+  const currentIds = new Set(current.map((p) => p.id))
+  let route = deriveInitialOrder(previous, geomWkt).ordered
+  for (const pole of polesOf(route)) {
+    if (!currentIds.has(pole.id)) route = removePoleFromRoute(route, pole.id)
+  }
+  for (const pole of current) route = upsertPoleInRoute(route, pole)
+  return route
+}
+
+/** Hai hình tuyến coi như giống nhau nếu cùng số đỉnh và từng đỉnh lệch dưới 1 cm. */
+export const isSameLine = (wktA: string | null | undefined, wktB: string | null | undefined): boolean => {
+  const a = typeof wktA === 'string' ? parseLineStringWkt(wktA) : []
+  const b = typeof wktB === 'string' ? parseLineStringWkt(wktB) : []
+  return a.length === b.length && a.every((c, i) => calculateDistanceMeters(c, b[i]) < 0.01)
+}
+
+/** Các cột có GPS của một tuyến, dạng điểm trên đường (bỏ qua cột có id trong `exceptId`). */
+export const orderedPolesOfSegment = (
+  poles: PoleListItem[],
+  segmentId: string,
+  exceptId?: string | null
+): OrderedPole[] =>
+  poles
+    .filter((p) => p.pole_id && p.pole_id !== exceptId && p.segment_id === segmentId && p.location)
+    .map((p) => ({ id: p.pole_id as string, coord: [p.location.lng, p.location.lat] as [number, number] }))
