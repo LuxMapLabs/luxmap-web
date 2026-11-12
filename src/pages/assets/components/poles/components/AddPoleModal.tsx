@@ -27,12 +27,13 @@ import {
   OUTSIDE_MANAGED_AREA_MESSAGE,
   getCommuneBboxInfo,
 } from '../../../../../utils/gis-map/mapUtils'
+import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
 import {
-  snapPointToPolyline,
-  parseLineStringWkt,
-  calculateDistanceMeters,
-  calculateRouteLengthMeters,
-} from '../../../../../utils/gis-map/routeUtils'
+  buildSegmentGeometry,
+  reconcileRoute,
+  type OrderedPole,
+} from '../../../../../utils/gis-map/segmentPoleOrder'
+import { clearSegmentDetail, fetchSegmentDetailRequest } from '../../../../../feature/assets/assetSlice'
 import { fetchMapLayersRequest } from '../../../../../feature/map/mapSlice'
 import type { RootState } from '../../../../../redux/rootReducer'
 import type { PoleListItem } from '../../../../../types/assets/poles'
@@ -92,6 +93,13 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const [selectedSegmentId, setSelectedSegmentId] = useState('')
   const [selectedCabinetId, setSelectedCabinetId] = useState('')
   const [selectedFeederId, setSelectedFeederId] = useState('')
+  // Chưa biết GPS: chỉ nhập thông tin cột, không cắm trên bản đồ
+  const [noGps, setNoGps] = useState(false)
+  const noGpsRef = useRef(noGps)
+  noGpsRef.current = noGps
+  useEffect(() => {
+    if (!noGps) requestAnimationFrame(() => mapRef.current?.resize())
+  }, [noGps])
 
   // Map Bounds từ Backend để giới hạn không gian địa bàn
   const currentUser = useSelector((state: RootState) => state?.auth?.user)
@@ -207,7 +215,9 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
   // Filter cabinets belonging to or connected with the selected segment
   const availableCabinetsOnSegment = useMemo(() => {
-    if (!selectedSegmentId || !availableCabinets) return []
+    if (!availableCabinets) return []
+    // Cột chưa biết GPS và chưa chọn tuyến: chọn trong tất cả tủ của xã
+    if (!selectedSegmentId) return noGps ? availableCabinets : []
 
     // 1. Lấy ID các tủ mà các cột trong tuyến này đang cấp nguồn
     const connectedCabinetIds = new Set<string>()
@@ -234,7 +244,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       if (segKeyword && cab.cabinet_name?.toLowerCase().includes(segKeyword)) return true
       return false
     })
-  }, [availableCabinets, selectedSegmentId, allPoles, existingPolesOnSegment, currentSegment])
+  }, [availableCabinets, selectedSegmentId, noGps, allPoles, existingPolesOnSegment, currentSegment])
 
   const currentCabinet = availableCabinetsOnSegment.find(
     (c) => c.cabinet_id === selectedCabinetId || c.external_ref === selectedCabinetId
@@ -266,44 +276,48 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     }
   }, [availableFeedersOnCabinet, selectedFeederId])
 
-  // Extract real coordinates of current route
-  const segmentCoords = useMemo<[number, number][]>(() => {
-    if (!selectedSegmentId) return []
-
-    // 1. Ưu tiên lấy LineString thật từ mapSegments (dữ liệu PostGIS Backend)
-    const mapSeg = mapSegments.find(
-      (s) => s.properties?.segment_id === selectedSegmentId
-    )
-    if (mapSeg && mapSeg.geometry?.type === 'LineString' && Array.isArray(mapSeg.geometry.coordinates)) {
-      const valid = mapSeg.geometry.coordinates.filter(
-        (c) => Array.isArray(c) && c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])
-      ) as [number, number][]
-      if (valid.length >= 2) return valid
+  // Hình tuyến đang lưu (kèm điểm uốn) của tuyến được chọn, lấy từ Backend
+  const segmentDetail = useSelector((state: RootState) => state.assets?.segmentDetail)
+  useEffect(() => {
+    if (!isOpen || !selectedSegmentId) return
+    dispatch(fetchSegmentDetailRequest(selectedSegmentId))
+    return () => {
+      dispatch(clearSegmentDetail())
     }
+  }, [dispatch, isOpen, selectedSegmentId])
+  const storedGeomWkt =
+    segmentDetail?.segmentId === selectedSegmentId && segmentDetail.isSettled ? segmentDetail.geomWkt : null
 
-    // 2. Nếu currentSegment có geom_wkt
-    if (currentSegment && 'geom_wkt' in currentSegment && typeof currentSegment.geom_wkt === 'string') {
-      const parsed = parseLineStringWkt(currentSegment.geom_wkt)
-      if (parsed.length >= 2) return parsed
-    }
+  // Cột đặt tự do nên đường tuyến chạy theo cột: hình đang lưu + cột hiện hữu + cột đang thêm (điểm uốn đã đặt được giữ).
+  // Chỉ để xem; hình tuyến thật được cập nhật khi lưu.
+  const existingRoute = useMemo<OrderedPole[]>(
+    () => existingPolesOnSegment.map((p) => ({ id: p.pole_id, coord: [p.lng, p.lat] as [number, number] })),
+    [existingPolesOnSegment]
+  )
+  const buildPreviewCoords = useCallback(
+    (draft: OrderedPole[]): [number, number][] => {
+      const geometry = buildSegmentGeometry(reconcileRoute(existingRoute, storedGeomWkt, [...existingRoute, ...draft]))
+      return geometry ? parseLineStringWkt(geometry.geomWkt) : []
+    },
+    [existingRoute, storedGeomWkt]
+  )
+  const buildPreviewCoordsRef = useRef(buildPreviewCoords)
+  buildPreviewCoordsRef.current = buildPreviewCoords
 
-    // 3. Nếu tuyến đã có cột đèn thực tế trong DB, lấy lộ trình nối qua các cột đèn
-    const segPoles = allPoles
-      .filter(
-        (p) =>
-          p.segment_id === selectedSegmentId &&
-          p.location &&
-          Number.isFinite(p.location.lat) &&
-          Number.isFinite(p.location.lng)
-      )
-      .sort((a, b) =>
-        (a.external_ref || '').localeCompare(b.external_ref || '', undefined, { numeric: true })
-      )
-      .map((p) => [p.location.lng, p.location.lat] as [number, number])
-    if (segPoles.length >= 2) return segPoles
+  // Các cột đang thêm có tọa độ hợp lệ; `override` thay vị trí một cột (đang kéo)
+  const draftPolesOf = (list: PoleRowDraft[], override?: { rowId: string; coord: [number, number] }): OrderedPole[] =>
+    list.flatMap((r) => {
+      if (override && r.rowId === override.rowId) return [{ id: r.rowId, coord: override.coord }]
+      const lat = parseFloat(r.lat)
+      const lng = parseFloat(r.lng)
+      return Number.isNaN(lat) || Number.isNaN(lng) ? [] : [{ id: r.rowId, coord: [lng, lat] as [number, number] }]
+    })
 
-    return []
-  }, [selectedSegmentId, mapSegments, currentSegment, allPoles])
+  const baseCoords = useMemo(() => buildPreviewCoords([]), [buildPreviewCoords])
+  const segmentCoords = useMemo(
+    () => buildPreviewCoords(draftPolesOf(rows)),
+    [buildPreviewCoords, rows]
+  )
 
   // Keep refs synchronized for event callbacks
   const selectedSegmentIdRef = useRef(selectedSegmentId)
@@ -332,156 +346,53 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     }
   }, [isOpen])
 
-  // Helper: Interpolate coordinates along polyline given target distance in meters
-  const getPointAtDistanceAlongPolyline = (
-    coords: [number, number][],
-    distMeters: number
-  ): [number, number] => {
-    if (!coords || coords.length === 0) return [0, 0]
-    if (coords.length === 1 || distMeters <= 0) return coords[0]
-
-    let accum = 0
-    for (let i = 0; i < coords.length - 1; i++) {
-      const p1 = coords[i]
-      const p2 = coords[i + 1]
-      const segLen = calculateDistanceMeters(p1, p2)
-      if (accum + segLen >= distMeters) {
-        const remain = distMeters - accum
-        const t = segLen === 0 ? 0 : remain / segLen
-        return [
-          Math.round((p1[0] + t * (p2[0] - p1[0])) * 1000000) / 1000000,
-          Math.round((p1[1] + t * (p2[1] - p1[1])) * 1000000) / 1000000,
-        ]
-      }
-      accum += segLen
+  // Thêm một cột nháp ở đúng vị trí đã chọn (cột đặt tự do, không bám vào đường)
+  const addPoleAtPoint = useCallback((lng: number, lat: number) => {
+    setErrorMsg(null)
+    if (noGpsRef.current) return
+    if (!selectedSegmentIdRef.current) {
+      setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1 trước khi cắm cột đèn!')
+      return
     }
-    return coords[coords.length - 1]
-  }
+    // Cột trùng đúng vị trí cột nháp khác thì nhích sang bên để còn thấy và kéo được
+    let atLng = lng
+    const taken = (x: number) =>
+      rowsRef.current.some((r) => Math.abs(parseFloat(r.lng) - x) < 0.000005 && Math.abs(parseFloat(r.lat) - lat) < 0.000005)
+    while (taken(atLng)) atLng += 0.00003
 
-  // Helper: Anti-Collision Leapfrog to avoid overlapping existing or draft poles
-  const resolveNonOverlappingRoutePoint = useCallback(
-    (rawLng: number, rawLat: number, excludeRowId?: string): [number, number] => {
-      const coords = segmentCoordsRef.current
-      if (!coords || coords.length < 2) return [rawLng, rawLat]
-
-      const snap = snapPointToPolyline([rawLng, rawLat], coords)
-      const mouseDist = snap.accumulatedDist
-      let targetDist = mouseDist
-
-      // Gather obstacle points
-      const obstaclePoints: [number, number][] = []
-
-      // 1. Existing poles on segment
-      existingPolesOnSegmentRef.current.forEach((p) => {
-        if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
-          obstaclePoints.push([p.lng, p.lat])
-        }
-      })
-
-      // 2. Draft pole rows (excluding current row being dragged)
-      rowsRef.current.forEach((r) => {
-        if (r.rowId !== excludeRowId) {
-          const lat = parseFloat(r.lat)
-          const lng = parseFloat(r.lng)
-          if (!isNaN(lat) && !isNaN(lng)) {
-            obstaclePoints.push([lng, lat])
-          }
-        }
-      })
-
-      if (obstaclePoints.length === 0) {
-        return snap.snappedPoint
-      }
-
-      // Convert obstacles to distance along polyline
-      const obstacleDists = obstaclePoints
-        .map((pt) => snapPointToPolyline(pt, coords).accumulatedDist)
-        .sort((a, b) => a - b)
-
-      const MIN_CLEARANCE = 2 // meters: khoảng cách an toàn tối thiểu tránh đè trùng khít cột
-
-      // Build & merge overlapping forbidden intervals [d - MIN_CLEARANCE, d + MIN_CLEARANCE]
-      const rawIntervals = obstacleDists.map((d) => [
-        Math.max(0, d - MIN_CLEARANCE),
-        d + MIN_CLEARANCE,
-      ] as [number, number])
-
-      const mergedIntervals: [number, number][] = []
-      for (const cur of rawIntervals) {
-        if (mergedIntervals.length === 0) {
-          mergedIntervals.push([...cur])
-        } else {
-          const prev = mergedIntervals[mergedIntervals.length - 1]
-          if (cur[0] <= prev[1]) {
-            prev[1] = Math.max(prev[1], cur[1])
-          } else {
-            mergedIntervals.push([...cur])
-          }
-        }
-      }
-
-      const totalLen = calculateRouteLengthMeters(coords)
-
-      // Push targetDist outside forbidden intervals
-      let iterations = 0
-      while (iterations < 10) {
-        iterations++
-        const inside = mergedIntervals.find(
-          ([start, end]) => targetDist >= start - 0.0001 && targetDist <= end + 0.0001
-        )
-        if (!inside) break
-
-        const [start, end] = inside
-        const mid = (start + end) / 2
-
-        if (start <= 0.1 && end >= totalLen - 0.1) {
-          break
-        }
-
-        if (start <= 0.1) {
-          targetDist = end + 0.05
-        } else if (end >= totalLen - 0.1) {
-          targetDist = Math.max(0, start - 0.05)
-        } else if (mouseDist >= mid) {
-          targetDist = end + 0.05
-        } else {
-          targetDist = Math.max(0, start - 0.05)
-        }
-      }
-
-      return getPointAtDistanceAlongPolyline(coords, targetDist)
-    },
-    []
-  )
-
-  // Helper: Snap coordinate onto route with anti-collision leapfrog and add a new pole row
-  const addPoleAtPoint = useCallback(
-    (rawLng: number, rawLat: number) => {
-      setErrorMsg(null)
-      if (!selectedSegmentIdRef.current || segmentCoordsRef.current.length < 2) {
-        setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1 trước khi cắm cột đèn!')
-        return
-      }
-
-      const [snappedLng, snappedLat] = resolveNonOverlappingRoutePoint(rawLng, rawLat)
-
-      const newRow: PoleRowDraft = {
-        rowId: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        pole_id: '',
-        lat: snappedLat.toFixed(6),
-        lng: snappedLng.toFixed(6),
-        note: '',
-        near_sensitive_poi: false,
-      }
-
-      setRows((prev) => [...prev, newRow])
-    },
-    [resolveNonOverlappingRoutePoint]
-  )
+    const newRow: PoleRowDraft = {
+      rowId: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      pole_id: '',
+      lat: lat.toFixed(6),
+      lng: atLng.toFixed(6),
+      note: '',
+      near_sensitive_poi: false,
+    }
+    setRows((prev) => [...prev, newRow])
+  }, [])
 
   // Handler: Add New Pole Row via button
   const handleAddRow = () => {
     setErrorMsg(null)
+
+    if (noGps) {
+      if (!selectedCabinetId) {
+        setErrorMsg('Vui lòng chọn Tủ điện điều khiển trực tiếp quản lý các cột đèn này!')
+        return
+      }
+      setRows((prev) => [
+        ...prev,
+        {
+          rowId: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          pole_id: '',
+          lat: '',
+          lng: '',
+          note: '',
+          near_sensitive_poi: false,
+        },
+      ])
+      return
+    }
 
     if (!selectedSegmentId) {
       setErrorMsg('Vui lòng chọn Tuyến đường áp dụng ở mục 1 trước khi thêm cột đèn!')
@@ -493,37 +404,14 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       return
     }
 
-    if (segmentCoords.length < 2) {
-      setErrorMsg('Tuyến đường được chọn chưa có dữ liệu tọa độ tim đường!')
+    // Đặt cột ở giữa vùng bản đồ đang nhìn; người dùng kéo tới đúng chỗ
+    const center = mapRef.current?.getCenter()
+    if (!center) return
+    if (!isPointInBounds(activeBoundsRef.current, center.lng, center.lat)) {
+      toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
       return
     }
-
-    const totalLength = calculateRouteLengthMeters(segmentCoords)
-
-    // If rows already exist, place the new pole 35m ahead along the centerline
-    if (rows.length > 0) {
-      const lastRow = rows[rows.length - 1]
-      const lastLat = parseFloat(lastRow.lat)
-      const lastLng = parseFloat(lastRow.lng)
-      if (!isNaN(lastLat) && !isNaN(lastLng)) {
-        const snap = snapPointToPolyline([lastLng, lastLat], segmentCoords)
-        const lastDist = snap.accumulatedDist
-        let targetDist = lastDist + 35
-        if (targetDist > totalLength) {
-          // If exceeded route length, step back or find available spot
-          targetDist = Math.max(0, lastDist - 35)
-          if (targetDist === 0) {
-            targetDist = totalLength * 0.5
-          }
-        }
-        const candidatePt = getPointAtDistanceAlongPolyline(segmentCoords, targetDist)
-        addPoleAtPoint(candidatePt[0], candidatePt[1])
-        return
-      }
-    }
-
-    // Default: start at the first point of the route
-    addPoleAtPoint(segmentCoords[0][0], segmentCoords[0][1])
+    addPoleAtPoint(center.lng, center.lat)
   }
 
   // Handler: Delete row
@@ -738,9 +626,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       }
     })
 
-    // Click map to snap & add pole
+    // Click map to add a pole right where it was clicked
     map.on('click', (e) => {
-      if (!selectedSegmentIdRef.current || segmentCoordsRef.current.length < 2) return
+      if (noGpsRef.current) return
+      if (!selectedSegmentIdRef.current) return
       if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
         toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
         return
@@ -807,40 +696,42 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     }
   }, [existingPolesGeoJSON])
 
-  // Update route polyline data and fit bounds when segmentCoords changes
+  // Vẽ lại đường tuyến mỗi khi nó đổi (thêm / dời cột)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    const updateSourceAndFit = () => {
+    const updateSource = () => {
       const source = map.getSource('segment-route') as maplibregl.GeoJSONSource | undefined
-      if (source) {
-        source.setData({
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: segmentCoords.length >= 2 ? segmentCoords : [],
-          },
-        })
-      }
-
-      if (segmentCoords.length >= 2) {
-        const bounds = new maplibregl.LngLatBounds()
-        segmentCoords.forEach((coord) => bounds.extend(coord))
-        map.fitBounds(bounds, FIT_BOUNDS_ASSET_ADD_SMOOTH)
-      }
+      source?.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: segmentCoords.length >= 2 ? segmentCoords : [],
+        },
+      })
     }
 
-    const source = map.getSource('segment-route') as maplibregl.GeoJSONSource | undefined
-    if (source) {
-      updateSourceAndFit()
-    } else if (map.isStyleLoaded()) {
-      updateSourceAndFit()
+    if (map.getSource('segment-route') || map.isStyleLoaded()) {
+      updateSource()
     } else {
-      map.once('load', updateSourceAndFit)
+      map.once('load', updateSource)
     }
   }, [segmentCoords])
+
+  // Chỉ zoom về tuyến khi đổi tuyến hoặc hình tuyến đang lưu đổi, không zoom mỗi lần thêm / kéo cột
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || baseCoords.length < 2) return
+    const fit = () => {
+      const bounds = new maplibregl.LngLatBounds()
+      baseCoords.forEach((coord) => bounds.extend(coord))
+      map.fitBounds(bounds, FIT_BOUNDS_ASSET_ADD_SMOOTH)
+    }
+    if (map.getSource('segment-route') || map.isStyleLoaded()) fit()
+    else map.once('load', fit)
+  }, [baseCoords])
 
   // Update Cabinet Marker on route
   useEffect(() => {
@@ -882,7 +773,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     }
   }, [currentCabinet])
 
-  // Synchronize Pole Markers & Draggable Snapping
+  // Synchronize Pole Markers (kéo tự do)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -932,51 +823,35 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
           map.dragPan.disable()
         })
 
-        // Realtime drag: snap to route centerline continuously with anti-collision leapfrog
+        // Kéo tự do; đường xem trước chạy theo cột ngay khi kéo
         marker.on('drag', () => {
           const raw = marker!.getLngLat()
-          if (segmentCoordsRef.current.length >= 2) {
-            const snappedPoint = resolveNonOverlappingRoutePoint(raw.lng, raw.lat, row.rowId)
-            marker!.setLngLat(snappedPoint)
-          }
+          const source = map.getSource('segment-route') as maplibregl.GeoJSONSource | undefined
+          const coords = buildPreviewCoordsRef.current(
+            draftPolesOf(rowsRef.current, { rowId: row.rowId, coord: [raw.lng, raw.lat] })
+          )
+          source?.setData({
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'LineString', coordinates: coords.length >= 2 ? coords : [] },
+          })
         })
 
-        // Drag end: re-enable map panning and update row state with auto-sort
+        // Drag end: bật lại kéo bản đồ và ghi vị trí mới vào dòng
         marker.on('dragend', () => {
           map.dragPan.enable()
           const raw = marker!.getLngLat()
           if (!isPointInBounds(activeBoundsRef.current, raw.lng, raw.lat)) {
             marker!.setLngLat(dragStartPos)
             toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+            setRows((prev) => [...prev])
             return
           }
-          if (segmentCoordsRef.current.length >= 2) {
-            const snappedPoint = resolveNonOverlappingRoutePoint(raw.lng, raw.lat, row.rowId)
-            marker!.setLngLat(snappedPoint)
-            setRows((prev) => {
-              const updated = prev.map((r) =>
-                r.rowId === row.rowId
-                  ? {
-                      ...r,
-                      lat: snappedPoint[1].toFixed(6),
-                      lng: snappedPoint[0].toFixed(6),
-                    }
-                  : r
-              )
-              // Tự động sắp xếp lại thứ tự cột từ đầu tuyến đến cuối tuyến
-              return [...updated].sort((a, b) => {
-                const distA = snapPointToPolyline(
-                  [parseFloat(a.lng), parseFloat(a.lat)],
-                  segmentCoordsRef.current
-                ).accumulatedDist
-                const distB = snapPointToPolyline(
-                  [parseFloat(b.lng), parseFloat(b.lat)],
-                  segmentCoordsRef.current
-                ).accumulatedDist
-                return distA - distB
-              })
-            })
-          }
+          setRows((prev) =>
+            prev.map((r) =>
+              r.rowId === row.rowId ? { ...r, lat: raw.lat.toFixed(6), lng: raw.lng.toFixed(6) } : r
+            )
+          )
         })
 
         markersMapRef.current.set(row.rowId, marker)
@@ -997,7 +872,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
         }
       }
     })
-  }, [rows, resolveNonOverlappingRoutePoint])
+  }, [rows])
 
   if (!isOpen) return null
 
@@ -1006,7 +881,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     e.preventDefault()
     setErrorMsg(null)
 
-    if (!selectedSegmentId) {
+    if (!noGps && !selectedSegmentId) {
       setErrorMsg('Vui lòng chọn Tuyến đường áp dụng!')
       return
     }
@@ -1041,12 +916,12 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       const parsedLat = parseFloat(row.lat)
       const parsedLng = parseFloat(row.lng)
 
-      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+      if (!noGps && (isNaN(parsedLat) || isNaN(parsedLng))) {
         setErrorMsg(`Hàng #${i + 1}: Tọa độ GPS không hợp lệ (Vui lòng chọn vị trí trên bản đồ)!`)
         return
       }
 
-      if (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
+      if (!noGps && (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180)) {
         setErrorMsg(`Hàng #${i + 1}: Tọa độ vượt quá phạm vi địa lý (Lat: -90..90, Lng: -180..180)!`)
         return
       }
@@ -1060,18 +935,18 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       validatedDataList.push({
         pole_id: poleId,
         external_ref: trimmedExternalRef || null,
-        segment_id: selectedSegmentId,
+        segment_id: selectedSegmentId || null,
         feeder_id: effectiveFeederId,
         cabinet_id: selectedCabinetId || null,
         cabinet_name: currentCabinet?.cabinet_name || null,
-        commune_id: currentSegment?.commune_id || 'COM-001',
+        commune_id: currentSegment?.commune_id || activeCommuneId || null,
         commune_name: currentSegment?.commune_name || null,
         data_source: 'field',
         near_sensitive_poi: !!row.near_sensitive_poi,
-        location: {
-          lat: parsedLat,
-          lng: parsedLng,
-        },
+        // Kiểu sinh từ BE chưa cho location null; cột chưa biết GPS gửi geom_wkt null
+        location: noGps
+          ? (null as unknown as PoleListItem['location'])
+          : { lat: parsedLat, lng: parsedLng },
         note: row.note?.trim() ? row.note.trim() : null,
         updated_at: new Date().toISOString(),
       })
@@ -1103,7 +978,11 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
           <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
             
             {/* ================= CỘT TRÁI (~45%): THÔNG SỐ & BẢNG CỘT ĐÈN ================= */}
-            <div className="md:col-span-5 p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 flex flex-col">
+            <div
+              className={`p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 border-slate-200 dark:border-slate-800 flex flex-col ${
+                noGps ? 'md:col-span-12' : 'md:col-span-5 md:border-r'
+              }`}
+            >
               
               {/* SECTION 1: TUYẾN ĐƯỜNG & TỦ ĐIỆN */}
               <div className="p-4 bg-slate-50/70 hover:bg-slate-50/90 dark:bg-slate-800/50 dark:hover:bg-slate-800/70 rounded-2xl border border-slate-200/90 hover:border-slate-300 dark:border-slate-700/80 dark:hover:border-slate-600 space-y-3 shadow-2xs hover:shadow-xs transition-all duration-200 shrink-0">
@@ -1117,12 +996,41 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                   </span>
                 </div>
 
-                <div className="space-y-3">
+                <div className={noGps ? 'grid md:grid-cols-2 gap-3 items-start' : 'space-y-3'}>
+                  <label className="md:col-span-2 flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 cursor-pointer">
+                    <span className="leading-tight">
+                      <span className="font-bold text-slate-800 dark:text-slate-100 block">Chưa biết GPS</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                        Chỉ nhập thông tin cột. Gắn vị trí sau, khi sửa cột.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      aria-label="Chưa biết GPS"
+                      checked={noGps}
+                      onChange={(e) => {
+                        setNoGps(e.target.checked)
+                        setRows([])
+                        setSelectedCabinetId('')
+                        setSelectedFeederId('')
+                        setErrorMsg(null)
+                      }}
+                      className="peer sr-only"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="relative shrink-0 w-9 h-5 rounded-full bg-slate-300 dark:bg-slate-600 peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 transition-colors after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4"
+                    />
+                  </label>
+
                   {/* 1. Select Segment */}
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center justify-between">
                       <span>Tuyến đường áp dụng:</span>
-                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">(Bắt buộc)</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                        {noGps ? '(Không bắt buộc)' : '(Bắt buộc)'}
+                      </span>
                     </label>
                     <select
                       value={selectedSegmentId}
@@ -1133,8 +1041,8 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                           : 'text-slate-900 dark:text-slate-100 border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500'
                       }`}
                     >
-                      <option value="" disabled className="text-slate-400 font-normal">
-                        -- Chọn tuyến đường áp dụng --
+                      <option value="" disabled={!noGps} className="text-slate-400 font-normal">
+                        {noGps ? '-- Chưa gán tuyến đường --' : '-- Chọn tuyến đường áp dụng --'}
                       </option>
                       {segmentList.map((seg) => (
                         <option key={seg.segment_id || ''} value={seg.segment_id || ''} className="text-slate-900 dark:text-slate-100">
@@ -1158,17 +1066,17 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                         setErrorMsg(null)
                       }}
                       placeholder={
-                        selectedSegmentId
+                        selectedSegmentId || noGps
                           ? availableCabinetsOnSegment.length > 0
                             ? '-- Chọn tủ điện quản lý --'
-                            : '-- Tuyến này chưa có tủ điện --'
+                            : '-- Chưa có tủ điện phù hợp --'
                           : '-- Vui lòng chọn Tuyến trước --'
                       }
-                      disabled={!selectedSegmentId || availableCabinetsOnSegment.length === 0}
+                      disabled={(!selectedSegmentId && !noGps) || availableCabinetsOnSegment.length === 0}
                       disabledPlaceholder={
-                        !selectedSegmentId
+                        !selectedSegmentId && !noGps
                           ? '-- Vui lòng chọn Tuyến trước --'
-                          : '-- Tuyến này chưa có tủ điện --'
+                          : '-- Chưa có tủ điện phù hợp --'
                       }
                       accentColor="indigo"
                       allowClear={true}
@@ -1268,7 +1176,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                         {rows.length === 0 ? (
                           <tr>
                             <td colSpan={5} className="py-8 text-center text-slate-400 dark:text-slate-500">
-                              Chưa có cột đèn nào. Click trên bản đồ hoặc bấm{' '}
+                              {noGps ? 'Chưa có cột đèn nào. Bấm' : 'Chưa có cột đèn nào. Click trên bản đồ hoặc bấm'}{' '}
                               <button
                                 type="button"
                                 onClick={handleAddRow}
@@ -1276,7 +1184,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                               >
                                 Thêm Cột
                               </button>{' '}
-                              để cắm mốc.
+                              {noGps ? 'để thêm cột.' : 'để cắm mốc.'}
                             </td>
                           </tr>
                         ) : (
@@ -1333,7 +1241,11 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
             </div>
 
             {/* ================= CỘT PHẢI (~55%): BẢN ĐỒ GIS VỆ TINH ================= */}
-            <div className="md:col-span-7 flex flex-col h-80 md:h-auto min-h-[520px] relative bg-blue-50 border-t md:border-t-0">
+            <div
+              className={`md:col-span-7 flex-col h-80 md:h-auto min-h-[520px] relative bg-blue-50 border-t md:border-t-0 ${
+                noGps ? 'hidden' : 'flex'
+              }`}
+            >
               <div ref={mapContainerRef} className="w-full h-full" />
 
               {/* Map overlay legend */}
@@ -1344,7 +1256,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#059669] border border-white inline-block"></span>
-                  <span>Cột đang thêm ({rows.length}) - Kéo để trượt dọc tuyến</span>
+                  <span>Cột đang thêm ({rows.length}) - Kéo để đặt vị trí</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#fde047] border border-slate-700/40 inline-block"></span>
@@ -1352,7 +1264,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-4 h-1 bg-sky-400 rounded-full"></span>
-                  <span>Tim tuyến đường chiếu sáng</span>
+                  <span>Hình tuyến (xem trước)</span>
                 </div>
                 {currentCabinet && (
                   <div className="flex items-center gap-2">
@@ -1368,13 +1280,13 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                   <Route className="w-8 h-8 text-blue-600 mb-2 animate-bounce" />
                   <p className="font-bold text-xs">Chưa chọn tuyến đường</p>
                   <p className="text-[11px] text-slate-600 mt-0.5 max-w-sm">
-                    Vui lòng chọn Tuyến đường áp dụng ở cột trái để hiển thị lộ trình tim đường và cắm mốc cột đèn trên bản đồ vệ tinh.
+                    Vui lòng chọn Tuyến đường áp dụng ở cột trái để xem các cột hiện có và cắm mốc cột đèn trên bản đồ vệ tinh.
                   </p>
                 </div>
               ) : segmentCoords.length < 2 ? (
-                <div className="absolute inset-x-3 top-3 bg-amber-500/90 text-slate-950 px-3 py-1.5 rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs font-bold backdrop-blur-xs z-10 pointer-events-none animate-in fade-in">
-                  <AlertCircle className="w-4 h-4 text-slate-950 shrink-0" />
-                  <span>Tuyến này chưa có dữ liệu tim đường GIS hoặc đang tải...</span>
+                <div className="absolute inset-x-3 top-3 bg-sky-600/90 text-white px-3 py-1.5 rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs font-bold backdrop-blur-xs z-10 pointer-events-none animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Tuyến chưa có đường. Click bản đồ hoặc bấm Thêm Cột để đặt cột; đường sẽ vẽ khi có từ 2 cột.</span>
                 </div>
               ) : null}
             </div>

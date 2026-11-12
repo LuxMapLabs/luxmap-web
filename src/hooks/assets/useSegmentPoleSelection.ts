@@ -2,10 +2,15 @@ import { useCallback, useMemo, useState } from 'react'
 import type { PoleListItem } from '../../types/assets/poles'
 import type { PickablePole } from '../../components/SegmentPolePickerMap'
 import {
+  autoSortRoute,
   buildSegmentGeometry,
+  dropEdgeBends,
+  insertBendInRoute,
   insertPoleInRoute,
+  makeBend,
+  moveBend as moveBendInRoute,
   movePole,
-  orderPolesByChain,
+  polesOf,
   removePole,
   type OrderedPole,
 } from '../../utils/gis-map/segmentPoleOrder'
@@ -28,7 +33,8 @@ export const toPickablePoles = (poles: PoleListItem[], currentSegmentId?: string
     }))
 
 /**
- * Danh sách cột của tuyến theo thứ tự dọc tuyến.
+ * Danh sách cột của tuyến theo thứ tự dọc tuyến, có thể xen điểm uốn (`selected` gồm cả hai,
+ * `poles` chỉ gồm cột).
  * Click cột trên bản đồ: thêm (tự chèn vào chỗ hợp lý) hoặc bỏ. Người dùng chỉnh thứ tự bằng
  * `move` (kéo thả). `lastAddedId` cho danh sách biết cột vừa thêm để cuộn tới và tô sáng.
  */
@@ -42,11 +48,13 @@ export const useSegmentPoleSelection = (candidates: PickablePole[], initial: Ord
       const pole = candidates.find((p) => p.id === poleId)
       if (!exists && !pole) return
       setSelected((prev) =>
-        prev.some((p) => p.id === poleId)
-          ? removePole(prev, poleId)
-          : pole
-          ? insertPoleInRoute(prev, { id: pole.id, coord: pole.coord })
-          : prev
+        dropEdgeBends(
+          prev.some((p) => p.id === poleId)
+            ? removePole(prev, poleId)
+            : pole
+            ? insertPoleInRoute(prev, { id: pole.id, coord: pole.coord })
+            : prev
+        )
       )
       setLastAddedId(exists ? null : poleId)
     },
@@ -54,20 +62,32 @@ export const useSegmentPoleSelection = (candidates: PickablePole[], initial: Ord
   )
 
   const remove = useCallback((poleId: string) => {
-    setSelected((prev) => removePole(prev, poleId))
+    setSelected((prev) => dropEdgeBends(removePole(prev, poleId)))
     setLastAddedId(null)
   }, [])
 
   const move = useCallback((from: number, to: number) => {
-    setSelected((prev) => movePole(prev, from, to))
+    setSelected((prev) => dropEdgeBends(movePole(prev, from, to)))
   }, [])
 
   /** Sắp lại theo chuỗi gần nhất, dùng khi danh sách bị xáo trộn nhiều. */
   const autoSort = useCallback(() => {
-    setSelected((prev) => orderPolesByChain(prev))
+    setSelected((prev) => autoSortRoute(prev))
   }, [])
 
+  /** Đặt điểm uốn tại tọa độ: nằm giữa hai cột, tự chèn vào chỗ làm đường dài thêm ít nhất. */
+  const addBend = useCallback((coord: [number, number]) => {
+    const bend = makeBend(coord)
+    setSelected((prev) => insertBendInRoute(prev, bend))
+    setLastAddedId(bend.id)
+  }, [])
+
+  const moveBend = useCallback((bendId: string, coord: [number, number]) => {
+    setSelected((prev) => moveBendInRoute(prev, bendId, coord))
+  }, [])
+
+  const poles = useMemo(() => polesOf(selected), [selected])
   const geometry = useMemo(() => buildSegmentGeometry(selected), [selected])
 
-  return { selected, toggle, remove, move, autoSort, lastAddedId, geometry }
+  return { selected, poles, toggle, remove, move, autoSort, addBend, moveBend, lastAddedId, geometry }
 }

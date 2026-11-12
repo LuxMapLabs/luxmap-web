@@ -137,6 +137,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     commune_name: 'Xã Phú Hòa Đông',
     data_source: 'field',
     pole_count: 24,
+    has_geometry: true,
     updated_at: '2026-10-08T10:00:00Z',
   }
 

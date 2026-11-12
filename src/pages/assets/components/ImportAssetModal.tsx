@@ -145,13 +145,13 @@ function parseCsvLine(line: string): string[] {
 }
 
 const REQUIRED_HEADERS_BY_CATEGORY: Record<string, string[]> = {
-  poles: ['external_ref', 'segment_external_ref', 'commune_id', 'geom_wkt', 'data_source'],
-  poles_and_fixtures: ['external_ref', 'segment_external_ref', 'commune_id', 'geom_wkt', 'data_source'],
+  poles: ['external_ref', 'segment_external_ref', 'commune_id', 'data_source'],
+  poles_and_fixtures: ['external_ref', 'segment_external_ref', 'commune_id', 'data_source'],
   fixtures: ['pole_external_ref', 'fixture_type', 'power_source', 'lamp_watt', 'install_date', 'data_source'],
   cabinets: ['external_ref', 'cabinet_name', 'commune_id', 'geom_wkt', 'data_source'],
 
   feeders: ['external_ref', 'feeder_name', 'commune_id', 'cabinet_external_ref'],
-  segments: ['external_ref', 'segment_name', 'road_class', 'length_m', 'geom_wkt', 'commune_id', 'data_source'],
+  segments: ['external_ref', 'segment_name', 'road_class', 'commune_id', 'data_source'],
 }
 
 export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
@@ -890,7 +890,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                       return `Đèn LED ${item.data.lamp_watt}W • Nguồn: ${item.data.power_source === 'grid' ? 'Lưới điện' : 'Mặt trời'} • Hạn BH: ${item.data.warranty_expiry || 'Chưa có'}`
                                     }
                                     if (item.category === 'segments') {
-                                      return `Tuyến: ${item.data.segment_name || item.externalRef} • Dài: ${item.data.length_m}m • Cấp: ${item.data.road_class === 'inter_commune' ? 'Liên xã' : 'Liên thôn'}`
+                                      return `Tuyến: ${item.data.segment_name || item.externalRef} • Dài: ${item.data.length_m ? `${item.data.length_m}m` : '-'} • Cấp: ${item.data.road_class === 'inter_commune' ? 'Liên xã' : 'Liên thôn'}`
                                     }
                                     if (item.category === 'cabinets') {
                                       return `Tủ: ${item.data.cabinet_name || item.externalRef} • ${formatCommuneDisplayName(item.data.commune_id)}`

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { GripVertical, ListOrdered, X } from 'lucide-react'
-import type { OrderedPole } from '../utils/gis-map/segmentPoleOrder'
+import { CornerUpRight, GripVertical, ListOrdered, X } from 'lucide-react'
+import { isBend, type OrderedPole } from '../utils/gis-map/segmentPoleOrder'
 
 interface SegmentPoleOrderListProps {
-  /** Các cột của tuyến, theo thứ tự dọc tuyến. */
+  /** Các cột của tuyến (xen điểm uốn nếu có), theo thứ tự dọc tuyến. */
   route: OrderedPole[]
   /** Mã hiển thị của từng cột, theo id. */
   codes: Record<string, string>
@@ -44,6 +44,10 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
     row?.scrollIntoView?.({ block: 'nearest' })
   }, [revealId])
 
+  const poleIndexes = route.flatMap((p, i) => (isBend(p) ? [] : [i]))
+  const firstPoleIndex = poleIndexes[0]
+  const lastPoleIndex = poleIndexes[poleIndexes.length - 1]
+
   const endDrag = () => {
     setDragIndex(null)
     setOverIndex(null)
@@ -66,7 +70,7 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
         <button
           type="button"
           onClick={onAutoSort}
-          disabled={route.length < 3}
+          disabled={poleIndexes.length < 3}
           title="Sắp lại các cột theo vị trí gần nhau"
           className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed cursor-pointer"
         >
@@ -85,8 +89,9 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
           className="max-h-[260px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900"
         >
           {route.map((pole, index) => {
-            const isFirst = index === 0
-            const isLast = index === route.length - 1
+            const bend = isBend(pole)
+            const isFirst = index === firstPoleIndex
+            const isLast = index === lastPoleIndex
             const isHighlighted = highlightId === pole.id
             return (
               <li
@@ -113,8 +118,8 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
                   endDrag()
                   onHover(null)
                 }}
-                onMouseEnter={() => onHover(pole.id)}
-                onMouseLeave={() => onHover(null)}
+                onMouseEnter={() => !bend && onHover(pole.id)}
+                onMouseLeave={() => !bend && onHover(null)}
                 className={`flex items-center gap-1 px-1.5 py-1 transition-colors ${
                   isHighlighted ? 'bg-amber-50 dark:bg-amber-950/30' : ''
                 } ${dragIndex === index ? 'opacity-40' : ''} ${
@@ -133,18 +138,25 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
                 <button
                   type="button"
                   onClick={() => onFocus(pole.id)}
-                  title="Xem cột này trên bản đồ"
+                  title={bend ? 'Xem điểm uốn này trên bản đồ' : 'Xem cột này trên bản đồ'}
                   className="flex-1 min-w-0 flex items-center gap-1.5 text-left cursor-pointer"
                 >
-                  <span className="font-mono font-semibold text-slate-800 dark:text-slate-100 truncate">
-                    {codes[pole.id] || pole.id}
-                  </span>
+                  {bend ? (
+                    <span className="flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-300 truncate">
+                      <CornerUpRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      Điểm uốn
+                    </span>
+                  ) : (
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-100 truncate">
+                      {codes[pole.id] || pole.id}
+                    </span>
+                  )}
                   {isFirst && (
                     <span className="shrink-0 px-1.5 py-px rounded bg-emerald-500 text-white text-[9px] font-bold">
                       Đầu tuyến
                     </span>
                   )}
-                  {isLast && route.length > 1 && (
+                  {isLast && poleIndexes.length > 1 && (
                     <span className="shrink-0 px-1.5 py-px rounded bg-rose-500 text-white text-[9px] font-bold">
                       Cuối tuyến
                     </span>
@@ -156,8 +168,8 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
                     onRemove(pole.id)
                     onHover(null)
                   }}
-                  title="Bỏ khỏi tuyến"
-                  aria-label={`Bỏ ${codes[pole.id] || pole.id} khỏi tuyến`}
+                  title={bend ? 'Xóa điểm uốn' : 'Bỏ khỏi tuyến'}
+                  aria-label={bend ? 'Xóa điểm uốn' : `Bỏ ${codes[pole.id] || pole.id} khỏi tuyến`}
                   className={`${iconButton} hover:text-rose-500`}
                 >
                   <X className="w-3.5 h-3.5" />
