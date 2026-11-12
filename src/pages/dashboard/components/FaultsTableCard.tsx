@@ -258,22 +258,12 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                   const rawNote = (fault.note || fault.review_note || '').trim()
                   const iotMatch = rawNote.match(/Thiết bị\s+(NODE-[\w-]+)\s+ở tủ\s+(CAB-[\w-]+)/i)
 
-                  const primaryCode = fault.pole_id
-                    ? fault.pole_id
-                    : iotMatch
-                    ? iotMatch[1]
-                    : isOffline
-                    ? fault.fault_id || 'Thiết bị IoT'
-                    : fault.fault_id || 'Chưa gán cột'
+                  const primaryCode = fault.pole_id || (iotMatch ? iotMatch[1] : fault.fault_id || '-')
 
                   const segmentName =
                     segmentNameMap[fault.segment_id || ''] ||
                     fault.segment_id ||
-                    (iotMatch
-                      ? `Tủ điều khiển ${iotMatch[2]}`
-                      : fault.location?.lat != null && fault.location?.lng != null
-                      ? `GPS: ${fault.location.lat.toFixed(4)}, ${fault.location.lng.toFixed(4)}`
-                      : 'Chưa rõ tuyến')
+                    (iotMatch ? iotMatch[2] : '-')
 
                   const progress = getFaultProgressInfo(fault)
                   const isUnassigned = progress.key === 'unassigned'

@@ -11,7 +11,7 @@ interface UrgentFaultsCardProps {
 
 const MAX_ITEMS = 4
 
-// Danh sách sự cố chưa có lịch công tác, bấm vào để tạo lịch ngay
+// Unassigned faults card allowing quick schedule creation
 function getUrgentFaultDisplay(fault: FaultItem, segmentNameMap: Record<string, string>) {
   const faultTypeStr = String(fault.fault_type || '').toLowerCase()
   const isOffline = faultTypeStr.includes('offline') || faultTypeStr.includes('node')
@@ -28,20 +28,12 @@ function getUrgentFaultDisplay(fault: FaultItem, segmentNameMap: Record<string, 
     ? fault.pole_id
     : iotMatch
     ? `${iotMatch[1]} • ${iotMatch[2]}`
-    : isOffline
-    ? `Thiết bị IoT (${fault.fault_id || 'Mất kết nối'})`
-    : `${fault.fault_id || 'Sự cố'} • Chưa gán cột`
+    : fault.fault_id || '-'
 
   const hasValidSegment = Boolean(fault.segment_id && segmentNameMap[fault.segment_id])
   const secondaryText = hasValidSegment
     ? segmentNameMap[fault.segment_id!]
-    : fault.segment_id
-    ? fault.segment_id
-    : noteText
-    ? noteText
-    : fault.location?.lat != null && fault.location?.lng != null
-    ? `GPS: ${fault.location.lat.toFixed(5)}, ${fault.location.lng.toFixed(5)}`
-    : 'Chưa rõ tuyến đường'
+    : fault.segment_id || noteText || '-'
 
   const typeLabel = isOffline ? 'Mất kết nối IoT' : isBlackout ? 'Mất sáng' : 'Sáng yếu'
   const typeBadgeClass = isOffline

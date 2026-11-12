@@ -49,8 +49,7 @@ export const ManagerDashboardPage: React.FC = () => {
     warrantyTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Handler khi click hàng sự cố "Chưa phân lịch" -> Trỏ sang tab Lịch làm việc & Mở popup Tạo sự vụ
-  // Với sự cố không gắn cột/tuyến (như mất kết nối tủ IoT), mở modal xem chi tiết thay vì nhảy sang tạo lịch kiểm tra cột
+  // Navigate to work schedule creation for pole/segment faults, or open detail modal for unmapped/IoT faults
   const handleNavigateToCreateSchedule = (fault: FaultItem) => {
     const type = String(fault.fault_type || '').toLowerCase()
     const isOffline = type.includes('offline') || type.includes('node')
@@ -255,8 +254,7 @@ export const ManagerDashboardPage: React.FC = () => {
     }).length
   }, [segmentFaults])
 
-  // Lọc danh sách sự cố "Cần xử lý ngay" (Chưa phân lịch công tác):
-  // Loại trừ sự cố mất kết nối tủ điều khiển IoT (node_offline) và chỉ giữ sự cố gắn với cột/tuyến cần giao ca kiểm tra
+  // Filter unassigned pole/segment faults for urgent scheduling card (excluding cabinet IoT offline alerts)
   const unassignedFaults = useMemo(
     () =>
       segmentFaults.filter((f) => {
