@@ -255,17 +255,25 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                     ? '📋 Khảo sát hiện trường'
                     : '🤖 Xe quét AI'
 
+                  const rawNote = (fault.note || fault.review_note || '').trim()
+                  const iotMatch = rawNote.match(/Thiết bị\s+(NODE-[\w-]+)\s+ở tủ\s+(CAB-[\w-]+)/i)
+
+                  const primaryCode = fault.pole_id || (iotMatch ? iotMatch[1] : fault.fault_id || '-')
+
                   const segmentName =
-                    segmentNameMap[fault.segment_id || ''] || fault.segment_id || 'Chưa rõ tuyến'
+                    segmentNameMap[fault.segment_id || ''] ||
+                    fault.segment_id ||
+                    (iotMatch ? iotMatch[2] : '-')
 
                   const progress = getFaultProgressInfo(fault)
                   const isUnassigned = progress.key === 'unassigned'
+                  const canSchedulePole = Boolean(fault.pole_id || fault.segment_id) && !isOffline
 
                   return (
                     <tr
                       key={fault.fault_id || idx}
                       onClick={() => {
-                        if (isUnassigned && onNavigateToCreateSchedule) {
+                        if (isUnassigned && canSchedulePole && onNavigateToCreateSchedule) {
                           onNavigateToCreateSchedule(fault)
                         } else {
                           onSelectFault(fault)
@@ -276,7 +284,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                         isUnassigned ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-teal-50/40'
                       }`}
                       title={
-                        isUnassigned
+                        isUnassigned && canSchedulePole
                           ? 'Tạo lịch ngay'
                           : 'Bấm vào hàng để xem tọa độ GPS chi tiết'
                       }
@@ -289,7 +297,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                               : 'bg-slate-100 text-slate-700 group-hover:bg-blue-50 group-hover:text-blue-700'
                           }`}
                         >
-                          {fault.pole_id || 'Chưa gán cột'}
+                          {primaryCode}
                         </span>
                         <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
                           {segmentName}
