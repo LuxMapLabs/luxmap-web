@@ -241,6 +241,12 @@ const assetSlice = createSlice({
       state.isMutating = true
       state.mutationError = null
     },
+    // Vẽ hình tuyến từ các cột có GPS cho tuyến chưa có hình
+    drawSegmentRequest: (state, action: PayloadAction<string>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
     createFixtureRequest: (state, action: PayloadAction<CreateFixtureRequest>) => {
       void action
       state.isMutating = true
@@ -349,6 +355,7 @@ export const {
   createSegmentRequest,
   updateSegmentRequest,
   deleteSegmentRequest,
+  drawSegmentRequest,
   createFixtureRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,

@@ -57,6 +57,8 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
 
   if (!segment) return null
 
+  const hasLength = segment.has_geometry && segment.length_m > 0
+
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 w-full max-w-xl overflow-hidden animate-in zoom-in-95">
@@ -98,9 +100,9 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
             <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl">
               <div className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Chiều dài</div>
               <div className="text-lg font-black text-blue-700 dark:text-blue-400 mt-1">
-                {(segment.length_m / 1000).toFixed(1)} km
+                {hasLength ? `${(segment.length_m / 1000).toFixed(1)} km` : '-'}
               </div>
-              <div className="text-[10px] text-slate-400 dark:text-slate-500">{segment.length_m.toLocaleString()} mét</div>
+              <div className="text-[10px] text-slate-400 dark:text-slate-500">{hasLength ? `${segment.length_m.toLocaleString()} mét` : 'Chưa có hình'}</div>
             </div>
 
             <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl">
@@ -137,7 +139,7 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
             <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
               <span className="text-slate-500 dark:text-slate-400">Mật độ cột trung bình:</span>
               <span className="font-semibold text-slate-800 dark:text-slate-200">
-                {segment.pole_count > 0 ? `~${Math.round(segment.length_m / segment.pole_count)} mét / cột` : 'Chưa gắn cột'}
+                {segment.pole_count > 0 && hasLength ? `~${Math.round(segment.length_m / segment.pole_count)} mét / cột` : segment.pole_count > 0 ? '-' : 'Chưa gắn cột'}
               </span>
             </div>
 
@@ -155,14 +157,20 @@ export const SegmentDetailModal: React.FC<SegmentDetailModalProps> = ({
             <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between text-xs">
               <span>Lộ trình Tuyến đường Chiếu sáng:</span>
             </label>
-            <SegmentRouteMap
-              coordinates={initialCoords}
-              startCoord={initialStart}
-              endCoord={initialEnd}
-              poles={segmentPoles}
-              communeId={segment.commune_id}
-              height="220px"
-            />
+            {segment.has_geometry || segmentPoles.length >= 2 ? (
+              <SegmentRouteMap
+                coordinates={initialCoords}
+                startCoord={initialStart}
+                endCoord={initialEnd}
+                poles={segmentPoles}
+                communeId={segment.commune_id}
+                height="220px"
+              />
+            ) : (
+              <div className="h-[220px] rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-center px-6 text-slate-500 dark:text-slate-400">
+                Tuyến chưa có hình. Hình tuyến hiện khi có từ 2 cột có GPS thuộc tuyến.
+              </div>
+            )}
           </div>
 
           {/* Actions */}

@@ -113,6 +113,7 @@ describe('assetCsvExporter', () => {
           commune_name: null,
           data_source: 'field',
           pole_count: 10,
+          has_geometry: true,
           updated_at: null,
         },
       ]
@@ -220,6 +221,7 @@ describe('assetCsvExporter', () => {
           commune_name: null,
           data_source: 'field',
           pole_count: 20,
+          has_geometry: true,
           updated_at: null,
         },
       ]

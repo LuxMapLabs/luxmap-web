@@ -16,6 +16,9 @@ export interface SegmentsTabProps {
   onAddSegment: (data: SegmentListItem, poleIds: string[]) => void
   onUpdateSegment: (updated: SegmentListItem, poleIds: string[]) => void
   onDeleteSegment?: (segmentId: string) => void
+  onDrawSegment?: (segmentId: string) => void
+  /** Tuyến chưa có hình nhưng đã có từ 2 cột có GPS */
+  drawableSegmentIds?: ReadonlySet<string>
   onOpenImport: () => void
 }
 
@@ -25,6 +28,8 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
   onAddSegment,
   onUpdateSegment,
   onDeleteSegment,
+  onDrawSegment,
+  drawableSegmentIds,
   onOpenImport,
 }) => {
   // Search & Filter state
@@ -175,6 +180,8 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
         onViewDetail={(seg) => setDetailSegment(seg)}
         onEdit={(seg) => setEditSegment(seg)}
         onDelete={(seg) => setDeleteSegmentItem(seg)}
+        onDraw={onDrawSegment ? (seg) => seg.segment_id && onDrawSegment(seg.segment_id) : undefined}
+        drawableSegmentIds={drawableSegmentIds}
       />
 
       {/* Pagination Footer */}
