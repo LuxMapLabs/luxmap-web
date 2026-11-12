@@ -12,6 +12,14 @@ export interface CommuneFormModalProps {
   onSubmit: (payload: { name: string; bbox?: CommuneBbox | null }) => void
 }
 
+// Ô nhập có thể đang giữ chuỗi dở dang ("106.50"); chuyển về số trước khi kiểm tra/gửi (rỗng/sai -> NaN)
+const toNumericBbox = (b: CommuneBbox): CommuneBbox => ({
+  min_lng: parseFloat(String(b.min_lng)),
+  min_lat: parseFloat(String(b.min_lat)),
+  max_lng: parseFloat(String(b.max_lng)),
+  max_lat: parseFloat(String(b.max_lat)),
+})
+
 export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
   isOpen,
   isSubmitting = false,
@@ -59,10 +67,11 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
   // Tính kích thước X × Y (km) của khung BBox
   const bboxDimensionText = useMemo(() => {
     if (!hasBbox || !bbox) return ''
-    const minLng = Number(bbox.min_lng)
-    const maxLng = Number(bbox.max_lng)
-    const minLat = Number(bbox.min_lat)
-    const maxLat = Number(bbox.max_lat)
+    const n = toNumericBbox(bbox)
+    const minLng = n.min_lng ?? NaN
+    const maxLng = n.max_lng ?? NaN
+    const minLat = n.min_lat ?? NaN
+    const maxLat = n.max_lat ?? NaN
     if (
       !Number.isFinite(minLng) ||
       !Number.isFinite(maxLng) ||
@@ -88,7 +97,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
     }
 
     if (hasBbox && bbox) {
-      const { min_lng, min_lat, max_lng, max_lat } = bbox
+      const { min_lng, min_lat, max_lng, max_lat } = toNumericBbox(bbox)
       if (
         typeof min_lng !== 'number' ||
         typeof min_lat !== 'number' ||
@@ -123,7 +132,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
 
     onSubmit({
       name: name.trim(),
-      bbox: hasBbox ? bbox : null,
+      bbox: hasBbox && bbox ? toNumericBbox(bbox) : null,
     })
   }
 
@@ -134,10 +143,12 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
 
     const num = parseFloat(normalized)
     setBbox((prev) => {
-      const current = prev || { min_lng: 106.47, min_lat: 10.95, max_lng: 106.53, max_lat: 11.01 }
+      // Chưa có khung: bắt đầu từ 4 ô trống, chỉ khi đủ 4 ô hợp lệ bản đồ mới hiện khung
+      const current = prev || ({ min_lng: '', min_lat: '', max_lng: '', max_lat: '' } as unknown as CommuneBbox)
       return {
         ...current,
-        [key]: isNaN(num) || normalized.endsWith('.') || normalized === '-' ? (normalized as any) : num,
+        // Giữ nguyên chuỗi đang gõ khi chưa khớp dạng số chuẩn (vd "11.0", "106.50") để không nuốt ký tự
+        [key]: isNaN(num) || String(num) !== normalized ? (normalized as any) : num,
       }
     })
     setHasBbox(true)
@@ -325,7 +336,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                       {bboxDimensionText || '—'}
                     </strong>
                   </span>
-                  {hasBbox ? (
+                  {bboxDimensionText ? (
                     <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Đã gắn khung BBox</span>

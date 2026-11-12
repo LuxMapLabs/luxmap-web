@@ -128,11 +128,16 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
     const max_lng = parseCoordValue(bbox.max_lng)
     const max_lat = parseCoordValue(bbox.max_lat)
 
+    // Giá trị đang gõ dở/ngoài phạm vi địa lý thì coi như chưa có khung (MapLibre ném lỗi nếu vĩ độ ngoài ±90)
     if (
       min_lng !== null &&
       min_lat !== null &&
       max_lng !== null &&
-      max_lat !== null
+      max_lat !== null &&
+      Math.abs(min_lng) <= 180 &&
+      Math.abs(max_lng) <= 180 &&
+      Math.abs(min_lat) <= 90 &&
+      Math.abs(max_lat) <= 90
     ) {
       return {
         min_lng: Math.min(min_lng, max_lng),
@@ -934,6 +939,13 @@ export const CommuneBboxMap: React.FC<CommuneBboxMapProps> = ({
       }, 400)
 
       fitTimersRef.current = [timer1, timer2]
+    } else if (!isDraggingHandleRef.current) {
+      // Gõ tay tọa độ làm khung rời khỏi tầm nhìn: đưa camera về khung mới
+      const map = mapRef.current
+      const view = map.getBounds()
+      const cLng = (activeBbox.min_lng + activeBbox.max_lng) / 2
+      const cLat = (activeBbox.min_lat + activeBbox.max_lat) / 2
+      if (!view.contains([cLng, cLat])) applyCameraFit(activeBbox, false)
     }
   }, [isMapLoaded, activeBbox, readOnly, updateBboxLayer, syncMarkers, applyCameraFit, clearFitTimers])
 
