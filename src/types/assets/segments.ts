@@ -8,7 +8,7 @@ export interface CreateSegmentRequest {
     external_ref?: string | null
     segment_name: string | null
     road_class: RoadClass
-    length_m: number
+    length_m?: number
     geom_wkt?: string | null
     commune_id: string | null
     data_source: DataSource
@@ -64,7 +64,7 @@ export interface UpdateSegmentRequest {
     external_ref?: string | null
     segment_name: string | null
     road_class: RoadClass
-    length_m: number
+    length_m?: number
     geom_wkt?: string | null
     data_source: DataSource
     pole_ids?: string[]

@@ -124,6 +124,13 @@ function* handleAcceptReport(
         return
       }
 
+      if (errorData?.code === 'POLE_LOCATION_REQUIRED') {
+        const msg = 'Cột đèn này chưa có GPS nên chưa duyệt được phản ánh. Vui lòng gắn vị trí cho cột trước.'
+        toast.error(msg)
+        yield put(acceptReportFailure(msg))
+        return
+      }
+
       if (errorData?.code === 'OPEN_FAULT_EXISTS' || errorData?.detail?.includes('already has open fault')) {
         const msg = 'Cột đèn này đã có sự cố mở cùng loại. Vui lòng chuyển sang tính năng Gộp (Merge)!'
         toast.error(msg)

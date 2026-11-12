@@ -193,7 +193,7 @@ export const PoleDetailDrawer: React.FC<PoleDetailDrawerProps> = ({
             <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
               <span className="text-slate-400 block text-[10px]">Tọa độ GPS</span>
               <span className="font-bold text-slate-800 font-mono text-[11px]">
-                {pole.location ? `${pole.location.lat.toFixed(4)}, ${pole.location.lng.toFixed(4)}` : '10.5841, 106.6321'}
+                {pole.location ? `${pole.location.lat.toFixed(4)}, ${pole.location.lng.toFixed(4)}` : '-'}
               </span>
             </div>
 

@@ -286,6 +286,21 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
       expect(screen.getByText('Hở dây điện / Sự cố nguy hiểm khác')).toBeInTheDocument()
     })
 
+    it('cột chưa có GPS (can_report=false): hiện cảnh báo và khóa nút gửi', () => {
+      renderWithProviders(<CitizenReportPage />, {
+        store: createTestStore({
+          autoResolvePole: {
+            ...mockPublicQr,
+            can_report: false,
+            reason: 'pole_location_required',
+          },
+        }),
+      })
+
+      expect(screen.getByRole('alert')).toHaveTextContent('chưa được cập nhật vị trí')
+      expect(screen.getByRole('button', { name: /gửi/i })).toBeDisabled()
+    })
+
     it('chuyển đổi danh mục sự cố cập nhật trạng thái chọn viền xanh', () => {
       renderWithProviders(<CitizenReportPage />, {
         store: createTestStore({

@@ -87,6 +87,7 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
       commune_id: 'COM-001',
       commune_name: 'Xã Phú Hòa Đông',
       pole_count: 3,
+      has_geometry: true,
       data_source: 'field',
       updated_at: '2026-01-01',
     },

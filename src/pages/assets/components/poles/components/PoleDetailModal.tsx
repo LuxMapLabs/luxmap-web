@@ -61,8 +61,9 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
     displayFixtureStatus = 'unknown'
   }
 
-  const lat = pole.location?.lat ?? 10.9701
-  const lng = pole.location?.lng ?? 106.4896
+  const gpsText = pole.location
+    ? `${pole.location.lat.toFixed(6)}, ${pole.location.lng.toFixed(6)}`
+    : 'Chưa có GPS'
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -162,7 +163,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
                 <span>Vị trí lắp đặt & Nguồn cấp</span>
               </span>
               <span className="text-[11px] font-mono text-slate-500">
-                GPS: {lat.toFixed(6)}, {lng.toFixed(6)}
+                GPS: {gpsText}
               </span>
             </div>
             <div className="text-slate-600 dark:text-slate-300 text-xs space-y-1">
