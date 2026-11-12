@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../../redux/rootReducer'
 import { closeExportModal } from '../../feature/assets/assetSlice'
@@ -98,6 +98,7 @@ export const AssetManagementPage: React.FC = () => {
     handleDeleteCabinet,
     handleDeletePole,
     handleDeleteSegment,
+    handleDrawSegment,
     handleAddSegment,
     handleUpdateSegment,
     handleAddIotNode,
@@ -107,6 +108,17 @@ export const AssetManagementPage: React.FC = () => {
     handleIssueCredential,
     handleImportSuccess,
   } = useAssetData()
+
+  // Tuyến chưa có hình nhưng đã có từ 2 cột có GPS: cho phép vẽ tuyến
+  const drawableSegmentIds = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const p of poles) {
+      if (p.segment_id && p.location) counts.set(p.segment_id, (counts.get(p.segment_id) ?? 0) + 1)
+    }
+    return new Set(
+      segments.filter((s) => !s.has_geometry && s.segment_id && (counts.get(s.segment_id) ?? 0) >= 2).map((s) => s.segment_id as string)
+    )
+  }, [poles, segments])
 
   return (
     <div className="h-full w-full flex flex-col bg-transparent dark:bg-slate-950 overflow-hidden select-none">
@@ -193,6 +205,8 @@ export const AssetManagementPage: React.FC = () => {
             onAddSegment={handleAddSegment}
             onUpdateSegment={handleUpdateSegment}
             onDeleteSegment={handleDeleteSegment}
+            onDrawSegment={handleDrawSegment}
+            drawableSegmentIds={drawableSegmentIds}
             onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}

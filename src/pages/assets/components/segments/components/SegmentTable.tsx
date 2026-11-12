@@ -13,6 +13,8 @@ export interface SegmentTableProps {
   onViewDetail: (segment: SegmentListItem) => void
   onEdit: (segment: SegmentListItem) => void
   onDelete?: (segment: SegmentListItem) => void
+  onDraw?: (segment: SegmentListItem) => void
+  drawableSegmentIds?: ReadonlySet<string>
 }
 
 export const SegmentTable: React.FC<SegmentTableProps> = ({
@@ -21,6 +23,8 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
   onViewDetail,
   onEdit,
   onDelete,
+  onDraw,
+  drawableSegmentIds,
 }) => {
   const showCommune = useShowCommune()
   return (
@@ -75,7 +79,25 @@ export const SegmentTable: React.FC<SegmentTableProps> = ({
                     </span>
                   </td>
                   <td className="p-3.5 font-mono font-semibold text-slate-800 dark:text-slate-200">
-                    {seg.length_m.toLocaleString()} m ({((seg.length_m) / 1000).toFixed(1)} km)
+                    {seg.has_geometry && seg.length_m
+                      ? `${seg.length_m.toLocaleString()} m (${(seg.length_m / 1000).toFixed(1)} km)`
+                      : '-'}
+                    {!seg.has_geometry && seg.segment_id && drawableSegmentIds?.has(seg.segment_id) && (
+                      <div className="mt-1 flex items-center gap-2 font-sans">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800">
+                          Đủ GPS, chưa vẽ hình
+                        </span>
+                        {onDraw && (
+                          <button
+                            type="button"
+                            onClick={() => onDraw(seg)}
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                            Vẽ tuyến
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200 font-mono">
                     {seg.pole_count} cột

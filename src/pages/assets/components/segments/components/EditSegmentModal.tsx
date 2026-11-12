@@ -9,6 +9,7 @@ import {
 } from '../../common/AssetModal'
 import { SegmentPolePickerMap } from '../../../../../components/SegmentPolePickerMap'
 import { SegmentPoleOrderList } from '../../../../../components/SegmentPoleOrderList'
+import { SegmentNoGpsPolePicker, noGpsPolesFor } from '../../../../../components/SegmentNoGpsPolePicker'
 import {
   toPickablePoles,
   useSegmentPoleSelection,
@@ -78,35 +79,53 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   )
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const { selected, toggle, remove, move, autoSort, lastAddedId, geometry } =
+  const { selected, poles, toggle, remove, move, autoSort, addBend, moveBend, lastAddedId, geometry } =
     useSegmentPoleSelection(candidates, initial.ordered)
+  // Cột chưa có GPS cũng gán được vào tuyến (không vào hình tuyến)
+  const noGpsPoles = useMemo(() => noGpsPolesFor(allPoles, segment.segment_id), [allPoles, segment.segment_id])
+  const [noGpsIds, setNoGpsIds] = useState<Set<string>>(() => new Set(allPoles.filter((p) => p.pole_id && !p.location && p.segment_id === segment.segment_id).map((p) => p.pole_id as string)))
+  const toggleNoGps = (id: string) =>
+    setNoGpsIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   const link = useSegmentPoleLink(lastAddedId)
   const poleCodes = useMemo(
     () => Object.fromEntries(candidates.map((p) => [p.id, p.code || p.id])),
     [candidates]
   )
 
+  // Đủ 2 cột có GPS thì có hình và chiều dài đo được
+  const route = geometry && poles.length >= 2 ? geometry : null
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitError(null)
 
-    if (!geometry || selected.length < 2) {
-      setSubmitError('Tuyến đường cần tối thiểu 2 cột đèn.')
+    // Tuyến đã có hình không thể quay về chưa có hình; tuyến chưa có hình thì cho lưu tiếp
+    if (!route && segment.has_geometry) {
+      setSubmitError('Tuyến đường đã có hình nên cần tối thiểu 2 cột đèn.')
       return
     }
-
+    // Chưa có hình thì không gửi geom_wkt và length_m: BE giữ tuyến chưa có hình, chưa có chiều dài
+    const { geom_wkt: _unused, length_m: _len, ...rest } = segment as SegmentListItem & { geom_wkt?: string }
+    void _unused
+    void _len
     onSave(
       {
-        ...segment,
+        ...rest,
         segment_name: segmentName.trim() || segment.segment_id,
         road_class: roadClass,
-        length_m: geometry.lengthM,
-        pole_count: selected.length,
+        ...(route ? { length_m: route.lengthM } : {}),
+        pole_count: poles.length + noGpsIds.size,
+        has_geometry: route !== null,
         commune_id: activeCommuneId || null,
-        geom_wkt: geometry.geomWkt,
+        ...(route ? { geom_wkt: route.geomWkt } : {}),
         updated_at: new Date().toISOString(),
       } as SegmentListItem,
-      selected.map((p) => p.id)
+      [...poles.map((p) => p.id), ...noGpsIds]
     )
     onClose()
   }
@@ -125,7 +144,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
         <AssetModalError message={submitError} />
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
           {/* CỘT TRÁI */}
-          <div className="md:col-span-5 p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
+          <div className={`${candidates.length === 0 ? 'md:col-span-12' : 'md:col-span-5'} p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800`}>
             <div className="space-y-1">
               <label className="font-bold text-slate-700 dark:text-slate-300">
                 Tên tuyến đường:
@@ -156,12 +175,27 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 <label className="font-bold text-slate-700 dark:text-slate-300">
                   Chiều dài tuyến (mét):
                 </label>
-                <input
-                  type="text"
-                  readOnly
-                  value={`${(geometry?.lengthM ?? 0).toLocaleString('vi-VN')} mét`}
-                  className="w-full p-2.5 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-200 cursor-not-allowed select-none focus:outline-none"
-                />
+                {route ? (
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${route.lengthM.toLocaleString('vi-VN')} mét`}
+                    className="w-full p-2.5 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-200 cursor-not-allowed select-none focus:outline-none"
+                  />
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      readOnly
+                      value="-"
+                      aria-label="Chiều dài tuyến"
+                      className="w-full p-2.5 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-200 cursor-not-allowed select-none focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Chưa đủ 2 cột có GPS nên tuyến chưa có hình và chưa đo được chiều dài. Hình và chiều dài có khi vẽ tuyến từ các cột có GPS.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
@@ -170,21 +204,25 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 Cột đèn thuộc tuyến:
               </span>
               <span className="px-2.5 py-0.5 rounded-full font-mono font-bold text-xs bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                {selected.length} / {candidates.length} cột
+                {poles.length} / {candidates.length} cột
               </span>
             </div>
 
-            <SegmentPoleOrderList
-              route={selected}
-              codes={poleCodes}
-              highlightId={link.highlightId}
-              revealId={link.revealId}
-              onHover={link.hoverFromList}
-              onFocus={link.focusPole}
-              onMove={move}
-              onRemove={remove}
-              onAutoSort={autoSort}
-            />
+            {candidates.length > 0 && (
+              <SegmentPoleOrderList
+                route={selected}
+                codes={poleCodes}
+                highlightId={link.highlightId}
+                revealId={link.revealId}
+                onHover={link.hoverFromList}
+                onFocus={link.focusPole}
+                onMove={move}
+                onRemove={remove}
+                onAutoSort={autoSort}
+              />
+            )}
+
+            <SegmentNoGpsPolePicker poles={noGpsPoles} selected={noGpsIds} onToggle={toggleNoGps} />
 
             {!initial.exact && (
               <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 flex gap-2">
@@ -198,12 +236,15 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
           </div>
 
           {/* CỘT PHẢI: BẢN ĐỒ */}
+          {candidates.length > 0 && (
           <div className="md:col-span-7 p-4 bg-slate-950 flex flex-col justify-between min-h-[480px] relative">
             <div className="min-h-[480px] h-[480px] rounded-2xl overflow-hidden border border-slate-700/80 shadow-inner relative">
               <SegmentPolePickerMap
                 poles={candidates}
                 selected={selected}
                 onTogglePole={toggle}
+                onAddBend={addBend}
+                onMoveBend={moveBend}
                 highlightId={link.highlightId}
                 onHoverPole={link.hoverFromMap}
                 focusRequest={link.focusRequest}
@@ -214,9 +255,10 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
             <p className="text-[10px] text-slate-400 mt-2 italic text-center shrink-0">
               💡 Mẹo: Chấm xanh là cột thuộc tuyến, chấm vàng là cột chưa thuộc tuyến nào. Click để
               thêm hoặc bỏ cột; cột thêm mới tự chèn vào chỗ hợp lý, kéo thả trong danh sách bên
-              trái nếu cần đổi.
+              trái nếu cần đổi. Đường cong hoặc góc rẽ thì bấm "Thêm điểm uốn" trên bản đồ.
             </p>
           </div>
+          )}
         </div>
 
         <AssetModalFooter

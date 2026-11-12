@@ -17,6 +17,7 @@ import {
   createSegmentRequest,
   updateSegmentRequest,
   deleteSegmentRequest,
+  drawSegmentRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
   createIotNodeRequest,
@@ -288,12 +289,11 @@ export function useAssetData() {
       external_ref: data.external_ref || data.segment_id || null,
       segment_name: data.segment_name || null,
       road_class: data.road_class || 'inter_commune',
-      length_m: Number(data.length_m) || 0,
+      // Chỉ tuyến đã có hình mới có chiều dài
+      ...(Number(data.length_m) > 0 ? { length_m: Number(data.length_m) } : {}),
       commune_id: data.commune_id || userCommuneId || null,
-      geom_wkt:
-        'geom_wkt' in data && typeof data.geom_wkt === 'string'
-          ? data.geom_wkt
-          : null,
+      // Chưa có hình thì bỏ hẳn geom_wkt để BE tạo tuyến chưa có hình
+      ...('geom_wkt' in data && typeof data.geom_wkt === 'string' ? { geom_wkt: data.geom_wkt } : {}),
       data_source: data.data_source || 'field',
       pole_ids: poleIds,
     }
@@ -311,11 +311,8 @@ export function useAssetData() {
       external_ref: updated.external_ref || updated.segment_id,
       segment_name: updated.segment_name,
       road_class: updated.road_class || 'inter_commune',
-      length_m: Number(updated.length_m) || 0,
-      geom_wkt:
-        'geom_wkt' in updated && typeof updated.geom_wkt === 'string'
-          ? updated.geom_wkt
-          : null,
+      ...(Number(updated.length_m) > 0 ? { length_m: Number(updated.length_m) } : {}),
+      ...('geom_wkt' in updated && typeof updated.geom_wkt === 'string' ? { geom_wkt: updated.geom_wkt } : {}),
       data_source: updated.data_source || 'field',
       pole_ids: poleIds,
     }
@@ -325,6 +322,10 @@ export function useAssetData() {
 
   const handleDeleteSegment = async (segmentId: string) => {
     dispatch(deleteSegmentRequest(segmentId))
+  }
+
+  const handleDrawSegment = (segmentId: string) => {
+    dispatch(drawSegmentRequest(segmentId))
   }
 
   // --- IoT Node Handlers (Redux-Saga First) ---
@@ -394,6 +395,7 @@ export function useAssetData() {
     handleDeleteCabinet,
     handleDeletePole,
     handleDeleteSegment,
+    handleDrawSegment,
     handleAddSegment,
     handleUpdateSegment,
     handleAddIotNode,

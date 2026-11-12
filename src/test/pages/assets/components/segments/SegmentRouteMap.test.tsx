@@ -218,6 +218,7 @@ describe('Segment modals & asset forms - Field Test Cases Suite', () => {
         commune_name: '',
     data_source: 'field',
     pole_count: 3,
+    has_geometry: true,
     updated_at: '2026-10-15T00:00:00Z',
   }
 
@@ -429,6 +430,7 @@ describe('Segment modals & asset forms - Field Test Cases Suite', () => {
         commune_name: '',
         data_source: 'field',
         pole_count: 10,
+        has_geometry: true,
         updated_at: '2026-10-15T00:00:00Z',
       }
       ;(existingSegment as any).geom_wkt = 'LINESTRING(106.485 10.972, 106.490 10.975)'
@@ -471,6 +473,7 @@ describe('Segment modals & asset forms - Field Test Cases Suite', () => {
       const segmentWithPoles = {
         ...mockSegment,
         pole_count: 5,
+        has_geometry: true,
       }
 
       render(

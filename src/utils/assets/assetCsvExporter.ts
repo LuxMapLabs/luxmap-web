@@ -193,7 +193,7 @@ export function exportSegmentsToCsv(
     const extRef = seg.external_ref || seg.segment_id || ''
     const name = seg.segment_name || ''
     const roadClass = seg.road_class || 'inter_commune'
-    const lengthM = seg.length_m || 0
+    const lengthM = seg.has_geometry ? seg.length_m || '' : ''
     const communeId = seg.commune_id || ''
     const dataSource = seg.data_source || 'field'
 

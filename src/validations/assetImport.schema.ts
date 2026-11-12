@@ -70,16 +70,34 @@ export const segmentImportSchema = z.object({
   road_class: z.enum(['inter_commune', 'inter_village'] as const satisfies readonly [RoadClass, ...RoadClass[]], {
     message: 'Cấp đường (road_class) phải là inter_commune hoặc inter_village',
   }),
-  length_m: z.coerce.number().positive('Chiều dài tuyến đường (length_m) phải lớn hơn 0'),
+  // Tuyến chưa có hình (không có geom_wkt) thì chưa có chiều dài: để trống
+  length_m: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : val),
+    z.coerce.number().positive('Chiều dài tuyến đường (length_m) phải lớn hơn 0').optional()
+  ),
   data_source: z
     .enum(['field', 'public_imagery', 'calibration_rig', 'simulated'] as const satisfies readonly [
       DataSource,
       ...DataSource[],
     ])
     .default('field'),
-  geom_wkt: z.string().refine((val) => /^LINESTRING\s*\(/i.test(val.trim()), {
-    message: 'Tọa độ tuyến đường phải là định dạng LINESTRING WKT hợp lệ',
-  }),
+  // Tuyến chỉ có trong sổ sách thì chưa có hình: để trống geom_wkt, hình vẽ sau khi cột có GPS
+  geom_wkt: z
+    .string()
+    .optional()
+    .nullable()
+    .refine((val) => !val || !val.trim() || /^LINESTRING\s*\(/i.test(val.trim()), {
+      message: 'Tọa độ tuyến đường phải là định dạng LINESTRING WKT hợp lệ',
+    })
+    .transform((val) => (val && val.trim() ? val.trim() : null)),
+}).superRefine((val, ctx) => {
+  if (val.geom_wkt && val.length_m === undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['length_m'],
+      message: 'Tuyến đã có tọa độ (geom_wkt) thì phải có chiều dài (length_m)',
+    })
+  }
 })
 
 export const cabinetImportSchema = z
@@ -127,9 +145,15 @@ export const poleImportSchema = z.object({
   commune_id: z.string().min(1, 'Mã xã/phường (commune_id) không được để trống'),
   segment_external_ref: z.string().min(1, 'Mã tuyến đường liên kết (segment_external_ref) không được để trống'),
   feeder_external_ref: z.string().optional().nullable(),
-  geom_wkt: z.string().refine((val) => /^POINT\s*\(\s*([0-9.-]+)\s+([0-9.-]+)\s*\)/i.test(val.trim()), {
-    message: 'Tọa độ cột điện phải là POINT(lng lat) WKT hợp lệ',
-  }),
+  // Cột chưa biết GPS: để trống geom_wkt, gắn vị trí sau
+  geom_wkt: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => val?.trim() || null)
+    .refine((val) => val === null || /^POINT\s*\(\s*([0-9.-]+)\s+([0-9.-]+)\s*\)/i.test(val), {
+      message: 'Tọa độ cột điện phải là POINT(lng lat) WKT hợp lệ, hoặc để trống nếu chưa có GPS',
+    }),
   near_sensitive_poi: z.preprocess((val) => {
     if (typeof val === 'string') return val.toLowerCase() === 'true'
     return Boolean(val)
@@ -257,8 +281,6 @@ export const REQUIRED_COLUMNS_BY_CATEGORY: Record<string, { key: string; label: 
     { key: 'external_ref', label: 'external_ref' },
     { key: 'segment_name', label: 'segment_name' },
     { key: 'road_class', label: 'road_class' },
-    { key: 'length_m', label: 'length_m' },
-    { key: 'geom_wkt', label: 'geom_wkt' },
     { key: 'commune_id', label: 'commune_id' },
     { key: 'data_source', label: 'data_source' },
   ],
@@ -279,14 +301,12 @@ export const REQUIRED_COLUMNS_BY_CATEGORY: Record<string, { key: string; label: 
     { key: 'external_ref', label: 'external_ref' },
     { key: 'segment_external_ref', label: 'segment_external_ref' },
     { key: 'commune_id', label: 'commune_id' },
-    { key: 'geom_wkt', label: 'geom_wkt' },
     { key: 'data_source', label: 'data_source' },
   ],
   poles_and_fixtures: [
     { key: 'external_ref', label: 'external_ref' },
     { key: 'segment_external_ref', label: 'segment_external_ref' },
     { key: 'commune_id', label: 'commune_id' },
-    { key: 'geom_wkt', label: 'geom_wkt' },
     { key: 'data_source', label: 'data_source' },
   ],
   fixtures: [
@@ -364,7 +384,7 @@ export function validateImportRow(
           external_ref: rowObj.external_ref || null,
           segment_name: rowObj.segment_name || null,
           road_class: (rowObj.road_class as RoadClass) || 'inter_commune',
-          length_m: parseFloat(rowObj.length_m) || 0,
+          ...(parseFloat(rowObj.length_m) > 0 ? { length_m: parseFloat(rowObj.length_m) } : {}),
           geom_wkt: rowObj.geom_wkt || null,
           commune_id: rowObj.commune_id || null,
           data_source: (rowObj.data_source as DataSource) || 'field',
@@ -389,7 +409,7 @@ export function validateImportRow(
       diffs.push({
         label: 'Tuyến đường mới',
         oldVal: 'Chưa có trên GIS',
-        newVal: `${data.segment_name} (${data.length_m}m)`,
+        newVal: data.length_m ? `${data.segment_name} (${data.length_m}m)` : data.segment_name,
       })
     } else {
       if (existing.segment_name !== data.segment_name) {
@@ -406,10 +426,10 @@ export function validateImportRow(
           newVal: data.road_class === 'inter_commune' ? 'Đường liên xã' : 'Đường liên thôn',
         })
       }
-      if (existing.length_m !== data.length_m) {
+      if (data.length_m !== undefined && existing.length_m !== data.length_m) {
         diffs.push({
           label: 'Chiều dài',
-          oldVal: `${existing.length_m}m`,
+          oldVal: existing.has_geometry ? `${existing.length_m}m` : '-',
           newVal: `${data.length_m}m`,
         })
       }
@@ -448,8 +468,8 @@ export function validateImportRow(
       external_ref: data.external_ref,
       segment_name: data.segment_name,
       road_class: data.road_class,
-      length_m: data.length_m,
-      geom_wkt: data.geom_wkt,
+      ...(data.length_m !== undefined ? { length_m: data.length_m } : {}),
+      ...(data.geom_wkt ? { geom_wkt: data.geom_wkt } : {}),
       commune_id: data.commune_id,
       data_source: data.data_source,
     }
@@ -970,8 +990,14 @@ export function validateImportRow(
       newVal: `Tạo mới (${segName}${matchedFeeder?.feeder_name ? ` • ${matchedFeeder.feeder_name}` : ''})`,
     })
   } else {
-    // 1. So sánh Tọa độ GIS
-    if (existingPole.location) {
+    // 1. So sánh Tọa độ GIS (chỉ khi file có geom_wkt; trống thì giữ nguyên vị trí cột)
+    if (data.geom_wkt && !existingPole.location) {
+      diffs.push({
+        label: 'Tọa độ GIS',
+        oldVal: 'Chưa có GPS',
+        newVal: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+      })
+    } else if (data.geom_wkt && existingPole.location) {
       const latDiff = Math.abs(existingPole.location.lat - lat)
       const lngDiff = Math.abs(existingPole.location.lng - lng)
       if (latDiff > 0.00001 || lngDiff > 0.00001) {
