@@ -50,7 +50,15 @@ export const ManagerDashboardPage: React.FC = () => {
   }
 
   // Handler khi click hàng sự cố "Chưa phân lịch" -> Trỏ sang tab Lịch làm việc & Mở popup Tạo sự vụ
+  // Với sự cố không gắn cột/tuyến (như mất kết nối tủ IoT), mở modal xem chi tiết thay vì nhảy sang tạo lịch kiểm tra cột
   const handleNavigateToCreateSchedule = (fault: FaultItem) => {
+    const type = String(fault.fault_type || '').toLowerCase()
+    const isOffline = type.includes('offline') || type.includes('node')
+    if (isOffline || (!fault.pole_id && !fault.segment_id)) {
+      setSelectedFault(fault)
+      return
+    }
+
     navigate('/work-schedule', {
       state: {
         openCreateModal: true,
@@ -247,8 +255,16 @@ export const ManagerDashboardPage: React.FC = () => {
     }).length
   }, [segmentFaults])
 
+  // Lọc danh sách sự cố "Cần xử lý ngay" (Chưa phân lịch công tác):
+  // Loại trừ sự cố mất kết nối tủ điều khiển IoT (node_offline) và chỉ giữ sự cố gắn với cột/tuyến cần giao ca kiểm tra
   const unassignedFaults = useMemo(
-    () => segmentFaults.filter((f) => getFaultProgressInfo(f).key === 'unassigned'),
+    () =>
+      segmentFaults.filter((f) => {
+        if (getFaultProgressInfo(f).key !== 'unassigned') return false
+        const type = String(f.fault_type || '').toLowerCase()
+        const isOffline = type.includes('offline') || type.includes('node')
+        return !isOffline && Boolean(f.pole_id || f.segment_id)
+      }),
     [segmentFaults]
   )
 
