@@ -123,6 +123,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
 
       const matchesStatus =
         statusFilter === 'all' ||
+        (statusFilter === 'no_gps' && !pole.location) ||
         (statusFilter === 'no_fixture' && !hasFixture) ||
         (statusFilter === 'normal' && hasFixture && currentStatus === 'normal') ||
         (statusFilter === 'dim' && hasFixture && currentStatus === 'dim') ||
@@ -225,8 +226,10 @@ export const PolesTab: React.FC<PolesTabProps> = ({
     let out = 0
     let unknown = 0
     let noFixture = 0
+    let noGps = 0
 
     poles.forEach((pole) => {
+      if (!pole.location) noGps++
       const hasFixture = Boolean(pole.active_fixture)
       if (!hasFixture) {
         noFixture++
@@ -251,6 +254,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
       out,
       unknown,
       noFixture,
+      noGps,
     }
   }, [poles, poleStatusMap])
 
@@ -332,6 +336,14 @@ export const PolesTab: React.FC<PolesTabProps> = ({
                 subLabel: 'Cột đèn chưa lắp đặt bộ đèn',
                 dotColor: 'bg-slate-700',
                 badge: poleStatusCounts.noFixture,
+              },
+              {
+                value: 'no_gps',
+                label: 'Chưa có GPS',
+                nativeLabel: '📍 Chưa có GPS',
+                subLabel: 'Cột chưa gắn vị trí, chưa hiện trên bản đồ',
+                dotColor: 'bg-amber-500',
+                badge: poleStatusCounts.noGps,
               },
             ]}
           />

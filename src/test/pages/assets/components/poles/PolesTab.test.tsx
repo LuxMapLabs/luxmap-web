@@ -49,6 +49,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
     commune_name: 'Xã Phú Hòa Đông',
     data_source: 'field',
     pole_count: 30,
+    has_geometry: true,
     updated_at: '2026-10-12T00:00:00Z',
   }
 

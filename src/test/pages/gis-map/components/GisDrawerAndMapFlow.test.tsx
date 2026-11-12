@@ -405,6 +405,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
         cabinet_name: 'Tủ A',
         segment_id: 'SEG-001',
         pole_count: 24,
+        has_geometry: true,
       }
 
       render(
@@ -450,6 +451,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
             commune_name: null,
             data_source: 'field',
             pole_count: 10,
+            has_geometry: true,
             updated_at: null,
           },
         ],
@@ -555,11 +557,12 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
     })
 
     it('validateImportRow chặn ngay và trả về invalid khi thiếu bất kỳ ô dữ liệu nào trong cột bắt buộc', () => {
+      // geom_wkt của cột không còn bắt buộc (cột chưa biết GPS), nên thử với commune_id rỗng
       const rowMissingWkt = {
         external_ref: 'POL-INCOMPLETE',
         segment_external_ref: 'SEG-TL08',
-        commune_id: 'commune_tl8',
-        geom_wkt: '', // Rỗng
+        commune_id: '', // Rỗng
+        geom_wkt: 'POINT(106.4896 10.9701)',
         data_source: 'field',
       }
 
@@ -573,7 +576,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       const result = validateImportRow('poles', rowMissingWkt, context, 2)
       expect(result.actionType).toBe('invalid')
       expect(result.errorMsg).toBe(
-        "Dòng 3: Cột 'geom_wkt' không có dữ liệu (bắt buộc điền đầy đủ)."
+        "Dòng 3: Cột 'commune_id' không có dữ liệu (bắt buộc điền đầy đủ)."
       )
     })
 

@@ -92,10 +92,13 @@ function* handleSubmitReport(action: PayloadAction<PublicReportSubmitPayload>) {
     }
   } catch (error: any) {
     const status = error?.response?.status
+    const errorCode = error?.response?.data?.error?.code || error?.response?.data?.code
     let errorMsg = 'Không thể gửi phản ánh vào lúc này. Vui lòng thử lại.'
 
     if (status === 404) {
       errorMsg = 'Mã tem QR không hợp lệ hoặc đã bị vô hiệu hóa.'
+    } else if (errorCode === 'POLE_LOCATION_REQUIRED') {
+      errorMsg = 'Cột đèn này chưa được cập nhật vị trí nên chưa nhận phản ánh. Vui lòng báo trực tiếp cho đơn vị quản lý.'
     } else if (status === 409) {
       errorMsg = 'Phản ánh này đã được hệ thống tiếp nhận trước đó (trùng lặp yêu cầu).'
     } else if (status === 413) {

@@ -202,7 +202,9 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                           <span>{pole.location.lat.toFixed(5)}, {pole.location.lng.toFixed(5)}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-400 dark:text-slate-500 font-mono text-xs">—</span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[10px] font-bold">
+                          Chưa có GPS
+                        </span>
                       )}
                     </td>
                     <td className="p-3.5">
