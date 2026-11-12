@@ -395,7 +395,7 @@ export const CitizenReportPage: React.FC = () => {
 
   // Xác định xem nút Submit có bị vô hiệu hóa không
   const isSubmitDisabled =
-    isSubmitting || isPendingSubmit || isLookingUp || !isValidCode || !currentPole
+    isSubmitting || isPendingSubmit || isLookingUp || !isValidCode || !currentPole || currentPole.can_report === false
 
   return (
     <div className="min-h-screen bg-slate-100/70 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col items-center p-3 sm:p-6 antialiased">
@@ -422,6 +422,15 @@ export const CitizenReportPage: React.FC = () => {
           isLoading={isLookingUp}
           error={lookupError}
         />
+
+        {currentPole && currentPole.can_report === false && (
+          <div
+            role="alert"
+            className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-xs text-amber-800 dark:text-amber-200"
+          >
+            Cột đèn này chưa được cập nhật vị trí nên chưa nhận phản ánh qua mã QR. Vui lòng báo trực tiếp cho đơn vị quản lý chiếu sáng.
+          </div>
+        )}
 
         {/* 2. Biểu mẫu gửi phản ánh: Hiển thị tức thì (Instant Render) */}
         <form

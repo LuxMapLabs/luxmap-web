@@ -38,6 +38,7 @@ export interface CabinetTopology {
     type?: string | null
     crs_note?: string | null
     unlocated_pole_count: number
+    unrouted_pole_count: number
     features: CabinetTopologyEdgePropertiesFeature[]
 }
 

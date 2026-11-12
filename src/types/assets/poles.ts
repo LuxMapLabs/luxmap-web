@@ -11,7 +11,7 @@ export interface CreatePoleRequest {
     segment_id?: string | null
     feeder_id?: string | null
     commune_id: string | null
-    geom_wkt: string | null
+    geom_wkt?: string | null
     near_sensitive_poi?: boolean
     data_source: DataSource
     note?: string | null
@@ -90,7 +90,7 @@ export interface UpdatePoleRequest {
     external_ref?: string | null
     segment_id: string | null
     feeder_id?: string | null
-    geom_wkt: string | null
+    geom_wkt?: string | null
     near_sensitive_poi?: boolean
     data_source: DataSource
     note?: string | null
