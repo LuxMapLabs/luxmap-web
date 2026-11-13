@@ -12,6 +12,7 @@ import type {
 } from '../../types/workorders/orders'
 import type { RootState } from '../../redux/rootReducer'
 import { fetchDashboardDataRequest } from '../dashboard/dashboardSlice'
+import { fetchAssetsRequest } from '../assets/assetSlice'
 import {
   fetchWorkOrdersRequest,
   fetchWorkOrdersSuccess,
@@ -88,8 +89,35 @@ function* handleFetchWorkOrders(action: PayloadAction<GetWorkOrdersFilter | unde
         scheduled_to: endOfMonth,
       }
     }
-    const result: WorkOrderItemPagedResult = yield call(workScheduleAPI.getWorkOrders, effectiveFilter)
-    yield put(fetchWorkOrdersSuccess(result))
+    const firstPage: WorkOrderItemPagedResult = yield call(
+      workScheduleAPI.getWorkOrders,
+      effectiveFilter
+    )
+    const allItems = [...(firstPage.items || [])]
+    const total = firstPage.total ?? allItems.length
+    const pageSize = firstPage.page_size || 50
+    let currentPage = firstPage.page || 1
+
+    // Tải tiếp các trang còn lại nếu tháng có nhiều hơn 1 trang lệnh công tác (tối đa 10 trang)
+    while (allItems.length < total && currentPage < 10) {
+      currentPage += 1
+      const nextPage: WorkOrderItemPagedResult = yield call(workScheduleAPI.getWorkOrders, {
+        ...effectiveFilter,
+        page: currentPage,
+      })
+      const nextItems = nextPage.items || []
+      if (nextItems.length === 0) break
+      allItems.push(...nextItems)
+      if (nextItems.length < pageSize) break
+    }
+
+    yield put(
+      fetchWorkOrdersSuccess({
+        ...firstPage,
+        items: allItems,
+        total,
+      })
+    )
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể tải lịch làm việc từ máy chủ')
     yield put(fetchWorkOrdersFailure(errorMsg))
@@ -134,11 +162,32 @@ function* handleFetchAssignees(action: PayloadAction<string | undefined>) {
 /**
  * Worker saga tạo mới lệnh công tác
  */
-function* handleCreateWorkOrder(action: PayloadAction<CreateWorkOrderRequest>) {
+function* handleCreateWorkOrder(
+  action: PayloadAction<{ request: CreateWorkOrderRequest; attachmentFiles?: File[] }>
+) {
   try {
-    yield call(workScheduleAPI.createWorkOrder, action.payload)
+    const { request: requestPayload, attachmentFiles } = action.payload
+    const created: WorkOrderDetail = yield call(workScheduleAPI.createWorkOrder, requestPayload)
+
+    let failedUploads = 0
+    if (attachmentFiles && attachmentFiles.length > 0 && created?.work_order_id) {
+      for (const file of attachmentFiles) {
+        try {
+          yield call(workScheduleAPI.uploadAttachment, created.work_order_id, file)
+        } catch {
+          failedUploads += 1
+        }
+      }
+    }
+
     yield put(createWorkOrderSuccess())
-    toast.success('Đã tạo thành công lệnh công tác mới trên máy chủ!')
+    if (failedUploads > 0) {
+      toast.warning(
+        `Đã tạo lệnh công tác nhưng có ${failedUploads}/${attachmentFiles?.length || 0} file PDF tải lên thất bại.`
+      )
+    } else {
+      toast.success('Đã tạo thành công lệnh công tác mới trên máy chủ!')
+    }
     yield put(fetchWorkOrdersRequest(undefined))
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể tạo lệnh công tác trên máy chủ')
@@ -166,6 +215,7 @@ function* handlePatchWorkOrder(
     yield put(patchWorkOrderSuccess())
     toast.success('Đã cập nhật lịch làm việc thành công trên máy chủ!')
     yield put(fetchWorkOrdersRequest(undefined))
+    yield put(fetchWorkOrderDetailRequest(workOrderId))
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể cập nhật lịch làm việc trên máy chủ')
     yield put(patchWorkOrderFailure(errorMsg))
@@ -227,8 +277,10 @@ function* handleVerifyWorkOrder(
       toast.success('🎉 Đã duyệt nghiệm thu báo cáo công tác thành công!')
     }
     yield put(fetchWorkOrdersRequest(undefined))
-    // Đồng bộ lại dữ liệu lỗi và bản đồ GIS
+    yield put(fetchWorkOrderDetailRequest(workOrderId))
+    // Đồng bộ lại dữ liệu lỗi, tài sản cột đèn (GPS) và bản đồ GIS
     yield put(fetchDashboardDataRequest())
+    yield put(fetchAssetsRequest())
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể duyệt nghiệm thu trên máy chủ')
     yield put(verifyWorkOrderFailure(errorMsg))

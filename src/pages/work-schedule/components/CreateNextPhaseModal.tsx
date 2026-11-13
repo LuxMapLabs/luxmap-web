@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Wrench, Search, Calendar, User, FileText } from 'lucide-react'
-import { TaskKind, WorkOrderAssignee } from '../../../types/workSchedule'
+import type { TaskKind } from '../../../types/common/enums'
+import type { WorkOrderAssignee } from '../../../types/workorders/orders'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 
@@ -33,7 +34,7 @@ const getTodayStr = () => {
 export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   isOpen,
   caseCode,
-  segment = 'Tuyến A - Tỉnh Lộ 8 (SEG-001)',
+  segment = '',
   defaultPoleIds = [],
   targetNextPhaseType,
   assignees,

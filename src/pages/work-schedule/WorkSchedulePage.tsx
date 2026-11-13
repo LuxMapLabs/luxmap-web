@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { RootState } from '../../redux/rootReducer'
-import { TaskKind } from '../../types/workSchedule'
+import type { TaskKind } from '../../types/common/enums'
+import type { CreateWorkOrderRequest } from '../../types/workorders/orders'
 import {
   setCurrentMonth,
   setFilterPhase,
@@ -33,6 +34,7 @@ import { RecurringSurveyModal } from './components/RecurringSurveyModal'
 import { fetchFaultsList } from '../../feature/dashboard/dashboardAPI'
 import { NOTIFICATION_TARGET_PARAMS } from '../../utils/notifications/notificationRoute'
 import { formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
+import { extractSegmentId } from '../../utils/work-schedule/poleUtils'
 import type { SurveyRecurringItem } from '../../types/survey-schedules/recurring'
 
 export const WorkSchedulePage: React.FC = () => {
@@ -47,6 +49,8 @@ export const WorkSchedulePage: React.FC = () => {
     viewingPhaseIndex,
     workOrderDetail,
     isLoadingWorkOrders,
+    isSubmitting,
+    actionError,
   } = useSelector((state: RootState) => state.workSchedule)
   const currentUser = useSelector((state: RootState) => state.auth.user)
   const activeCommuneId =
@@ -82,6 +86,16 @@ export const WorkSchedulePage: React.FC = () => {
 
   // Modals state
   const [isCreateManualOpen, setIsCreateManualOpen] = useState(false)
+  const pendingCreateCloseRef = useRef(false)
+
+  useEffect(() => {
+    if (pendingCreateCloseRef.current && !isSubmitting) {
+      pendingCreateCloseRef.current = false
+      if (!actionError) {
+        setIsCreateManualOpen(false)
+      }
+    }
+  }, [isSubmitting, actionError])
   const [isAutoDispatchOpen, setIsAutoDispatchOpen] = useState(false)
   const [isRecurringSurveyOpen, setIsRecurringSurveyOpen] = useState(false)
   const [unassignedFaultsCount, setUnassignedFaultsCount] = useState(0)
@@ -279,12 +293,31 @@ export const WorkSchedulePage: React.FC = () => {
     setIsCreateManualOpen(true)
   }
 
-  const handleCreateNewCaseSubmit = (payload: any) => {
-    // 1. Trích xuất mã tuyến đường từ chuỗi segment (ví dụ: 'SEG-001')
-    const segmentIdMatch = payload.segment?.match(/SEG-\d+/i)
-    const segmentId = segmentIdMatch ? segmentIdMatch[0].toUpperCase() : 'SEG-001'
+  const handleCreateNewCaseSubmit = (payload: {
+    title: string
+    segment: string
+    initPhase: TaskKind
+    assigneeId: string
+    assigneeName: string
+    date: string
+    notes?: string
+    materialsNote?: string
+    poleIds?: string[]
+    faultIds?: string[]
+    qrPdfRawFiles?: File[]
+  }) => {
+    // 1. Trích xuất mã tuyến đường từ chuỗi segment
+    const segmentId = extractSegmentId(payload.segment)
 
-    const backendPayload: any = {
+    if (
+      (payload.initPhase === 'pole_gps_update' || payload.initPhase === 'survey') &&
+      !segmentId
+    ) {
+      toast.error('Không xác định được mã tuyến đường hợp lệ.')
+      return
+    }
+
+    const backendPayload: CreateWorkOrderRequest = {
       task_kind: payload.initPhase,
       title: payload.title?.trim() || 'Lệnh công tác mới',
       scheduled_date: payload.date,
@@ -294,7 +327,10 @@ export const WorkSchedulePage: React.FC = () => {
       materials_note: payload.materialsNote?.trim() || undefined,
     }
 
-    if (payload.initPhase === 'survey') {
+    if (payload.initPhase === 'pole_gps_update') {
+      backendPayload.segment_id = segmentId
+      backendPayload.pole_ids = payload.poleIds || []
+    } else if (payload.initPhase === 'survey') {
       // Backend Survey: Yêu cầu commune_id và segment_ids[]
       backendPayload.commune_id = activeCommuneId
       backendPayload.segment_ids = [segmentId]
@@ -302,16 +338,24 @@ export const WorkSchedulePage: React.FC = () => {
       // Backend Inspection: Nếu có fault_ids từ các cột đã chọn thì gửi fault_ids, nếu không có thì gửi segment_id
       if (payload.faultIds && payload.faultIds.length > 0) {
         backendPayload.fault_ids = payload.faultIds
-      } else {
+      } else if (segmentId) {
         backendPayload.segment_id = segmentId
+      } else {
+        toast.error('Vui lòng chọn tuyến đường hoặc sự cố cần kiểm tra.')
+        return
       }
     } else if (payload.initPhase === 'repair') {
       // Backend Repair: Yêu cầu fault_ids[] của các sự cố đã xác nhận
       backendPayload.fault_ids = payload.faultIds || []
     }
 
-    dispatch(createWorkOrderRequest(backendPayload))
-    setIsCreateManualOpen(false)
+    pendingCreateCloseRef.current = true
+    dispatch(
+      createWorkOrderRequest({
+        request: backendPayload,
+        attachmentFiles: payload.initPhase === 'pole_gps_update' ? payload.qrPdfRawFiles : undefined,
+      })
+    )
   }
 
   // Xử lý mở giai đoạn tiếp theo (gọi API /follow-up trên máy chủ)
@@ -393,6 +437,24 @@ export const WorkSchedulePage: React.FC = () => {
       returnWorkOrderRequest({
         workOrderId,
         note,
+      })
+    )
+  }
+
+  // Xử lý Quản lý duyệt & Import GIS cho báo cáo GPS (POST /api/v1/work-orders/{id}/verify)
+  const handleApproveGpsUpdate = (_code: string) => {
+    const currentPhase = selectedCase?.phases[selectedCase.currentPhaseIndex]
+    const workOrderId = currentPhase?.workOrderId
+
+    if (!workOrderId) {
+      toast.error('Không tìm thấy mã lệnh công tác để duyệt & import GIS.')
+      return
+    }
+
+    dispatch(
+      verifyWorkOrderRequest({
+        workOrderId,
+        note: 'Quản lý đã duyệt báo cáo GPS và import tọa độ cột vào bản đồ GIS.',
       })
     )
   }
@@ -638,6 +700,7 @@ export const WorkSchedulePage: React.FC = () => {
         onApproveCancellationReassign={handleApproveCancellationReassign}
         onApproveCancellationCancel={handleApproveCancellationCancel}
         onRejectCancellation={handleRejectCancellation}
+        onApproveGpsUpdate={handleApproveGpsUpdate}
       />
 
       {/* Modal 2: Tạo giai đoạn tiếp theo (giữ nguyên mã sự vụ) */}

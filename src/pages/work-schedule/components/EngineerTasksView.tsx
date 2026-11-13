@@ -1,6 +1,6 @@
 import React from 'react'
 import { FileEdit, CheckCircle, MapPin, Calendar, Zap } from 'lucide-react'
-import { ScheduleCase } from '../../../types/workSchedule'
+import type { ScheduleCase } from '../../../feature/work-schedule/workScheduleSlice'
 
 interface EngineerTasksViewProps {
   cases: ScheduleCase[]

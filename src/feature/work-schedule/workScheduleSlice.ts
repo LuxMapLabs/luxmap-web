@@ -1,17 +1,69 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type {
-  WorkOrderItem,
-  WorkOrderDetail,
-  WorkOrderAssignee,
-  WorkOrderItemPagedResult,
-  CreateWorkOrderRequest,
-  PatchWorkOrderRequest,
-  FollowUpWorkOrderRequest,
-} from '../../types/workorders/orders'
+import type { WorkOrderItem, WorkOrderDetail, WorkOrderAssignee, WorkOrderItemPagedResult, CreateWorkOrderRequest, PatchWorkOrderRequest, FollowUpWorkOrderRequest, WorkOrderAttachmentItem, WorkOrderPoleLocation } from '../../types/workorders/orders'
 import type { TaskKind } from '../../types/common/enums'
-import type { ScheduleCase } from '../../types/workSchedule'
 import type { GetWorkOrdersFilter } from './workScheduleAPI'
 import { mapWorkOrdersToScheduleCases, formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
+
+// ==========================================
+// CẤU TRÚC HỒ SƠ SỰ VỤ & THANH TIẾN TRÌNH (UI STATE)
+// Backend trả về từng WorkOrderItem độc lập có case_id,
+// Frontend gom nhóm và hiển thị dưới dạng Stepper các giai đoạn.
+// ==========================================
+
+export interface SchedulePhase {
+  phaseType: TaskKind
+  name: string
+  date: string
+  dueDate?: string
+  createdAt?: string
+  rawStatus?: string
+  assigneeId: string
+  assigneeName: string
+  status: 'pending' | 'reported' | 'ended'
+  notes?: string
+  returnReason?: string
+  materialsNote?: string // Ghi chú vật tư tự do (textarea)
+  workOrderId?: string
+  segmentId?: string
+  poleIds?: string[] // Danh sách các cột đèn cụ thể cần kiểm tra / sửa chữa / cập nhật GPS
+  qrPdfFiles?: WorkOrderAttachmentItem[] // File PDF chứa mã QR quản lý gửi xuống cho kỹ sư
+  cancellationRequest?: {
+    status: 'none' | 'pending' | 'rejected'
+    reason: string
+    requestedAt?: string
+    requestedBy?: string
+    rejectReason?: string
+    rejectedAt?: string
+  }
+  report?: {
+    submittedAt: string
+    summary: string
+    videoUrl?: string
+    photoEvidence?: string[]
+    luxMeasured?: string
+    suggestedMaterialsNote?: string // Kỹ sư tự do nhập ghi chú đề xuất
+    usedMaterialsNote?: string      // Kỹ sư nhập / Quản lý tự do chỉnh sửa
+    poleGpsLocations?: WorkOrderPoleLocation[] // Tọa độ GPS các cột kỹ sư gửi lên
+    aiDetections?: Array<{
+      poleId: string
+      issue: string
+      confidence: number
+    }>
+  }
+}
+
+export interface ScheduleCase {
+  code: string                  // Ví dụ: SCH-001 (giữ nguyên xuyên suốt)
+  title: string
+  segment: string
+  createdAt?: string            // Ngày giờ tạo của vụ việc
+  currentPhaseIndex: number     // 0: Khảo sát, 1: Kiểm tra, 2: Sửa chữa, 3: Cấp trên
+  isTerminated: boolean         // True nếu bị từ chối duyệt hoặc đóng sớm
+  endReason?: string
+  poleIds?: string[]            // Cột đèn liên quan của sự vụ
+  hasPendingCancellationRequest?: boolean // Có yêu cầu xin hủy lịch từ kỹ sư hiện trường đang chờ duyệt
+  phases: SchedulePhase[]       // Lịch sử các giai đoạn
+}
 
 export interface WorkScheduleState {
   // 1. Thực thể API Backend 
@@ -214,7 +266,10 @@ export const workScheduleSlice = createSlice({
     // -------------------------------------------------------------
     // 4. CÁC TÁC VỤ MUTATION (Nhận trực tiếp 100% Request DTOs từ Backend)
     // -------------------------------------------------------------
-    createWorkOrderRequest(state, _action: PayloadAction<CreateWorkOrderRequest>) {
+    createWorkOrderRequest(
+      state,
+      _action: PayloadAction<{ request: CreateWorkOrderRequest; attachmentFiles?: File[] }>
+    ) {
       state.isSubmitting = true
       state.actionError = null
     },

@@ -3,6 +3,7 @@
  * Sinh tự động từ endpoint Backend
  */
 import type { FeederControlMode, FeederPowerState, TopologySource } from '../common/enums'
+import type { AssetPhotoCover } from '../assets/cabinets'
 import type { Geometry } from '../common/base'
 
 export interface CabinetFeederState {
@@ -14,6 +15,8 @@ export interface CabinetFeederState {
 }
 
 export interface CabinetProperties {
+    photo_count?: number
+    cover_photo?: AssetPhotoCover
     cabinet_id: string | null
     cabinet_name: string | null
     commune_id: string | null
