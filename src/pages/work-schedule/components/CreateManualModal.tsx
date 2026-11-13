@@ -163,12 +163,17 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
     segmentsList,
   ])
 
-  // Reset khi người dùng chủ động đổi tuyến đường hoặc giai đoạn (bỏ qua khi prefill)
+  // Reset khi người dùng chủ động đổi tuyến đường hoặc giai đoạn (bỏ qua khi prefill hoặc lần nạp tuyến đầu tiên)
   useEffect(() => {
     if (isPrefillAppliedRef.current) {
       isPrefillAppliedRef.current = false
       prevSegmentRef.current = segment
       prevPhaseRef.current = initPhase
+      return
+    }
+    // Bỏ qua reset nếu tuyến đường vừa được nạp lần đầu sau khi danh sách tuyến tải xong
+    if (prevSegmentRef.current === '' && segment !== '' && prevPhaseRef.current === initPhase) {
+      prevSegmentRef.current = segment
       return
     }
     if (prevSegmentRef.current !== segment || prevPhaseRef.current !== initPhase) {
