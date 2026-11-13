@@ -768,27 +768,6 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         Nộp lúc: {effectiveSubmittedAt}
                       </span>
                     )}
-                    {/* Nút Xem GIS cho báo cáo Cập nhật vị trí cột (chức năng popup do thành viên khác phát triển) */}
-                    {currentPhase.phaseType === 'pole_gps_update' && hasPhaseReport && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onPreviewGis) {
-                            onPreviewGis({
-                              code: caseItem.code,
-                              segment: caseItem.segment,
-                              poles: effectivePoleGpsLocations,
-                            })
-                          } else {
-                            toast.info('Chức năng Xem GIS (popup bản đồ thu nhỏ) đang được kết nối.')
-                          }
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-xs transition cursor-pointer active:scale-95"
-                      >
-                        <MapIcon className="w-3.5 h-3.5" />
-                        <span>Xem GIS</span>
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -799,45 +778,69 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         {effectiveReportNote}
                       </p>
 
-                      {/* Bảng tọa độ GPS của các cột trong báo cáo */}
-                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200 text-[11px] uppercase">
-                              <th className="py-2 px-3 font-extrabold">Mã cột</th>
-                              <th className="py-2 px-3 font-extrabold">Vĩ độ (Lat)</th>
-                              <th className="py-2 px-3 font-extrabold">Kinh độ (Lng)</th>
-                              <th className="py-2 px-3 font-extrabold">Sai số</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {effectivePoleGpsLocations.length > 0 ? (
-                              effectivePoleGpsLocations.map((g, idx) => (
-                                <tr key={g.pole_id || idx} className="hover:bg-violet-50/40">
-                                  <td className="py-2 px-3 font-mono font-black text-slate-900">
-                                    {g.pole_id || '-'}
-                                  </td>
-                                  <td className="py-2 px-3 font-mono font-bold text-emerald-700">
-                                    {g.lat != null ? g.lat.toFixed(6) : '-'}
-                                  </td>
-                                  <td className="py-2 px-3 font-mono font-bold text-emerald-700">
-                                    {g.lng != null ? g.lng.toFixed(6) : '-'}
-                                  </td>
-                                  <td className="py-2 px-3 font-mono text-[11px] text-slate-500">
-                                    {g.accuracy_m != null ? `±${g.accuracy_m}m` : '-'}
-                                  </td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={4} className="py-4 text-center text-slate-400">
-                                  Chưa có dữ liệu tọa độ GPS chi tiết cho từng cột.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
+                      {/* Nút mở báo cáo chi tiết tọa độ GPS & ảnh hiện trường */}
+                      <button
+                        type="button"
+                        onClick={() => setIsFieldReportModalOpen(true)}
+                        className="w-full py-2.5 px-3.5 rounded-xl bg-linear-to-r from-indigo-600 via-violet-600 to-indigo-700 hover:from-indigo-700 hover:to-violet-800 text-white font-extrabold text-xs shadow-md shadow-indigo-500/20 hover:shadow-lg transition-all flex items-center justify-between group cursor-pointer active:scale-[0.99]"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="p-1 rounded-lg bg-white/20">
+                            <MapIcon className="w-4 h-4 text-white" />
+                          </span>
+                          <span className="tracking-tight">
+                            Xem Báo Cáo Tọa Độ GPS Chi Tiết ({effectivePoleGpsLocations.length} cột)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
+                          <span>Chi tiết &amp; Xem GIS</span>
+                          <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                        </div>
+                      </button>
+
+                      {/* Bản xem trước tóm tắt dữ liệu GPS */}
+                      <div className="p-3 bg-violet-50/70 border border-violet-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full bg-violet-600 animate-pulse shrink-0" />
+                          <span className="font-bold text-violet-950 shrink-0">
+                            Dữ liệu GPS đã thu thập:
+                          </span>
+                          <span className="font-extrabold text-violet-800 font-mono truncate">
+                            {effectivePoleGpsLocations.length > 0
+                              ? `${effectivePoleGpsLocations.length} cột (${effectivePoleGpsLocations
+                                  .map((g) => g.pole_id || '-')
+                                  .join(', ')})`
+                              : 'Chưa có tọa độ chi tiết'}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-violet-700 font-semibold bg-violet-100 px-2 py-0.5 rounded-md shrink-0">
+                          {currentPhase.status === 'ended' ? 'Đã chốt' : 'Chờ duyệt'}
+                        </span>
                       </div>
+
+                      {/* Bản xem trước toàn bộ ảnh hiện trường kỹ sư gửi lên (không giới hạn số lượng) */}
+                      {previewEvidence.length > 0 && (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto pr-1 select-none">
+                          {previewEvidence.map((ev, idx) => (
+                            <div
+                              key={ev.evidence_id || idx}
+                              onClick={() => setIsFieldReportModalOpen(true)}
+                              className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs bg-slate-950 cursor-pointer group"
+                              title="Bấm để xem báo cáo chi tiết & phóng to ảnh"
+                            >
+                              <EvidenceImage
+                                evidenceId={ev.evidence_id}
+                                fallbackSrc={ev.thumbnail_url || ev.original_url || undefined}
+                                alt={`Ảnh cột ${idx + 1}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                              <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
+                                Ảnh #{idx + 1}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="py-6 text-center text-xs text-slate-500">
@@ -1370,6 +1373,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         caseItem={caseItem}
         phase={currentPhase || null}
         onClose={() => setIsFieldReportModalOpen(false)}
+        onPreviewGis={onPreviewGis}
       />
 
       {/* Modal Chỉnh Sửa Lịch Công Tác */}
