@@ -10,12 +10,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileText,
+  Map as MapIcon,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../../../redux/rootReducer'
 import type { ScheduleCase, SchedulePhase } from '../../../feature/work-schedule/workScheduleSlice'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
-import { EvidenceItem, WorkOrderPole, PolePhotoItem } from '../../../types/workorders/orders'
+import { EvidenceItem, WorkOrderPole, PolePhotoItem, WorkOrderPoleLocation } from '../../../types/workorders/orders'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { EvidenceImage } from './EvidenceImage'
 import { PolePhotoImage } from './PolePhotoImage'
@@ -40,6 +42,11 @@ interface FieldReportDetailModalProps {
   caseItem: ScheduleCase | null
   phase: SchedulePhase | null
   onClose: () => void
+  onPreviewGis?: (payload: {
+    code: string
+    segment: string
+    poles: WorkOrderPoleLocation[]
+  }) => void
 }
 
 interface ZoomImageTarget {
@@ -55,8 +62,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   caseItem,
   phase,
   onClose,
+  onPreviewGis,
 }) => {
-  const [activeTab, setActiveTab] = useState<'video' | 'photos' | 'ai'>('video')
+  const [activeTab, setActiveTab] = useState<'video' | 'photos' | 'ai' | 'gps'>('video')
   const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [zoomImage, setZoomImage] = useState<ZoomImageTarget | null>(null)
   const [backendEvidence, setBackendEvidence] = useState<EvidenceItem[]>([])
@@ -116,6 +124,8 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
     if (isOpen && phase) {
       if (phase.phaseType === 'survey') {
         setActiveTab('video')
+      } else if (phase.phaseType === 'pole_gps_update') {
+        setActiveTab('gps')
       } else {
         setActiveTab('photos')
       }
@@ -142,6 +152,10 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const effectiveUsedMaterials =
     (isTargetDetail && workOrderDetail?.materials_used) ||
     report?.usedMaterialsNote
+  const effectivePoleGpsLocations: WorkOrderPoleLocation[] =
+    isTargetDetail && workOrderDetail?.pole_locations
+      ? workOrderDetail.pole_locations
+      : report?.poleGpsLocations || []
 
   // Lọc các cột đèn có cảnh báo / bất thường
   const abnormalPoles = poles.filter(
@@ -217,64 +231,173 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 
         {/* Navigation Tabs */}
         <div className="px-6 border-b border-slate-200 bg-white flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setActiveTab('video')}
-            className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-              activeTab === 'video'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Video className="w-4 h-4" />
-            <span>
-              {phase.phaseType === 'survey'
-                ? `Video Quét Thực Địa (${poleVideos.length})`
-                : `Video Tuyến (${poleVideos.length})`}
-            </span>
-          </button>
+          {phase.phaseType === 'pole_gps_update' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveTab('gps')}
+                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                  activeTab === 'gps'
+                    ? 'border-violet-600 text-violet-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <MapIcon className="w-4 h-4" />
+                <span>Tọa Độ GPS Từng Cột ({effectivePoleGpsLocations.length})</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('photos')}
-            className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-              activeTab === 'photos'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Camera className="w-4 h-4" />
-            <span>
-              {phase.phaseType === 'repair'
-                ? `Ảnh Trước & Sau Sửa Chữa (${photoCount})`
-                : phase.phaseType === 'inspection'
-                ? `Ảnh Hiện Trường & Đo Đạc (${photoCount})`
-                : `Ảnh Chụp Bằng Chứng (${photoCount})`}
-            </span>
-          </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('photos')}
+                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                  activeTab === 'photos'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Camera className="w-4 h-4" />
+                <span>Ảnh Hiện Trường ({photoCount})</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveTab('video')}
+                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                  activeTab === 'video'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Video className="w-4 h-4" />
+                <span>
+                  {phase.phaseType === 'survey'
+                    ? `Video Quét Thực Địa (${poleVideos.length})`
+                    : `Video Tuyến (${poleVideos.length})`}
+                </span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('ai')}
-            className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-              activeTab === 'ai'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Cpu className="w-4 h-4" />
-            <span>
-              {phase.phaseType === 'survey'
-                ? 'Phân Tích AI & Tuyến Khảo Sát'
-                : phase.phaseType === 'inspection'
-                ? 'Chẩn Đoán Lỗi & Đề Xuất Vật Tư'
-                : 'Nghiệm Thu Kỹ Thuật & Vật Tư'}
-            </span>
-          </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('photos')}
+                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                  activeTab === 'photos'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Camera className="w-4 h-4" />
+                <span>
+                  {phase.phaseType === 'repair'
+                    ? `Ảnh Trước & Sau Sửa Chữa (${photoCount})`
+                    : phase.phaseType === 'inspection'
+                    ? `Ảnh Hiện Trường & Đo Đạc (${photoCount})`
+                    : `Ảnh Chụp Bằng Chứng (${photoCount})`}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('ai')}
+                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                  activeTab === 'ai'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Cpu className="w-4 h-4" />
+                <span>
+                  {phase.phaseType === 'survey'
+                    ? 'Phân Tích AI & Tuyến Khảo Sát'
+                    : phase.phaseType === 'inspection'
+                    ? 'Chẩn Đoán Lỗi & Đề Xuất Vật Tư'
+                    : 'Nghiệm Thu Kỹ Thuật & Vật Tư'}
+                </span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Modal Content Body */}
         <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 custom-scrollbar bg-slate-50/50">
+          {/* TAB GPS (DÀNH RIÊNG CHO CẬP NHẬT VỊ TRÍ CỘT) */}
+          {activeTab === 'gps' && (
+            <div className="flex flex-col gap-4 animate-in fade-in duration-150">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-violet-50/70 border border-violet-200">
+                <div className="flex-1 min-w-[220px]">
+                  <div className="text-xs font-extrabold text-violet-950 mb-1">
+                    Ghi chú báo cáo từ kỹ sư:
+                  </div>
+                  <p className="text-xs text-slate-700 font-medium leading-relaxed whitespace-pre-line">
+                    {effectiveReportNote}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onPreviewGis) {
+                      onPreviewGis({
+                        code: caseItem.code,
+                        segment: caseItem.segment,
+                        poles: effectivePoleGpsLocations,
+                      })
+                    } else {
+                      toast.info('Chức năng Xem GIS (popup bản đồ thu nhỏ) đang được kết nối.')
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-xs transition cursor-pointer active:scale-95 shrink-0"
+                >
+                  <MapIcon className="w-3.5 h-3.5" />
+                  <span>Xem GIS</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200 text-[11px] uppercase">
+                      <th className="py-2.5 px-3 font-extrabold">Mã cột</th>
+                      <th className="py-2.5 px-3 font-extrabold">Vĩ độ (Lat)</th>
+                      <th className="py-2.5 px-3 font-extrabold">Kinh độ (Lng)</th>
+                      <th className="py-2.5 px-3 font-extrabold">Sai số</th>
+                      <th className="py-2.5 px-3 font-extrabold">Thời gian ghi nhận</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {effectivePoleGpsLocations.length > 0 ? (
+                      effectivePoleGpsLocations.map((g, idx) => (
+                        <tr key={g.pole_id || idx} className="hover:bg-violet-50/40">
+                          <td className="py-2.5 px-3 font-mono font-black text-slate-900">
+                            {g.pole_id || '-'}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
+                            {g.lat != null ? g.lat.toFixed(6) : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
+                            {g.lng != null ? g.lng.toFixed(6) : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                            {g.accuracy_m != null ? `±${g.accuracy_m}m` : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-[11px] text-slate-500">
+                            {g.captured_at ? new Date(g.captured_at).toLocaleString('vi-VN') : '-'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-slate-400">
+                          Chưa có dữ liệu tọa độ GPS chi tiết cho từng cột.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* TAB 1: VIDEO KHẢO SÁT THỰC ĐỊA */}
           {activeTab === 'video' && (
             <div className="flex flex-col gap-4 animate-in fade-in duration-150">
