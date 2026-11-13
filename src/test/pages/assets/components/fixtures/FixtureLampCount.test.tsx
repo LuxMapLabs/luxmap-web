@@ -240,6 +240,35 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
     expect(screen.getByText(/POLE-0003/i)).toBeInTheDocument()
   })
 
+  it('6b. AddFixtureModal gắn một cấu hình chung cho nhiều cột đã tick, mỗi cột một bộ đèn', () => {
+    const polesOnSeg: PoleListItem[] = ['A', 'B', 'C'].map((k) => ({
+      ...mockPoles[2],
+      pole_id: `POLE-X${k}`,
+      external_ref: `POLE-X${k}`,
+      active_fixture: undefined,
+    }))
+    const onAddFixtures = vi.fn()
+    render(
+      <AddFixtureModal
+        isOpen={true}
+        onClose={vi.fn()}
+        poles={polesOnSeg}
+        segments={mockSegments}
+        onAddFixtures={onAddFixtures}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText(/Tuyến đường/i), { target: { value: 'SEG-001' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Chọn tất cả' }))
+    fireEvent.change(screen.getByLabelText('Số bóng / bộ'), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận thêm \(3 Bộ Đèn\)/ }))
+
+    expect(onAddFixtures).toHaveBeenCalledTimes(1)
+    const requests = onAddFixtures.mock.calls[0][0] as CreateFixtureRequest[]
+    expect(requests.map((r) => r.pole_id)).toEqual(['POLE-XA', 'POLE-XB', 'POLE-XC'])
+    expect(requests.every((r) => r.lamp_count === 2)).toBe(true)
+  })
+
   it('7. EditFixtureModal có dropdown Tuyến đường, mặc định tuyến hiện tại và hiển thị cột [Đang lắp] cùng cột [Chưa lắp]', () => {
     render(
       <EditFixtureModal
