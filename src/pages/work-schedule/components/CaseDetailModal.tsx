@@ -12,18 +12,21 @@ import {
   Wrench,
   Video,
   ExternalLink,
-  Play,
   Zap,
   RotateCcw,
   Edit3,
   Trash2,
   UserCheck,
   AlertCircle,
+  Map as MapIcon,
+  FileText,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../../../redux/rootReducer'
-import { ScheduleCase, WorkOrderAssignee } from '../../../types/workSchedule'
+import type { ScheduleCase } from '../../../feature/work-schedule/workScheduleSlice'
+import type { WorkOrderAssignee, WorkOrderPoleLocation } from '../../../types/workorders/orders'
 import { FieldReportDetailModal } from './FieldReportDetailModal'
 import { EditScheduleModal } from './EditScheduleModal'
 import { CancelScheduleModal } from './CancelScheduleModal'
@@ -32,9 +35,8 @@ import { RejectCancellationModal } from './RejectCancellationModal'
 import { checkScheduleModificationAllowed } from '../../../utils/work-schedule/scheduleRules'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
-import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
-import fieldBrokenFixtureImg from '../../../assets/images/field-broken-fixture.jpg'
-import fieldLuxmeterImg from '../../../assets/images/field-luxmeter-4lux.jpg'
+import type { EvidenceItem } from '../../../types/workorders/orders'
+import { EvidenceImage } from './EvidenceImage'
 
 interface CaseDetailModalProps {
   isOpen: boolean
@@ -68,6 +70,12 @@ interface CaseDetailModalProps {
   }) => Promise<void> | void
   onApproveCancellationCancel?: (reason: string) => Promise<void> | void
   onRejectCancellation?: (reason: string) => Promise<void> | void
+  onApproveGpsUpdate?: (code: string) => void
+  onPreviewGis?: (payload: {
+    code: string
+    segment: string
+    poles: WorkOrderPoleLocation[]
+  }) => void
 }
 
 const STEPPER_STEPS = [
@@ -93,6 +101,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   onApproveCancellationReassign,
   onApproveCancellationCancel,
   onRejectCancellation,
+  onApproveGpsUpdate,
+  onPreviewGis,
 }) => {
   // Dữ liệu chi tiết lệnh công tác từ máy chủ
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
@@ -124,6 +134,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
 
   // Danh sách cột đèn thực tế của lệnh (đặc biệt cho bước Khảo sát trên tuyến)
   const [surveyPoles, setSurveyPoles] = useState<string[]>([])
+  const [previewEvidence, setPreviewEvidence] = useState<EvidenceItem[]>([])
 
   useEffect(() => {
     setIsInspectionApprovedLocal(false)
@@ -155,8 +166,18 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             }
           })
           .catch(() => setSurveyPoles([]))
+
+        if (currentP.phaseType !== 'survey') {
+          workScheduleAPI
+            .getWorkOrderEvidence(currentP.workOrderId)
+            .then((res) => setPreviewEvidence(res.items || []))
+            .catch(() => setPreviewEvidence([]))
+        } else {
+          setPreviewEvidence([])
+        }
       } else {
         setSurveyPoles([])
+        setPreviewEvidence([])
       }
     }
   }, [caseItem, viewingPhaseIndex, isOpen, workOrderDetail])
@@ -189,6 +210,33 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
     (isCurrentPhaseDetail && workOrderDetail?.materials_note) ||
     currentPhase?.report?.suggestedMaterialsNote
 
+  const effectiveQrPdfFiles =
+    isCurrentPhaseDetail && workOrderDetail?.attachments
+      ? workOrderDetail.attachments
+      : currentPhase?.qrPdfFiles || []
+
+  const effectivePoleGpsLocations =
+    isCurrentPhaseDetail && workOrderDetail?.pole_locations
+      ? workOrderDetail.pole_locations
+      : currentPhase?.report?.poleGpsLocations || []
+
+  const handleDownloadAttachment = async (attachmentId: string, fileName: string) => {
+    const workOrderId = currentPhase?.workOrderId
+    if (!workOrderId || !attachmentId) return
+    try {
+      const blobUrl = await workScheduleAPI.fetchAttachmentBlob(workOrderId, attachmentId)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = fileName || 'qr-labels.pdf'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+    } catch {
+      toast.error('Không thể tải xuống file PDF đính kèm.')
+    }
+  }
+
   // Kiểm tra quy chế: cho phép sửa/hủy khi chưa hoàn tất (đồng bộ với Backend C#)
   const modificationCheck = checkScheduleModificationAllowed(
     currentPhase?.date || currentPhase?.dueDate,
@@ -204,6 +252,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
     currentPhase?.rawStatus ||
     ''
   ).toLowerCase()
+
+  const effectiveReturnReason =
+    (isCurrentPhaseDetail &&
+      workOrderDetail?.review_note &&
+      effectiveRawStatus !== 'done' &&
+      effectiveRawStatus !== 'verified'
+      ? workOrderDetail.review_note
+      : undefined) || currentPhase?.returnReason
 
   // Kiểm tra bước hiện tại đã được duyệt hay chưa
   const isCurrentlyApproved = isInspectionApprovedLocal && currentPhase?.phaseType === 'inspection'
@@ -259,9 +315,24 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-5 custom-scrollbar">
           {/* ======================================================== */}
-          {/* THANH TIẾN TRÌNH STEPPER 4 BƯỚC */}
+          {/* THANH TIẾN TRÌNH STEPPER 4 BƯỚC (ẨN NẾU LÀ CẬP NHẬT VỊ TRÍ CỘT ĐỘC LẬP) */}
           {/* ======================================================== */}
-          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4">
+          {currentPhase?.phaseType === 'pole_gps_update' ? (
+            <div className="p-3.5 rounded-2xl bg-violet-50 border border-violet-200 flex items-center gap-3">
+              <span className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0">
+                <MapPin className="w-4 h-4" />
+              </span>
+              <div>
+                <div className="text-xs font-extrabold text-violet-950">
+                  Giai đoạn độc lập: Cập nhật vị trí cột (GPS)
+                </div>
+                <div className="text-[11px] text-violet-700 mt-0.5">
+                  Nhiệm vụ tách biệt hoàn toàn khỏi quy trình Khảo sát / Kiểm tra / Sửa chữa. Khi Quản lý duyệt, tọa độ GPS của các cột sẽ được import thẳng vào Bản đồ GIS.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4">
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">
               Vòng đời sự vụ (Bấm để xem lại lịch sử các bước):
             </div>
@@ -358,6 +429,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               })}
             </div>
           </div>
+          )}
 
           {/* ======================================================== */}
           {/* BANNER CẢNH BÁO: KỸ SƯ YÊU CẦU XIN HỦY LỊCH */}
@@ -623,21 +695,156 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 {currentPhase.notes || 'Thực hiện nghiêm túc quy chuẩn an toàn lao động.'}
               </div>
 
+              {/* File PDF chứa mã QR đã gửi cho kỹ sư (riêng cho Cập nhật vị trí cột) */}
+              {currentPhase.phaseType === 'pole_gps_update' && (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-2">
+                  <div className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-violet-600" />
+                    <span>
+                      File PDF mã QR đã gửi xuống cho kỹ sư ({effectiveQrPdfFiles.length} file):
+                    </span>
+                  </div>
+                  {effectiveQrPdfFiles.length > 0 ? (
+                    <div className="flex flex-col gap-1.5">
+                      {effectiveQrPdfFiles.map((file, idx) => (
+                        <div
+                          key={file.attachment_id || idx}
+                          className="px-3 py-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-mono text-[10px] font-black shrink-0">
+                              PDF
+                            </span>
+                            <span className="font-bold text-slate-800 truncate">
+                              {file.file_name || 'attachment.pdf'}
+                            </span>
+                          </div>
+                          {currentPhase.workOrderId && file.attachment_id ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDownloadAttachment(
+                                  file.attachment_id!,
+                                  file.file_name || 'qr-labels.pdf'
+                                )
+                              }
+                              className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 shrink-0 cursor-pointer"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Tải về</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 shrink-0">-</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-500">-</div>
+                  )}
+                </div>
+              )}
+
+              {/* Thông báo nếu nhiệm vụ GPS vừa bị yêu cầu làm lại */}
+              {currentPhase.phaseType === 'pole_gps_update' && effectiveReturnReason && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                  <RotateCcw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Yêu cầu làm lại từ Quản lý:</strong> {effectiveReturnReason}
+                  </div>
+                </div>
+              )}
+
               {/* Chi tiết nội dung báo cáo của Kỹ sư */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-3">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2 gap-2 flex-wrap">
                   <span className="text-xs font-extrabold text-blue-700 flex items-center gap-1.5">
                     <FileCheck className="w-4 h-4" />
                     Báo cáo nghiệm thu: {currentPhase.name}
                   </span>
-                  {effectiveSubmittedAt && (
-                    <span className="text-[11px] text-slate-500">
-                      Nộp lúc: {effectiveSubmittedAt}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {effectiveSubmittedAt && (
+                      <span className="text-[11px] text-slate-500">
+                        Nộp lúc: {effectiveSubmittedAt}
+                      </span>
+                    )}
+                    {/* Nút Xem GIS cho báo cáo Cập nhật vị trí cột (chức năng popup do thành viên khác phát triển) */}
+                    {currentPhase.phaseType === 'pole_gps_update' && hasPhaseReport && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onPreviewGis) {
+                            onPreviewGis({
+                              code: caseItem.code,
+                              segment: caseItem.segment,
+                              poles: effectivePoleGpsLocations,
+                            })
+                          } else {
+                            toast.info('Chức năng Xem GIS (popup bản đồ thu nhỏ) đang được kết nối.')
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-xs transition cursor-pointer active:scale-95"
+                      >
+                        <MapIcon className="w-3.5 h-3.5" />
+                        <span>Xem GIS</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {hasPhaseReport ? (
+                {currentPhase.phaseType === 'pole_gps_update' ? (
+                  hasPhaseReport ? (
+                    <div className="flex flex-col gap-3">
+                      <p className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line">
+                        {effectiveReportNote}
+                      </p>
+
+                      {/* Bảng tọa độ GPS của các cột trong báo cáo */}
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200 text-[11px] uppercase">
+                              <th className="py-2 px-3 font-extrabold">Mã cột</th>
+                              <th className="py-2 px-3 font-extrabold">Vĩ độ (Lat)</th>
+                              <th className="py-2 px-3 font-extrabold">Kinh độ (Lng)</th>
+                              <th className="py-2 px-3 font-extrabold">Sai số</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {effectivePoleGpsLocations.length > 0 ? (
+                              effectivePoleGpsLocations.map((g, idx) => (
+                                <tr key={g.pole_id || idx} className="hover:bg-violet-50/40">
+                                  <td className="py-2 px-3 font-mono font-black text-slate-900">
+                                    {g.pole_id || '-'}
+                                  </td>
+                                  <td className="py-2 px-3 font-mono font-bold text-emerald-700">
+                                    {g.lat != null ? g.lat.toFixed(6) : '-'}
+                                  </td>
+                                  <td className="py-2 px-3 font-mono font-bold text-emerald-700">
+                                    {g.lng != null ? g.lng.toFixed(6) : '-'}
+                                  </td>
+                                  <td className="py-2 px-3 font-mono text-[11px] text-slate-500">
+                                    {g.accuracy_m != null ? `±${g.accuracy_m}m` : '-'}
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={4} className="py-4 text-center text-slate-400">
+                                  Chưa có dữ liệu tọa độ GPS chi tiết cho từng cột.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-xs text-slate-500">
+                      ⏳ Kỹ sư hiện trường đang thực hiện nhiệm vụ, chưa gửi báo cáo tọa độ GPS.
+                    </div>
+                  )
+                ) : hasPhaseReport ? (
                   <div className="flex flex-col gap-3">
                     <p className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line">
                       {effectiveReportNote}
@@ -667,56 +874,42 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
                           <span className="font-bold text-blue-950">
-                            Khảo sát video hành trình đêm trên tuyến:
+                            Khảo sát thực địa trên tuyến:
                           </span>
                           <span className="font-extrabold text-blue-800 font-mono">
                             {surveyPoles.length > 0 ? `${surveyPoles.length} cột ghi nhận` : 'Toàn tuyến'}
                           </span>
                         </div>
                         <span className="text-[11px] text-blue-700 font-semibold bg-blue-100 px-2 py-0.5 rounded-md">
-                          Video 1080P • AI Detector
+                          Dữ liệu thực địa &amp; AI
                         </span>
                       </div>
-                    ) : (
-                      /* Thư viện thumbnails bằng chứng hiện trường: CHỈ PREVIEW TĨNH, KHÔNG CLICK */
+                    ) : previewEvidence.length > 0 ? (
                       <div className="grid grid-cols-3 gap-2 select-none">
-                        <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
-                          <img
-                            src={fieldSurveyNightImg}
-                            alt="Video Hiện Trường"
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-slate-950/30 flex items-center justify-center">
-                            <span className="w-7 h-7 rounded-full bg-white/90 text-blue-600 flex items-center justify-center shadow">
-                              <Play className="w-3.5 h-3.5 ml-0.5 fill-blue-600" />
+                        {previewEvidence.slice(0, 3).map((ev, idx) => (
+                          <div
+                            key={ev.evidence_id || idx}
+                            className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs bg-slate-950"
+                          >
+                            <EvidenceImage
+                              evidenceId={ev.evidence_id}
+                              fallbackSrc={ev.thumbnail_url || ev.original_url || undefined}
+                              alt={`Bằng chứng ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
+                              {ev.kind === 'before'
+                                ? 'Trước sửa chữa'
+                                : ev.kind === 'after'
+                                ? 'Sau sửa chữa'
+                                : 'Hiện trường'}
                             </span>
                           </div>
-                          <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
-                            Video ghi nhận
-                          </span>
-                        </div>
-
-                        <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
-                          <img
-                            src={fieldBrokenFixtureImg}
-                            alt="Thiết bị thực tế"
-                            className="w-full h-full object-cover"
-                          />
-                          <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
-                            Hiện trạng thiết bị
-                          </span>
-                        </div>
-
-                        <div className="relative rounded-xl overflow-hidden aspect-4/3 border border-slate-200 shadow-2xs">
-                          <img
-                            src={fieldLuxmeterImg}
-                            alt="Đo kiểm tra"
-                            className="w-full h-full object-cover"
-                          />
-                          <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
-                            Đo kiểm thiết bị
-                          </span>
-                        </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 text-center">
+                        Chưa có ảnh bằng chứng đính kèm — bấm nút trên để xem chi tiết báo cáo.
                       </div>
                     )}
 
@@ -847,6 +1040,47 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           {/* Các nút hành động tác nghiệp Quản lý */}
           {!caseItem.isTerminated && (
             <div className="flex items-center gap-2">
+              {/* Giai đoạn 4 (Độc lập): Cập nhật vị trí cột (GPS) */}
+              {currentPhase.phaseType === 'pole_gps_update' && (
+                <>
+                  {isActivePhase &&
+                    hasReport &&
+                    currentPhase.status !== 'ended' &&
+                    effectiveRawStatus !== 'verified' &&
+                    effectiveRawStatus !== 'cancelled' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReturnReason('')
+                          setIsReturnModalOpen(true)
+                        }}
+                        className="flex items-center gap-1 px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition cursor-pointer active:scale-95"
+                        title="Yêu cầu kỹ sư hiện trường đo lại tọa độ GPS"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Yêu cầu làm lại</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onApproveGpsUpdate?.(caseItem.code)}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                        title="Duyệt báo cáo và import thẳng tọa độ GPS của các cột vào bản đồ GIS"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Duyệt &amp; Import GIS</span>
+                      </button>
+                    </>
+                  )}
+
+                  {currentPhase.status === 'ended' && (
+                    <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                      ✓ Đã duyệt &amp; Import GPS vào GIS
+                    </span>
+                  )}
+                </>
+              )}
+
               {/* Giai đoạn 1: Khảo sát */}
               {currentPhase.phaseType === 'survey' && (
                 <>

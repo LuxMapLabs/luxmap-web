@@ -2,6 +2,7 @@
  * Auto-generated Types for: map/poles
  * Sinh tự động từ endpoint Backend
  */
+import type { PoleAssetPhotoItem } from '../assets/poles'
 import type { FaultStatus, FaultType, FixtureStatus, FixtureType, NodeStatus, PowerSource, Severity, SourceChannel, WarrantyStatus } from '../common/enums'
 import type { Geometry } from '../common/base'
 
@@ -15,6 +16,7 @@ export interface PoleMapBaseline {
 }
 
 export interface PoleMapDetail {
+    asset_photos?: PoleAssetPhotoItem[]
     pole_id: string | null
     segment_id: string | null
     segment_name: string | null

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { useSelector } from 'react-redux'
 import {
   Search,
   CheckSquare,
@@ -10,9 +11,10 @@ import {
   ChevronUp,
   Loader2,
 } from 'lucide-react'
-import { getPolesBySegment, extractSegmentId, PoleItem } from '../../../utils/work-schedule/poleUtils'
+import { extractSegmentId, PoleItem } from '../../../utils/work-schedule/poleUtils'
 import { faultAPI } from '../../../feature/faults/faultAPI'
 import type { FaultItem } from '../../../types/faults/faults'
+import type { RootState } from '../../../redux/rootReducer'
 
 interface PoleSelectorProps {
   segmentStr: string
@@ -82,28 +84,31 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
     return map
   }, [faults])
 
-  // Lấy danh sách các cột đèn ĐANG CÓ SỰ CỐ trên tuyến
+  const storePoles = useSelector((state: RootState) => state.assets.poles)
+
+  // Lấy danh sách các cột đèn ĐANG CÓ SỰ CỐ trên tuyến (đọc thông số thật từ assets.poles)
   const poles: PoleItem[] = useMemo(() => {
-    const allSegmentPoles = getPolesBySegment(segmentStr)
     const faultPoleIds = Object.keys(poleFaultMap)
 
     if (faultPoleIds.length === 0) {
       return []
     }
 
+    const segmentShortName = segmentStr ? segmentStr.split(' (')[0] : segmentId || '-'
+
     return faultPoleIds.map((pid) => {
-      const match = allSegmentPoles.find((p) => p.poleId === pid)
-      if (match) return match
+      const assetPole = storePoles.find((p) => p.pole_id === pid)
+      const fixture = assetPole?.active_fixture || assetPole?.active_fixtures?.[0]
       return {
         poleId: pid,
-        segmentId,
-        fixtureType: 'led_road_lamp',
-        lampWatt: 100,
-        atlas: `Cột đèn ${pid} (${segmentStr.split(' (')[0]})`,
-        status: 'dim',
+        segmentId: assetPole?.segment_id || segmentId,
+        fixtureType: fixture?.fixture_type || '-',
+        lampWatt: typeof fixture?.lamp_watt === 'number' ? fixture.lamp_watt : null,
+        atlas: assetPole?.note || `${pid} (${segmentShortName})`,
+        status: fixture?.warranty_status || '-',
       }
     })
-  }, [segmentStr, segmentId, poleFaultMap])
+  }, [segmentStr, segmentId, poleFaultMap, storePoles])
 
   // Lọc theo từ khóa tìm kiếm
   const filteredPoles = useMemo(() => {
@@ -272,7 +277,7 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
                       {pole.poleId}
                     </span>
                     <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                      {pole.lampWatt}W LED
+                      {pole.lampWatt != null ? `${pole.lampWatt}W` : '-'}
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-500 truncate flex items-center gap-1">

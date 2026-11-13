@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
   X,
-  Play,
-  Pause,
   Video,
   Camera,
   Cpu,
@@ -15,13 +13,27 @@ import {
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../../../redux/rootReducer'
-import { ScheduleCase, SchedulePhase } from '../../../types/workSchedule'
+import type { ScheduleCase, SchedulePhase } from '../../../feature/work-schedule/workScheduleSlice'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import { EvidenceItem, WorkOrderPole, PolePhotoItem } from '../../../types/workorders/orders'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { EvidenceImage } from './EvidenceImage'
 import { PolePhotoImage } from './PolePhotoImage'
-import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
+import { PoleVideoPlayer } from './PoleVideoPlayer'
+
+const formatDurationMs = (ms?: number): string => {
+  if (ms == null || ms <= 0) return '—'
+  const totalSeconds = Math.round(ms / 1000)
+  const mins = Math.floor(totalSeconds / 60)
+  const secs = totalSeconds % 60
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+const formatByteCount = (bytes?: number): string => {
+  if (bytes == null || bytes <= 0) return '—'
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 interface FieldReportDetailModalProps {
   isOpen: boolean
@@ -45,7 +57,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'video' | 'photos' | 'ai'>('video')
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [zoomImage, setZoomImage] = useState<ZoomImageTarget | null>(null)
   const [backendEvidence, setBackendEvidence] = useState<EvidenceItem[]>([])
   const [poles, setPoles] = useState<WorkOrderPole[]>([])
@@ -60,6 +72,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   // Tải ảnh bằng chứng nghiệm thu và danh sách cột từ Backend nếu có mã lệnh công tác
   useEffect(() => {
     if (isOpen && targetWorkOrderId) {
+      setSelectedVideoIndex(0)
       workScheduleAPI
         .getWorkOrderEvidence(targetWorkOrderId)
         .then((res) => {
@@ -136,7 +149,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
       (p.fixture_status && p.fixture_status !== 'normal' && p.fixture_status !== 'unknown') ||
       (p.open_fault_count && p.open_fault_count > 0)
   )
-  const highlightedPole = abnormalPoles[0] || poles[0] || null
 
   // Danh sách hình ảnh bằng chứng thực địa từ Backend
   const displayPhotos = backendEvidence.map((ev, idx) => ({
@@ -155,6 +167,18 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
     desc: `Thời điểm ghi nhận: ${ev.captured_at ? new Date(ev.captured_at).toLocaleString('vi-VN') : ev.uploaded_at || 'Đã ghi nhận'}`,
     tag: ev.kind === 'before' ? 'Trước sửa' : ev.kind === 'after' ? 'Sau sửa' : 'Hiện trường',
   }))
+
+  // Danh sách clip video thực địa theo từng cột đèn từ Backend
+  const poleVideos = polePhotos.filter((p) => Boolean(p.video && p.photo_id))
+  const selectedVideoPhoto = poleVideos[selectedVideoIndex] || poleVideos[0] || null
+
+  // Tổng số ảnh thực tế hiển thị trong Tab 2 theo đúng giai đoạn
+  const photoCount = phase.phaseType === 'survey' ? polePhotos.length : displayPhotos.length
+
+  // Phiên bản mô hình AI thực tế từ dữ liệu backend (nếu có)
+  const modelVersionSource = polePhotos.find((p) => p.model_version || p.artifact_version)
+  const modelVersionLabel =
+    modelVersionSource?.model_version || modelVersionSource?.artifact_version || null
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -204,7 +228,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           >
             <Video className="w-4 h-4" />
             <span>
-              {phase.phaseType === 'survey' ? 'Video Quét Thực Địa (Chính)' : 'Video Tuyến (Tham chiếu)'}
+              {phase.phaseType === 'survey'
+                ? `Video Quét Thực Địa (${poleVideos.length})`
+                : `Video Tuyến (${poleVideos.length})`}
             </span>
           </button>
 
@@ -220,10 +246,10 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
             <Camera className="w-4 h-4" />
             <span>
               {phase.phaseType === 'repair'
-                ? `Ảnh Trước & Sau Sửa Chữa (${displayPhotos.length})`
+                ? `Ảnh Trước & Sau Sửa Chữa (${photoCount})`
                 : phase.phaseType === 'inspection'
-                ? `Ảnh Hiện Trường & Đo Đạc (${displayPhotos.length})`
-                : `Ảnh Chụp Bằng Chứng (${displayPhotos.length})`}
+                ? `Ảnh Hiện Trường & Đo Đạc (${photoCount})`
+                : `Ảnh Chụp Bằng Chứng (${photoCount})`}
             </span>
           </button>
 
@@ -249,95 +275,123 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 
         {/* Modal Content Body */}
         <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 custom-scrollbar bg-slate-50/50">
-          {/* TAB 1: VIDEO KHẢO SÁT BAN ĐÊM */}
+          {/* TAB 1: VIDEO KHẢO SÁT THỰC ĐỊA */}
           {activeTab === 'video' && (
             <div className="flex flex-col gap-4 animate-in fade-in duration-150">
-              <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-video shadow-xl border border-slate-800 group select-none">
-                {/* Ảnh nền video đêm */}
-                <img
-                  src={fieldSurveyNightImg}
-                  alt="Night Survey Video Frame"
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${
-                    isPlaying ? 'opacity-90 brightness-110' : 'opacity-70'
-                  }`}
-                />
-
-                {/* HUD Overlay Kỹ Thuật Số */}
-                <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none">
-                  <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[10px] text-white font-mono">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span>REC • NIGHT SURVEY CAM</span>
-                    <span className="text-slate-400">1080P/30FPS</span>
-                  </div>
-                  <div className="bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[10px] text-emerald-400 font-mono">
-                    TUYẾN: {formatSegmentDisplay(caseItem.segment)} • 25 km/h
-                  </div>
-                </div>
-
-                <div className="absolute top-3 right-3 pointer-events-none">
-                  <div className="bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[10px] text-amber-300 font-mono flex items-center gap-1.5">
-                    <Cpu className="w-3 h-3 text-amber-400" />
-                    <span>CV DETECTOR: ACTIVE</span>
-                  </div>
-                </div>
-
-                {/* Bounding Box AI phát hiện cột đèn trên video */}
-                {highlightedPole ? (
-                  <div className="absolute top-1/4 left-1/4 w-32 h-44 border-2 border-dashed border-amber-400/90 rounded-lg pointer-events-none flex flex-col justify-between p-1 bg-amber-500/10 animate-pulse">
-                    <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1 rounded w-fit">
-                      {highlightedPole.pole_id} [{highlightedPole.status_confidence ? `${Math.round(highlightedPole.status_confidence * 100)}%` : '92%'}]
-                    </span>
-                    <span className="text-[8px] text-amber-300 font-mono bg-slate-900/80 px-1 rounded uppercase">
-                      {highlightedPole.fixture_status || 'DETECTED'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="absolute top-1/4 left-1/4 w-36 h-44 border-2 border-dashed border-blue-400/90 rounded-lg pointer-events-none flex flex-col justify-between p-1 bg-blue-500/10">
-                    <span className="bg-blue-600 text-white text-[9px] font-black px-1 rounded w-fit">
-                      QUÉT TUYẾN
-                    </span>
-                    <span className="text-[8px] text-blue-200 font-mono bg-slate-900/80 px-1 rounded uppercase">
-                      AI CAMERA
-                    </span>
-                  </div>
-                )}
-
-                {/* Nút Play/Pause ở trung tâm */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="w-16 h-16 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-2xl transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-xs ring-4 ring-white/30"
-                  >
-                    {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
-                  </button>
-                </div>
-
-                {/* Thanh điều khiển Video Player dưới đáy */}
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-3 pt-6 flex flex-col gap-2">
-                  <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden cursor-pointer">
-                    <div
-                      className={`bg-blue-500 h-full rounded-full ${
-                        isPlaying ? 'w-2/3 transition-all duration-1000' : 'w-1/3'
-                      }`}
+              {poleVideos.length > 0 && selectedVideoPhoto && targetWorkOrderId ? (
+                <>
+                  <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-video shadow-xl border border-slate-800">
+                    <PoleVideoPlayer
+                      workOrderId={targetWorkOrderId}
+                      photoId={selectedVideoPhoto.photo_id}
+                      className="w-full h-full object-contain bg-black"
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-white/90 font-mono">
-                    <div className="flex items-center gap-3">
-                      <span>{isPlaying ? '00:28' : '00:15'} / 00:45</span>
-                      <span className="text-slate-400">• Tệp: survey_video_night.mp4</span>
+
+                  {/* Thông số kỹ thuật thực tế của clip đang phát */}
+                  <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-slate-900 text-white">
+                        {selectedVideoPhoto.pole_id || 'Cột đèn'}
+                      </span>
+                      <span className="text-slate-600 font-medium">
+                        Thời lượng: <strong>{formatDurationMs(selectedVideoPhoto.video?.duration_ms)}</strong>
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-slate-600 font-medium">
+                        Dung lượng: <strong>{formatByteCount(selectedVideoPhoto.video?.byte_count)}</strong>
+                      </span>
+                      {selectedVideoPhoto.video?.sampled_frames != null && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-slate-600 font-medium">
+                            Frames: <strong>{selectedVideoPhoto.video.sampled_frames}</strong>
+                            {selectedVideoPhoto.video.on_frames != null &&
+                              selectedVideoPhoto.video.off_frames != null &&
+                              ` (Sáng: ${selectedVideoPhoto.video.on_frames}, Tắt: ${selectedVideoPhoto.video.off_frames})`}
+                          </span>
+                        </>
+                      )}
+                      {selectedVideoPhoto.video?.confidence_median != null && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-slate-600 font-medium">
+                            Độ tin cậy AI: <strong>{Math.round(selectedVideoPhoto.video.confidence_median * 100)}%</strong>
+                          </span>
+                        </>
+                      )}
+                      {selectedVideoPhoto.video?.hdr && (
+                        <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">
+                          HDR
+                        </span>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setZoomImage({ src: fieldSurveyNightImg })}
-                      className="flex items-center gap-1 hover:text-blue-400 cursor-pointer"
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                      <span>Xem toàn màn hình</span>
-                    </button>
+                    {selectedVideoPhoto.captured_at && (
+                      <span className="text-[11px] text-slate-500">
+                        Quay lúc: {new Date(selectedVideoPhoto.captured_at).toLocaleString('vi-VN')}
+                      </span>
+                    )}
                   </div>
+
+                  {/* Danh sách chọn video theo cột đèn (nếu có nhiều hơn 1 clip) */}
+                  {poleVideos.length > 1 && (
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                        Danh sách video cột đèn ({poleVideos.length} clip)
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {poleVideos.map((vp, idx) => {
+                          const effectiveState = vp.final_cv_state || vp.cv_state
+                          const isOut = effectiveState === 'off'
+                          const isNormal = effectiveState === 'on'
+                          const isSelected = idx === selectedVideoIndex
+
+                          return (
+                            <button
+                              key={vp.photo_id || idx}
+                              type="button"
+                              onClick={() => setSelectedVideoIndex(idx)}
+                              className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1 ${
+                                isSelected
+                                  ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500/20'
+                                  : 'bg-white border-slate-200 hover:border-blue-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-mono font-bold text-xs text-slate-900 truncate">
+                                  {vp.pole_id || `Clip #${idx + 1}`}
+                                </span>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-black ${
+                                    isOut
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : isNormal
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {isOut ? 'LỖI' : isNormal ? 'ĐẠT' : 'CHƯA RÕ'}
+                                </span>
+                              </div>
+                              <span className="text-[10.5px] text-slate-500 font-mono">
+                                {formatDurationMs(vp.video?.duration_ms)} • {formatByteCount(vp.video?.byte_count)}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center flex flex-col items-center justify-center gap-2">
+                  <Video className="w-8 h-8 text-slate-400" />
+                  <span className="text-xs font-bold text-slate-700">Chưa có video thực địa được tải lên</span>
+                  <span className="text-[11px] text-slate-500 max-w-md">
+                    Kỹ sư hiện trường chưa tải lên clip video nào cho lệnh công tác này. Sau khi kỹ sư đồng bộ video từ ứng dụng di động, video sẽ xuất hiện tại đây.
+                  </span>
                 </div>
-              </div>
+              )}
 
               {/* Thông tin mô tả video & báo cáo kỹ sư */}
               <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col gap-2">
@@ -399,10 +453,17 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                               {isOut ? 'MẤT SÁNG (LỖI)' : isNormal ? 'ĐẠT CHUẨN' : 'CHƯA RÕ'}
                             </span>
 
-                            {/* Mã cột */}
-                            <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/80 backdrop-blur-md text-white border border-white/20">
-                              {photo.pole_id || `Cột #${idx + 1}`}
-                            </span>
+                            {/* Mã cột & nhãn có video */}
+                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/80 backdrop-blur-md text-white border border-white/20">
+                                {photo.pole_id || `Cột #${idx + 1}`}
+                              </span>
+                              {photo.video && (
+                                <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-blue-600/90 backdrop-blur-md text-white border border-blue-400/30 flex items-center gap-1">
+                                  <Video className="w-2.5 h-2.5" /> Video
+                                </span>
+                              )}
+                            </div>
 
                             <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center">
                               <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-slate-900 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shadow-lg">
@@ -439,7 +500,10 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 
                             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10.5px] text-slate-500 font-medium">
                               <span>
-                                Độ tin cậy: <strong className="text-slate-700">{photo.confidence ? `${Math.round(photo.confidence * 100)}%` : '90%'}</strong>
+                                Độ tin cậy:{' '}
+                                <strong className="text-slate-700">
+                                  {photo.confidence != null ? `${Math.round(photo.confidence * 100)}%` : 'Chưa có'}
+                                </strong>
                               </span>
                               {photo.lat && photo.lng && (
                                 <span className="font-mono text-slate-400">
@@ -521,9 +585,11 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     <Cpu className="w-4 h-4 text-amber-500" />
                     Chẩn Đoán Tự Động Từ Mô Hình Computer Vision
                   </h4>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                    Mô hình v2.4 Đã Kiểm Định
-                  </span>
+                  {modelVersionLabel && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                      Mô hình {modelVersionLabel}
+                    </span>
+                  )}
                 </div>
 
                 {/* Danh sách cột đèn được chẩn đoán */}
@@ -540,7 +606,8 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                             <span className="font-mono text-blue-700 font-bold">{p.pole_id}</span>
                             <span>Trạng thái: {p.fixture_status || 'Cần kiểm tra'}</span>
                             <span className="px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 text-[10px] font-mono font-bold">
-                              Độ tin cậy: {p.status_confidence ? `${Math.round(p.status_confidence * 100)}%` : '90%'}
+                              Độ tin cậy:{' '}
+                              {p.status_confidence != null ? `${Math.round(p.status_confidence * 100)}%` : 'Chưa có'}
                             </span>
                             {p.open_fault_count && p.open_fault_count > 0 ? (
                               <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
@@ -593,9 +660,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-slate-700">Đo kiểm quang phổ tự động</span>
-                      <p className="text-[11px] text-slate-500">
-                        Đánh giá cường độ sáng liên tục qua cảm biến độ rọi gắn trên phương tiện khảo sát đêm.
+                      <span className="text-xs font-bold text-slate-500">Chưa có số đo Lux thực tế</span>
+                      <p className="text-[11px] text-slate-400">
+                        Kỹ sư hiện trường chưa ghi nhận kết quả đo độ rọi mặt đường cho giai đoạn này.
                       </p>
                     </div>
                   )}

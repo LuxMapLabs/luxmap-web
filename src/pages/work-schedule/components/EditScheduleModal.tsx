@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { X, Edit3, Calendar, User, MapPin, FileText, Wrench, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { ScheduleCase, SchedulePhase, WorkOrderAssignee } from '../../../types/workSchedule'
+import type { ScheduleCase, SchedulePhase } from '../../../feature/work-schedule/workScheduleSlice'
+import type { WorkOrderAssignee } from '../../../types/workorders/orders'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 interface EditScheduleModalProps {

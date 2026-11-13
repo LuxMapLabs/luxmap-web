@@ -69,7 +69,7 @@ export type SweepProcessingStatus = 'not_started' | 'queued' | 'processing' | 's
 
 export type SweepStatus = 'uploading' | 'queued' | 'processing' | 'awaiting_review' | 'accepted' | 'returned' | 'failed'
 
-export type TaskKind = 'inspection' | 'repair' | 'survey'
+export type TaskKind = 'inspection' | 'repair' | 'survey' | 'pole_gps_update'
 
 export type TopologySource = 'verified' | 'inferred'
 
