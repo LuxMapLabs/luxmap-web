@@ -333,21 +333,13 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
         />
       )
 
-      // Kiểm tra header cột 'Hạn bảo hành' có mặt trong thead
+      // Kiểm tra nhãn 'Hạn bảo hành' có mặt trong form
       const thLabel = screen.getByText(/Hạn bảo hành/i)
       expect(thLabel).toBeInTheDocument()
 
-      // Chọn tuyến đường và cột điện để xuất hiện hàng bóng đèn
-      const selects = document.querySelectorAll('select')
-      const segmentSelect = selects[0]
-      fireEvent.change(segmentSelect, { target: { value: mockSegment.segment_id } })
-
-      const poleSelect = selects[1]
-      fireEvent.change(poleSelect, { target: { value: mockPoleWithoutFixture.pole_id } })
-
-      // Bấm '+ Thêm bộ đèn mới'
-      const addRowBtn = screen.getAllByText(/Thêm bộ đèn mới/i)[0]
-      fireEvent.click(addRowBtn)
+      // Chọn tuyến đường rồi tick cột để mở cấu hình bộ đèn chung
+      fireEvent.change(screen.getByLabelText(/Tuyến đường/i), { target: { value: mockSegment.segment_id } })
+      fireEvent.click(screen.getByRole('checkbox'))
 
       // Kiểm tra ô input date hạn bảo hành có mặt
       const dateInputs = document.querySelectorAll('input[type="date"]')
