@@ -24,6 +24,7 @@ import { AdminManagementPage } from './pages/users/UserManagementPage'
 import { CommunesManagementPage } from './pages/communes/CommunesManagementPage'
 import { SystemSettingsPage } from './pages/settings/SystemSettingsPage'
 import { FirmwareManagementPage } from './pages/firmware/FirmwareManagementPage'
+import { IotBridgeAdminPage } from './pages/iot-bridge/IotBridgeAdminPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
 import { SuperiorDashboardPage } from './pages/superior-dashboard/SuperiorDashboardPage'
@@ -158,6 +159,7 @@ function App() {
             <Route path="/admin/communes" element={<CommunesManagementPage />} />
             <Route path="/admin/firmware" element={<FirmwareManagementPage />} />
             <Route path="/admin/settings" element={<SystemSettingsPage />} />
+            <Route path="/admin/iot-bridge" element={<IotBridgeAdminPage />} />
           </Route>
 
           {/* 404 Not Found Page */}

@@ -11,6 +11,7 @@ import {
   XCircle,
   Clock,
   Cable,
+  RadioTower,
 } from 'lucide-react'
 import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
@@ -26,6 +27,7 @@ export interface IotNodeTableProps {
   onDelete: (nodeId: string) => void
   onSetRelay: (node: IotNodeItem) => void
   onIssueCredential: (node: IotNodeItem) => void
+  onSetSource?: (node: IotNodeItem) => void
 }
 
 export const IotNodeTable: React.FC<IotNodeTableProps> = ({
@@ -37,6 +39,7 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
   onDelete,
   onSetRelay,
   onIssueCredential,
+  onSetSource,
 }) => {
   const showCommune = useShowCommune()
   const getCabinetName = (cabinetId: string | null) => {
@@ -91,7 +94,7 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
               <th className="py-3 px-4 text-center">Điều khiển từ xa</th>
               <th className="py-3 px-4 text-center">Xác thực (Secret)</th>
               <th className="py-3 px-4">Báo cáo gần nhất</th>
-              <th className="py-3 px-4">Rơ-le đấu nối</th>
+              <th className="py-3 px-4">Mạch điều khiển</th>
               <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -213,34 +216,30 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
 
                     {/* Rơ-le Đấu Nối */}
                     <td className="py-3.5 px-4">
-                      {node.relays && node.relays.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 max-w-[220px]">
-                          {node.relays.map((r) => (
-                            <span
-                              key={r.relay_no}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border ${
-                                r.feeder_id
-                                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
-                              }`}
-                              title={`Rơ-le ${r.relay_no}: ${
-                                r.feeder_id ? `Đấu nối mạch ${r.feeder_id}` : 'Chưa đấu nối'
-                              } (Chế độ: ${r.control_mode || 'Chưa báo cáo'})`}
-                            >
-                              <Cable className="w-2.5 h-2.5" />
-                              <span>
-                                R{r.relay_no}: {r.feeder_id || 'Trống'}
-                              </span>
-                              {r.control_mode && (
-                                <span className="uppercase text-[9px] px-1 py-0.2 bg-white/60 dark:bg-black/30 rounded">
-                                  {r.control_mode}
-                                </span>
-                              )}
+                      {/* Mỗi thiết bị chỉ có 1 rơ-le nên chỉ hiển thị mạch mà rơ-le đó đang nối */}
+                      {node.relays?.[0] ? (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border ${
+                            node.relays[0].feeder_id
+                              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                          }`}
+                          title={`${
+                            node.relays[0].feeder_id
+                              ? `Đấu nối mạch ${node.relays[0].feeder_id}`
+                              : 'Chưa đấu nối'
+                          } (Chế độ: ${node.relays[0].control_mode || 'Chưa báo cáo'})`}
+                        >
+                          <Cable className="w-2.5 h-2.5" />
+                          <span>{node.relays[0].feeder_id || 'Trống'}</span>
+                          {node.relays[0].control_mode && (
+                            <span className="uppercase text-[9px] px-1 py-0.2 bg-white/60 dark:bg-black/30 rounded">
+                              {node.relays[0].control_mode}
                             </span>
-                          ))}
-                        </div>
+                          )}
+                        </span>
                       ) : (
-                        <span className="text-slate-400 italic">0 rơ-le</span>
+                        <span className="text-slate-400 italic">Chưa đấu nối</span>
                       )}
                     </td>
 
@@ -254,6 +253,9 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
                         menuItems={[
     { key: 'relay', label: 'Cấu hình đấu nối rơ-le', icon: <Sliders />, onClick: () => onSetRelay(node) },
     { key: 'credential', label: 'Cấp Secret xác thực mới', icon: <Key />, onClick: () => onIssueCredential(node) },
+    ...(onSetSource
+      ? [{ key: 'source', label: 'Nguồn đo IoT bridge', icon: <RadioTower />, onClick: () => onSetSource(node) }]
+      : []),
     {
       key: 'delete',
       label: 'Xóa thiết bị',

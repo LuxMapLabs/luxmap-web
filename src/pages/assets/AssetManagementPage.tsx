@@ -253,6 +253,7 @@ export const AssetManagementPage: React.FC = () => {
             onDeleteIotNode={handleDeleteIotNode}
             onSetRelay={handleSetRelay}
             onIssueCredential={handleIssueCredential}
+            poles={poles}
           />
         )}
 

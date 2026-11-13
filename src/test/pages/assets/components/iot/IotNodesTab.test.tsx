@@ -32,10 +32,7 @@ vi.mock('../../../../../feature/assets/assetAPI', async (importOriginal) => {
         data_source: 'simulated',
         supports_remote_control: true,
         has_credential: true,
-        relays: [
-          { relay_no: 1, feeder_id: 'FDR-001' },
-          { relay_no: 2, feeder_id: 'FDR-001' },
-        ],
+        relays: [{ relay_no: 1, feeder_id: 'FDR-001' }],
       })),
     },
   }
@@ -188,7 +185,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     expect(screen.getByText('Kiểm chuẩn (Rig)')).toBeInTheDocument()
     expect(screen.getByText('Đã cấp')).toBeInTheDocument()
     expect(screen.getByText('Chưa cấp')).toBeInTheDocument()
-    expect(screen.getByText('R1: FDR-001')).toBeInTheDocument()
+    expect(screen.getByText('FDR-001')).toBeInTheDocument()
   })
 
   it('2. Lọc danh sách thiết bị IoT khi gõ từ khóa tìm kiếm', () => {
@@ -291,28 +288,44 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
 
     expect(screen.getByText('Cấu Hình Đấu Nối Rơ-le')).toBeInTheDocument()
     expect(screen.getByText('Rơ-le #1')).toBeInTheDocument()
-    expect(screen.getByText('Thêm Rơ-le')).toBeInTheDocument()
-    
-    // Ban đầu chưa bấm thêm/sửa thì form cấu hình chưa hiển thị
-    expect(screen.queryByText('Đấu nối vào mạch')).not.toBeInTheDocument()
 
-    // Test click thêm rơ-le mới -> form cấu hình mở ra cho rơ-le #2
-    const addRelayBtn = screen.getByText('Thêm Rơ-le')
-    fireEvent.click(addRelayBtn)
-    expect(screen.getByText('Đấu Nối Rơ-le Mới: #2')).toBeInTheDocument()
-    expect(screen.getByText('Đang cấu hình Rơ-le #2')).toBeInTheDocument()
+    // Mỗi thiết bị chỉ có 1 rơ-le: đã có rơ-le #1 thì không có nút thêm rơ-le
+    expect(screen.queryByText('Thêm Rơ-le')).not.toBeInTheDocument()
+
+    // Ban đầu chưa bấm sửa thì form cấu hình chưa hiển thị
+    expect(screen.queryByText(/Mạch Điện Xuất Tuyến Thuộc Tủ/)).not.toBeInTheDocument()
+
+    // Chỉ được đổi mạch cho rơ-le #1
+    fireEvent.click(screen.getByText('Đổi mạch'))
+    expect(screen.getByText('Đổi Mạch Cho Rơ-le #1')).toBeInTheDocument()
     expect(screen.getByText(/Mạch Điện Xuất Tuyến Thuộc Tủ/)).toBeInTheDocument()
 
-    // Kiểm tra mạch FDR-001 đã đấu nối rơ-le #1 thì bị khóa [🔒 Đã đấu nối]
+    // Mạch FDR-001 đang là mạch của rơ-le #1 nên chọn được; mạch FDR-001-B của cùng tủ còn trống
     const selectEl = screen.getByRole('combobox') as HTMLSelectElement
-    const wiredOption = Array.from(selectEl.options).find(o => o.value === 'FDR-001')
-    expect(wiredOption?.disabled).toBe(true)
+    expect(Array.from(selectEl.options).find((o) => o.value === 'FDR-001')?.disabled).toBe(false)
+    fireEvent.change(selectEl, { target: { value: 'FDR-001-B' } })
 
-    const submitBtn = screen.getByText('Lưu rơ-le này')
-    fireEvent.click(submitBtn)
+    fireEvent.click(screen.getByText('Cập Nhật Mạch'))
+    expect(handleSave).toHaveBeenCalledWith('IOT-NODE-001', 1, 'FDR-001-B')
+  })
 
-    // Rơ-le #2 tự động chọn mạch còn trống tiếp theo (FDR-001-B) và không cho nối trùng vào FDR-001
-    expect(handleSave).toHaveBeenCalledWith('IOT-NODE-001', 2, 'FDR-001-B')
+  it('6b. Thiết bị chưa có rơ-le: thêm rơ-le luôn là rơ-le số 1', () => {
+    const handleSave = vi.fn()
+    render(
+      <SetRelayModal
+        isOpen={true}
+        node={mockIotNodes[1]}
+        feeders={mockFeeders}
+        onClose={vi.fn()}
+        onSave={handleSave}
+      />
+    )
+
+    fireEvent.click(screen.getByText('Thêm Rơ-le'))
+    expect(screen.getByText('Đấu Nối Rơ-le Mới: #1')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Lưu rơ-le này'))
+    expect(handleSave).toHaveBeenCalledWith('IOT-NODE-002', 1, 'FDR-002')
   })
 
   it('7. Hiển thị modal xác nhận xóa tùy chỉnh (ConfirmDeleteIotNodeModal) thay vì window.confirm', () => {

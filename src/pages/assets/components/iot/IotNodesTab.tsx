@@ -16,6 +16,8 @@ import { IotNodeDetailModal } from './components/IotNodeDetailModal'
 import { SetRelayModal } from './components/SetRelayModal'
 import { IssueCredentialModal } from './components/IssueCredentialModal'
 import { ConfirmDeleteIotNodeModal } from './components/ConfirmDeleteIotNodeModal'
+import { NodeSourceModal } from './components/NodeSourceModal'
+import type { PoleListItem } from '../../../../types/assets/poles'
 import { TablePagination } from '../common/TablePagination'
 
 export interface IotNodesTabProps {
@@ -28,6 +30,8 @@ export interface IotNodesTabProps {
   onDeleteIotNode: (nodeId: string) => void
   onSetRelay: (nodeId: string, relayNo: number, feederId: string | null) => void
   onIssueCredential: (nodeId: string, onSuccess: (cred: IotNodeCredential) => void) => void
+  /** Trụ để chọn trụ đại diện khi gán nguồn đo IoT bridge. */
+  poles?: PoleListItem[]
 }
 
 export const IotNodesTab: React.FC<IotNodesTabProps> = ({
@@ -40,8 +44,10 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
   onDeleteIotNode,
   onSetRelay,
   onIssueCredential,
+  poles = [],
 }) => {
   const [searchQuery, setSearchQuery] = useState('')
+  const [sourceNode, setSourceNode] = useState<IotNodeItem | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
 
@@ -150,6 +156,7 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
         onDelete={handleDeleteWithCheck}
         onSetRelay={(node) => setSelectedRelayNodeId(node.node_id)}
         onIssueCredential={(node) => setCredentialNode(node)}
+        onSetSource={(node) => setSourceNode(node)}
       />
 
       {/* Pagination */}
@@ -206,6 +213,10 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
         onClose={() => setCredentialNode(null)}
         onIssue={onIssueCredential}
       />
+
+      {sourceNode && (
+        <NodeSourceModal key={sourceNode.node_id} node={sourceNode} poles={poles} onClose={() => setSourceNode(null)} />
+      )}
 
       <ConfirmDeleteIotNodeModal
         isOpen={!!deleteNodeId}

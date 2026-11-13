@@ -13,6 +13,8 @@ export interface SetRelayModalProps {
   onSave: (nodeId: string, relayNo: number, feederId: string | null) => void
 }
 
+const SINGLE_RELAY_NO = 1
+
 export const SetRelayModal: React.FC<SetRelayModalProps> = ({
   isOpen,
   node,
@@ -139,14 +141,10 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
     })
   }, [cabinetFeeders, getFeederWiringInfo])
 
-  // Tính số rơ-le kế tiếp khả dụng (tối đa 32)
-  const nextAvailableRelayNo = useMemo(() => {
-    if (!activeNode?.relays || activeNode.relays.length === 0) return 1
-    const maxRelay = Math.max(...activeNode.relays.map((r) => r.relay_no))
-    return Math.min(32, maxRelay + 1)
-  }, [activeNode?.relays])
-
   if (!isOpen || !activeNode) return null
+
+  // Mỗi thiết bị IoT chỉ nối 1 mạch điện qua đúng 1 rơ-le (số 1): đã có rơ-le thì chỉ được đổi mạch.
+  const hasRelay = (activeNode.relays?.length || 0) > 0
 
   // Chọn rơ-le đang có để đổi mạch
   const handleSelectExistingRelay = (relay: IotNodeRelay) => {
@@ -161,7 +159,7 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
   const handleAddNewRelay = () => {
     setEditingRelayNo(null)
     setIsAddingNew(true)
-    setRelayNo(nextAvailableRelayNo)
+    setRelayNo(SINGLE_RELAY_NO)
     // Tự động chọn mạch đầu tiên CHƯA đấu nối
     const firstAvailable = cabinetFeeders.find((f) => {
       const info = getFeederWiringInfo(f.feeder_id || '', null)
@@ -210,8 +208,8 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
       return
     }
 
-    if (relayNo < 1 || relayNo > 32) {
-      setErrorMsg('Số thứ tự rơ-le phải nằm trong khoảng từ 1 đến 32!')
+    if (relayNo !== SINGLE_RELAY_NO) {
+      setErrorMsg('Mỗi thiết bị IoT chỉ có 1 rơ-le (rơ-le số 1)!')
       return
     }
 
@@ -306,7 +304,7 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Cable className="w-4 h-4 text-indigo-600" />
-                <span>Danh Sách Rơ-le Đã Đấu Nối ({activeNode.relays?.length || 0})</span>
+                <span>Rơ-le Đã Đấu Nối</span>
                 {isRefreshing && (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
                 )}
@@ -318,7 +316,7 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
                   <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
                   <span>Đang cấu hình Rơ-le #{relayNo}</span>
                 </span>
-              ) : (
+              ) : hasRelay ? null : (
                 <button
                   type="button"
                   onClick={handleAddNewRelay}
@@ -415,7 +413,7 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
                   </span>
                 </span>
                 <span className="text-[11px] text-slate-500 font-mono">
-                  Rơ-le số 1..32
+                  Mỗi thiết bị 1 rơ-le
                 </span>
               </div>
 
@@ -441,11 +439,11 @@ export const SetRelayModal: React.FC<SetRelayModalProps> = ({
                 </label>
                 <input
                   type="number"
-                  min={1}
-                  max={32}
+                  min={SINGLE_RELAY_NO}
+                  max={SINGLE_RELAY_NO}
                   value={relayNo}
-                  onChange={(e) => setRelayNo(parseInt(e.target.value) || 1)}
-                  disabled={!isAddingNew}
+                  readOnly
+                  disabled
                   required
                   className="w-full px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 disabled:bg-slate-100 dark:disabled:bg-slate-900 rounded-xl text-xs font-mono font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-primary transition"
                 />

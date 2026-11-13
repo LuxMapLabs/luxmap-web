@@ -27,6 +27,7 @@ import { fetchPoleDetailRequest, clearPoleDetail } from '../../../feature/map/ma
 import { previewLightingRequest, openHistoryModal } from '../../../feature/lighting/lightingSlice'
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
+import { IotBridgeControlCard } from './IotBridgeControlCard'
 
 export interface GisDrawerPanelProps {
   selectedPole: PoleFeature | null
@@ -572,6 +573,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Điều khiển mạch của trụ qua IoT bridge (chỉ hiện khi mạch có node IoT) */}
+                  <IotBridgeControlCard poleId={poleId} />
 
                   {/* 3. Luminance Baseline History (Operational Telemetry) */}
                   <div className="bg-white dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-2xs space-y-2">

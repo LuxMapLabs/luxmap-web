@@ -191,7 +191,7 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
             <div className="flex items-center justify-between mb-2.5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <Cable className="w-4 h-4 text-indigo-600" />
-                <span>Danh Sách Rơ-le Điều Khiển ({node.relays?.length || 0})</span>
+                <span>Rơ-le Điều Khiển</span>
               </h4>
               <button
                 type="button"
@@ -218,7 +218,7 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {node.relays.map((r) => (
+                    {node.relays.slice(0, 1).map((r) => (
                       <tr key={r.relay_no} className="hover:bg-slate-50/50">
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
                           Rơ-le #{r.relay_no}

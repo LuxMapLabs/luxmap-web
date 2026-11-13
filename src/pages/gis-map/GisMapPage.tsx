@@ -95,6 +95,7 @@ import { useElectricalCascade } from '../../hooks/gis-map/useElectricalCascade'
 import { useGisMapInstance } from '../../hooks/gis-map/useGisMapInstance'
 import { useFeederLinesLayer } from '../../hooks/gis-map/useFeederLinesLayer'
 import { useGisMarkers } from '../../hooks/gis-map/useGisMarkers'
+import { useIotBridgeMarkers } from '../../hooks/gis-map/useIotBridgeMarkers'
 import type { SearchResultItem } from '../../utils/gis-map/gisSearchUtils'
 
 export const GisMapPage: React.FC = () => {
@@ -387,6 +388,9 @@ export const GisMapPage: React.FC = () => {
     onSelectPole: handleSelectPole,
     onSelectCabinet: handleSelectCabinet,
   })
+
+  // 9b. Marker gateway và node của IoT bridge (GET /iot/servers, GET /iot/nodes)
+  useIotBridgeMarkers(mapRef.current, isMapLoaded)
 
   // 10. Lọc tuyến từ Dropdown & Zoom vào tuyến (không mở Drawer)
   const handleSegmentSelect = useCallback(
