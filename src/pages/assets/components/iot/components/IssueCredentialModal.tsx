@@ -7,7 +7,7 @@ export interface IssueCredentialModalProps {
   isOpen: boolean
   node: IotNodeItem | null
   onClose: () => void
-  onIssue: (nodeId: string, onSuccess: (cred: IotNodeCredential) => void) => void
+  onIssue: (nodeId: string, onSuccess: (cred: IotNodeCredential) => void, onError?: () => void) => void
 }
 
 export const IssueCredentialModal: React.FC<IssueCredentialModalProps> = ({
@@ -28,7 +28,7 @@ export const IssueCredentialModal: React.FC<IssueCredentialModalProps> = ({
     onIssue(node.node_id, (cred) => {
       setIsGenerating(false)
       setIssuedCredential(cred)
-    })
+    }, () => setIsGenerating(false))
   }
 
   const handleCopy = () => {

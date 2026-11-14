@@ -51,6 +51,7 @@ export interface IotCommandStatus {
     command_id?: string | null
     mode?: string | null
     command?: string | null
+    expires_at?: string | null
     command_acknowledged?: boolean
     auto_schedule?: IotAutoSchedule
 }

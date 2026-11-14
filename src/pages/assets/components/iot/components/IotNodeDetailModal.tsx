@@ -1,5 +1,6 @@
 import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
+import { IotLampControl } from './IotLampControl'
 import {
   X,
   Cpu,
@@ -170,6 +171,10 @@ export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
               </div>
             </div>
           </div>
+
+          {node.supports_remote_control && node.node_id && (
+            <IotLampControl key={node.node_id} nodeId={node.node_id} />
+          )}
 
           {/* Lần báo cáo và Cập nhật */}
           <div className="p-3 bg-slate-100/70 dark:bg-slate-800/30 rounded-xl flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">

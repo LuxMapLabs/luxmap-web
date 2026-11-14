@@ -20,14 +20,22 @@
     <p>Giao diện web quản lý tài sản và sự cố chiếu sáng. Bảng này bắt đầu ghi nhận từ ngày 20/10/2026; chưa tổng hợp lịch sử toàn dự án.</p>
     <section>
       <h2>Công việc hiện tại</h2>
-      <p>Sửa nền trắng ở ô tài khoản và mật khẩu khi trình duyệt tự điền; làm rõ gợi ý tài khoản.</p>
+      <p>Điều khiển đèn IoT trên chi tiết node cho Manager; chờ ACK và sửa loading khi cấp secret thất bại.</p>
       <label for="task-progress">Tiến độ bản sửa mã nguồn: 100%</label>
       <progress id="task-progress" value="100" max="100">100%</progress>
-      <p>Hoàn tất ngày 20/10/2026: bản sửa <code>6b7a826</code> đã lên Production tại <a href="https://luxmap.com.vn">luxmap.com.vn</a> qua VPS. Vercel chỉ là bản Preview.</p>
+      <p>Lịch sử: hoàn tất ngày 20/10/2026, bản sửa <code>6b7a826</code> đã lên Production tại <a href="https://luxmap.com.vn">luxmap.com.vn</a> qua VPS. Vercel chỉ là bản Preview.</p>
     </section>
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>14/11/2026 — Điều khiển đèn IoT</dt>
+        <dd>Thêm POST/GET command và GET pole control bằng API client chung; bổ sung expires_at/control_channel. UI xác nhận phạm vi cả feeder, poll ACK đúng ID, xử lý lệnh bị thay thế/hết thời gian/lỗi, hủy khi đóng modal. Cấp secret thất bại giải phóng nút tạo.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/types/iot/{nodes,poles}.ts</code>; <code>src/feature/assets/{assetAPI,assetSaga,assetSlice}.ts</code>; <code>src/hooks/assets/useAssetData.ts</code>; <code>src/pages/assets/components/iot/IotNodesTab.tsx</code>; <code>src/pages/assets/components/iot/components/{IotNodeDetailModal,IssueCredentialModal,IotLampControl}.tsx</code>; <code>src/pages/assets/components/iot/components/useIotLampCommand.ts</code>; <code>src/test/pages/assets/components/iot/{IotNodesTab,IotLampControl,IssueCredentialModal}.test.tsx</code>; <code>README.md</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>fix(iot): release the secret button when issuing a credential fails</code>; <code>feat(iot): switch a feeder ON/OFF/AUTO from the node detail and wait for the ACK</code> (nhánh <code>feat/IOT-LAMP-CONTROL</code>, chưa push).</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ npx tsc --noEmit: exit 0; npm test: 31 file, 285 test đạt; npm run lint: 0 lỗi, 34 cảnh báo nền, không thêm cảnh báo; npm run build: exit 0 (cảnh báo chunk lớn). Test DOM mô phỏng API xác minh xác nhận gửi, pending/ACK, superseded, lỗi, timeout và cleanup. Preview trình duyệt bị sandbox chặn mở cổng (EPERM); chưa gửi lệnh tới backend/thiết bị thật.</dd>
         <dt>20/10/2026 — Giao diện đăng nhập</dt>
         <dd>Giữ nền tối và chữ trắng khi autofill, dùng chung màu nền cho ô nhập và khung bao. Đổi placeholder thành “Nhập tên đăng nhập hoặc email”.</dd>
         <dt>File thay đổi</dt>
@@ -44,11 +52,11 @@
     </section>
     <section>
       <h2>Còn lại</h2>
-      <p>Không còn việc chặn bản sửa login. Người đang mở bản cũ tải lại trang bằng Ctrl/Cmd-Shift-R.</p>
+      <p>Kiểm chứng ON/OFF/AUTO trên testbed đã provisioning bằng tài khoản Manager. UI pole, lịch AUTO mới, provisioning và số đo điện nằm ngoài phạm vi tác vụ này.</p>
     </section>
     <section>
       <h2>Vấn đề đã biết</h2>
-      <p>Chưa kiểm tra Safari/Firefox hoặc đăng nhập bằng tài khoản thật; kiểm tra Production chỉ thao tác giao diện với dữ liệu thử, không gửi yêu cầu đăng nhập.</p>
+      <p>Lint nền: 0 lỗi, 34 cảnh báo. Chưa kiểm chứng IoT production hoặc tải điện thực tế; ACK là xác nhận xử lý lệnh của thiết bị. Preview cục bộ bị sandbox chặn mở cổng.</p>
     </section>
   </body>
 </html>
