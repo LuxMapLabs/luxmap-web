@@ -14,6 +14,7 @@ export interface AgendaWorkOrder {
     parent_work_order_id?: string | null
     case_id: string | null
     fault_ids: string[]
+    pole_ids: string[]
     wo_status?: WorkOrderStatus
     cancellation_request_status?: CancellationRequestStatus
     cancellation_request_note?: string | null
@@ -62,6 +63,7 @@ export interface CompleteWorkOrderRequest {
     report_note: string | null
     materials_used?: string | null
     fault_outcomes?: FaultOutcomeRequest[]
+    pole_locations?: PoleLocationReport[]
     performed_at?: string | null
 }
 
@@ -71,6 +73,7 @@ export interface CreateWorkOrderRequest {
     fault_ids?: string[]
     segment_id?: string | null
     segment_ids?: string[]
+    pole_ids?: string[]
     assigned_to?: string | null
     due_date?: string | null
     scheduled_date?: string | null
@@ -144,6 +147,14 @@ export interface PatchWorkOrderRequest {
     due_date?: string | null
     scheduled_date?: string | null
     materials_note?: any
+}
+
+export interface PoleLocationReport {
+    pole_id?: string | null
+    lat?: number
+    lng?: number
+    accuracy_m?: number
+    captured_at?: string | null
 }
 
 export interface PolePhotoDecisionRequest {
@@ -265,6 +276,14 @@ export interface WorkOrderAssigneePagedResult {
     items?: WorkOrderAssignee[]
 }
 
+export interface WorkOrderAttachmentItem {
+    attachment_id?: string | null
+    file_name?: string | null
+    byte_count?: number
+    uploaded_at?: string | null
+    download_url?: string | null
+}
+
 export interface WorkOrderDetail {
     work_order_id: string | null
     title: string | null
@@ -275,6 +294,7 @@ export interface WorkOrderDetail {
     parent_work_order_id?: string | null
     case_id: string | null
     fault_ids: string[]
+    pole_ids: string[]
     wo_status?: WorkOrderStatus
     cancellation_request_status?: CancellationRequestStatus
     cancellation_request_note?: string | null
@@ -301,6 +321,8 @@ export interface WorkOrderDetail {
     assignee_eligible?: boolean
     allowed_actions: string[]
     faults: WorkOrderFaultDetail[]
+    pole_locations?: WorkOrderPoleLocation[]
+    attachments?: WorkOrderAttachmentItem[]
 }
 
 export interface WorkOrderFaultDetail {
@@ -324,6 +346,7 @@ export interface WorkOrderItem {
     parent_work_order_id?: string | null
     case_id: string | null
     fault_ids: string[]
+    pole_ids: string[]
     wo_status?: WorkOrderStatus
     cancellation_request_status?: CancellationRequestStatus
     cancellation_request_note?: string | null
@@ -366,6 +389,14 @@ export interface WorkOrderPole {
     fixture_count?: number
     work_order_fault_ids: string[]
     note?: string | null
+}
+
+export interface WorkOrderPoleLocation {
+    pole_id?: string | null
+    lat?: number
+    lng?: number
+    accuracy_m?: number
+    captured_at?: string | null
 }
 
 export interface WorkOrderPolePagedResult {

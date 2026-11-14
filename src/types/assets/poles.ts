@@ -5,6 +5,7 @@
 import type { DataSource, TopologySource } from '../common/enums'
 import type { AssetLocation } from '../common/base'
 import type { ActiveFixture } from './fixtures'
+import type { AssetPhotoCover } from './cabinets'
 
 export interface CreatePoleRequest {
     external_ref?: string | null
@@ -18,7 +19,29 @@ export interface CreatePoleRequest {
     feeder_source?: string | null
 }
 
+export interface PoleAssetPhotoItem {
+    photo_id?: string | null
+    created_at?: string | null
+    uploaded_by?: string | null
+    client_op_id?: string | null
+    width?: number
+    height?: number
+    byte_count?: number
+    thumbnail_bytes?: number
+    original_url?: string | null
+    thumbnail_url?: string | null
+    pole_id?: string | null
+}
+
+export interface PoleAssetPhotoItemPagedResult {
+    page?: number
+    page_size?: number
+    total?: number
+    items?: PoleAssetPhotoItem[]
+}
+
 export interface PoleDetail {
+    asset_photos?: PoleAssetPhotoItem[]
     pole: PoleListItem
     segment_name: string | null
     geom_wkt: string | null
@@ -26,6 +49,8 @@ export interface PoleDetail {
 }
 
 export interface PoleListItem {
+    photo_count?: number
+    cover_photo?: AssetPhotoCover
     pole_id: string | null
     external_ref?: string | null
     segment_id: string | null
