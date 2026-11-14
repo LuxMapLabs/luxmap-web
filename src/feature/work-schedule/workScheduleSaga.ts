@@ -50,26 +50,127 @@ import {
   closeCaseDetail,
 } from './workScheduleSlice'
 
-function extractApiErrorMessage(err: any, fallbackMessage: string): string {
-  const errData = err?.response?.data
+interface ApiErrorDetailPole {
+  pole_id?: string
+  segment_id?: string
+  distance_m?: number
+  corridor_m?: number
+}
+
+interface ApiErrorPayload {
+  code?: string
+  message?: string
+  details?: Record<string, unknown>
+}
+
+interface ApiResponseErrorShape {
+  response?: {
+    data?: {
+      error?: string | ApiErrorPayload
+      message?: string
+      title?: string
+    }
+  }
+  message?: string
+}
+
+function formatDetailValue(value: unknown): string {
+  if (value == null) return ''
+  if (Array.isArray(value)) {
+    return value.map((item) => formatDetailValue(item)).filter(Boolean).join(', ')
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  return String(value)
+}
+
+function formatOffSegmentPoles(rawPoles: unknown): string {
+  if (!Array.isArray(rawPoles) || rawPoles.length === 0) return ''
+  return rawPoles
+    .map((item) => {
+      if (typeof item !== 'object' || item === null) return String(item)
+      const p = item as ApiErrorDetailPole
+      const poleId = p.pole_id || 'Không rõ'
+      if (typeof p.distance_m === 'number' && typeof p.corridor_m === 'number') {
+        return `${poleId} (lệch ${p.distance_m}m / tối đa ${p.corridor_m}m)`
+      }
+      if (typeof p.distance_m === 'number') {
+        return `${poleId} (lệch ${p.distance_m}m)`
+      }
+      return poleId
+    })
+    .join(', ')
+}
+
+function extractApiErrorMessage(err: unknown, fallbackMessage: string): string {
+  const errObj = (err && typeof err === 'object' ? err : {}) as ApiResponseErrorShape
+  const errData = errObj.response?.data
   const apiError = errData?.error
   if (typeof apiError === 'string') return apiError
-  if (apiError?.message) {
-    if (apiError.details && typeof apiError.details === 'object') {
-      const detailEntries = Object.entries(apiError.details).filter(([k]) => k !== 'correlation_id')
-      if (detailEntries.length > 0) {
-        const detailStr = detailEntries
-          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-          .join('; ')
-        return `${apiError.message} (${detailStr})`
-      }
+
+  if (apiError && typeof apiError === 'object') {
+    const details = apiError.details && typeof apiError.details === 'object' ? apiError.details : undefined
+    const code = apiError.code
+
+    if (code === 'POLE_OFF_SEGMENT') {
+      const polesText = formatOffSegmentPoles(details?.poles)
+      return polesText
+        ? `Cột nằm ngoài phạm vi tuyến đường: ${polesText}`
+        : 'Tọa độ cột nằm ngoài phạm vi tuyến đường cho phép.'
     }
-    return apiError.message
+    if (code === 'POLE_ALREADY_IN_WORK_ORDER') {
+      const poleId = typeof details?.pole_id === 'string' ? details.pole_id : ''
+      const woId = typeof details?.work_order_id === 'string' ? details.work_order_id : ''
+      if (poleId && woId) {
+        return `Cột ${poleId} đang nằm trong một phiếu công tác khác (${woId}).`
+      }
+      return 'Cột được chọn đang nằm trong một phiếu công tác khác chưa đóng.'
+    }
+    if (code === 'FAULT_ALREADY_IN_WORK_ORDER') {
+      const faultId = typeof details?.fault_id === 'string' ? details.fault_id : ''
+      const woId = typeof details?.work_order_id === 'string' ? details.work_order_id : ''
+      if (faultId && woId) {
+        return `Sự cố ${faultId} đang nằm trong một phiếu công tác khác (${woId}).`
+      }
+      return 'Sự cố được chọn đang được xử lý trong một phiếu công tác khác.'
+    }
+
+    const mappedByCode: Record<string, string> = {
+      INVALID_STATE_TRANSITION: 'Trạng thái phiếu công tác hiện tại không cho phép thực hiện thao tác này.',
+      CONCURRENT_MODIFICATION: 'Phiếu công tác vừa được cập nhật ở nơi khác. Vui lòng tải lại và thử lại.',
+      AFTER_EVIDENCE_REQUIRED: 'Cần có ảnh chụp sau sửa chữa trước khi hoàn tất phiếu.',
+      NOTHING_TO_FOLLOW_UP: 'Không có sự cố hoặc hạng mục nào đủ điều kiện để tạo bước tiếp theo.',
+      CROSS_COMMUNE_REFERENCE: 'Dữ liệu được chọn không thuộc cùng địa bàn xã/phường.',
+      WORK_ORDER_NOT_FOUND: 'Không tìm thấy phiếu công tác.',
+      ASSET_NOT_FOUND: 'Không tìm thấy tuyến đường hoặc cột đèn trong hệ thống.',
+      FAULT_NOT_FOUND: 'Không tìm thấy sự cố được chọn.',
+      FAULT_STATUS_NOT_ELIGIBLE: 'Trạng thái sự cố hiện tại không hợp lệ để thực hiện thao tác này.',
+      VALIDATION_FAILED: 'Dữ liệu gửi lên không hợp lệ.',
+    }
+
+    if (code && mappedByCode[code]) {
+      return mappedByCode[code]
+    }
+
+    if (apiError.message) {
+      if (details) {
+        const detailEntries = Object.entries(details).filter(([k]) => k !== 'correlation_id')
+        if (detailEntries.length > 0) {
+          const detailStr = detailEntries
+            .map(([k, v]) => `${k}: ${formatDetailValue(v)}`)
+            .join('; ')
+          return `${apiError.message} (${detailStr})`
+        }
+      }
+      return apiError.message
+    }
+    if (code) return code
   }
-  if (apiError?.code) return apiError.code
+
   if (errData?.message) return errData.message
   if (errData?.title) return errData.title
-  if (err?.message) return err.message
+  if (errObj.message) return errObj.message
   return fallbackMessage
 }
 
