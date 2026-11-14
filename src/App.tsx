@@ -76,7 +76,7 @@ function App() {
   useEffect(() => {
     // Không chạy checkAuth() nếu đang truy cập trang công khai /r/, /report hoặc /privacy (tránh request thừa và lỗi 401 console)
     const path = window.location.pathname
-    if (path.startsWith('/report') || path.startsWith('/r/') || path.startsWith('/privacy')) {
+    if (path === '/report' || path.startsWith('/r/') || path.startsWith('/privacy')) {
       return
     }
     // /set-password bỏ qua kiểm tra phiên nhưng người dùng sẽ chuyển sang /login ngay sau đó,
