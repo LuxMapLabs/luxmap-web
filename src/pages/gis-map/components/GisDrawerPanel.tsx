@@ -28,6 +28,24 @@ import { previewLightingRequest, openHistoryModal } from '../../../feature/light
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
 import { IotBridgeControlCard } from './IotBridgeControlCard'
+import { formatDate } from '../../../utils/dateUtils'
+import { isManager } from '../../../utils/roleUtils'
+
+// Nhãn trạng thái cột theo fixture_status do API trả về
+const poleStatusBadge = (status?: string | null) =>
+  status === 'out'
+    ? { label: 'Đèn tắt', className: 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' }
+    : status === 'dim'
+    ? { label: 'Đèn mờ', className: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' }
+    : status === 'normal'
+    ? { label: 'Đạt chuẩn', className: 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300' }
+    : { label: 'Chưa quét', className: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300' }
+
+// Trạng thái cấp điện của mạch theo power_state do API trả về
+const feederPowerLabel = (state?: string | null) =>
+  state === 'on' ? 'Đang cấp điện' : state === 'off' ? 'Đã ngắt điện' : 'Chưa rõ'
+
+const fixtureTypeLabel = (type?: string | null) => (type === 'led_road_lamp' ? 'Đèn LED đường phố' : type || '-')
 
 export interface GisDrawerPanelProps {
   selectedPole: PoleFeature | null
@@ -41,8 +59,6 @@ export interface GisDrawerPanelProps {
   setSelectedFeeder?: (f: any) => void
   cabinets?: any[]
   effectivePoles?: PoleFeature[]
-  feederStatusMap?: Record<string, 'active' | 'fault'>
-  onToggleFeeder?: (feederId: string, feederName?: string) => void
 }
 
 const FAULT_TYPE_LABELS: Record<FaultType, string> = {
@@ -92,8 +108,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   selectedFeeder,
   setSelectedFeeder,
   effectivePoles: propsEffectivePoles = [],
-  feederStatusMap,
-  onToggleFeeder: _onToggleFeeder,
 }) => {
   // Lightbox Modal state
   const [lightboxImage, setLightboxImage] = useState<{
@@ -106,7 +120,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   const dispatch = useDispatch<AppDispatch>()
   const { poleDetail } = useSelector((state: RootState) => state.map)
   const { feeders: assetFeeders } = useSelector((state: RootState) => state.assets)
-  const activeFeederModes = useSelector((state: RootState) => state.lighting?.activeFeederModes || {})
+  // Bật/Tắt/Auto là capability ControlLighting: chỉ Quản lý; Cấp giám sát chỉ xem
+  const canControlLighting = useSelector((state: RootState) => isManager(state.auth.user?.role))
 
   const handleControlFeederMode = (feederId: string, mode: FeederControlMode) => {
     dispatch(
@@ -291,9 +306,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   : selectedCabinet
                   ? 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300'
                   : selectedFeeder
-                  ? feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
-                    ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
-                    : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                   : activeSegmentDetail.hasActiveSegmentFault
                   ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
                   : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
@@ -314,13 +327,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   alt="Tủ điện"
                 />
               ) : selectedFeeder ? (
-                <Zap
-                  className={`w-4 h-4 ${
-                    feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
-                      ? 'text-rose-600 dark:text-rose-400'
-                      : 'text-emerald-600 dark:text-emerald-400'
-                  }`}
-                />
+                <Zap className="w-4 h-4 text-amber-500" />
               ) : (
                 <Radio className={`w-4 h-4 ${activeSegmentDetail.hasActiveSegmentFault ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
               )}
@@ -337,19 +344,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     ? selectedFeeder.feeder_name || selectedFeeder.external_ref || selectedFeeder.feeder_id
                     : activeSegmentDetail.name}
                 </span>
-                {selectedFeeder && (
-                  <span
-                    className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
-                      feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
-                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                        : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                    }`}
-                  >
-                    {feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
-                      ? 'Đã ngắt nguồn'
-                      : 'Đang cấp điện'}
-                  </span>
-                )}
                 {selectedPole && (
                   <span
                     className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
@@ -415,17 +409,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
           {selectedPole ? (
             <div className="space-y-4 text-xs">
               {/* Cascade Fault Alert Banner */}
-              {selectedPole.properties.power_loss_reason && (
-                <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 p-3 rounded-xl text-xs space-y-1">
-                  <div className="font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                    <span>Sự cố mất nguồn cấp điện!</span>
-                  </div>
-                  <p className="text-rose-700 dark:text-rose-400 text-[11px] leading-relaxed">
-                    {selectedPole.properties.power_loss_reason}
-                  </p>
-                </div>
-              )}
 
               {/* 1. Actual Pole Photo */}
               {polePhotoUrl ? (
@@ -469,7 +452,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                       <div className="flex justify-between">
                         <span>Tuyến:</span>
-                        <strong className="text-slate-900 dark:text-white">{selectedPole.properties.segment_id}</strong>
+                        <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.fullName || activeSegmentDetail.name}</strong>
                       </div>
                       <div className="flex justify-between">
                         <span>Nguồn cấp:</span>
@@ -480,8 +463,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div className="flex justify-between">
                         <span>Bóng đèn:</span>
                         <strong className="text-slate-900 dark:text-white">
-                          {poleDetail?.fixture?.fixture_type || selectedPole.properties.fixture_type || 'LED'} (
-                          {poleDetail?.fixture?.lamp_watt || selectedPole.properties.lamp_watt || 100}W)
+                          {fixtureTypeLabel(poleDetail?.fixture?.fixture_type || selectedPole.properties.fixture_type)}
+                          {(poleDetail?.fixture?.lamp_watt || selectedPole.properties.lamp_watt) &&
+                            ` (${poleDetail?.fixture?.lamp_watt || selectedPole.properties.lamp_watt}W)`}
                         </strong>
                       </div>
                       <div className="flex justify-between">
@@ -493,13 +477,13 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div className="flex justify-between">
                         <span>Lắp đặt:</span>
                         <span className="text-slate-800 dark:text-slate-200">
-                          {poleDetail?.fixture?.install_date || selectedPole.properties.install_date || '—'}
+                          {formatDate(poleDetail?.fixture?.install_date || selectedPole.properties.install_date) || '—'}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Hạn bảo hành:</span>
                         <span className="text-slate-800 dark:text-slate-200 font-mono">
-                          {poleDetail?.fixture?.warranty_expiry || selectedPole.properties.warranty_expiry || '—'}
+                          {formatDate(poleDetail?.fixture?.warranty_expiry || selectedPole.properties.warranty_expiry) || '—'}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -524,10 +508,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div className="flex justify-between items-start gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
                         <span className="text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1 font-medium">
                           <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                          Ghi chú Atlas:
+                          Ghi chú vị trí:
                         </span>
                         <span className="font-semibold text-slate-800 dark:text-slate-200 text-right">
-                          {selectedPole.properties.atlas || selectedPole.properties.atlas_note || 'Đang cập nhật'}
+                          {selectedPole.properties.atlas || selectedPole.properties.atlas_note || '-'}
                         </span>
                       </div>
                     </div>
@@ -582,7 +566,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
                         <Activity className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                        <span>Quang thông 3 đêm gần nhất</span>
+                        <span>Độ sáng 3 đêm gần nhất</span>
                       </span>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Baseline</span>
                     </div>
@@ -639,7 +623,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           </span>
                         ) : (
                           <span className="ml-1.5 px-2 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
-                            Bình thường
+                            Không có sự cố
                           </span>
                         )}
                       </span>
@@ -738,10 +722,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1 font-medium">
                       <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      Ghi chú Atlas:
+                      Ghi chú vị trí:
                     </span>
                     <span className="text-slate-900 dark:text-slate-100 font-semibold text-right max-w-55">
-                      {selectedCabinet.atlas || selectedCabinet.landmark_note || 'Đang cập nhật'}
+                      {selectedCabinet.atlas || selectedCabinet.landmark_note || '-'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -760,20 +744,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       {cabinetConnectedPoles.length || selectedCabinet.total_poles_managed || 0} cột đèn
                     </strong>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Công suất phụ tải:</span>
-                    <strong className="text-slate-900 dark:text-white font-mono">{selectedCabinet.current_load_kw} kW</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Điện áp định mức:</span>
-                    <strong className={`font-mono ${selectedCabinet.voltage_v === 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-900 dark:text-white'}`}>
-                      {selectedCabinet.voltage_v} V
-                    </strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Hệ số công suất:</span>
-                    <strong className="text-slate-900 dark:text-white font-mono">cosφ {selectedCabinet.power_factor || 0.95}</strong>
-                  </div>
                 </div>
 
                 </div>
@@ -786,22 +756,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <span>Hệ thống IoT Giám sát từ xa</span>
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">
-                    {selectedCabinet.iot_gateway_id || selectedCabinet.iot_node_id}
+                    {selectedCabinet.iot_gateway_id || selectedCabinet.iot_node_id || 'Chưa gắn thiết bị'}
                   </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Hệ số Cos φ</span>
-                    <strong className="text-slate-900 dark:text-white font-mono text-xs">{selectedCabinet.power_factor || '0.95'}</strong>
-                  </div>
-                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Tần số lưới</span>
-                    <strong className="text-slate-900 dark:text-white font-mono text-xs">50.0 Hz</strong>
-                  </div>
-                  <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Nhiệt độ tủ</span>
-                    <strong className="text-slate-900 dark:text-white font-mono text-xs">34.2 °C</strong>
-                  </div>
                 </div>
 
                 
@@ -893,10 +849,13 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                               </span>
                               <span>•</span>
                               <span>{poleCount} cột đèn</span>
+                              <span>•</span>
+                              <span>{feederPowerLabel(cabFeeder?.power_state ?? feeder.power_state)}</span>
                             </div>
                           </div>
 
                           {/* 3-State Segmented Control: ON / OFF / AUTO */}
+                          {canControlLighting && (
                           <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
                             <button
                               type="button"
@@ -940,6 +899,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                               <span>Auto</span>
                             </button>
                           </div>
+                          )}
                         </div>
                       </div>
                     )
@@ -955,7 +915,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                    <span>Điều khiển nguồn Mạch điện (IoT)</span>
+                    <span>{canControlLighting ? 'Điều khiển nguồn Mạch điện (IoT)' : 'Nguồn Mạch điện'}</span>
                   </span>
                   <button
                     type="button"
@@ -977,7 +937,12 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </button>
                   {(() => {
                     const selId = selectedFeeder.feeder_id || selectedFeeder.external_ref
-                    const mode: FeederControlMode = activeFeederModes[selId] || (feederStatusMap?.[selId] === 'fault' ? 'off' : 'auto')
+                    const assetFeeder = (assetFeeders || []).find((af: any) => af.feeder_id === selId)
+                    const mode: FeederControlMode | undefined =
+                      selectedFeeder.control?.control_mode ||
+                      selectedFeeder.control_mode ||
+                      assetFeeder?.control?.control_mode
+                    if (!mode) return null
                     return (
                       <span
                         className={`text-[9.5px] font-bold px-2 py-0.5 rounded ${
@@ -988,7 +953,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                             : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300'
                         }`}
                       >
-                        {mode === 'on' ? 'ĐANG BẬT (ON)' : mode === 'off' ? 'ĐÃ NGẮT (OFF)' : 'TỰ ĐỘNG (AUTO)'}
+                        {mode === 'on' ? 'Chế độ: Bật' : mode === 'off' ? 'Chế độ: Tắt' : 'Chế độ: Tự động'}
                       </span>
                     )
                   })()}
@@ -999,9 +964,11 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <div className="font-bold text-slate-900 dark:text-white text-xs truncate">
                       {selectedFeeder.feeder_name || selectedFeeder.external_ref || selectedFeeder.feeder_id}
                     </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Chuyển đổi trạng thái nguồn rơ-le điều khiển mạch
-                    </div>
+                    {canControlLighting && (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Chuyển đổi trạng thái nguồn rơ-le điều khiển mạch
+                      </div>
+                    )}
                   </div>
 
                   {/* 3-Mode Tri-State Control Buttons */}
@@ -1013,6 +980,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       selectedFeeder.control_mode ||
                       assetFeeder?.control?.control_mode
                     const currentMode: FeederControlMode | undefined = realBackendMode
+                    if (!canControlLighting) return null
                     return (
                       <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
                         <button
@@ -1101,9 +1069,14 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     </strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Điện áp định mức:</span>
-                    <strong className="text-slate-900 dark:text-white font-mono">
-                      {feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault' ? '0 V (Mất nguồn)' : '220 V'}
+                    <span>Trạng thái cấp điện:</span>
+                    <strong className="text-slate-900 dark:text-white">
+                      {feederPowerLabel(
+                        selectedFeeder.power_state ??
+                          (assetFeeders || []).find(
+                            (af: any) => af.feeder_id === (selectedFeeder.feeder_id || selectedFeeder.external_ref)
+                          )?.power_state
+                      )}
                     </strong>
                   </div>
                 </div>
@@ -1115,17 +1088,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
                     Danh sách Cột đèn thuộc Mạch ({selectedFeeder.external_ref || selectedFeeder.feeder_id})
                   </p>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
-                        ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
-                        : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                    }`}
-                  >
-                    {feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
-                      ? 'Tất cả đèn đang tắt'
-                      : 'Đang cấp điện chiếu sáng'}
-                  </span>
                 </div>
 
                 <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar pr-0.5">
@@ -1136,8 +1098,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         p.properties.feeder_id === selectedFeeder.external_ref
                     )
                     .map((f: PoleFeature, index: number) => {
-                      const isFeederOff =
-                        feederStatusMap?.[selectedFeeder.feeder_id || selectedFeeder.external_ref] === 'fault'
+                      const statusBadge = poleStatusBadge(f.properties.fixture_status)
                       const lampLabel = f.properties.lamp_code || `Đèn số ${index + 1}`
 
                       return (
@@ -1154,14 +1115,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                               {lampLabel}
                             </span>
                           </div>
-                          <span
-                            className={`text-[9.5px] px-2 py-0.5 rounded font-bold ${
-                              isFeederOff
-                                ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
-                                : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                            }`}
-                          >
-                            {isFeederOff ? 'TẮT (Mất nguồn)' : 'SÁNG (220V)'}
+                          <span className={`text-[9.5px] px-2 py-0.5 rounded font-bold ${statusBadge.className}`}>
+                            {statusBadge.label}
                           </span>
                         </div>
                       )

@@ -248,8 +248,6 @@ export const GisMapPage: React.FC = () => {
   // 4. Hook quản lý logic điện học cascade & danh mục phân tuyến
   const {
     cabinets,
-    feederStatusMap,
-    handleToggleFeeder,
     effectivePoles,
     segmentsList,
     segmentInfoMap,
@@ -288,14 +286,12 @@ export const GisMapPage: React.FC = () => {
     }
     return (
       segmentsList[0] || {
-        id: 'SEG-001',
-        name: 'Tuyến A',
-        cabinet: 'NODE-001-CTRL',
-        road: 'Tuyến A',
-        poleCount: 46,
-        lengthM: 1600,
-        hasActiveSegmentFault: false,
-        iotStatus: 'online',
+        id: '',
+        name: '-',
+        cabinet: '',
+        road: '',
+        poleCount: 0,
+        lengthM: 0,
       }
     )
   }, [selectedSegmentId, segmentInfoMap, segmentsList])
@@ -545,8 +541,6 @@ export const GisMapPage: React.FC = () => {
           setSelectedFeeder={setSelectedFeeder}
           cabinets={cabinets}
           effectivePoles={effectivePoles}
-          feederStatusMap={feederStatusMap}
-          onToggleFeeder={handleToggleFeeder}
         />
       )}
 

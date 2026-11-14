@@ -51,7 +51,7 @@ export function searchAllCategories({
       results.push({
         id: s.id,
         title: s.name,
-        subtitle: `${s.poleCount} cột đèn • ${s.lengthM}m • Tủ ${s.cabinet}`,
+        subtitle: `${s.poleCount} cột đèn • ${s.lengthM}m${s.cabinet ? ` • Tủ ${s.cabinet}` : ''}`,
         category: 'segment',
         data: s,
         badgeText: 'Tuyến đường',
