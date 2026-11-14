@@ -32,12 +32,6 @@ interface CreateManualModalProps {
   }) => void
 }
 
-const FALLBACK_SEGMENTS = [
-  'Tuyến A - Trục chính liên xã Phước Hậu (SEG-001)',
-  'Tuyến B - Đường liên thôn Mỹ Hạnh Bắc (SEG-002)',
-  'Tuyến C - Tuyến đường ra cầu (SEG-003)',
-]
-
 const getTodayStr = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -58,8 +52,8 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
 }) => {
   const [initPhase, setInitPhase] = useState<TaskKind>(initialPhase || 'survey')
   const [title, setTitle] = useState(initialTitle || '')
-  const [segmentsList, setSegmentsList] = useState<string[]>(FALLBACK_SEGMENTS)
-  const [segment, setSegment] = useState(FALLBACK_SEGMENTS[0])
+  const [segmentsList, setSegmentsList] = useState<string[]>([])
+  const [segment, setSegment] = useState('')
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(initialPoleIds || [])
   const [selectedFaultIds, setSelectedFaultIds] = useState<string[]>(initialFaultIds || [])
   const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || '')
@@ -171,6 +165,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   // - Kiểm tra: Bắt buộc phải chọn ít nhất 01 cột có sự cố
   // - Khảo sát: Cho phép tạo bình thường vì đi rà quét tìm lỗi mới trên toàn tuyến
   const isSubmitDisabled =
+    !segment ||
     (initPhase === 'repair' && selectedFaultIds.length === 0) ||
     (initPhase === 'inspection' && selectedPoleIds.length === 0)
 
@@ -311,7 +306,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ví dụ: Sự cố mất sáng đoạn qua UBND xã Phước Hậu"
+                placeholder="Ví dụ: Sự cố mất sáng đoạn qua trụ sở UBND xã"
                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

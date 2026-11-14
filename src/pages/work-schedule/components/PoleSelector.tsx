@@ -10,7 +10,7 @@ import {
   ChevronUp,
   Loader2,
 } from 'lucide-react'
-import { getPolesBySegment, extractSegmentId, PoleItem } from '../../../utils/work-schedule/poleUtils'
+import { extractSegmentId, PoleItem } from '../../../utils/work-schedule/poleUtils'
 import { faultAPI } from '../../../feature/faults/faultAPI'
 import type { FaultItem } from '../../../types/faults/faults'
 
@@ -21,6 +21,15 @@ interface PoleSelectorProps {
   taskKindName?: string // 'Kiểm tra' hoặc 'Sửa chữa'
   allowEmpty?: boolean
 }
+
+const FAULT_TYPE_TEXT: Record<string, string> = {
+  lamp_out: 'Mất sáng',
+  lamp_dim: 'Sáng yếu',
+  segment_outage: 'Mất điện cả tuyến',
+  node_offline: 'Thiết bị mất kết nối',
+  runtime_decline: 'Suy giảm thời gian chạy',
+}
+const faultTypeText = (type?: string) => (type ? FAULT_TYPE_TEXT[type] || type : 'Sự cố')
 
 export const PoleSelector: React.FC<PoleSelectorProps> = ({
   segmentStr,
@@ -40,6 +49,10 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
   useEffect(() => {
     let isCancelled = false
     const fetchSegmentFaults = async () => {
+      if (!segmentId) {
+        setFaults([])
+        return
+      }
       setIsLoading(true)
       try {
         const res = await faultAPI.getFaults({
@@ -82,28 +95,21 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
     return map
   }, [faults])
 
-  // Lấy danh sách các cột đèn ĐANG CÓ SỰ CỐ trên tuyến
+  // Lấy danh sách các cột đèn ĐANG CÓ SỰ CỐ trên tuyến (mỗi cột lấy sự cố đầu tiên)
   const poles: PoleItem[] = useMemo(() => {
-    const allSegmentPoles = getPolesBySegment(segmentStr)
-    const faultPoleIds = Object.keys(poleFaultMap)
-
-    if (faultPoleIds.length === 0) {
-      return []
-    }
-
-    return faultPoleIds.map((pid) => {
-      const match = allSegmentPoles.find((p) => p.poleId === pid)
-      if (match) return match
-      return {
-        poleId: pid,
-        segmentId,
-        fixtureType: 'led_road_lamp',
-        lampWatt: 100,
-        atlas: `Cột đèn ${pid} (${segmentStr.split(' (')[0]})`,
-        status: 'dim',
+    const byPole = new Map<string, PoleItem>()
+    faults.forEach((f) => {
+      if (f.pole_id && !byPole.has(f.pole_id)) {
+        byPole.set(f.pole_id, {
+          poleId: f.pole_id,
+          segmentId,
+          faultType: f.fault_type,
+          atlas: f.note?.trim() || f.fault_id || '',
+        })
       }
     })
-  }, [segmentStr, segmentId, poleFaultMap])
+    return [...byPole.values()]
+  }, [faults, segmentId])
 
   // Lọc theo từ khóa tìm kiếm
   const filteredPoles = useMemo(() => {
@@ -113,7 +119,7 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
       (p) =>
         p.poleId.toLowerCase().includes(q) ||
         p.atlas.toLowerCase().includes(q) ||
-        String(p.lampWatt).includes(q)
+        faultTypeText(p.faultType).toLowerCase().includes(q)
     )
   }, [poles, searchTerm])
 
@@ -272,7 +278,7 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
                       {pole.poleId}
                     </span>
                     <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                      {pole.lampWatt}W LED
+                      {faultTypeText(pole.faultType)}
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-500 truncate flex items-center gap-1">
