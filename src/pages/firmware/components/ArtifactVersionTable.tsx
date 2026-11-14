@@ -225,8 +225,8 @@ export const ArtifactVersionTable: React.FC<ArtifactVersionTableProps> = ({
           <thead>
             <tr className="bg-white/50 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <th className="py-3.5 px-4 w-12 text-center">ID</th>
-              <th className="py-3.5 px-4">Thành phần (Component)</th>
-              <th className="py-3.5 px-4">Phiên bản (Version)</th>
+              <th className="py-3.5 px-4">Thành phần</th>
+              <th className="py-3.5 px-4">Phiên bản</th>
               <th className="py-3.5 px-4">Mã băm SHA-256</th>
               <th className="py-3.5 px-4 text-center">Metadata</th>
               <th className="py-3.5 px-4">Người tạo</th>

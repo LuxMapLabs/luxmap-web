@@ -139,7 +139,7 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
           </div>
 
           <p className="text-xs text-slate-500 leading-relaxed mb-3">
-            Tỷ lệ công suất hoặc quang thông thực tế so với định mức danh định của đèn chiếu sáng trên tuyến.
+            Tỷ lệ độ sáng đo được khi khảo sát so với mức chuẩn (baseline) của chính cột đèn đó.
           </p>
 
           {/* 2. Khối điều khiển Tham số (Control Island) */}
@@ -270,8 +270,8 @@ const DimCard: React.FC<DimCardProps> = ({ setting, isUpdating, onSave }) => {
           {/* 3. Khối Tác động Kỹ thuật (Impact Alert Box) */}
           <div className="p-3.5 rounded-xl bg-amber-50/80 border-l-4 border-amber-500 text-xs text-amber-950 leading-relaxed mb-4">
             <span className="font-bold text-amber-900">Quy tắc cảnh báo: </span>
-            Bóng đèn có công suất hoặc quang thông thực tế tụt dưới{' '}
-            <strong className="font-bold underline">{Math.round(value * 100)}%</strong> định mức sẽ tự động được hệ thống đánh dấu là đèn mờ (dim) và gắn cờ cảnh báo sự cố.
+            Cột đèn đang bật mà độ sáng đo được tụt dưới{' '}
+            <strong className="font-bold underline">{Math.round(value * 100)}%</strong> mức chuẩn của chính cột đó sẽ tự động được hệ thống đánh dấu là đèn mờ (dim) và gắn cờ cảnh báo sự cố.
           </div>
         </div>
 

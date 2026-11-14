@@ -183,7 +183,7 @@ export const EngineerReportModal: React.FC<EngineerReportModalProps> = ({
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Gửi Báo Cáo Lên Quản Lý</span>
+              <span>Gửi báo cáo lên quản lý</span>
             </button>
           </div>
         </form>

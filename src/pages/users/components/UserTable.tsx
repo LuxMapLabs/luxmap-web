@@ -138,7 +138,7 @@ export const UserTable: React.FC<UserTableProps> = ({
           <thead className="bg-slate-50/75 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200/80 dark:border-slate-800">
             <tr>
               <th className="py-3 px-3.5 w-[30%] min-w-[220px]">Người dùng / Tài khoản</th>
-              <th className="py-3 px-3.5 w-[18%] min-w-[150px]">Vai trò (RBAC)</th>
+              <th className="py-3 px-3.5 w-[18%] min-w-[150px]">Vai trò</th>
               <th className="py-3 px-3.5 w-[18%] min-w-[140px]">Phạm vi địa bàn</th>
               <th className="py-3 px-3.5 w-[12%] min-w-[100px]">Trạng thái</th>
               <th className="py-3 px-3.5 w-[10%] min-w-[95px]">Ngày tạo</th>
