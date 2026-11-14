@@ -382,41 +382,31 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         </div>
       </div>
 
-      <div
-        className={`flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 min-h-[42px] rounded-xl border text-xs transition-colors ${
-          selectedPoles.length > 0
-            ? 'border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200'
-            : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400'
-        }`}
-      >
-        {selectedPoles.length > 0 ? (
-          <>
-            <span>
-              Đã chọn <strong>{selectedPoles.length}</strong> cột đèn để in tem QR
-            </span>
-            <div className="flex items-center gap-3">
-              {selectedPoles.length < filteredPoles.length && (
-                <button
-                  type="button"
-                  onClick={handleSelectAllFiltered}
-                  className="font-semibold underline underline-offset-2 hover:text-blue-600 dark:hover:text-blue-100 cursor-pointer"
-                >
-                  Chọn tất cả {filteredPoles.length} cột đang lọc
-                </button>
-              )}
+      {selectedPoles.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 min-h-[42px] rounded-xl border text-xs transition-colors border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200">
+          <span>
+            Đã chọn <strong>{selectedPoles.length}</strong> cột đèn để in tem QR
+          </span>
+          <div className="flex items-center gap-3">
+            {selectedPoles.length < filteredPoles.length && (
               <button
                 type="button"
-                onClick={handleClearSelection}
+                onClick={handleSelectAllFiltered}
                 className="font-semibold underline underline-offset-2 hover:text-blue-600 dark:hover:text-blue-100 cursor-pointer"
               >
-                Bỏ chọn
+                Chọn tất cả {filteredPoles.length} cột đang lọc
               </button>
-            </div>
-          </>
-        ) : (
-          <span>Tick vào ô vuông đầu mỗi dòng để chọn cột đèn cần in tem QR.</span>
-        )}
-      </div>
+            )}
+            <button
+              type="button"
+              onClick={handleClearSelection}
+              className="font-semibold underline underline-offset-2 hover:text-blue-600 dark:hover:text-blue-100 cursor-pointer"
+            >
+              Bỏ chọn
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Table */}
       <PoleTable

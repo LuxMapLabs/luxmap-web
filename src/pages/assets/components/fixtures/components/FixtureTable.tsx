@@ -61,7 +61,9 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
   }
 
   return (
-    <div className="w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
+    // @container: ẩn dần cột ít quan trọng theo bề rộng khung bảng (đổi cả khi thu gọn sidebar), xem đủ trong modal chi tiết.
+    // Ngưỡng đo với mã cột dài (KS-20260928-222537): đủ cột ~1274px, bỏ Ngày tháo dỡ ~1173px, bỏ thêm Loại đèn ~1027px.
+    <div className="@container w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
       <table className="w-full text-left text-xs border-collapse">
         <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 sticky top-0 z-10 select-none">
           <tr>
@@ -70,12 +72,13 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
             <th className="py-3 px-3.5">Tuyến đường</th>
             <th className="py-3 px-3.5 text-center">Số bóng / bộ</th>
             <th className="py-3 px-3.5 text-center">Công suất</th>
-            <th className="py-3 px-3.5">Loại đèn / nguồn</th>
-            <th className="py-3 px-3.5">Ngày lắp đặt</th>
-            <th className="py-3 px-3.5">Hạn bảo hành</th>
-            <th className="py-3 px-3.5">Ngày tháo dỡ</th>
+            <th className="py-3 px-3.5 hidden @min-[1180px]:table-cell">Loại đèn / nguồn</th>
+            <th className="py-3 px-3.5 hidden @min-[1030px]:table-cell">Ngày lắp đặt</th>
+            <th className="py-3 px-3.5 hidden @min-[1030px]:table-cell">Hạn bảo hành</th>
+            {/* Ẩn đầu tiên: ngày tháo dỡ đã có trong badge "Tháo dỡ (…)" ở cột Trạng thái */}
+            <th className="py-3 px-3.5 hidden @min-[1280px]:table-cell">Ngày tháo dỡ</th>
             <th className="py-3 px-3.5 text-center">Trạng thái</th>
-            <th className="py-3 px-3.5 text-center w-24">Thao tác</th>
+            <th className="py-3 px-3.5 text-center w-24 sticky right-0 bg-slate-50 shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)]">Thao tác</th>
           </tr>
         </thead>
 
@@ -180,7 +183,7 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                   </td>
 
                   {/* Loại bóng & Nguồn */}
-                  <td className="py-2.5 px-3.5">
+                  <td className="py-2.5 px-3.5 hidden @min-[1180px]:table-cell">
                     <div className="font-medium text-slate-800">
                       {fixture.fixture_type === 'led_road_lamp' ? 'Đèn LED đường phố' : fixture.fixture_type}
                     </div>
@@ -190,17 +193,17 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                   </td>
 
                   {/* Ngày lắp đặt */}
-                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-600">
+                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-600 hidden @min-[1030px]:table-cell">
                     {fixture.install_date || '—'}
                   </td>
 
                   {/* Hạn bảo hành */}
-                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-600">
+                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-600 hidden @min-[1030px]:table-cell">
                     {fixture.warranty_expiry || '—'}
                   </td>
 
                   {/* Ngày tháo dỡ */}
-                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-600">
+                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-600 hidden @min-[1280px]:table-cell">
                     {fixture.removed_date || '—'}
                   </td>
 
@@ -219,8 +222,12 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                     )}
                   </td>
 
-                  {/* Thao tác */}
-                  <td className="py-2.5 px-3.5 text-center">
+                  {/* Thao tác: ghim bên phải để không bị cuộn khuất khi bảng rộng hơn khung; nền đặc vì ô sticky đè lên nội dung cuộn bên dưới (màu hover ở index.css) */}
+                  <td
+                    className={`py-2.5 px-3.5 text-center sticky right-0 shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)] ${
+                      isRetired ? 'bg-slate-50' : 'bg-white'
+                    }`}
+                  >
                     <RowActions
                       viewLabel="Xem chi tiết bộ đèn"
                       editLabel="Chỉnh sửa thông số"
