@@ -10,7 +10,7 @@
 @theme {
   --font-ops: 'Plus Jakarta Sans', system-ui, sans-serif;
   --shadow-ops: 0 1px 2px rgba(15, 27, 45, 0.04), 0 6px 18px -8px rgba(15, 27, 45, 0.1);
-  --shadow-ops-hover: 0 2px 4px rgba(15, 27, 45, 0.05), 0 18px 34px -14px rgba(190, 69, 122, 0.28);
+  --shadow-ops-hover: 0 2px 4px rgba(15, 27, 45, 0.05), 0 18px 34px -14px rgba(47, 85, 144, 0.22);
   --color-primary: #1f3864;
   --color-secondary: #3e86c9;
   --color-accent: #5fc4b0;
@@ -26,6 +26,23 @@
 body {
   background-color: #f8fafc;
   color: #0f172a;
+}
+
+/* <select> gốc: thay mũi tên mặc định của trình duyệt bằng chevron giống các dropdown tự dựng
+   (lucide ChevronDown 16px, slate-400, cách mép phải 12px — xem CabinetSearchSelect).
+   Để ngoài @layer để thắng padding của utility (p-2.5…) và chừa chỗ cho chevron. */
+select:not([multiple]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  padding-right: 36px;
+}
+/* Select nền trong suốt đặt trong một khung đã có padding (bộ lọc dạng pill): chevron sát mép select */
+select.bg-transparent:not([multiple]) {
+  background-position: right 0 center;
+  padding-right: 20px;
 }
 
 /* Prevent browser default black focus outlines on interactive tabs and buttons */
@@ -647,54 +664,56 @@ button:focus-visible {
 }
 
 /* Print styles for A4 Technical Inspection Report */
-/* Manager và Superior: đổi dải màu blue của Tailwind sang hồng nhẹ.
+/* Manager và Superior: đổi dải màu blue của Tailwind sang xanh navy trầm.
    DefaultLayout gắn class này lên <html> khi người dùng không phải Admin, nên modal portal cũng ăn theo. */
 .ops-theme {
-  /* Bảng màu hồng nhẹ (hồng pha tím, lệch khỏi đỏ rose của trạng thái sự cố). Gom blue, indigo và teal về cùng một dải. */
-  --color-blue-50: #fdf4f8;
-  --color-blue-100: #fbe7f0;
-  --color-blue-200: #f6cfe0;
-  --color-blue-300: #efa8c6;
-  --color-blue-400: #e37fa9;
-  --color-blue-500: #d4608f;
-  --color-blue-600: #be457a;
-  --color-blue-700: #9d3764;
-  --color-blue-800: #7f2e52;
-  --color-blue-900: #67274a;
-  --color-blue-950: #3d1230;
-  --color-indigo-50: #fdf4f8;
-  --color-indigo-100: #fbe7f0;
-  --color-indigo-200: #f6cfe0;
-  --color-indigo-300: #efa8c6;
-  --color-indigo-400: #e37fa9;
-  --color-indigo-500: #d4608f;
-  --color-indigo-600: #be457a;
-  --color-indigo-700: #9d3764;
-  --color-indigo-800: #7f2e52;
-  --color-indigo-900: #67274a;
-  --color-indigo-950: #3d1230;
-  --color-teal-50: #fdf4f8;
-  --color-teal-100: #fbe7f0;
-  --color-teal-200: #f6cfe0;
-  --color-teal-300: #efa8c6;
-  --color-teal-400: #e37fa9;
-  --color-teal-500: #d4608f;
-  --color-teal-600: #be457a;
-  --color-teal-700: #9d3764;
-  --color-teal-800: #7f2e52;
-  --color-teal-900: #67274a;
-  --color-teal-950: #3d1230;
+  /* Bảng màu navy trầm (GovTech Navy #1f3864, dịu mắt khi làm việc lâu). Gom blue, indigo và teal về cùng một dải. */
+  --color-blue-50: #f3f6fb;
+  --color-blue-100: #e6ecf5;
+  --color-blue-200: #cdd9ea;
+  --color-blue-300: #a9bedb;
+  --color-blue-400: #7c9bc6;
+  --color-blue-500: #5479ad;
+  --color-blue-600: #2f5590;
+  --color-blue-700: #27467c;
+  --color-blue-800: #1f3864;
+  --color-blue-900: #1a2e52;
+  --color-blue-950: #101c33;
+  --color-indigo-50: #f3f6fb;
+  --color-indigo-100: #e6ecf5;
+  --color-indigo-200: #cdd9ea;
+  --color-indigo-300: #a9bedb;
+  --color-indigo-400: #7c9bc6;
+  --color-indigo-500: #5479ad;
+  --color-indigo-600: #2f5590;
+  --color-indigo-700: #27467c;
+  --color-indigo-800: #1f3864;
+  --color-indigo-900: #1a2e52;
+  --color-indigo-950: #101c33;
+  --color-teal-50: #f3f6fb;
+  --color-teal-100: #e6ecf5;
+  --color-teal-200: #cdd9ea;
+  --color-teal-300: #a9bedb;
+  --color-teal-400: #7c9bc6;
+  --color-teal-500: #5479ad;
+  --color-teal-600: #2f5590;
+  --color-teal-700: #27467c;
+  --color-teal-800: #1f3864;
+  --color-teal-900: #1a2e52;
+  --color-teal-950: #101c33;
   /* nút chính */
-  --color-primary: #be457a;
-  --color-secondary: #d4608f;
+  --color-primary: #2f5590;
+  --color-secondary: #5479ad;
 
   /* Thang chữ thống nhất cho Manager: 11 (chú thích, nhãn) · 13 (nội dung, bảng, nút) · 14 (nhấn mạnh) · 16+ (tiêu đề) */
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.25rem;
   --font-mono: var(--font-ops);
+  /* Modal render qua portal nằm ngoài layout nên phải đặt font mặc định ở đây */
+  --default-font-family: var(--font-ops);
 }
 
-/* Superior: đè dải màu hồng của ops-theme bằng xanh sương hồ (nhạt, ít bão hòa). Phải đứng sau .ops-theme. */
+/* Superior: đè dải màu navy của ops-theme bằng xanh sương hồ (nhạt, ít bão hòa). Phải đứng sau .ops-theme. */
 .superior-theme {
   --color-blue-50: #f3f8fc;
   --color-blue-100: #e4eff8;
@@ -733,7 +752,7 @@ button:focus-visible {
   --color-secondary: #6b9bc4;
 }
 
-/* Admin: dải màu slate-tím than, tách khỏi xanh sương hồ của Superior và hồng của Manager. Phải đứng sau .superior-theme. */
+/* Admin: dải màu slate-tím than, tách khỏi xanh sương hồ của Superior và navy của Manager. Phải đứng sau .superior-theme. */
 .admin-theme {
   --color-blue-50: #f4f5fa;
   --color-blue-100: #e7e9f4;
@@ -757,6 +776,8 @@ button:focus-visible {
   --color-indigo-800: #262a47;
   --color-indigo-900: #1e2138;
   --color-indigo-950: #12142a;
+  /* Modal render qua portal nằm ngoài layout nên phải đặt font mặc định ở đây */
+  --default-font-family: var(--font-ops);
   --color-primary: #3b3f6b;
   --color-secondary: #5a609a;
 }
@@ -830,10 +851,14 @@ button:focus-visible {
   transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 .ops-theme main table tbody tr:hover {
-  background-color: rgba(253, 244, 248, 0.85);
-  box-shadow: inset 3px 0 0 #be457a;
+  background-color: rgba(243, 246, 251, 0.9);
+  box-shadow: inset 3px 0 0 #2f5590;
 }
-/* Superior dùng dải xanh sương, không dùng vệt hồng của Manager */
+/* Ô ghim (sticky, vd. cột Thao tác) phải có nền đặc để che nội dung cuộn bên dưới: dùng màu hover ở trên đã pha sẵn trên nền trắng */
+.ops-theme main table tbody tr:hover > td.sticky {
+  background-color: #f5f7fb;
+}
+/* Superior dùng dải xanh sương, không dùng vệt navy của Manager */
 .superior-theme main table tbody tr:hover {
   background-color: rgba(243, 248, 252, 0.95);
   box-shadow: inset 3px 0 0 #4a7aa3;
@@ -899,11 +924,8 @@ button:focus-visible {
 
 /* Nền và chuyển động cho Manager / Superior (khác kiểu kính mờ của Admin) */
 .ops-bg {
-  background-color: #fbf4f7;
-  background-image:
-    radial-gradient(1100px 360px at 70% -120px, rgba(212, 96, 143, 0.12), transparent 70%),
-    radial-gradient(#f0dbe5 1px, transparent 1.3px);
-  background-size: auto, 26px 26px;
+  background-color: #f3f5f8;
+  background-image: radial-gradient(1100px 360px at 70% -120px, rgba(84, 121, 173, 0.1), transparent 70%);
   background-attachment: fixed;
 }
 /* Nền sương hồ của Superior: xanh nhạt, một vệt nắng đào ở góc trên */

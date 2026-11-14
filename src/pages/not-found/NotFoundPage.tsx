@@ -81,7 +81,7 @@ export const NotFoundPage: React.FC = () => {
           {/* Heading & Subtitles */}
           <div className="space-y-2 max-w-xl">
             <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              Không Tìm Thấy Trang Yêu Cầu
+              Không tìm thấy trang
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-md mx-auto">
               Đường dẫn bạn yêu cầu không tồn tại hoặc đã được di chuyển khỏi hệ thống LuxMap.
