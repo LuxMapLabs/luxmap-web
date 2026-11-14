@@ -315,7 +315,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       )}
 
                       {/* Dòng dưới: Kỹ sư & Badge Báo cáo / Xin Hủy */}
-                      <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-600 gap-1">
+                      {/* flex-wrap: thẻ hẹp thì badge xuống dòng thay vì ép mất tên kỹ sư và tràn khỏi thẻ */}
+                      <div className="flex flex-wrap items-center justify-between mt-1.5 text-[10px] text-slate-600 gap-1">
                         <span className="flex items-center gap-1 truncate max-w-24 sm:max-w-28">
                           <User className="w-3 h-3 shrink-0" />
                           <span className="truncate">{phase.assigneeName}</span>
@@ -338,7 +339,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                               title="Kỹ sư đã nộp báo cáo hiện trường kèm ảnh & video - Nhấp để duyệt"
                             >
                               <FileText className="w-2.5 h-2.5" />
-                              <span>CHỜ DUYỆT BÁO CÁO</span>
+                              <span>CHỜ DUYỆT</span>
                             </span>
                           )}
                         </div>
