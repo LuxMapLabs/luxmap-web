@@ -21,6 +21,10 @@ export const FixtureTableSkeleton: React.FC<FixtureTableSkeletonProps> = ({ rowC
           <td className="py-3.5 px-3.5">
             <div className="h-4 w-28 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
+          {/* Số Bóng / Bộ */}
+          <td className="py-3.5 px-3.5 text-center">
+            <div className="h-5 w-16 bg-slate-200 dark:bg-slate-800 rounded-lg mx-auto" />
+          </td>
           {/* Công Suất */}
           <td className="py-3.5 px-3.5 text-center">
             <div className="h-5 w-14 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto" />
