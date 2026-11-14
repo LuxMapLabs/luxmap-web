@@ -24,6 +24,16 @@ async function fetchAllNodes(): Promise<IotNodeStatus[]> {
   }
 }
 
+/** Chấm trạng thái không chữ: dùng cho node gắn ở tủ điện để không che bản đồ; tên node xem khi rê chuột. */
+function dotElement(badge: IotStatusBadge, title: string): HTMLDivElement {
+  const el = document.createElement('div')
+  el.title = title
+  el.style.cssText =
+    `width:12px;height:12px;border-radius:9999px;background:${IOT_TONE_COLOR[badge.tone]};` +
+    'border:2px solid #fff;box-shadow:0 1px 3px rgba(15,23,42,.35);cursor:default'
+  return el
+}
+
 function markerElement(text: string, badge: IotStatusBadge, title: string): HTMLDivElement {
   const el = document.createElement('div')
   el.title = title
@@ -41,7 +51,7 @@ function markerElement(text: string, badge: IotStatusBadge, title: string): HTML
 
 /**
  * Marker IoT bridge trên bản đồ GIS: gateway theo `location` của server (null = chưa có toạ độ, không vẽ),
- * node theo toạ độ tủ điện — lệch sang góc trên phải để không đè marker tủ.
+ * node theo toạ độ tủ điện — một chấm trạng thái ở góc trên phải marker tủ, không kèm chữ.
  */
 export function useIotBridgeMarkers(map: maplibregl.Map | null, isMapLoaded: boolean) {
   const [servers, setServers] = useState<IotServerStatus[]>([])
@@ -79,9 +89,9 @@ export function useIotBridgeMarkers(map: maplibregl.Map | null, isMapLoaded: boo
     nodes.forEach((node) => {
       if (!node.location) return
       const badge = iotStatusBadge(IOT_NODE_STATUS, node.status)
-      const el = markerElement(node.node_id || 'IoT', badge, `${node.node_id} (tủ ${node.cabinet_id}): ${badge.label}`)
+      const el = dotElement(badge, `${node.node_id} (tủ ${node.cabinet_id}): ${badge.label}`)
       markers.push(
-        new maplibregl.Marker({ element: el, anchor: 'bottom-left', offset: [10, -10] })
+        new maplibregl.Marker({ element: el, anchor: 'center', offset: [12, -12] })
           .setLngLat([node.location.lng, node.location.lat])
           .addTo(map)
       )
