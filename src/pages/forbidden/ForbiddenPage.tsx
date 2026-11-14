@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   ShieldAlert,
   ArrowLeft,
@@ -7,12 +7,18 @@ import {
   Map as MapIcon,
   Lightbulb,
   Lock,
+  LogOut,
 } from 'lucide-react'
 import { RootState } from '../../redux/rootReducer'
+import { logout } from '../../feature/auth/authSlice'
+import { isFieldCrew } from '../../utils/roleUtils'
 
 export const ForbiddenPage: React.FC = () => {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const { user } = useSelector((state: RootState) => state.auth)
+  // Kỹ sư hiện trường không có màn hình nào trên web: chỉ cho đăng xuất, không dẫn về trang chủ (sẽ quay lại đây)
+  const isFieldEngineer = isFieldCrew(user?.role)
 
   return (
     <div className="h-screen w-screen bg-[#f8fafc] relative overflow-hidden flex flex-col justify-between select-none font-sans text-slate-800">
@@ -48,9 +54,6 @@ export const ForbiddenPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold text-base tracking-wider text-slate-900 uppercase">LuxMap</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.2 bg-rose-100 text-rose-700 rounded-md border border-rose-200">
-                SECURITY RBAC
-              </span>
             </div>
             <p className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">
               Hệ thống GIS Quản lý Chiếu sáng Nông thôn
@@ -91,30 +94,47 @@ export const ForbiddenPage: React.FC = () => {
           {/* Heading & Subtitles */}
           <div className="space-y-2 max-w-xl">
             <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              Khu Vực Bị Hạn Chế Truy Cập
+              Không có quyền truy cập
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
-              Tài khoản của bạn hiện không đủ thẩm quyền để truy cập vào phân hệ này. Vui lòng liên hệ Quản trị viên nếu bạn cần cấp quyền truy cập công tác.
+              {isFieldEngineer
+                ? 'Tài khoản Kỹ sư hiện trường làm việc trên ứng dụng di động LuxMap. Giao diện web dành cho Quản lý, Cấp giám sát và Quản trị hệ thống.'
+                : 'Tài khoản của bạn không có quyền truy cập trang này. Vui lòng liên hệ Quản trị hệ thống nếu cần được cấp quyền.'}
             </p>
           </div>
 
           {/* Interactive Action Buttons */}
           <div className="flex flex-row items-center justify-center gap-3 pt-6">
-            <button
-              onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
-              className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer hover:border-slate-300 active:scale-95"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Quay lại trang trước</span>
-            </button>
+            {isFieldEngineer ? (
+              <button
+                onClick={() => {
+                  dispatch(logout())
+                  navigate('/login', { replace: true })
+                }}
+                className="px-6 py-2.5 rounded-xl bg-[#1f3864] hover:bg-[#1a2f55] text-white font-bold text-xs shadow-md shadow-slate-900/25 transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Đăng xuất</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+                  className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer hover:border-slate-300 active:scale-95"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Quay lại trang trước</span>
+                </button>
 
-            <button
-              onClick={() => navigate('/')}
-              className="px-6 py-2.5 rounded-xl bg-[#1f3864] hover:bg-[#1a2f55] text-white font-bold text-xs shadow-md shadow-slate-900/25 transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
-            >
-              <Home className="w-4 h-4" />
-              <span>Về Trang Chủ Tác Nghiệp</span>
-            </button>
+                <button
+                  onClick={() => navigate('/')}
+                  className="px-6 py-2.5 rounded-xl bg-[#1f3864] hover:bg-[#1a2f55] text-white font-bold text-xs shadow-md shadow-slate-900/25 transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
+                >
+                  <Home className="w-4 h-4" />
+                  <span>Về trang chủ</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </main>
@@ -124,7 +144,7 @@ export const ForbiddenPage: React.FC = () => {
         <div>© 2026 LuxMap · Hệ thống GIS Quản lý Tài sản & Sự cố Chiếu sáng Nông thôn</div>
         <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium">
           <MapIcon className="w-3.5 h-3.5 text-primary" />
-          <span>Kiểm soát phân quyền theo vai trò tác nghiệp (RBAC)</span>
+          <span>Phân quyền theo vai trò</span>
         </div>
       </footer>
     </div>

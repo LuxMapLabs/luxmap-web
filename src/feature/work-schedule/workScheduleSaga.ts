@@ -12,10 +12,13 @@ import type {
 } from '../../types/workorders/orders'
 import type { RootState } from '../../redux/rootReducer'
 import { fetchDashboardDataRequest } from '../dashboard/dashboardSlice'
+import { fetchSegmentsList } from '../dashboard/dashboardAPI'
+import type { SegmentListItem } from '../../types/assets/segments'
 import { fetchAssetsRequest } from '../assets/assetSlice'
 import {
   fetchWorkOrdersRequest,
   fetchWorkOrdersSuccess,
+  fetchSegmentNamesSuccess,
   fetchWorkOrdersFailure,
   fetchWorkOrderDetailRequest,
   fetchWorkOrderDetailSuccess,
@@ -193,10 +196,16 @@ function* handleFetchWorkOrders(action: PayloadAction<GetWorkOrdersFilter | unde
         scheduled_to: endOfMonth,
       }
     }
-    const firstPage: WorkOrderItemPagedResult = yield call(
-      workScheduleAPI.getWorkOrders,
-      effectiveFilter
-    )
+    // Tên tuyến chỉ để hiển thị: không tải được thì lịch hiện mã tuyến
+    const [firstPage, segments]: [WorkOrderItemPagedResult, SegmentListItem[]] = yield all([
+      call(workScheduleAPI.getWorkOrders, effectiveFilter),
+      call(fetchSegmentsList),
+    ])
+    const segmentNames: Record<string, string> = {}
+    segments.forEach((s) => {
+      if (s.segment_id && s.segment_name) segmentNames[s.segment_id] = s.segment_name
+    })
+    yield put(fetchSegmentNamesSuccess(segmentNames))
     const allItems = [...(firstPage.items || [])]
     const total = firstPage.total ?? allItems.length
     const pageSize = firstPage.page_size || 50

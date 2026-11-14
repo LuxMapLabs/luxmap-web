@@ -24,6 +24,15 @@ interface PoleSelectorProps {
   allowEmpty?: boolean
 }
 
+const FAULT_TYPE_TEXT: Record<string, string> = {
+  lamp_out: 'Mất sáng',
+  lamp_dim: 'Sáng yếu',
+  segment_outage: 'Mất điện cả tuyến',
+  node_offline: 'Thiết bị mất kết nối',
+  runtime_decline: 'Suy giảm thời gian chạy',
+}
+const faultTypeText = (type?: string) => (type ? FAULT_TYPE_TEXT[type] || type : 'Sự cố')
+
 export const PoleSelector: React.FC<PoleSelectorProps> = ({
   segmentStr,
   selectedPoleIds,
@@ -42,6 +51,10 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
   useEffect(() => {
     let isCancelled = false
     const fetchSegmentFaults = async () => {
+      if (!segmentId) {
+        setFaults([])
+        return
+      }
       setIsLoading(true)
       try {
         const res = await faultAPI.getFaults({
@@ -86,29 +99,24 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
 
   const storePoles = useSelector((state: RootState) => state.assets.poles)
 
-  // Lấy danh sách các cột đèn ĐANG CÓ SỰ CỐ trên tuyến (đọc thông số thật từ assets.poles)
+  // Lấy danh sách các cột đèn ĐANG CÓ SỰ CỐ trên tuyến (mỗi cột lấy sự cố đầu tiên, thông số đọc từ assets.poles)
   const poles: PoleItem[] = useMemo(() => {
-    const faultPoleIds = Object.keys(poleFaultMap)
-
-    if (faultPoleIds.length === 0) {
-      return []
-    }
-
     const segmentShortName = segmentStr ? segmentStr.split(' (')[0] : segmentId || '-'
-
-    return faultPoleIds.map((pid) => {
-      const assetPole = storePoles.find((p) => p.pole_id === pid)
+    const byPole = new Map<string, PoleItem>()
+    faults.forEach((f) => {
+      if (!f.pole_id || byPole.has(f.pole_id)) return
+      const assetPole = storePoles.find((p) => p.pole_id === f.pole_id)
       const fixture = assetPole?.active_fixture || assetPole?.active_fixtures?.[0]
-      return {
-        poleId: pid,
+      byPole.set(f.pole_id, {
+        poleId: f.pole_id,
         segmentId: assetPole?.segment_id || segmentId,
-        fixtureType: fixture?.fixture_type || '-',
+        faultType: f.fault_type,
         lampWatt: typeof fixture?.lamp_watt === 'number' ? fixture.lamp_watt : null,
-        atlas: assetPole?.note || `${pid} (${segmentShortName})`,
-        status: fixture?.warranty_status || '-',
-      }
+        atlas: f.note?.trim() || assetPole?.note || `${f.pole_id} (${segmentShortName})`,
+      })
     })
-  }, [segmentStr, segmentId, poleFaultMap, storePoles])
+    return [...byPole.values()]
+  }, [faults, segmentStr, segmentId, storePoles])
 
   // Lọc theo từ khóa tìm kiếm
   const filteredPoles = useMemo(() => {
@@ -118,7 +126,7 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
       (p) =>
         p.poleId.toLowerCase().includes(q) ||
         p.atlas.toLowerCase().includes(q) ||
-        String(p.lampWatt).includes(q)
+        faultTypeText(p.faultType).toLowerCase().includes(q)
     )
   }, [poles, searchTerm])
 
@@ -277,7 +285,8 @@ export const PoleSelector: React.FC<PoleSelectorProps> = ({
                       {pole.poleId}
                     </span>
                     <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                      {pole.lampWatt != null ? `${pole.lampWatt}W` : '-'}
+                      {faultTypeText(pole.faultType)}
+                      {pole.lampWatt != null ? ` · ${pole.lampWatt}W` : ''}
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-500 truncate flex items-center gap-1">

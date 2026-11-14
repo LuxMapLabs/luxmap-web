@@ -2,6 +2,7 @@ import React from 'react'
 import { OpsCard } from '../../../components/ops/OpsCard'
 import { OpsTabs } from '../../../components/ops/OpsTabs'
 import type { WarrantyItem } from '../../../types/statistics/warranty'
+import { formatDate } from '../../../utils/dateUtils'
 
 interface WarrantyTableCardProps {
   items: WarrantyItem[]
@@ -60,7 +61,7 @@ export const WarrantyTableCard: React.FC<WarrantyTableCardProps> = ({
                   return (
                     <tr
                       key={idx}
-                      className="group border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:bg-teal-50/40 hover:shadow-[inset_3px_0_0_#be457a]"
+                      className="group border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:bg-teal-50/40 hover:shadow-[inset_3px_0_0_var(--color-blue-600)]"
                     >
                       <td className="py-3 px-6">
                         <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-[#f1f5f9] text-slate-700 transition-colors group-hover:bg-teal-100 group-hover:text-teal-800">
@@ -72,14 +73,14 @@ export const WarrantyTableCard: React.FC<WarrantyTableCardProps> = ({
                       </td>
                       <td className="py-3 px-3">
                         <div className="font-medium text-slate-800">{segmentName}</div>
-                        <div className="text-[10px] text-slate-400">{item.fixture_type || 'Đèn LED'} • {item.lamp_watt ? `${item.lamp_watt}W` : ''}</div>
+                        <div className="text-[10px] text-slate-400">{item.fixture_type === 'led_road_lamp' ? 'Đèn LED đường phố' : item.fixture_type || '-'}{item.lamp_watt ? ` • ${item.lamp_watt}W` : ''}</div>
                       </td>
                       <td className="py-3 px-3">
                         <div className="font-semibold text-slate-700">
-                          {item.warranty_expiry || 'N/A'}
+                          {formatDate(item.warranty_expiry) || '-'}
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          Lắp đặt: {item.install_date || 'N/A'}
+                          Lắp đặt: {formatDate(item.install_date) || '-'}
                         </div>
                       </td>
                       <td className="py-3 px-6">

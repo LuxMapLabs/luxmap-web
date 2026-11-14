@@ -1,25 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { toast } from 'sonner'
 import type { RootState } from '../../redux/rootReducer'
 import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
 import {
-  fetchSegmentsList,
-  fetchFixtureStatusStatistics,
-  fetchRepairTimelinessStatistics,
-  fetchWarrantyStatistics,
-  fetchFaultsList,
-  fetchCitizenFeedbackStatistics,
-  fetchWorkOrderStatistics,
-  downloadStatisticsCsv,
-} from '../../feature/dashboard/dashboardAPI'
-import type { SegmentListItem } from '../../types/assets/segments'
-import type { FixtureStatusStatistics } from '../../types/statistics/fixture-status'
-import type { RepairTimelinessStatistics } from '../../types/statistics/repair-timeliness'
-import type { WarrantyList } from '../../types/statistics/warranty'
-import type { FaultItem } from '../../types/faults/faults'
-import type { CitizenFeedbackStatistics } from '../../types/statistics/citizen-feedback'
-import type { WorkOrderStatusStatistics } from '../../types/statistics/work-orders'
+  fetchSuperiorDashboardRequest,
+  exportSuperiorCsvRequest,
+} from '../../feature/dashboard/superiorDashboardSlice'
 
 import { SuperiorToolbar, type SuperiorCsvExportType } from './components/SuperiorToolbar'
 import { SuperiorKpiGrid, type SuperiorKpiData } from './components/SuperiorKpiGrid'
@@ -48,17 +34,19 @@ export const SuperiorDashboardPage: React.FC = () => {
   const [selectedPeriodDays, setSelectedPeriodDays] = useState<7 | 30 | 90>(30)
   const [detailTab, setDetailTab] = useState<DetailTab>('faults')
 
-  // State dữ liệu từ APIs Backend
-  const [segments, setSegments] = useState<SegmentListItem[]>([])
-  const [fixtureStats, setFixtureStats] = useState<FixtureStatusStatistics | null>(null)
-  const [slaStats, setSlaStats] = useState<RepairTimelinessStatistics | null>(null)
-  const [warrantyData, setWarrantyData] = useState<WarrantyList | null>(null)
-  const [faults, setFaults] = useState<FaultItem[]>([])
-  const [citizenFeedbackStats, setCitizenFeedbackStats] = useState<CitizenFeedbackStatistics | null>(null)
-  const [workOrderStats, setWorkOrderStats] = useState<WorkOrderStatusStatistics | null>(null)
+  // Dữ liệu từ APIs Backend: tải qua Saga, lưu ở store superiorDashboard
+  const {
+    segments,
+    fixtureStats,
+    slaStats,
+    warrantyData,
+    faults,
+    citizenFeedbackStats,
+    workOrderStats,
+    loading,
+    refreshing,
+  } = useSelector((state: RootState) => state.superiorDashboard)
 
-  const [loading, setLoading] = useState<boolean>(true)
-  const [refreshing, setRefreshing] = useState<boolean>(false)
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
 
   // Toggle Presentation / Fullscreen Mode
@@ -86,118 +74,36 @@ export const SuperiorDashboardPage: React.FC = () => {
     dispatch(fetchDashboardDataRequest())
   }, [dispatch])
 
-  // Hàm tải dữ liệu toàn diện kết nối tất cả các API Backend
-  const loadDashboardData = useCallback(async (isSilent = false) => {
-    if (!isSilent) setLoading(true)
-    else setRefreshing(true)
-
-    try {
-      // Tính ngày from..to cho chu kỳ SLA và thống kê
-      const today = new Date()
-      const fromDate = new Date()
-      fromDate.setDate(today.getDate() - selectedPeriodDays)
-      const toStr = today.toISOString().split('T')[0]
-      const fromStr = fromDate.toISOString().split('T')[0]
-
-      // Gọi đồng thời tất cả 6 nguồn dữ liệu từ Backend
-      const segmentParam = selectedSegmentId !== 'all' ? { segment_id: selectedSegmentId } : {}
-
-      const [
-        segmentsRes,
-        fixtureRes,
-        slaRes,
-        warrantyRes,
-        faultsRes,
-        citizenRes,
-        workOrderRes,
-      ] = await Promise.allSettled([
-        fetchSegmentsList(),
-        fetchFixtureStatusStatistics({ commune_id: communeId, ...segmentParam }),
-        fetchRepairTimelinessStatistics({
-          commune_id: communeId,
-          ...segmentParam,
-          from: fromStr,
-          to: toStr,
-        }),
-        fetchWarrantyStatistics({
-          commune_id: communeId,
-          within_days: 90,
-          status: 'all',
-          page_size: 100,
-        }),
-        fetchFaultsList({
-          sort: '-detected_at',
-          page_size: 100,
-        }),
-        fetchCitizenFeedbackStatistics({
-          commune_id: communeId,
-          ...segmentParam,
-          from: fromStr,
-          to: toStr,
-          group_by: 'segment',
-        }),
-        fetchWorkOrderStatistics({
-          commune_id: communeId,
-          ...segmentParam,
-          from: fromStr,
-          to: toStr,
-          group_by: 'task_kind',
-        }),
-      ])
-
-      if (segmentsRes.status === 'fulfilled' && segmentsRes.value.length > 0) setSegments(segmentsRes.value)
-      if (fixtureRes.status === 'fulfilled') setFixtureStats(fixtureRes.value)
-      if (slaRes.status === 'fulfilled') setSlaStats(slaRes.value)
-      if (warrantyRes.status === 'fulfilled') setWarrantyData(warrantyRes.value)
-      if (faultsRes.status === 'fulfilled' && faultsRes.value.length > 0) setFaults(faultsRes.value)
-      if (citizenRes.status === 'fulfilled') setCitizenFeedbackStats(citizenRes.value)
-      if (workOrderRes.status === 'fulfilled') setWorkOrderStats(workOrderRes.value)
-    } catch (err) {
-      console.error('[SuperiorDashboard] Load failed:', err)
-      toast.error('Có lỗi xảy ra khi đồng bộ số liệu')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [communeId, communeName, selectedPeriodDays, selectedSegmentId])
+  // Yêu cầu Saga tải toàn bộ số liệu theo xã / tuyến / chu kỳ đang chọn
+  const loadDashboardData = useCallback(
+    (isSilent = false) => {
+      dispatch(
+        fetchSuperiorDashboardRequest({
+          communeId,
+          segmentId: selectedSegmentId !== 'all' ? selectedSegmentId : null,
+          periodDays: selectedPeriodDays,
+          silent: isSilent,
+        })
+      )
+    },
+    [dispatch, communeId, selectedPeriodDays, selectedSegmentId]
+  )
 
   useEffect(() => {
     loadDashboardData()
   }, [loadDashboardData])
 
-  // Tải lần lượt các báo cáo CSV đã chọn (mỗi báo cáo một file)
-  const handleExportCsv = async (types: SuperiorCsvExportType[]) => {
-    const todayStr = new Date().toISOString().split('T')[0]
-    const toastId = toast.loading(`Đang tải báo cáo 1/${types.length}...`)
-    const failed: SuperiorCsvExportType[] = []
-
-    for (const [index, type] of types.entries()) {
-      toast.loading(`Đang tải báo cáo ${index + 1}/${types.length}...`, { id: toastId })
-      try {
-        const params: Record<string, any> = { commune_id: communeId }
-        if (selectedSegmentId !== 'all') params.segment_id = selectedSegmentId
-        if (type === 'warranty') params.within_days = 90
-        if (type === 'repair-timeliness' || type === 'citizen-feedback' || type === 'work-orders') {
-          const fromDate = new Date()
-          fromDate.setDate(new Date().getDate() - selectedPeriodDays)
-          params.from = fromDate.toISOString().split('T')[0]
-          params.to = todayStr
-        }
-        await downloadStatisticsCsv(type, params, `${type}-${communeCode}-${todayStr}.csv`)
-      } catch {
-        failed.push(type)
-      }
-    }
-
-    if (failed.length === 0) {
-      toast.success(`Đã tải ${types.length} báo cáo CSV`, { id: toastId })
-    } else if (failed.length === types.length) {
-      toast.error('Không thể xuất file CSV từ máy chủ', { id: toastId })
-    } else {
-      toast.warning(`Đã tải ${types.length - failed.length}/${types.length} báo cáo, lỗi: ${failed.join(', ')}`, {
-        id: toastId,
+  // Tải lần lượt các báo cáo CSV đã chọn (Saga xử lý từng file và báo tiến độ)
+  const handleExportCsv = (types: SuperiorCsvExportType[]) => {
+    dispatch(
+      exportSuperiorCsvRequest({
+        types,
+        communeId,
+        communeCode,
+        segmentId: selectedSegmentId !== 'all' ? selectedSegmentId : null,
+        periodDays: selectedPeriodDays,
       })
-    }
+    )
   }
 
   // Nguồn dữ liệu hợp nhất giữa local fetch và Redux store (đảm bảo khớp 100% với Manager Dashboard)
@@ -247,39 +153,15 @@ export const SuperiorDashboardPage: React.FC = () => {
     return effectiveSegments.reduce((sum, s) => sum + (s.pole_count || 0), 0)
   }, [effectiveSegments])
 
-  // --- TÍNH TOÁN DỮ LIỆU TỪNG TUYẾN (ĐỒNG BỘ 100% CÁCH TÍNH CỦA MANAGER DASHBOARD) ---
+  // --- HIỆN TRẠNG BÓNG THEO TỪNG TUYẾN: lấy thẳng từ statistics/fixture-status (group_by=segment) ---
+  // Cột chưa được quét phủ tính là "chưa rõ", không tự coi là đạt chuẩn.
   const segmentChartData: FixtureBarItem[] = useMemo(() => {
     if (!displaySegments.length) return []
+    const rows = fixtureStats?.rows ?? []
 
     return displaySegments.map((seg) => {
       const segId = seg.segment_id || ''
-      const poleCount = seg.pole_count || 0
-      const segFaults = effectiveFaults.filter((f) => f.segment_id === segId)
-
-      // 1. Số bóng mất sáng (out): bao gồm các lỗi out, blackout, segment_outage
-      const out = segFaults.filter((f) => {
-        const type = String(f.fault_type || '').toLowerCase()
-        return (
-          !type.includes('offline') &&
-          !type.includes('node') &&
-          (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
-        )
-      }).length
-
-      // 2. Số bóng sáng yếu (dim): bao gồm các lỗi dim, runtime_decline
-      const dim = segFaults.filter((f) => {
-        const type = String(f.fault_type || '').toLowerCase()
-        return (
-          !type.includes('offline') &&
-          !type.includes('node') &&
-          (type.includes('dim') || type.includes('runtime_decline'))
-        )
-      }).length
-
-      // 3. Số bóng hoạt động đạt chuẩn (Normal) - ĐỒNG BỘ 100% VỚI MANAGER DASHBOARD
-      const normal = Math.max(0, poleCount - out - dim)
-      const unknown = 0
-
+      const segRows = rows.filter((r) => r.segment_id === segId)
       const name = seg.segment_name || segId
       const shortLabel = name.length > 24 ? name.substring(0, 22) + '...' : name
 
@@ -287,22 +169,24 @@ export const SuperiorDashboardPage: React.FC = () => {
         id: segId,
         name,
         shortLabel,
-        normal,
-        dim,
-        out,
-        unknown,
+        normal: segRows.reduce((acc, r) => acc + r.normal, 0),
+        dim: segRows.reduce((acc, r) => acc + r.dim, 0),
+        out: segRows.reduce((acc, r) => acc + r.out, 0),
+        unknown: segRows.reduce((acc, r) => acc + r.unknown, 0),
       }
     })
-  }, [displaySegments, effectiveFaults])
+  }, [displaySegments, fixtureStats])
 
   // --- TÍNH TOÁN DỮ LIỆU BỘ CHỈ SỐ KPI VĨ MÔ DỰA TRÊN DỮ LIỆU THỰC TẾ ---
   const kpiData: SuperiorKpiData = useMemo(() => {
     // 1. Tình trạng chiếu sáng
-    const normal = segmentChartData.reduce((acc, s) => acc + s.normal, 0)
-    const dim = segmentChartData.reduce((acc, s) => acc + s.dim, 0)
-    const out = segmentChartData.reduce((acc, s) => acc + s.out, 0)
-    const unknown = segmentChartData.reduce((acc, s) => acc + s.unknown, 0)
-    const total = normal + dim + out + unknown
+    // Tổng toàn xã (kể cả cột chưa gán tuyến) lấy từ API; normal + dim + out + unknown = pole_count
+    const statRows = fixtureStats?.rows ?? []
+    const normal = statRows.reduce((acc, r) => acc + r.normal, 0)
+    const dim = statRows.reduce((acc, r) => acc + r.dim, 0)
+    const out = statRows.reduce((acc, r) => acc + r.out, 0)
+    const unknown = statRows.reduce((acc, r) => acc + r.unknown, 0)
+    const total = statRows.reduce((acc, r) => acc + r.pole_count, 0)
     const normalPct = total > 0 ? (normal / total) * 100 : 0
 
     // 2. Dữ liệu từ SLA repair timeliness
@@ -373,7 +257,7 @@ export const SuperiorDashboardPage: React.FC = () => {
       warrantyExpiringCount: expiringItems.length,
       warrantyActiveCount: activeItems.length,
     }
-  }, [segmentChartData, selectedSegmentId, slaStats, filteredFaults, effectiveWarrantyItems])
+  }, [fixtureStats, selectedSegmentId, slaStats, filteredFaults, effectiveWarrantyItems])
 
   // Hiện trạng bóng theo nguồn dữ liệu: lấy thẳng từ statistics/fixture-status
   const dataSourceChartData: FixtureBarItem[] = useMemo(() => {

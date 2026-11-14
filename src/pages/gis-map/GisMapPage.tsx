@@ -95,6 +95,7 @@ import { useElectricalCascade } from '../../hooks/gis-map/useElectricalCascade'
 import { useGisMapInstance } from '../../hooks/gis-map/useGisMapInstance'
 import { useFeederLinesLayer } from '../../hooks/gis-map/useFeederLinesLayer'
 import { useGisMarkers } from '../../hooks/gis-map/useGisMarkers'
+import { useIotBridgeMarkers } from '../../hooks/gis-map/useIotBridgeMarkers'
 import type { SearchResultItem } from '../../utils/gis-map/gisSearchUtils'
 
 export const GisMapPage: React.FC = () => {
@@ -247,8 +248,6 @@ export const GisMapPage: React.FC = () => {
   // 4. Hook quản lý logic điện học cascade & danh mục phân tuyến
   const {
     cabinets,
-    feederStatusMap,
-    handleToggleFeeder,
     effectivePoles,
     segmentsList,
     segmentInfoMap,
@@ -287,14 +286,12 @@ export const GisMapPage: React.FC = () => {
     }
     return (
       segmentsList[0] || {
-        id: 'SEG-001',
-        name: 'Tuyến A',
-        cabinet: 'NODE-001-CTRL',
-        road: 'Tuyến A',
-        poleCount: 46,
-        lengthM: 1600,
-        hasActiveSegmentFault: false,
-        iotStatus: 'online',
+        id: '',
+        name: '-',
+        cabinet: '',
+        road: '',
+        poleCount: 0,
+        lengthM: 0,
       }
     )
   }, [selectedSegmentId, segmentInfoMap, segmentsList])
@@ -387,6 +384,9 @@ export const GisMapPage: React.FC = () => {
     onSelectPole: handleSelectPole,
     onSelectCabinet: handleSelectCabinet,
   })
+
+  // 9b. Marker gateway và node của IoT bridge (GET /iot/servers, GET /iot/nodes)
+  useIotBridgeMarkers(mapRef.current, isMapLoaded)
 
   // 10. Lọc tuyến từ Dropdown & Zoom vào tuyến (không mở Drawer)
   const handleSegmentSelect = useCallback(
@@ -541,8 +541,6 @@ export const GisMapPage: React.FC = () => {
           setSelectedFeeder={setSelectedFeeder}
           cabinets={cabinets}
           effectivePoles={effectivePoles}
-          feederStatusMap={feederStatusMap}
-          onToggleFeeder={handleToggleFeeder}
         />
       )}
 

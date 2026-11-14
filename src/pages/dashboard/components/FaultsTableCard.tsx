@@ -280,7 +280,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                         }
                       }}
                       style={{ '--i': idx } as React.CSSProperties}
-                      className={`ops-rise group cursor-pointer border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:shadow-[inset_3px_0_0_#be457a] ${
+                      className={`ops-rise group cursor-pointer border-b border-[#eef2f6] transition-colors duration-150 shadow-[inset_3px_0_0_transparent] hover:shadow-[inset_3px_0_0_var(--color-blue-600)] ${
                         isUnassigned ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-teal-50/40'
                       }`}
                       title={

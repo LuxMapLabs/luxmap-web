@@ -242,7 +242,7 @@ export const LoginPage: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <span className="tracking-wide">Bắt đầu ca làm việc</span>
+                  <span className="tracking-wide">Đăng nhập</span>
                   <ArrowRight className="w-4 h-4 text-[#5fc4b0] transition-transform duration-300 group-hover:translate-x-1.5 group-hover:text-white shrink-0" />
                 </>
               )}
@@ -266,26 +266,9 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Telemetry Status Bar đặt tinh tế bên trong khung đăng nhập */}
-          <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-xs select-none text-slate-400">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span className="font-semibold text-slate-200 tracking-wide text-[11px]">
-                Hệ thống Trực tuyến
-              </span>
-            </div>
-            <span className="text-white/20">|</span>
-            <span className="text-[11px] text-slate-400">
-              IoT Gateway: <span className="text-slate-300 font-medium">Sẵn sàng</span>
-            </span>
-            <span className="text-white/20">|</span>
-            <span className="text-[#5fc4b0] font-mono text-[11px] tracking-wider font-semibold">
-              LUXMAP v2.4
-            </span>
-          </div>
+          <p className="pt-5 mt-5 border-t border-white/10 text-center text-[11px] leading-relaxed select-none text-slate-400">
+            Nền tảng GIS quản lý tài sản và sự cố chiếu sáng đường giao thông nông thôn
+          </p>
         </div>
       </div>
     </div>

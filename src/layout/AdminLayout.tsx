@@ -8,6 +8,7 @@ import {
   Compass,
   Cpu,
   SlidersHorizontal,
+  RadioTower,
   ChevronsLeft,
   ChevronsRight,
   type LucideIcon,
@@ -53,6 +54,13 @@ const NAV_ITEMS: AdminNavItem[] = [
     title: 'Firmware & Mô hình AI',
     icon: Cpu,
     isActive: (p) => p.startsWith('/admin/firmware'),
+  },
+  {
+    to: '/admin/iot-bridge',
+    label: 'IoT Bridge',
+    title: 'IoT Bridge — server, gateway & secret MQTT',
+    icon: RadioTower,
+    isActive: (p) => p.startsWith('/admin/iot-bridge'),
   },
   {
     to: '/admin/settings',

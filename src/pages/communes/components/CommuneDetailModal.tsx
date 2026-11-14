@@ -129,7 +129,7 @@ export const CommuneDetailModal: React.FC<CommuneDetailModalProps> = ({
             <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
               <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                 <Compass className="w-3.5 h-3.5 text-secondary" />
-                <span>Tọa Độ Khung Bao Bản Đồ (Bounding Box)</span>
+                <span>Tọa độ khung bao bản đồ (BBox)</span>
               </h3>
               <span className="text-[10px] text-slate-500 font-mono font-medium">EPSG:4326</span>
             </div>

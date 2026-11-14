@@ -121,7 +121,7 @@ export const ManagerLayout: React.FC = () => {
         }`}
       >
         <div className={`flex items-center gap-2.5 pb-5 pt-1 ${collapsed ? 'justify-center' : 'px-2'}`}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-linear-to-br from-teal-400 to-teal-600 shadow-[0_8px_16px_-6px_rgba(190,69,122,0.55)]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-linear-to-br from-teal-400 to-teal-600 shadow-[0_8px_16px_-6px_rgba(47,85,144,0.55)]">
             <Lightbulb className="h-[18px] w-[18px] fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
           </div>
           {!collapsed && <span className="flex-1 text-[15px] font-extrabold tracking-wide text-slate-900">LUXMAP</span>}

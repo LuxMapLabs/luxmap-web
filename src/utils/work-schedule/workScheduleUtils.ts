@@ -11,6 +11,22 @@ type WorkOrderRawItem = WorkOrderItem & Partial<WorkOrderDetail> & {
   ai_detections?: any
 }
 
+/** segment_id -> tên tuyến, lấy từ danh sách tuyến của backend */
+export type SegmentNameMap = Record<string, string>
+
+/**
+ * Nhãn hiển thị cho một hay nhiều tuyến của lệnh: tên tuyến tra theo mã, thiếu tên thì giữ mã.
+ * Lệnh khảo sát có thể gắn nhiều tuyến nên ghép bằng dấu phẩy.
+ */
+export function segmentLabelFromIds(
+  ids: Array<string | null | undefined>,
+  names: SegmentNameMap
+): string | null {
+  const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))]
+  if (unique.length === 0) return null
+  return unique.map((id) => names[id] || id).join(', ')
+}
+
 /**
  * Định dạng tên hiển thị tuyến đường từ dữ liệu API
  */
@@ -39,7 +55,8 @@ export function formatSegmentDisplay(
  */
 export function mapWorkOrdersToScheduleCases(
   rawItems: WorkOrderItem[],
-  assignees?: WorkOrderAssignee[]
+  assignees?: WorkOrderAssignee[],
+  segmentNames: SegmentNameMap = {}
 ): ScheduleCase[] {
   if (!rawItems || rawItems.length === 0) return []
 
@@ -74,7 +91,9 @@ export function mapWorkOrdersToScheduleCases(
     const workOrderId = raw.work_order_id || ''
     const caseKey = raw.case_id || workOrderId
     const title = raw.title || 'Lệnh công tác'
-    const segment = formatSegmentDisplay(raw.segment_name || raw.segment_id, title)
+    const segmentLabel =
+      raw.segment_name || segmentLabelFromIds([raw.segment_id, ...(raw.segment_ids ?? [])], segmentNames)
+    const segment = formatSegmentDisplay(segmentLabel, title)
     const rawKind = String(raw.task_kind || 'inspection').toLowerCase()
     const woStatus = String(raw.wo_status || 'open').toLowerCase()
     const assignedTo = raw.assigned_to || ''
@@ -97,8 +116,8 @@ export function mapWorkOrdersToScheduleCases(
         phases: [],
       }
     } else {
-      if (raw.segment_name || raw.segment_id) {
-        casesMap[caseKey].segment = formatSegmentDisplay(raw.segment_name || raw.segment_id, title)
+      if (segmentLabel) {
+        casesMap[caseKey].segment = formatSegmentDisplay(segmentLabel, title)
       }
       if (Boolean(endReason)) {
         casesMap[caseKey].isTerminated = true

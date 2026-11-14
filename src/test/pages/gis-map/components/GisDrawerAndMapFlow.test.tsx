@@ -151,7 +151,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
     handleSelectPole: vi.fn(),
     selectedCabinet: null,
     setSelectedCabinet: vi.fn(),
-    onToggleFeeder: vi.fn(),
     cabinets: [],
     effectivePoles: [],
   }
@@ -253,7 +252,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getAllByText('Chưa quét').length).toBeGreaterThan(0)
     })
 
-    it('GisDrawerPanel Zero-Mock: render đúng placeholder khi không có ảnh khảo sát và badge "Bình thường" khi không có lỗi', () => {
+    it('GisDrawerPanel Zero-Mock: render đúng placeholder khi không có ảnh khảo sát và badge "Không có sự cố" khi không có lỗi', () => {
       const normalPole: PoleFeature = {
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [106.4899, 10.9705] },
@@ -290,9 +289,9 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       // 1. Kiểm tra placeholder khi không có ảnh (không còn ảnh Unsplash ngẫu nhiên)
       expect(screen.getByText('Chưa có ảnh cột đèn')).toBeInTheDocument()
 
-      // 2. Kiểm tra badge "Bình thường" trên accordion khi không có lỗi
+      // 2. Kiểm tra badge "Không có sự cố" trên accordion khi không có lỗi
       expect(screen.getByText('Sự cố đang ghi nhận')).toBeInTheDocument()
-      expect(screen.getByText('Bình thường')).toBeInTheDocument()
+      expect(screen.getByText('Không có sự cố')).toBeInTheDocument()
 
       // 3. Không còn bất kỳ dấu vết nào của mock data incidentHistory cũ
       expect(screen.queryByText(/Cháy chấn lưu LED 60W/i)).toBeNull()
@@ -415,7 +414,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
             selectedPole={null}
             selectedCabinet={null}
             selectedFeeder={mockFeeder}
-            feederStatusMap={{ 'FDR-009': 'active' }}
           />
         </Provider>
       )
@@ -424,7 +422,9 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getByText(/Điều khiển nguồn Mạch điện/i)).toBeInTheDocument()
       expect(screen.getByText('Thông số Kỹ thuật Mạch điện')).toBeInTheDocument()
       expect(screen.getByText('Tủ A')).toBeInTheDocument()
-      expect(screen.getAllByText(/ĐANG BẬT|TỰ ĐỘNG|ĐANG CẤP ĐIỆN/i).length).toBeGreaterThan(0)
+      // API chưa trả power_state / control_mode: không tự đoán chế độ, trạng thái cấp điện ghi 'Chưa rõ'
+      expect(screen.getByText('Chưa rõ')).toBeInTheDocument()
+      expect(screen.queryByText(/Chế độ: /)).toBeNull()
     })
 
     it('validateImportRow chấp nhận dòng dữ liệu CSV có đủ 100% các cột bắt buộc', () => {
@@ -490,9 +490,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
         landmark_note: 'Gần UBND xã Phú Hòa Đông',
         status: 'active',
         feeder_ids: ['FDR-01', 'FDR-02'],
-        current_load_kw: 12.5,
-        voltage_v: 220,
-        power_factor: 0.95,
       }
 
       const mockConnectedPoles: PoleFeature[] = [
@@ -522,7 +519,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
         },
       ]
 
-      const handleToggleFeeder = vi.fn()
 
       render(
         <Provider store={store}>
@@ -531,8 +527,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
             selectedPole={null}
             selectedCabinet={mockCabinet}
             effectivePoles={mockConnectedPoles}
-            onToggleFeeder={handleToggleFeeder}
-            feederStatusMap={{ 'FDR-01': 'active', 'FDR-02': 'fault' }}
           />
         </Provider>
       )

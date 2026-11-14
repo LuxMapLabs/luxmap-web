@@ -104,7 +104,7 @@ const renderStatusBadge = (status: CitizenReportStatus) => {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold">
           <CheckCircle2 className="w-3 h-3" />
-          <span>Đã tạo Fault</span>
+          <span>Đã tạo sự cố</span>
         </span>
       )
     case 'merged':

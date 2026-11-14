@@ -515,18 +515,16 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
   )
 
   // 1. When Drawer is OPEN (width is limited to ~800px):
-  // Put Route Selector UNDER Search Box to give Status Pills full room on Row 1
+  // Row 1: Search Box + Route Selector. Row 2: Status Pills on their own row so none is cut off by the drawer
   if (isPanelOpen) {
     return (
-      <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex items-start gap-2.5 pointer-events-none">
-        {/* Left Column: Search Box on top, Tools directly underneath */}
-        <div className="flex flex-col gap-2 pointer-events-auto shrink-0">
+      <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex flex-col items-start gap-2 pointer-events-none">
+        <div className="flex items-center gap-2.5 pointer-events-auto">
           {searchInputNode('w-64 sm:w-72 md:w-80')}
           {toolsNode('max-w-[160px] sm:max-w-[190px]', 'left')}
         </div>
 
-        {/* Right side on Row 1: Status Filter Pills */}
-        <div className="pointer-events-auto shrink-0">
+        <div className="pointer-events-auto max-w-full overflow-x-auto">
           {statusPillsNode}
         </div>
       </div>

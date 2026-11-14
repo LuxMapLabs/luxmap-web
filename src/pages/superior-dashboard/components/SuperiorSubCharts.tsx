@@ -94,6 +94,13 @@ const Stat: React.FC<{ value: React.ReactNode; label: string; color: string }> =
   </div>
 )
 
+// Biểu đồ không có số liệu: báo rõ thay vì để trục trống
+const EmptyChart: React.FC = () => (
+  <div className="flex h-full items-center justify-center text-xs font-medium text-slate-400">
+    Chưa có dữ liệu trong khoảng thời gian đã chọn
+  </div>
+)
+
 export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
   faultData,
   warrantyData,
@@ -108,6 +115,12 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
 
   const activeFaultData = faultMode === 'channel' ? faultData.channelData : faultData.typeData
   const activeWarrantyData = warrantyMode === 'status' ? warrantyData.statusData : warrantyData.fixtureTypeData
+  const faultTotal = activeFaultData.reduce((sum, d) => sum + d.value, 0)
+  const warrantyTotal = activeWarrantyData.reduce((sum, d) => sum + d.value, 0)
+  const workTotal =
+    workMode === 'workorders'
+      ? workOrderData.woByKindData.reduce((sum, d) => sum + d.completed + d.inProgress + d.pending, 0)
+      : workOrderData.citizenBySegmentData.reduce((sum, d) => sum + d.confirmed + d.merged + d.rejected, 0)
 
   return (
     <section
@@ -135,7 +148,9 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
       {activeTab === 'faults' && (
         <div className="mt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-slate-500">Tỷ lệ phát hiện giữa camera AI, IoT và người dân báo</p>
+            <p className="text-xs text-slate-500">
+              {faultMode === 'channel' ? 'Sự cố đang ghi nhận theo kênh phát hiện' : 'Sự cố đang ghi nhận theo loại lỗi'}
+            </p>
             <div className={SEGMENTED}>
               <button type="button" onClick={() => setFaultMode('channel')} className={segBtn(faultMode === 'channel')}>
                 Kênh
@@ -146,6 +161,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
             </div>
           </div>
           <div className="w-full h-48 mt-2">
+            {faultTotal === 0 ? <EmptyChart /> : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart layout="vertical" data={activeFaultData} margin={{ top: 8, right: 20, left: 10, bottom: 4 }}>
                 <XAxis type="number" hide />
@@ -165,11 +181,17 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            )}
           </div>
-          <div className="grid grid-cols-3 gap-2 border-t border-[#E4EFF8] pt-3">
-            <Stat value={`${faultData.aiPct}%`} label="Camera AI quét" color="#4A7AA3" />
-            <Stat value={`${faultData.iotPct}%`} label="Node IoT / tủ" color="#6C7BD8" />
-            <Stat value={`${faultData.citizenPct}%`} label="Dân báo qua QR" color="#3FA57A" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 border-t border-[#E4EFF8] pt-3">
+            {activeFaultData.map((d) => (
+              <Stat
+                key={d.name}
+                value={faultTotal === 0 ? '-' : `${Math.round((d.value / faultTotal) * 100)}%`}
+                label={d.name}
+                color="#3B6385"
+              />
+            ))}
           </div>
         </div>
       )}
@@ -196,6 +218,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
             </div>
           </div>
           <div className="w-full h-48 mt-2">
+            {warrantyTotal === 0 ? <EmptyChart /> : (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -221,10 +244,15 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
                   align="right"
                   layout="vertical"
                   iconSize={9}
-                  formatter={(value) => <span className="text-xs font-medium text-slate-600">{value}</span>}
+                  formatter={(value) => (
+                    <span className="text-xs font-medium text-slate-600">
+                      {value} · <strong className="text-slate-800">{activeWarrantyData.find((d) => d.name === value)?.value ?? 0}</strong>
+                    </span>
+                  )}
                 />
               </PieChart>
             </ResponsiveContainer>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2 border-t border-[#E4EFF8] pt-3">
             <Stat value={warrantyData.activeCount} label="Còn hạn (>90 ngày)" color="#3FA57A" />
@@ -248,6 +276,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
             </div>
           </div>
           <div className="w-full h-48 mt-2">
+            {workTotal === 0 ? <EmptyChart /> : (
             <ResponsiveContainer width="100%" height="100%">
               {workMode === 'workorders' ? (
                 <BarChart data={workOrderData.woByKindData} margin={{ top: 10, right: 10, left: -20, bottom: 4 }}>
@@ -275,6 +304,7 @@ export const SuperiorSubCharts: React.FC<SuperiorSubChartsProps> = ({
                 </BarChart>
               )}
             </ResponsiveContainer>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2 border-t border-[#E4EFF8] pt-3">
             <Stat value={workOrderData.totalAccepted} label="Đã nghiệm thu" color="#3FA57A" />

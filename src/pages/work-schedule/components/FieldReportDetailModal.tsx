@@ -122,9 +122,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
     }
   }, [isOpen, targetWorkOrderId])
 
-  // Tự động chuyển tab thích hợp theo từng giai đoạn:
-  // - Khảo sát: Ưu tiên xem Video hành trình đêm
-  // - Kiểm tra / Sửa chữa: Ưu tiên xem Ảnh chụp bằng chứng hiện trường
+  // Mỗi lần mở một giai đoạn mới thì quay về tab ảnh bằng chứng
   useEffect(() => {
     if (isOpen && phase) {
       if (phase.phaseType === 'survey') {
@@ -652,7 +650,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                 )}
                               </div>
                               <p className="text-[11px] text-slate-500 mt-1">
-                                Chụp lúc: {photo.captured_at ? new Date(photo.captured_at).toLocaleString('vi-VN') : 'Gần đây'}
+                                Chụp lúc: {photo.captured_at ? new Date(photo.captured_at).toLocaleString('vi-VN') : '-'}
                               </p>
                               {photo.review_note && (
                                 <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200 mt-1 line-clamp-2">
@@ -779,7 +777,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                             ) : null}
                           </div>
                           <p className="text-[11px] text-amber-800 leading-relaxed">
-                            {p.note || 'Hệ thống AI phát hiện bất thường quang thông hoặc tình trạng đui đèn trên cột.'}
+                            {p.note || 'Chưa có ghi chú cho cột này.'}
                           </p>
                         </div>
                       </div>
@@ -789,12 +787,12 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>
-                      Đã khảo sát {poles.length} cột dọc tuyến <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Tất cả cột đèn đều hoạt động trong ngưỡng an toàn, không phát hiện sự cố nghiêm trọng.
+                      Đã khảo sát {poles.length} cột dọc tuyến <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Không có cột nào bị đánh dấu bất thường hoặc đang có sự cố mở.
                     </span>
                   </div>
                 ) : (
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
-                    Ghi nhận tuyến: <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Dữ liệu Computer Vision đã hoàn tất phân tích toàn tuyến.
+                    Tuyến: <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Chưa có dữ liệu cột đèn cho lệnh này.
                   </div>
                 )}
               </div>
@@ -837,7 +835,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     Vật tư đề xuất từ kỹ sư
                   </span>
                   <div className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    {effectiveSuggestedMaterials || effectiveUsedMaterials || 'Không phát sinh vật tư trong giai đoạn này'}
+                    {effectiveSuggestedMaterials || effectiveUsedMaterials || 'Kỹ sư không ghi nhận vật tư'}
                   </div>
                   <p className="text-[11px] text-slate-400">
                     Thông tin đề xuất phục vụ lập kế hoạch cho các giai đoạn tiếp theo của sự vụ.

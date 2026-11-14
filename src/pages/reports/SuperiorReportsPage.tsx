@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
+import { useSelector, useDispatch } from 'react-redux'
+import type { RootState } from '../../redux/rootReducer'
 import { reportsAPI } from '../../feature/reports/reportsAPI'
+import {
+  fetchReportsRequest,
+  openReportRequest,
+  closeReport,
+} from '../../feature/reports/reportsSlice'
 import type { SuperiorReportItem } from '../../types/reports/report'
 import { ReportFilterBar } from './components/ReportFilterBar'
 import { ReportTable } from './components/ReportTable'
@@ -9,17 +16,29 @@ import { TablePagination } from '../assets/components/common/TablePagination'
 import { exportReportToPdf } from '../../utils/reports/reportPdfGenerator'
 
 export const SuperiorReportsPage: React.FC = () => {
-  // Trạng thái ngày/tháng được chọn (mặc định tháng hiện tại: Tháng 10 năm 2026)
-  const [currentMonth, setCurrentMonth] = useState<number>(9) // 0-indexed (9 là Tháng 10)
-  const [currentYear, setCurrentYear] = useState<number>(2026)
+  const dispatch = useDispatch()
+  // Trạng thái ngày/tháng được chọn (mặc định tháng hiện tại, tháng tính từ 0)
+  const [currentMonth, setCurrentMonth] = useState<number>(() => new Date().getMonth())
+  const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear())
+
+  // Tên xã lấy từ hồ sơ tài khoản đang đăng nhập
+  const userCommunes = useSelector((state: RootState) => state.auth.user?.communes)
+  const communeNames = useMemo(() => {
+    const map: Record<string, string> = {}
+    userCommunes?.forEach((c) => {
+      if (c.commune_id && c.name) map[c.commune_id] = c.name
+    })
+    return map
+  }, [userCommunes])
 
   // Bộ lọc
   const [filterPhase, setFilterPhase] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
 
-  // Dữ liệu & Loading
-  const [reports, setReports] = useState<SuperiorReportItem[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  // Dữ liệu & Loading: tải qua Saga, lưu ở store reports
+  const { reports, loading: isLoading, loadFailed, selectedReport } = useSelector(
+    (state: RootState) => state.reports
+  )
 
   // Phân trang phía trình duyệt trên danh sách đã lọc
   const PAGE_SIZE = 10
@@ -29,36 +48,19 @@ export const SuperiorReportsPage: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isBulkExporting, setIsBulkExporting] = useState<boolean>(false)
 
-  // Modal chi tiết
-  const [selectedReport, setSelectedReport] = useState<SuperiorReportItem | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
-
-  // Tải danh sách báo cáo
-  const loadReports = async () => {
-    setIsLoading(true)
-    try {
-      // Lấy đủ mọi loại công tác của tháng, lọc theo loại ở phía trình duyệt để đổi chip không phải tải lại
-      const data = await reportsAPI.getVerifiedReports({
-        taskKind: 'all',
-        searchQuery: searchQuery,
-        month: currentMonth,
-        year: currentYear,
-      })
-      setReports(data)
-    } catch {
-      toast.error('Không thể đồng bộ danh sách báo cáo từ máy chủ')
-    } finally {
-      setIsLoading(false)
-    }
+  // Yêu cầu Saga tải danh sách báo cáo của tháng đang chọn
+  const loadReports = () => {
+    dispatch(fetchReportsRequest({ month: currentMonth, year: currentYear, searchQuery, communeNames }))
   }
 
   useEffect(() => {
     loadReports()
-  }, [currentMonth, currentYear])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMonth, currentYear, communeNames])
 
   // Lọc tìm kiếm theo thời gian thực phía client
   const filteredReports = useMemo(() => {
-    return reportsAPI.filterLocalMockReports(reports, {
+    return reportsAPI.filterReports(reports, {
       taskKind: filterPhase,
       searchQuery: searchQuery,
       month: currentMonth,
@@ -66,17 +68,9 @@ export const SuperiorReportsPage: React.FC = () => {
     })
   }, [reports, filterPhase, searchQuery, currentMonth, currentYear])
 
-  // Thao tác xem chi tiết
-  const handleViewReport = async (report: SuperiorReportItem) => {
-    setSelectedReport(report)
-    setIsModalOpen(true)
-    // Tải thêm thông tin chi tiết (ảnh evidence, v.v. nếu có từ máy chủ)
-    try {
-      const fullDetail = await reportsAPI.getReportDetail(report.workOrderId)
-      setSelectedReport(fullDetail)
-    } catch {
-      // Giữ nguyên thông tin tóm tắt nếu gặp lỗi
-    }
+  // Thao tác xem chi tiết: mở modal ngay, Saga tải thêm ảnh evidence / ghi chú
+  const handleViewReport = (report: SuperiorReportItem) => {
+    dispatch(openReportRequest(report))
   }
 
   // Thao tác xuất PDF nhanh
@@ -174,6 +168,19 @@ export const SuperiorReportsPage: React.FC = () => {
       />
 
       {/* 3. BẢNG DANH SÁCH BÁO CÁO NGHIỆM THU */}
+      {loadFailed ? (
+        <div className="rounded-[20px] border border-rose-200 bg-white p-12 text-center">
+          <h4 className="text-sm font-bold text-slate-800">Không tải được danh sách báo cáo</h4>
+          <p className="mt-1 text-xs text-slate-500">Kiểm tra kết nối tới máy chủ rồi thử lại.</p>
+          <button
+            type="button"
+            onClick={loadReports}
+            className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer"
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : (
       <ReportTable
         reports={pageReports}
         totalCount={filteredReports.length}
@@ -187,6 +194,7 @@ export const SuperiorReportsPage: React.FC = () => {
         onExportSelected={handleExportSelected}
         isBulkExporting={isBulkExporting}
       />
+      )}
 
       {!isLoading && filteredReports.length > 0 && (
         <TablePagination
@@ -201,9 +209,9 @@ export const SuperiorReportsPage: React.FC = () => {
 
       {/* 4. MODAL XEM VĂN BẢN NGHIỆM THU A4 VÀ XUẤT PDF */}
       <ReportDetailModal
-        isOpen={isModalOpen}
+        isOpen={selectedReport !== null}
         report={selectedReport}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => dispatch(closeReport())}
       />
     </div>
   )

@@ -1,66 +1,33 @@
 import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
-import { RowActions } from '../../common/RowActions'
-import {
-  Trash2,
-  Cpu,
-  Zap,
-  Key,
-  Sliders,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Cable,
-} from 'lucide-react'
-import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
+import { Cpu, Zap, Clock, Cable, RadioTower } from 'lucide-react'
+import type { IotNodeStatus } from '../../../../../types/iot/nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import type { FeederListItem } from '../../../../../types/assets/feeders'
 import { IotNodeTableSkeleton } from './IotNodeTableSkeleton'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
+import { IOT_NODE_STATUS, IOT_TONE_CLASS, iotStatusBadge } from '../../../../../constants/iot'
+import { feederOnRelayOne } from '../../../../../utils/iot/iotRegistration'
 
 export interface IotNodeTableProps {
-  iotNodes: IotNodeItem[]
+  /** Một trang của `GET /iot/nodes`. */
+  iotNodes: IotNodeStatus[]
   cabinets: CabinetListItem[]
+  feeders: FeederListItem[]
   isLoading?: boolean
-  onViewDetail: (node: IotNodeItem) => void
-  onEdit: (node: IotNodeItem) => void
-  onDelete: (nodeId: string) => void
-  onSetRelay: (node: IotNodeItem) => void
-  onIssueCredential: (node: IotNodeItem) => void
+  onSetSource: (node: IotNodeStatus) => void
 }
 
-export const IotNodeTable: React.FC<IotNodeTableProps> = ({
-  iotNodes,
-  cabinets,
-  isLoading = false,
-  onViewDetail,
-  onEdit,
-  onDelete,
-  onSetRelay,
-  onIssueCredential,
-}) => {
-  const showCommune = useShowCommune()
-  const getCabinetName = (cabinetId: string | null) => {
-    if (!cabinetId) return 'Chưa gán tủ'
-    const cab = cabinets.find((c) => c.cabinet_id === cabinetId)
-    return cab?.cabinet_name || cab?.external_ref || cabinetId
-  }
+const formatDateTime = (dateStr?: string | null) => {
+  if (!dateStr) return null
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
-  const formatDateTime = (dateStr?: string | null) => {
-    if (!dateStr) return '—'
-    try {
-      const d = new Date(dateStr)
-      if (isNaN(d.getTime())) return dateStr
-      return d.toLocaleString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
-    } catch {
-      return dateStr
-    }
-  }
+export const IotNodeTable: React.FC<IotNodeTableProps> = ({ iotNodes, cabinets, feeders, isLoading = false, onSetSource }) => {
+  const showCommune = useShowCommune()
+  const cabinetOf = (cabinetId?: string | null) => cabinets.find((c) => c.cabinet_id === cabinetId)
 
   if (!isLoading && iotNodes.length === 0) {
     return (
@@ -68,11 +35,9 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
         <div className="w-16 h-16 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-purple-100 dark:border-purple-800/60 shadow-sm">
           <Cpu className="w-8 h-8" />
         </div>
-        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">
-          Chưa có thiết bị IoT nào
-        </h3>
-        <p className="text-slate-500 dark:text-slate-400 text-xs max-w-sm mx-auto mb-4">
-          Hệ thống chưa ghi nhận bộ điều khiển viễn trắc IoT nào gắn tại tủ điện. Bạn có thể nhấn nút đăng ký thiết bị mới.
+        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Chưa có thiết bị IoT nào</h3>
+        <p className="text-slate-500 dark:text-slate-400 text-xs max-w-sm mx-auto">
+          Hệ thống chưa ghi nhận thiết bị IoT nào gắn tại tủ điện trong địa bàn của bạn.
         </p>
       </div>
     )
@@ -87,11 +52,10 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
               <th className="py-3 px-4">Mã thiết bị</th>
               <th className="py-3 px-4">Tủ điện cấp nguồn</th>
               {showCommune && <th className="py-3 px-4">Địa bàn</th>}
-              <th className="py-3 px-4 text-center">Nguồn dữ liệu</th>
-              <th className="py-3 px-4 text-center">Điều khiển từ xa</th>
-              <th className="py-3 px-4 text-center">Xác thực (Secret)</th>
-              <th className="py-3 px-4">Báo cáo gần nhất</th>
-              <th className="py-3 px-4">Rơ-le đấu nối</th>
+              <th className="py-3 px-4">Mạch (rơ-le #1)</th>
+              <th className="py-3 px-4">Server IoT</th>
+              <th className="py-3 px-4">Trạng thái bridge</th>
+              <th className="py-3 px-4">Nhận gần nhất</th>
               <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -101,13 +65,13 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
             ) : (
               iotNodes.map((node) => {
                 const nodeId = node.node_id || 'Chưa cấp mã'
+                const cabinet = cabinetOf(node.cabinet_id)
+                const feederId = feederOnRelayOne(feeders, node.node_id)?.feeder_id
+                const badge = iotStatusBadge(IOT_NODE_STATUS, node.status)
+                const receivedAt = formatDateTime(node.last_received_at)
 
                 return (
-                  <tr
-                    key={nodeId}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                  >
-                    {/* Mã Thiết Bị */}
+                  <tr key={nodeId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-200/50 dark:border-purple-800/50">
@@ -119,7 +83,6 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
                       </div>
                     </td>
 
-                    {/* Tủ Điện Cấp Nguồn */}
                     <td className="py-3.5 px-4">
                       {node.cabinet_id ? (
                         <div className="flex items-center gap-1.5">
@@ -128,11 +91,9 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
                           </div>
                           <div>
                             <span className="font-bold text-slate-800 dark:text-slate-100">
-                              {getCabinetName(node.cabinet_id)}
+                              {cabinet?.cabinet_name || cabinet?.external_ref || node.cabinet_id}
                             </span>
-                            <span className="block text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                              {node.cabinet_id}
-                            </span>
+                            <span className="block text-[10px] font-mono text-slate-400 dark:text-slate-500">{node.cabinet_id}</span>
                           </div>
                         </div>
                       ) : (
@@ -140,131 +101,52 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({
                       )}
                     </td>
 
-                    {/* Địa bàn */}
                     {showCommune && (
                       <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                        {formatFriendlyCommuneName(
-                          cabinets.find((c) => c.cabinet_id === node.cabinet_id)?.commune_name,
-                          node.commune_id
-                        )}
+                        {formatFriendlyCommuneName(cabinet?.commune_name, node.commune_id)}
                       </td>
                     )}
 
-                    {/* Nguồn Dữ Liệu */}
-                    <td className="py-3.5 px-4 text-center">
-                      {node.data_source === 'simulated' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                          Mô phỏng
-                        </span>
-                      ) : node.data_source === 'calibration_rig' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                          Kiểm chuẩn (Rig)
+                    <td className="py-3.5 px-4">
+                      {feederId ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                          <Cable className="w-2.5 h-2.5" />
+                          {feederId}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {node.data_source}
-                        </span>
+                        <span className="text-slate-400 italic">Chưa đấu nối</span>
                       )}
                     </td>
 
-                    {/* Điều Khiển Từ Xa */}
-                    <td className="py-3.5 px-4 text-center">
-                      {node.supports_remote_control ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                          <CheckCircle2 className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                          Hỗ trợ
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                          <XCircle className="w-3 h-3 text-slate-400" />
-                          Chỉ đọc
-                        </span>
-                      )}
+                    <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-200">
+                      {node.server_id || <span className="font-sans text-slate-400 italic">—</span>}
                     </td>
 
-                    {/* Xác Thực (Secret) */}
-                    <td className="py-3.5 px-4 text-center">
-                      {node.has_credential ? (
-                        <span
-                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 cursor-help"
-                          title={`Secret cấp ngày: ${formatDateTime(node.credential_set_at)}`}
-                        >
-                          <Key className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                          Đã cấp
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                          Chưa cấp
-                        </span>
-                      )}
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[badge.tone]}`}>
+                        {badge.label}
+                      </span>
                     </td>
 
-                    {/* Báo Cáo Gần Nhất */}
                     <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                      {node.last_report_at ? (
+                      {receivedAt ? (
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{formatDateTime(node.last_report_at)}</span>
+                          <span>{receivedAt}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic">Chưa có tín hiệu</span>
+                        <span className="text-slate-400 italic">Chưa có mẫu đo</span>
                       )}
                     </td>
 
-                    {/* Rơ-le Đấu Nối */}
-                    <td className="py-3.5 px-4">
-                      {node.relays && node.relays.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 max-w-[220px]">
-                          {node.relays.map((r) => (
-                            <span
-                              key={r.relay_no}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border ${
-                                r.feeder_id
-                                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
-                              }`}
-                              title={`Rơ-le ${r.relay_no}: ${
-                                r.feeder_id ? `Đấu nối mạch ${r.feeder_id}` : 'Chưa đấu nối'
-                              } (Chế độ: ${r.control_mode || 'Chưa báo cáo'})`}
-                            >
-                              <Cable className="w-2.5 h-2.5" />
-                              <span>
-                                R{r.relay_no}: {r.feeder_id || 'Trống'}
-                              </span>
-                              {r.control_mode && (
-                                <span className="uppercase text-[9px] px-1 py-0.2 bg-white/60 dark:bg-black/30 rounded">
-                                  {r.control_mode}
-                                </span>
-                              )}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 italic">0 rơ-le</span>
-                      )}
-                    </td>
-
-                    {/* Thao Tác */}
                     <td className="py-3.5 px-4 text-right">
-                      <RowActions
-                        viewLabel="Xem chi tiết thiết bị IoT"
-                        editLabel="Chỉnh sửa thiết bị"
-                        onView={() => onViewDetail(node)}
-                        onEdit={() => onEdit(node)}
-                        menuItems={[
-    { key: 'relay', label: 'Cấu hình đấu nối rơ-le', icon: <Sliders />, onClick: () => onSetRelay(node) },
-    { key: 'credential', label: 'Cấp Secret xác thực mới', icon: <Key />, onClick: () => onIssueCredential(node) },
-    {
-      key: 'delete',
-      label: 'Xóa thiết bị',
-      icon: <Trash2 />,
-      danger: true,
-      onClick: () => {
-        if (node.node_id) onDelete(node.node_id)
-      },
-    },
-  ]}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => onSetSource(node)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer whitespace-nowrap"
+                      >
+                        <RadioTower className="w-3.5 h-3.5" /> Nguồn đo
+                      </button>
                     </td>
                   </tr>
                 )

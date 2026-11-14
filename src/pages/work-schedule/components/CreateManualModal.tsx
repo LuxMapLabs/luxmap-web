@@ -403,7 +403,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ví dụ: Sự cố mất sáng đoạn qua UBND xã Phước Hậu"
+                  placeholder="Ví dụ: Sự cố mất sáng đoạn qua trụ sở UBND xã"
                   className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

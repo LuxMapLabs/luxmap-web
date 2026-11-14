@@ -33,6 +33,7 @@ import type { ActiveFixture } from '../../../types/assets/fixtures'
 import type { ManagedFixture } from '../../../hooks/assets/useAssetData'
 import {
   validateImportRow,
+  parsePointWkt,
   type FieldDiff,
   type ParsedItemReview,
 } from '../../../validations/assetImport.schema'
@@ -48,62 +49,80 @@ interface CategoryConfig {
   templateFileName: string
   templateUrl: string
   description: string
+  /** Danh mục phải có sẵn trên hệ thống trước khi nạp danh mục này */
+  prerequisite: string
+  /** Danh mục nên nạp tiếp theo */
+  nextStep: string | null
 }
+
+const IMPORT_ORDER_HINT = 'Thứ tự nạp đầy đủ: Tuyến đường → Tủ điện → Mạch điện → Cột điện → Bộ đèn.'
 
 const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
   poles: {
     id: 'poles' as ImportAssetCategory,
     label: 'Cột điện',
-    title: 'Cột Điện Chiếu Sáng',
+    title: 'Cột điện chiếu sáng',
     icon: <Boxes className="w-5 h-5 text-blue-600" />,
     templateFileName: 'poles.csv',
     templateUrl: '/templates/poles.csv',
-    description: 'Nạp danh mục Cột điện theo chuẩn Backend. Hệ thống tự động so khớp tọa độ WKT và các thuộc tính cột.',
+    description: 'Nạp danh mục Cột điện. Hệ thống tự động so khớp tọa độ WKT và các thuộc tính cột.',
+    prerequisite: 'Cần có sẵn: Tuyến đường (bắt buộc) và Mạch điện (nếu file có cột feeder_external_ref).',
+    nextStep: 'Bước tiếp theo: nạp Bộ đèn gắn lên các cột vừa nạp.',
   },
   fixtures: {
     id: 'fixtures' as ImportAssetCategory,
     label: 'Bộ đèn',
-    title: 'Bộ Đèn Chiếu Sáng',
+    title: 'Bộ đèn chiếu sáng',
     icon: <Lightbulb className="w-5 h-5 text-amber-500" />,
     templateFileName: 'fixtures.csv',
     templateUrl: '/templates/fixtures.csv',
-    description: 'Nạp danh mục Bộ đèn gắn lên cột. Quản lý công suất (Watt), số lượng bóng trên bộ đèn, nguồn điện, ngày lắp đặt và hạn bảo hành theo chuẩn Backend.',
+    description: 'Nạp danh mục Bộ đèn gắn lên cột. Quản lý công suất (Watt), số lượng bóng trên bộ đèn, nguồn điện, ngày lắp đặt và hạn bảo hành.',
+    prerequisite: 'Cần có sẵn: Cột điện (mã trong cột pole_external_ref phải đã có trên hệ thống).',
+    nextStep: null,
   },
   poles_and_fixtures: {
     id: 'poles_and_fixtures' as ImportAssetCategory,
     label: 'Cột & Bộ đèn',
-    title: 'Cột & Bộ Đèn',
+    title: 'Cột và bộ đèn',
     icon: <Boxes className="w-5 h-5 text-blue-600" />,
     templateFileName: 'poles.csv',
     templateUrl: '/templates/poles.csv',
-    description: 'Nạp danh mục Cột đèn & Bộ đèn. Hệ thống tự động phát hiện bản ghi Mới, Cập nhật thông số và ẩn các bản ghi không thay đổi.',
+    description: 'Nạp danh mục Cột đèn & Bộ đèn. Hệ thống tự động phát hiện bản ghi mới, cập nhật thông số và ẩn các bản ghi không thay đổi.',
+    prerequisite: 'Cần có sẵn: Tuyến đường (bắt buộc) và Mạch điện (nếu file có cột feeder_external_ref).',
+    nextStep: null,
   },
   feeders: {
     id: 'feeders' as ImportAssetCategory,
     label: 'Mạch điện',
-    title: 'Mạch Điện Xuất Tuyến',
+    title: 'Mạch điện xuất tuyến',
     icon: <Zap className="w-5 h-5 text-amber-500" />,
     templateFileName: 'feeders.csv',
     templateUrl: '/templates/feeders.csv',
-    description: 'Nạp danh mục Mạch điện xuất tuyến (Feeder) thuộc các trạm Tủ điện theo chuẩn Backend.',
+    description: 'Nạp danh mục Mạch điện xuất tuyến (Feeder) thuộc các trạm Tủ điện.',
+    prerequisite: 'Cần có sẵn: Tủ điện (mã trong cột cabinet_external_ref).',
+    nextStep: 'Bước tiếp theo: nạp Cột điện (gán cột vào mạch).',
   },
   cabinets: {
     id: 'cabinets' as ImportAssetCategory,
     label: 'Tủ điện',
-    title: 'Tủ Điện',
+    title: 'Tủ điện',
     icon: <Zap className="w-5 h-5 text-amber-500" />,
     templateFileName: 'cabinets.csv',
     templateUrl: '/templates/cabinets.csv',
-    description: 'Nạp danh mục trạm tủ điện chiếu sáng theo chuẩn Backend.',
+    description: 'Nạp danh mục trạm tủ điện chiếu sáng.',
+    prerequisite: 'Không cần nạp danh mục nào trước.',
+    nextStep: 'Bước tiếp theo: nạp Mạch điện thuộc các tủ vừa nạp.',
   },
   segments: {
     id: 'segments' as ImportAssetCategory,
     label: 'Tuyến đường chiếu sáng',
-    title: 'Tuyến Đường Chiếu Sáng',
+    title: 'Tuyến đường chiếu sáng',
     icon: <Route className="w-5 h-5 text-indigo-600" />,
     templateFileName: 'segments.csv',
     templateUrl: '/templates/segments.csv',
     description: 'Nạp danh mục các tuyến đường giao thông liên xã, liên thôn và trục không gian chiếu sáng.',
+    prerequisite: 'Không cần nạp danh mục nào trước.',
+    nextStep: 'Bước tiếp theo: nạp Tủ điện, sau đó Mạch điện và Cột điện.',
   },
 }
 
@@ -371,7 +390,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900 text-base tracking-tight">
-                  Nạp & Kiểm Tra Dữ Liệu: {config.title}
+                  Nạp và kiểm tra dữ liệu: {config.title}
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -413,7 +432,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 </h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {importStage === 1 && 'Hệ thống đang tiền xử lý các dòng dữ liệu và ánh xạ trường chuẩn hóa.'}
-                  {importStage === 2 && 'Máy chủ Backend đang xác thực tọa độ WKT GIS và quan hệ liên kết dữ liệu.'}
+                  {importStage === 2 && 'Máy chủ đang xác thực tọa độ WKT GIS và quan hệ liên kết dữ liệu.'}
                   {importStage >= 3 && 'Tiến trình lưu trữ và hoàn tất cập nhật vào hệ cơ sở dữ liệu.'}
                 </p>
               </div>
@@ -444,7 +463,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-xs">
                   <FileCheck2 className="w-4 h-4 text-blue-600 dark:text-sky-400" />
-                  <span>File Mẫu Chuẩn CSV: {config.title}</span>
+                  <span>File mẫu CSV: {config.title}</span>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Tải tệp mẫu định dạng chuẩn UTF-8 (<code className="text-slate-700 dark:text-slate-300 bg-slate-200/60 dark:bg-slate-700 px-1 py-0.5 rounded font-mono text-[10px]">{config.templateFileName}</code>) để điền dữ liệu trước khi nạp.
@@ -460,6 +479,17 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 <Download className="w-3.5 h-3.5 text-blue-600 dark:text-sky-400" />
                 <span>Tải file mẫu CSV</span>
               </a>
+            </div>
+          )}
+
+          {/* Hướng dẫn thứ tự nạp */}
+          {!importResult && (
+            <div className="px-3.5 py-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-[11px] text-blue-900 flex items-start gap-2">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-px" />
+              <div className="space-y-0.5">
+                <div className="font-semibold">{config.prerequisite}</div>
+                <div className="text-blue-800/80">{IMPORT_ORDER_HINT}</div>
+              </div>
             </div>
           )}
 
@@ -521,7 +551,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                     {fileName ? (
                       <span className="text-blue-600 font-medium underline">Nhấp để chọn tệp CSV khác</span>
                     ) : (
-                      <>Hỗ trợ định dạng CSV chuẩn Backend: UTF-8, dấu phẩy phân tách</>
+                      <>Hỗ trợ định dạng CSV: UTF-8, dấu phẩy phân tách</>
                     )}
                   </p>
                 </div>
@@ -546,7 +576,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-center">
                   <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider flex items-center justify-center gap-1">
                     <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Thêm Mới</span>
+                    <span>Thêm mới</span>
                   </div>
                   <div className="text-2xl font-bold text-emerald-700 mt-0.5">{newCount}</div>
                   <div className="text-[10px] text-emerald-600">Bản ghi chưa có trên GIS</div>
@@ -556,7 +586,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-center">
                   <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wider flex items-center justify-center gap-1">
                     <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Cập Nhật</span>
+                    <span>Cập nhật</span>
                   </div>
                   <div className="text-2xl font-bold text-amber-700 mt-0.5">{updatedCount}</div>
                   <div className="text-[10px] text-amber-600">Thay đổi thông số kỹ thuật</div>
@@ -567,10 +597,10 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                   <div className="p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-center">
                     <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wider flex items-center justify-center gap-1">
                       <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Vi Phạm Ràng Buộc</span>
+                      <span>Dòng lỗi</span>
                     </div>
                     <div className="text-2xl font-bold text-rose-700 mt-0.5">{invalidCount}</div>
-                    <div className="text-[10px] text-rose-600">Lỗi định dạng hoặc thiếu cha</div>
+                    <div className="text-[10px] text-rose-600">Sai định dạng hoặc thiếu dữ liệu liên quan</div>
                   </div>
                 )}
 
@@ -578,7 +608,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 <div className="p-3 bg-slate-100/80 border border-slate-200 rounded-xl text-center opacity-85">
                   <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-center gap-1">
                     <Check className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Không Thay Đổi</span>
+                    <span>Không thay đổi</span>
                   </div>
                   <div className="text-2xl font-bold text-slate-600 mt-0.5">{unchangedCount}</div>
                   <div className="text-[10px] text-slate-500">Đã tự động ẩn khỏi bảng</div>
@@ -592,9 +622,10 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                   <span>
                     Bảng xem trước chỉ liệt kê <strong>{reviewRows.length} bản ghi</strong> (gồm{' '}
                     <strong>{newCount} thêm mới</strong>, <strong>{updatedCount} cập nhật</strong>
-                    {invalidCount > 0 && <span className="text-rose-600 font-bold">, {invalidCount} lỗi vi phạm</span>}
+                    {invalidCount > 0 && <span className="text-rose-600 font-bold">, {invalidCount} dòng lỗi</span>}
                     ).{' '}
                     Có <strong>{unchangedCount} bản ghi trùng khớp 100%</strong> đã được tự động ẩn theo yêu cầu.
+                    {invalidCount > 0 && <> Số dòng trong thông báo lỗi không tính dòng tiêu đề.</>}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -605,7 +636,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                     </span>
                   )}
                   <span className="text-[11px] font-semibold text-blue-700 bg-white border border-blue-200 px-2 py-0.5 rounded-md shrink-0">
-                    Hiển thị: {reviewRows.length}/{allParsedItems.length}
+                    Hiển thị {reviewRows.length}/{allParsedItems.length}
                   </span>
                 </div>
               </div>
@@ -613,9 +644,9 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
               {/* Review Table (Strictly displaying only reviewRows: NEW & UPDATED) */}
               {reviewRows.length > 0 ? (
                 <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-                  <div className="max-h-72 overflow-y-auto">
+                  <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-50 text-slate-700 font-semibold sticky top-0 border-b border-slate-200 z-10">
+                      <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                         <tr>
                           <th className="py-2.5 px-3 w-28">Tác vụ</th>
                           <th className="py-2.5 px-3 w-32">
@@ -641,7 +672,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                               ? 'Thông số bộ đèn'
                               : category === 'segments'
                                 ? 'Cấp đường / Chiều dài'
-                                : category === 'cabinets'
+                                : category === 'cabinets' || category === 'feeders'
                                   ? 'Khu vực quản lý'
                                   : 'Tọa độ GIS'}
                           </th>
@@ -664,7 +695,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                               {item.actionType === 'invalid' ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 whitespace-nowrap">
                                   <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
-                                  <span>Lỗi ràng buộc</span>
+                                  <span>Dòng lỗi</span>
                                 </span>
                               ) : item.actionType === 'new' ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
@@ -687,6 +718,9 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                             {/* Location */}
                             <td className="py-2.5 px-3 align-top">
                               {(() => {
+                                if (item.actionType === 'invalid') {
+                                  return <span className="text-slate-400">-</span>
+                                }
                                 if (item.category === 'fixtures') {
                                   const parentPole = poles.find(
                                     (p) =>
@@ -706,13 +740,10 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                   return (
                                     <>
                                       <div
-                                        className={`truncate max-w-[170px] ${item.actionType === 'invalid'
-                                          ? 'text-rose-600 font-medium italic'
-                                          : 'font-semibold text-slate-800'
-                                        }`}
+                                        className="truncate max-w-[170px] font-semibold text-slate-800"
                                         title={seg?.segment_name || 'Cột ' + item.externalRef}
                                       >
-                                        {seg?.segment_name || (item.actionType === 'invalid' ? item.errorMsg : `Cột ${item.externalRef}`)}
+                                        {seg?.segment_name || `Cột ${item.externalRef}`}
                                       </div>
                                       {cab?.cabinet_name ? (
                                         <div className="text-[10px] text-slate-500 font-mono">
@@ -820,6 +851,9 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                             {/* Specs */}
                             <td className="py-2.5 px-3 align-top font-mono text-[10px] text-slate-600">
                               {(() => {
+                                if (item.actionType === 'invalid') {
+                                  return <span className="text-slate-400">-</span>
+                                }
                                 if (item.category === 'fixtures') {
                                   const count = item.data.lamp_count || 1
                                   const totalWatt = item.data.lamp_watt * count
@@ -860,18 +894,23 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                     </div>
                                   )
                                 }
+                                if (item.category === 'feeders') {
+                                  return (
+                                    <div>
+                                      <span className="font-bold text-slate-800">
+                                        {item.data.commune_id ? getCommuneName(item.data.commune_id) : '-'}
+                                      </span>
+                                    </div>
+                                  )
+                                }
                                 // Poles
-                                return (
-                                  <div>
-                                    <span className="font-semibold text-slate-700">WKT GIS</span>
-                                    {item.data.geom_wkt ? (
-                                      <div className="text-[9px] text-slate-400 font-mono truncate max-w-[110px]" title={item.data.geom_wkt}>
-                                        {item.data.geom_wkt}
-                                      </div>
-                                    ) : (
-                                      <div className="text-[9px] text-slate-400 italic">Chưa có WKT</div>
-                                    )}
+                                const point = parsePointWkt(item.data.geom_wkt)
+                                return point ? (
+                                  <div className="text-slate-700" title={item.data.geom_wkt ?? undefined}>
+                                    {point.lat.toFixed(5)}, {point.lng.toFixed(5)}
                                   </div>
+                                ) : (
+                                  <div className="text-[10px] text-slate-400 italic">Chưa có GPS</div>
                                 )
                               })()}
                             </td>
@@ -977,10 +1016,10 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
               <div className="flex items-center justify-between pb-3 border-b border-emerald-200/80">
                 <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Kết Quả Nạp {config.label} Từ Backend API:</span>
+                  <span>Kết quả nạp {config.label}</span>
                 </div>
                 <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  Phản Hồi Thành Công
+                  Hoàn tất
                 </span>
               </div>
 
@@ -1022,7 +1061,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 <div className="text-left p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5">
                   <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
                     <AlertTriangle className="w-4 h-4 text-rose-600" />
-                    <span>Chi tiết các dòng bị Backend từ chối ({importResult.rows.length}):</span>
+                    <span>Các dòng bị từ chối ({importResult.rows.length}) — số dòng không kể dòng tiêu đề:</span>
                   </div>
                   <div className="max-h-32 overflow-y-auto space-y-1 text-[11px] pr-2 font-mono">
                     {importResult.rows.map((err: ImportRowError, idx: number) => (
@@ -1035,13 +1074,20 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 </div>
               )}
 
+              {config.nextStep && (importResult.failed ?? 0) === 0 && (importResult.inserted ?? 0) + (importResult.updated ?? 0) > 0 && (
+                <div className="text-[11px] text-slate-600 bg-white border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2 justify-center">
+                  <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>{config.nextStep}</span>
+                </div>
+              )}
+
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={handleCompleteAndClose}
                   className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-xs hover:shadow transition cursor-pointer"
                 >
-                  Hoàn Tất & Xem Danh Sách Tài Sản
+                  Hoàn tất và xem danh sách
                 </button>
               </div>
             </div>
@@ -1076,23 +1122,23 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 {isImporting ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Đang Gửi Lên Backend...</span>
+                    <span>Đang gửi dữ liệu...</span>
                   </>
                 ) : !selectedFile ? (
                   <>
                     <UploadCloud className="w-4 h-4" />
-                    <span>Vui Lòng Chọn Tệp CSV</span>
+                    <span>Vui lòng chọn tệp CSV</span>
                   </>
                 ) : allParsedItems.length > 0 && !hasChanges ? (
                   invalidCount > 0 && importableCount === 0 ? (
                     <>
                       <AlertTriangle className="w-4 h-4 text-rose-500" />
-                      <span>Không Thể Nạp — Tất Cả Bản Ghi Vi Phạm Lỗi</span>
+                      <span>Không thể nạp — tất cả dòng đều có lỗi</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>Dữ Liệu Trùng Khớp 100% — Không Cần Nạp</span>
+                      <span>Dữ liệu trùng khớp 100% — không cần nạp</span>
                     </>
                   )
                 ) : (
@@ -1100,10 +1146,10 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                     <UploadCloud className="w-4 h-4" />
                     <span>
                       {newCount > 0 && updatedCount > 0
-                        ? `Nạp Vào Hệ Thống (${importableCount} bản ghi: ${newCount} mới, ${updatedCount} sửa)`
+                        ? `Nạp vào hệ thống (${importableCount} bản ghi: ${newCount} mới, ${updatedCount} sửa)`
                         : newCount > 0
-                          ? `Nạp Vào Hệ Thống (${newCount} bản ghi mới)`
-                          : `Nạp Vào Hệ Thống (${updatedCount} bản ghi cập nhật)`}
+                          ? `Nạp vào hệ thống (${newCount} bản ghi mới)`
+                          : `Nạp vào hệ thống (${updatedCount} bản ghi cập nhật)`}
                     </span>
                   </>
                 )}

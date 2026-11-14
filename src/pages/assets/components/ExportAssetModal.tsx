@@ -237,7 +237,7 @@ export const ExportAssetModal: React.FC<ExportAssetModalProps> = ({
                   onClick={() => handleToggleCategory(opt.id)}
                   className={`group relative p-3.5 rounded-2xl border-2 text-left flex items-start gap-3 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 ${
                     isSelected
-                      ? 'border-teal-500 bg-teal-50/70 shadow-[0_10px_22px_-14px_rgba(190,69,122,0.7)]'
+                      ? 'border-teal-500 bg-teal-50/70 shadow-[0_10px_22px_-14px_rgba(47,85,144,0.7)]'
                       : 'border-slate-200 bg-white hover:border-teal-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900'
                   }`}
                 >
@@ -282,7 +282,7 @@ export const ExportAssetModal: React.FC<ExportAssetModalProps> = ({
               type="button"
               onClick={handleExport}
               disabled={selectedCategories.length === 0}
-              className="download-trigger px-5 py-2 bg-linear-to-br from-teal-500 to-teal-700 hover:shadow-[0_10px_20px_-10px_rgba(190,69,122,0.75)] hover:-translate-y-px active:scale-[0.97] text-white rounded-xl text-[13px] font-bold transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+              className="download-trigger px-5 py-2 bg-linear-to-br from-teal-500 to-teal-700 hover:shadow-[0_10px_20px_-10px_rgba(47,85,144,0.75)] hover:-translate-y-px active:scale-[0.97] text-white rounded-xl text-[13px] font-bold transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               <DownloadIcon className="w-4 h-4" />
               <span>
