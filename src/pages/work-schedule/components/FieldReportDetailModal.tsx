@@ -80,17 +80,18 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   // Tải ảnh bằng chứng nghiệm thu và danh sách cột từ Backend nếu có mã lệnh công tác
   useEffect(() => {
     if (isOpen && targetWorkOrderId) {
+      let cancelled = false
       setSelectedVideoIndex(0)
       workScheduleAPI
-        .getWorkOrderEvidence(targetWorkOrderId)
-        .then((res) => {
-          if (res.items && res.items.length > 0) {
-            setBackendEvidence(res.items)
-          } else {
-            setBackendEvidence([])
+        .getAllWorkOrderEvidence(targetWorkOrderId)
+        .then((items) => {
+          if (!cancelled) {
+            setBackendEvidence(items)
           }
         })
-        .catch(() => setBackendEvidence([]))
+        .catch(() => {
+          if (!cancelled) setBackendEvidence([])
+        })
 
       workScheduleAPI
         .getWorkOrderPoles(targetWorkOrderId)
@@ -114,6 +115,10 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           }
         })
         .catch(() => setPolePhotos([]))
+
+      return () => {
+        cancelled = true
+      }
     }
   }, [isOpen, targetWorkOrderId])
 
@@ -352,12 +357,12 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <tbody className="divide-y divide-slate-100">
                     {effectivePoleGpsLocations.length > 0 ? (
                       effectivePoleGpsLocations.map((g, idx) => {
-                        const polePhotoMatches = g.pole_id
-                          ? polePhotos.filter((p) => p.pole_id === g.pole_id)
+                        const evidenceMatches = g.pole_id
+                          ? backendEvidence.filter((ev) => ev.pole_id === g.pole_id)
                           : []
-                        const matchedPhoto =
-                          polePhotoMatches.length > 0
-                            ? polePhotoMatches[polePhotoMatches.length - 1]
+                        const matchedEvidence =
+                          evidenceMatches.length > 0
+                            ? evidenceMatches[evidenceMatches.length - 1]
                             : undefined
 
                         return (
@@ -366,30 +371,34 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                               {g.pole_id || '-'}
                             </td>
                             <td className="py-2 px-3">
-                              {matchedPhoto?.photo_id && targetWorkOrderId ? (
+                              {matchedEvidence?.evidence_id ? (
                                 <button
                                   type="button"
                                   onClick={() =>
                                     setZoomImage({
-                                      polePhotoId: matchedPhoto.photo_id,
-                                      workOrderId: targetWorkOrderId,
+                                      evidenceId: matchedEvidence.evidence_id,
                                       src:
-                                        matchedPhoto.original_url ||
-                                        matchedPhoto.thumbnail_url ||
-                                        undefined,
+                                        matchedEvidence.original_url ||
+                                        matchedEvidence.thumbnail_url ||
+                                        workScheduleAPI.getEvidenceImageUrl(
+                                          matchedEvidence.evidence_id || '',
+                                          'original'
+                                        ),
                                       title: `Cột ${g.pole_id || ''}`,
                                     })
                                   }
                                   title="Bấm để phóng to ảnh"
                                   className="relative w-14 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-950 group cursor-pointer block shadow-2xs"
                                 >
-                                  <PolePhotoImage
-                                    workOrderId={targetWorkOrderId}
-                                    photoId={matchedPhoto.photo_id}
+                                  <EvidenceImage
+                                    evidenceId={matchedEvidence.evidence_id}
                                     fallbackSrc={
-                                      matchedPhoto.thumbnail_url ||
-                                      matchedPhoto.original_url ||
-                                      undefined
+                                      matchedEvidence.thumbnail_url ||
+                                      matchedEvidence.original_url ||
+                                      workScheduleAPI.getEvidenceImageUrl(
+                                        matchedEvidence.evidence_id,
+                                        'thumbnail'
+                                      )
                                     }
                                     alt={`Ảnh cột ${g.pole_id || ''}`}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
