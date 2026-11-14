@@ -24,6 +24,7 @@ vi.mock('../../../../../feature/assets/assetAPI', async (importOriginal) => {
     ...actual,
     default: {
       ...actual.default,
+      getIotNodeCommand: vi.fn().mockResolvedValue({}),
       getIotNodeDetail: vi.fn().mockImplementation(async (nodeId: string) => ({
         node_id: nodeId,
         cabinet_id: 'CAB-001',
@@ -274,7 +275,7 @@ describe('IotNodesTab & IoT Node Components Integration Tests', () => {
     const generateBtn = screen.getByText('Tạo secret mới')
     fireEvent.click(generateBtn)
 
-    expect(handleIssue).toHaveBeenCalledWith('IOT-NODE-001', expect.any(Function))
+    expect(handleIssue).toHaveBeenCalledWith('IOT-NODE-001', expect.any(Function), expect.any(Function))
   })
 
   it('6. Modal Cấu Hình Đấu Nối Rơ-le lọc đúng mạch của tủ điện đó', () => {

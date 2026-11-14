@@ -712,6 +712,7 @@ function* handleIssueIotNodeCredential(action: PayloadAction<IssueIotNodeCredent
     const errorMsg = getErrorMessage(error, 'Không thể cấp secret thiết bị IoT')
     yield put(mutationFailure(errorMsg))
     toast.error(`Lỗi cấp secret: ${errorMsg}`)
+    action.payload.onError?.()
   }
 }
 

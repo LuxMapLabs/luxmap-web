@@ -353,9 +353,10 @@ export function useAssetData() {
 
   const handleIssueCredential = (
     nodeId: string,
-    onSuccess: (cred: IotNodeCredential) => void
+    onSuccess: (cred: IotNodeCredential) => void,
+    onError?: () => void
   ) => {
-    dispatch(issueIotNodeCredentialRequest({ nodeId, onSuccess }))
+    dispatch(issueIotNodeCredentialRequest({ nodeId, onSuccess, onError }))
   }
 
   // --- Import Handler ---

@@ -27,7 +27,7 @@ export interface IotNodesTabProps {
   onUpdateIotNode: (nodeId: string, data: UpdateIotNodeRequest) => void
   onDeleteIotNode: (nodeId: string) => void
   onSetRelay: (nodeId: string, relayNo: number, feederId: string | null) => void
-  onIssueCredential: (nodeId: string, onSuccess: (cred: IotNodeCredential) => void) => void
+  onIssueCredential: (nodeId: string, onSuccess: (cred: IotNodeCredential) => void, onError?: () => void) => void
 }
 
 export const IotNodesTab: React.FC<IotNodesTabProps> = ({
