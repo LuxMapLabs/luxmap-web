@@ -101,11 +101,6 @@ export const AssetManagementPage: React.FC = () => {
     handleDrawSegment,
     handleAddSegment,
     handleUpdateSegment,
-    handleAddIotNode,
-    handleUpdateIotNode,
-    handleDeleteIotNode,
-    handleSetRelay,
-    handleIssueCredential,
     handleImportSuccess,
   } = useAssetData()
 
@@ -243,18 +238,7 @@ export const AssetManagementPage: React.FC = () => {
 
         {/* Tab 4 Content: Thiết bị IoT */}
         {activeCategory === 'iot_nodes' && (
-          <IotNodesTab
-            iotNodes={iotNodes}
-            cabinets={cabinets}
-            feeders={feeders}
-            isLoading={isLoadingAssets}
-            onAddIotNode={handleAddIotNode}
-            onUpdateIotNode={handleUpdateIotNode}
-            onDeleteIotNode={handleDeleteIotNode}
-            onSetRelay={handleSetRelay}
-            onIssueCredential={handleIssueCredential}
-            poles={poles}
-          />
+          <IotNodesTab cabinets={cabinets} feeders={feeders} poles={poles} />
         )}
 
         {/* Tab 5 Content: Cột điện */}

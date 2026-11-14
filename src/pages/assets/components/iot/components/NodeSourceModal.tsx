@@ -2,19 +2,23 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { X, RadioTower, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import iotAPI from '../../../../../feature/iot/iotAPI'
-import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
+import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { IotNodeStatus } from '../../../../../types/iot/nodes'
 import type { IotServerStatus } from '../../../../../types/iot/servers'
 import { apiErrorMessage } from '../../../../../utils/iot/apiError'
-import { isValidBridgeId } from '../../../../../utils/iot/iotRegistration'
+import { feederOnRelayOne, isValidBridgeId } from '../../../../../utils/iot/iotRegistration'
 
 const RELAY_NO = 1
 
 export interface NodeSourceModalProps {
-  node: IotNodeItem | null
+  /** Một dòng của `GET /iot/nodes`: đã có `server_id` / `status` nên không phải đọc lại. */
+  node: IotNodeStatus | null
+  feeders: FeederListItem[]
   poles: PoleListItem[]
   onClose: () => void
+  /** Sau khi gán / sửa / gỡ thành công, để trang cha tải lại danh sách. */
+  onSaved: () => void
 }
 
 const inputClass =
@@ -29,11 +33,10 @@ const positive = (value: string): number | null => {
 
 /**
  * Gán nguồn đo IoT bridge cho node (docs/LUXMAP-IOT-FE.md mục 2.4). Node đã có nguồn → sửa (PUT, gửi lại đủ hồ sơ) hoặc gỡ.
- * Mạch lấy từ rơ-le #1 của node; trụ đại diện phải thuộc đúng mạch đó (backend kiểm lại).
+ * Mạch là mạch đang đấu vào rơ-le #1 của node (`feeder.control`); trụ đại diện phải thuộc đúng mạch đó (backend kiểm lại).
  */
-export const NodeSourceModal: React.FC<NodeSourceModalProps> = ({ node, poles, onClose }) => {
+export const NodeSourceModal: React.FC<NodeSourceModalProps> = ({ node, feeders, poles, onClose, onSaved }) => {
   const [servers, setServers] = useState<IotServerStatus[]>([])
-  const [current, setCurrent] = useState<IotNodeStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [serverId, setServerId] = useState('')
   const [deviceId, setDeviceId] = useState('')
@@ -46,27 +49,28 @@ export const NodeSourceModal: React.FC<NodeSourceModalProps> = ({ node, poles, o
   const [error, setError] = useState<string | null>(null)
 
   const nodeId = node?.node_id || ''
-  const feederId = node?.relays?.find((r) => r.relay_no === RELAY_NO)?.feeder_id || null
+  const feederId = feederOnRelayOne(feeders, nodeId)?.feeder_id || null
   const feederPoles = useMemo(() => poles.filter((p) => p.feeder_id && p.feeder_id === feederId), [poles, feederId])
-  const configured = Boolean(current && (current.server_id || current.status !== 'unconfigured'))
+  const configured = Boolean(node && (node.server_id || node.status !== 'unconfigured'))
+  const currentServerId = node?.server_id || ''
 
   useEffect(() => {
     if (!nodeId) return
     let cancelled = false
     setLoading(true)
-    Promise.allSettled([iotAPI.getServers(), iotAPI.getNodes({ page: 1, page_size: 200 })]).then(([s, n]) => {
-      if (cancelled) return
-      const serverList = s.status === 'fulfilled' ? s.value : []
-      const status = n.status === 'fulfilled' ? n.value.items?.find((item) => item.node_id === nodeId) || null : null
-      setServers(serverList)
-      setCurrent(status)
-      setServerId(status?.server_id || serverList[0]?.server_id || '')
-      setLoading(false)
-    })
+    iotAPI
+      .getServers()
+      .catch(() => [] as IotServerStatus[])
+      .then((serverList) => {
+        if (cancelled) return
+        setServers(serverList)
+        setServerId(currentServerId || serverList[0]?.server_id || '')
+        setLoading(false)
+      })
     return () => {
       cancelled = true
     }
-  }, [nodeId])
+  }, [nodeId, currentServerId])
 
   useEffect(() => {
     if (!poleId && feederPoles[0]?.pole_id) setPoleId(feederPoles[0].pole_id)
@@ -80,7 +84,7 @@ export const NodeSourceModal: React.FC<NodeSourceModalProps> = ({ node, poles, o
     const nominalVoltage = positive(voltage)
     const nominalCurrent = positive(currentMa)
     const nominalPower = positive(powerMw)
-    if (!feederId) return setError('Node chưa đấu rơ-le #1 vào mạch nào. Hãy cấu hình đấu nối rơ-le trước.')
+    if (!feederId) return setError('Node chưa đấu rơ-le #1 vào mạch nào nên chưa gán nguồn đo được.')
     if (!serverId) return setError('Chưa có server IoT nào. Nhờ Quản trị viên đăng ký server ở trang IoT Bridge.')
     if (!isValidBridgeId(deviceId.trim())) return setError('Device ID không hợp lệ (chữ, số, "-" hoặc "_", tối đa 64 ký tự).')
     if (!poleId) return setError(`Mạch ${feederId} chưa có trụ nào để làm trụ đại diện.`)
@@ -102,7 +106,7 @@ export const NodeSourceModal: React.FC<NodeSourceModalProps> = ({ node, poles, o
       if (configured) await iotAPI.updateNodeSource(nodeId, profile)
       else await iotAPI.registerNodeSource(nodeId, profile)
       toast.success(configured ? `Đã cập nhật nguồn đo của ${nodeId}` : `Đã gán nguồn đo cho ${nodeId}`)
-      onClose()
+      onSaved()
     } catch (err) {
       setError(apiErrorMessage(err, 'Không lưu được nguồn đo.'))
     } finally {
@@ -117,7 +121,7 @@ export const NodeSourceModal: React.FC<NodeSourceModalProps> = ({ node, poles, o
     try {
       await iotAPI.deleteNodeSource(nodeId)
       toast.success(`Đã gỡ nguồn đo của ${nodeId}`)
-      onClose()
+      onSaved()
     } catch (err) {
       setError(apiErrorMessage(err, 'Không gỡ được nguồn đo.'))
     } finally {
@@ -141,7 +145,7 @@ export const NodeSourceModal: React.FC<NodeSourceModalProps> = ({ node, poles, o
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Nguồn đo IoT bridge</h3>
               <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                {nodeId} · {loading ? 'đang tải…' : configured ? `đã gán (${current?.server_id || '—'})` : 'chưa gán'}
+                {nodeId} · {configured ? `đã gán (${node.server_id || '—'})` : 'chưa gán'}
               </p>
             </div>
           </div>
@@ -156,12 +160,6 @@ export const NodeSourceModal: React.FC<NodeSourceModalProps> = ({ node, poles, o
         </div>
 
         <form onSubmit={save} className="p-6 space-y-3">
-          {!node.supports_remote_control && (
-            <p className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200">
-              Node đang tắt "điều khiển từ xa": gán nguồn vẫn đọc được số đo, nhưng không bật/tắt mạch qua bridge được. Bật lại ở
-              "Chỉnh sửa thiết bị".
-            </p>
-          )}
           {configured && (
             <p className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900 text-[11px] text-blue-800 dark:text-blue-200">
               Node đã có nguồn đo. Backend không trả lại hồ sơ cũ, nên khi lưu cần nhập lại đầy đủ các ô bên dưới.

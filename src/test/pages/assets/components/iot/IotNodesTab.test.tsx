@@ -1,9 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { IotNodesTab } from '../../../../../pages/assets/components/iot/IotNodesTab'
-import { IotNodeDetailModal } from '../../../../../pages/assets/components/iot/components/IotNodeDetailModal'
-import { IssueCredentialModal } from '../../../../../pages/assets/components/iot/components/IssueCredentialModal'
-import { SetRelayModal } from '../../../../../pages/assets/components/iot/components/SetRelayModal'
+import iotAPI from '../../../../../feature/iot/iotAPI'
 import assetReducer, {
   createIotNodeRequest,
   updateIotNodeRequest,
@@ -11,356 +9,104 @@ import assetReducer, {
   setIotNodeRelayRequest,
   issueIotNodeCredentialRequest,
 } from '../../../../../feature/assets/assetSlice'
-import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 
-
 vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
 
-vi.mock('../../../../../feature/assets/assetAPI', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../../feature/assets/assetAPI')>()
-  return {
-    ...actual,
-    default: {
-      ...actual.default,
-      getIotNodeDetail: vi.fn().mockImplementation(async (nodeId: string) => ({
-        node_id: nodeId,
-        cabinet_id: 'CAB-001',
-        commune_id: 'COM-001',
-        node_role: 'segment_controller',
-        data_source: 'simulated',
-        supports_remote_control: true,
-        has_credential: true,
-        relays: [{ relay_no: 1, feeder_id: 'FDR-001' }],
-      })),
-    },
-  }
-})
+vi.mock('../../../../../feature/iot/iotAPI', () => ({
+  default: { getNodes: vi.fn(), getServers: vi.fn() },
+}))
 
-describe('IotNodesTab & IoT Node Components Integration Tests', () => {
-  const mockCabinets: CabinetListItem[] = [
-    {
-      cabinet_id: 'CAB-001',
-      external_ref: 'CAB-TL8-A',
-      cabinet_name: 'Tủ A - Tỉnh Lộ 8',
-      commune_id: 'COM-001',
-      commune_name: 'Xã Phú Hòa Đông',
-      data_source: 'field',
-      location: { lat: 10.9701, lng: 106.4896 },
-      feeder_ids: ['FDR-001'],
-      updated_at: '2026-10-20T10:00:00Z',
-    },
-    {
-      cabinet_id: 'CAB-002',
-      external_ref: 'CAB-TL8-B',
-      cabinet_name: 'Tủ B - Tỉnh Lộ 8',
-      commune_id: 'COM-002',
-      commune_name: 'Xã Tân An Hội',
-      data_source: 'field',
-      location: { lat: 10.973, lng: 106.495 },
-      feeder_ids: ['FDR-002'],
-      updated_at: '2026-10-20T10:00:00Z',
-    },
-  ]
+const api = vi.mocked(iotAPI)
 
-  const mockFeeders: FeederListItem[] = [
-    {
-      feeder_id: 'FDR-001',
-      external_ref: 'FDR-CAB-TL8-A',
-      feeder_name: 'Lộ 1 - Tủ A - Tỉnh Lộ 8',
-      commune_id: 'COM-001',
-      commune_name: 'Xã Phú Hòa Đông',
-      has_geometry: true,
-      pole_count: 5,
-      cabinet: {
-        cabinet_id: 'CAB-001',
-        cabinet_name: 'Tủ A - Tỉnh Lộ 8',
-        location: { lat: 10.9701, lng: 106.4896 },
-        cabinet_source: 'verified',
-      },
-      updated_at: '2026-10-20T10:00:00Z',
-    },
-    {
-      feeder_id: 'FDR-001-B',
-      external_ref: 'FDR-CAB-TL8-A2',
-      feeder_name: 'Lộ 2 - Tủ A - Tỉnh Lộ 8',
-      commune_id: 'COM-001',
-      commune_name: 'Xã Phú Hòa Đông',
-      has_geometry: true,
-      pole_count: 3,
-      cabinet: {
-        cabinet_id: 'CAB-001',
-        cabinet_name: 'Tủ A - Tỉnh Lộ 8',
-        location: { lat: 10.9701, lng: 106.4896 },
-        cabinet_source: 'verified',
-      },
-      updated_at: '2026-10-20T10:00:00Z',
-    },
-    {
-      feeder_id: 'FDR-002',
-      external_ref: 'FDR-CAB-TL8-B',
-      feeder_name: 'Lộ 1 - Tủ B - Tỉnh Lộ 8',
-      commune_id: 'COM-002',
-      commune_name: 'Xã Tân An Hội',
-      has_geometry: false,
-      pole_count: 0,
-      cabinet: {
-        cabinet_id: 'CAB-002',
-        cabinet_name: 'Tủ B - Tỉnh Lộ 8',
-        location: { lat: 10.973, lng: 106.495 },
-        cabinet_source: 'verified',
-      },
-      updated_at: '2026-10-20T10:00:00Z',
-    },
-  ]
+describe('IotNodesTab (GET /iot/nodes)', () => {
+  const cabinets = [
+    { cabinet_id: 'CAB-001', external_ref: 'CAB-TL8-A', cabinet_name: 'Tủ A - Tỉnh Lộ 8', commune_id: 'COM-001' },
+    { cabinet_id: 'CAB-002', external_ref: 'CAB-TL8-B', cabinet_name: 'Tủ B - Tỉnh Lộ 8', commune_id: 'COM-002' },
+  ] as CabinetListItem[]
 
-  const mockIotNodes: IotNodeItem[] = [
+  // FDR-001 đấu vào rơ-le #1 của IOT-NODE-001; IOT-NODE-002 chỉ có mạch ở rơ-le #2.
+  const feeders = [
+    { feeder_id: 'FDR-001', control: { node_id: 'IOT-NODE-001', relay_no: 1 } },
+    { feeder_id: 'FDR-002', control: { node_id: 'IOT-NODE-002', relay_no: 2 } },
+  ] as FeederListItem[]
+
+  const nodes = [
     {
       node_id: 'IOT-NODE-001',
+      server_id: 'iot-server-01',
+      status: 'online',
+      last_received_at: '2026-11-13T02:00:00Z',
       cabinet_id: 'CAB-001',
       commune_id: 'COM-001',
-      node_role: 'segment_controller',
-      data_source: 'simulated',
-      supports_remote_control: true,
-      has_credential: true,
-      credential_set_at: '2026-10-20T08:00:00Z',
-      last_report_at: '2026-10-21T02:00:00Z',
-      relays: [
-        {
-          relay_no: 1,
-          feeder_id: 'FDR-001',
-          control_mode: 'on',
-          mode_reported_at: '2026-10-21T02:00:00Z',
-        },
-      ],
-      updated_at: '2026-10-21T02:00:00Z',
     },
     {
       node_id: 'IOT-NODE-002',
+      server_id: null,
+      status: 'unconfigured',
+      last_received_at: null,
       cabinet_id: 'CAB-002',
       commune_id: 'COM-002',
-      node_role: 'segment_controller',
-      data_source: 'calibration_rig',
-      supports_remote_control: false,
-      has_credential: false,
-      credential_set_at: null,
-      last_report_at: null,
-      relays: [],
-      updated_at: '2026-10-20T10:00:00Z',
     },
   ]
 
-  it('1. Render đầy đủ thanh công cụ tìm kiếm và bảng danh sách thiết bị IoT', () => {
-    render(
-      <IotNodesTab
-        iotNodes={mockIotNodes}
-        cabinets={mockCabinets}
-        feeders={mockFeeders}
-        onAddIotNode={vi.fn()}
-        onUpdateIotNode={vi.fn()}
-        onDeleteIotNode={vi.fn()}
-        onSetRelay={vi.fn()}
-        onIssueCredential={vi.fn()}
-      />
-    )
-
-    // Kiểm tra toolbar
-    expect(
-      screen.getByPlaceholderText('Tìm theo mã thiết bị, mã tủ, tên tủ, địa bàn...')
-    ).toBeInTheDocument()
-    expect(screen.getByText('Thêm thiết bị IoT')).toBeInTheDocument()
-
-    // Kiểm tra các cột tiêu đề bảng
-    expect(screen.getByText('Mã thiết bị')).toBeInTheDocument()
-    expect(screen.getByText('Tủ điện cấp nguồn')).toBeInTheDocument()
-    expect(screen.getByText('Nguồn dữ liệu')).toBeInTheDocument()
-    expect(screen.getByText('Điều khiển từ xa')).toBeInTheDocument()
-    expect(screen.getByText('Xác thực (Secret)')).toBeInTheDocument()
-
-    // Kiểm tra dữ liệu dòng
-    expect(screen.getByText('IOT-NODE-001')).toBeInTheDocument()
-    expect(screen.getByText('IOT-NODE-002')).toBeInTheDocument()
-    expect(screen.getByText('Mô phỏng')).toBeInTheDocument()
-    expect(screen.getByText('Kiểm chuẩn (Rig)')).toBeInTheDocument()
-    expect(screen.getByText('Đã cấp')).toBeInTheDocument()
-    expect(screen.getByText('Chưa cấp')).toBeInTheDocument()
-    expect(screen.getByText('FDR-001')).toBeInTheDocument()
+  beforeEach(() => {
+    vi.clearAllMocks()
+    api.getNodes.mockResolvedValue({ page: 1, page_size: 200, total: 2, items: nodes })
+    api.getServers.mockResolvedValue([])
   })
 
-  it('2. Lọc danh sách thiết bị IoT khi gõ từ khóa tìm kiếm', () => {
-    render(
-      <IotNodesTab
-        iotNodes={mockIotNodes}
-        cabinets={mockCabinets}
-        feeders={mockFeeders}
-        onAddIotNode={vi.fn()}
-        onUpdateIotNode={vi.fn()}
-        onDeleteIotNode={vi.fn()}
-        onSetRelay={vi.fn()}
-        onIssueCredential={vi.fn()}
-      />
-    )
+  it('lists the nodes from /iot/nodes with bridge status, server and the feeder on relay 1', async () => {
+    render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
 
-    const searchInput = screen.getByPlaceholderText(
-      'Tìm theo mã thiết bị, mã tủ, tên tủ, địa bàn...'
-    )
-    fireEvent.change(searchInput, { target: { value: 'IOT-NODE-002' } })
+    const row1 = (await screen.findByText('IOT-NODE-001')).closest('tr')!
+    expect(api.getNodes).toHaveBeenCalledWith({ page: 1, page_size: 200 })
+    expect(within(row1).getByText('Tủ A - Tỉnh Lộ 8')).toBeInTheDocument()
+    expect(within(row1).getByText('iot-server-01')).toBeInTheDocument()
+    expect(within(row1).getByText('Node online')).toBeInTheDocument()
+    expect(within(row1).getByText('FDR-001')).toBeInTheDocument()
 
-    // Node 002 vẫn hiển thị, node 001 bị lọc
-    expect(screen.getByText('IOT-NODE-002')).toBeInTheDocument()
-    expect(screen.queryByText('IOT-NODE-001')).not.toBeInTheDocument()
+    // Mạch ở rơ-le #2 không phải mạch của nguồn đo bridge.
+    const row2 = screen.getByText('IOT-NODE-002').closest('tr')!
+    expect(within(row2).getByText('Chưa gán nguồn đo')).toBeInTheDocument()
+    expect(within(row2).getByText('Chưa đấu nối')).toBeInTheDocument()
+    expect(within(row2).getByText('Chưa có mẫu đo')).toBeInTheDocument()
+
+    // Không còn thao tác của /assets/iot-nodes.
+    expect(screen.queryByText('Thêm thiết bị IoT')).not.toBeInTheDocument()
   })
 
-  it('3. Mở modal Đăng ký thiết bị IoT mới khi click nút', () => {
-    render(
-      <IotNodesTab
-        iotNodes={mockIotNodes}
-        cabinets={mockCabinets}
-        feeders={mockFeeders}
-        onAddIotNode={vi.fn()}
-        onUpdateIotNode={vi.fn()}
-        onDeleteIotNode={vi.fn()}
-        onSetRelay={vi.fn()}
-        onIssueCredential={vi.fn()}
-      />
-    )
+  it('filters by server id', async () => {
+    render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
+    await screen.findByText('IOT-NODE-001')
 
-    const addBtn = screen.getByText('Thêm thiết bị IoT')
-    fireEvent.click(addBtn)
-
-    expect(screen.getByText('Đăng ký thiết bị IoT mới')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('-- Chọn tủ điện gắn thiết bị --')).toBeInTheDocument()
-  })
-
-  it('4. Modal Xem Chi Tiết Thiết Bị IoT hiển thị thông tin và danh sách rơ-le', () => {
-    const handleClose = vi.fn()
-    render(
-      <IotNodeDetailModal
-        isOpen={true}
-        node={mockIotNodes[0]}
-        cabinets={mockCabinets}
-        onClose={handleClose}
-        onEdit={vi.fn()}
-        onSetRelay={vi.fn()}
-        onIssueCredential={vi.fn()}
-      />
-    )
+    fireEvent.change(screen.getByPlaceholderText(/Tìm theo mã thiết bị/), { target: { value: 'iot-server-01' } })
 
     expect(screen.getByText('IOT-NODE-001')).toBeInTheDocument()
-    expect(screen.getByText('Tủ A - Tỉnh Lộ 8')).toBeInTheDocument()
-    expect(screen.getByText('Mô phỏng (Simulated)')).toBeInTheDocument()
-    expect(screen.getByText('Rơ-le #1')).toBeInTheDocument()
-    expect(screen.getByText('FDR-001')).toBeInTheDocument()
+    expect(screen.queryByText('IOT-NODE-002')).not.toBeInTheDocument()
   })
 
-  it('5. Modal Cấp Secret Xác Thực cảnh báo an toàn và gọi hàm tạo secret', () => {
-    const handleIssue = vi.fn()
-    render(
-      <IssueCredentialModal
-        isOpen={true}
-        node={mockIotNodes[0]}
-        onClose={vi.fn()}
-        onIssue={handleIssue}
-      />
-    )
+  it('shows the API error message', async () => {
+    api.getNodes.mockRejectedValue({ response: { data: { error: { message: 'Bạn không có quyền.' } } } })
+    render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
 
-    expect(screen.getByText('Cấp secret xác thực IoT')).toBeInTheDocument()
-    expect(screen.getByText('Cảnh báo bảo mật quan trọng:')).toBeInTheDocument()
-
-    const generateBtn = screen.getByText('Tạo secret mới')
-    fireEvent.click(generateBtn)
-
-    expect(handleIssue).toHaveBeenCalledWith('IOT-NODE-001', expect.any(Function))
+    expect(await screen.findByText('Bạn không có quyền.')).toBeInTheDocument()
   })
 
-  it('6. Modal Cấu Hình Đấu Nối Rơ-le lọc đúng mạch của tủ điện đó', () => {
-    const handleSave = vi.fn()
-    render(
-      <SetRelayModal
-        isOpen={true}
-        node={mockIotNodes[0]}
-        feeders={mockFeeders}
-        onClose={vi.fn()}
-        onSave={handleSave}
-      />
-    )
+  it('opens the bridge source dialog for the row, with the feeder on relay 1', async () => {
+    render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
+    const row1 = (await screen.findByText('IOT-NODE-001')).closest('tr')!
 
-    expect(screen.getByText('Cấu Hình Đấu Nối Rơ-le')).toBeInTheDocument()
-    expect(screen.getByText('Rơ-le #1')).toBeInTheDocument()
+    fireEvent.click(within(row1).getByRole('button', { name: /Nguồn đo/ }))
 
-    // Mỗi thiết bị chỉ có 1 rơ-le: đã có rơ-le #1 thì không có nút thêm rơ-le
-    expect(screen.queryByText('Thêm Rơ-le')).not.toBeInTheDocument()
-
-    // Ban đầu chưa bấm sửa thì form cấu hình chưa hiển thị
-    expect(screen.queryByText(/Mạch Điện Xuất Tuyến Thuộc Tủ/)).not.toBeInTheDocument()
-
-    // Chỉ được đổi mạch cho rơ-le #1
-    fireEvent.click(screen.getByText('Đổi mạch'))
-    expect(screen.getByText('Đổi Mạch Cho Rơ-le #1')).toBeInTheDocument()
-    expect(screen.getByText(/Mạch Điện Xuất Tuyến Thuộc Tủ/)).toBeInTheDocument()
-
-    // Mạch FDR-001 đang là mạch của rơ-le #1 nên chọn được; mạch FDR-001-B của cùng tủ còn trống
-    const selectEl = screen.getByRole('combobox') as HTMLSelectElement
-    expect(Array.from(selectEl.options).find((o) => o.value === 'FDR-001')?.disabled).toBe(false)
-    fireEvent.change(selectEl, { target: { value: 'FDR-001-B' } })
-
-    fireEvent.click(screen.getByText('Cập Nhật Mạch'))
-    expect(handleSave).toHaveBeenCalledWith('IOT-NODE-001', 1, 'FDR-001-B')
+    expect(await screen.findByRole('dialog', { name: 'Nguồn đo IoT bridge' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('FDR-001')).toBeInTheDocument()
   })
+})
 
-  it('6b. Thiết bị chưa có rơ-le: thêm rơ-le luôn là rơ-le số 1', () => {
-    const handleSave = vi.fn()
-    render(
-      <SetRelayModal
-        isOpen={true}
-        node={mockIotNodes[1]}
-        feeders={mockFeeders}
-        onClose={vi.fn()}
-        onSave={handleSave}
-      />
-    )
-
-    fireEvent.click(screen.getByText('Thêm Rơ-le'))
-    expect(screen.getByText('Đấu Nối Rơ-le Mới: #1')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByText('Lưu rơ-le này'))
-    expect(handleSave).toHaveBeenCalledWith('IOT-NODE-002', 1, 'FDR-002')
-  })
-
-  it('7. Hiển thị modal xác nhận xóa tùy chỉnh (ConfirmDeleteIotNodeModal) thay vì window.confirm', () => {
-    const handleDelete = vi.fn()
-    render(
-      <IotNodesTab
-        iotNodes={mockIotNodes}
-        cabinets={mockCabinets}
-        feeders={mockFeeders}
-        onAddIotNode={vi.fn()}
-        onUpdateIotNode={vi.fn()}
-        onDeleteIotNode={handleDelete}
-        onSetRelay={vi.fn()}
-        onIssueCredential={vi.fn()}
-      />
-    )
-
-    // Tìm nút xóa cho node IOT-NODE-002 (node này không có rơ-le nối mạch)
-    // Hành động xóa nằm trong menu "Thêm thao tác" của từng dòng; dòng thứ 2 là IOT-NODE-002
-    const moreButtons = screen.getAllByRole('button', { name: 'Thêm thao tác' })
-    fireEvent.click(moreButtons[1])
-    fireEvent.click(screen.getByRole('menuitem', { name: /Xóa thiết bị/ }))
-
-    // Kiểm tra modal xác nhận xóa xuất hiện
-    expect(screen.getByText('Xác nhận xóa thiết bị IoT')).toBeInTheDocument()
-    expect(screen.getByText(/Thao tác này sẽ gỡ bỏ thiết bị khỏi tủ điện/)).toBeInTheDocument()
-
-    // Click nút "Xác Nhận Xóa"
-    const confirmBtn = screen.getByRole('button', { name: 'Xác Nhận Xóa' })
-    fireEvent.click(confirmBtn)
-
-    expect(handleDelete).toHaveBeenCalledWith('IOT-NODE-002')
-  })
-
-  it('8. Xác minh Redux slice xử lý đúng actions IoT Node CRUD', () => {
+describe('assetSlice IoT node actions', () => {
+  it('sets isMutating for the IoT node CRUD actions', () => {
     const initialState = {
       poles: [],
       cabinets: [],

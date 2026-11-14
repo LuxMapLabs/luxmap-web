@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { NodeSourceModal } from '../../../../../pages/assets/components/iot/components/NodeSourceModal'
 import iotAPI from '../../../../../feature/iot/iotAPI'
-import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
+import type { IotNodeStatus } from '../../../../../types/iot/nodes'
+import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 
 vi.mock('../../../../../feature/iot/iotAPI', () => ({
   default: {
     getServers: vi.fn(),
-    getNodes: vi.fn(),
     registerNodeSource: vi.fn(),
     updateNodeSource: vi.fn(),
     deleteNodeSource: vi.fn(),
@@ -17,18 +17,17 @@ vi.mock('../../../../../feature/iot/iotAPI', () => ({
 
 const api = vi.mocked(iotAPI)
 
-const node = (overrides: Partial<IotNodeItem> = {}): IotNodeItem => ({
+const node = (overrides: Partial<IotNodeStatus> = {}): IotNodeStatus => ({
   node_id: 'NODE-001',
+  server_id: null,
+  status: 'unconfigured',
   cabinet_id: 'CAB-009',
   commune_id: 'COM-001',
-  node_role: 'segment_controller',
-  data_source: 'calibration_rig',
-  supports_remote_control: true,
-  has_credential: false,
-  relays: [{ relay_no: 1, feeder_id: 'FDR-010' }],
-  updated_at: null,
   ...overrides,
 })
+
+// FDR-010 đấu vào rơ-le #1 của NODE-001.
+const feeders = [{ feeder_id: 'FDR-010', control: { node_id: 'NODE-001', relay_no: 1 } }] as FeederListItem[]
 
 const poles = [
   { pole_id: 'POLE-0027', feeder_id: 'FDR-013', segment_id: 'SEG-001' },
@@ -49,10 +48,9 @@ describe('NodeSourceModal', () => {
   })
 
   it('registers a new source on relay 1 with the feeder of that relay and a pole of that feeder', async () => {
-    api.getNodes.mockResolvedValue({ items: [{ node_id: 'NODE-001', server_id: null, status: 'unconfigured' }] })
     api.registerNodeSource.mockResolvedValue({ node_id: 'NODE-001' })
-    const onClose = vi.fn()
-    render(<NodeSourceModal node={node()} poles={poles} onClose={onClose} />)
+    const onSaved = vi.fn()
+    render(<NodeSourceModal node={node()} feeders={feeders} poles={poles} onClose={vi.fn()} onSaved={onSaved} />)
 
     expect(await screen.findByText(/chưa gán/)).toBeInTheDocument()
     fill()
@@ -71,12 +69,19 @@ describe('NodeSourceModal', () => {
       })
     )
     expect(api.updateNodeSource).not.toHaveBeenCalled()
-    expect(onClose).toHaveBeenCalled()
+    expect(onSaved).toHaveBeenCalled()
   })
 
   it('updates with PUT when the node already has a source, and removes only after a second click', async () => {
-    api.getNodes.mockResolvedValue({ items: [{ node_id: 'NODE-001', server_id: 'iot-server-01', status: 'offline' }] })
-    render(<NodeSourceModal node={node()} poles={poles} onClose={vi.fn()} />)
+    render(
+      <NodeSourceModal
+        node={node({ server_id: 'iot-server-01', status: 'offline' })}
+        feeders={feeders}
+        poles={poles}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    )
 
     expect(await screen.findByText('Cập nhật nguồn đo')).toBeInTheDocument()
     fill()
@@ -91,8 +96,9 @@ describe('NodeSourceModal', () => {
   })
 
   it('refuses to save a node whose relay 1 is not wired to a feeder', async () => {
-    api.getNodes.mockResolvedValue({ items: [{ node_id: 'NODE-001', server_id: null, status: 'unconfigured' }] })
-    render(<NodeSourceModal node={node({ relays: [] })} poles={poles} onClose={vi.fn()} />)
+    // Mạch chỉ đấu vào rơ-le #2 thì không phải mạch của nguồn đo.
+    const relayTwo = [{ feeder_id: 'FDR-010', control: { node_id: 'NODE-001', relay_no: 2 } }] as FeederListItem[]
+    render(<NodeSourceModal node={node()} feeders={relayTwo} poles={poles} onClose={vi.fn()} onSaved={vi.fn()} />)
 
     await screen.findByText(/chưa gán/)
     fill()
