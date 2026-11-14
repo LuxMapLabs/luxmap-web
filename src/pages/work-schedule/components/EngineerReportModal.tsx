@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { X, Send, Video, Search, Wrench, FileText } from 'lucide-react'
-import { ScheduleCase } from '../../../types/workSchedule'
+import type { ScheduleCase } from '../../../feature/work-schedule/workScheduleSlice'
 
 interface EngineerReportModalProps {
   isOpen: boolean
@@ -22,13 +22,9 @@ export const EngineerReportModal: React.FC<EngineerReportModalProps> = ({
   onSubmit,
 }) => {
   const [summary, setSummary] = useState('')
-  const [suggestedMaterialsNote, setSuggestedMaterialsNote] = useState(
-    '02 bộ bóng LED 100W, 01 chấn lưu, 1 cuộn băng keo cách điện'
-  )
-  const [usedMaterialsNote, setUsedMaterialsNote] = useState(
-    '02 bóng LED 100W Rạng Đông, 01 aptomat 16A'
-  )
-  const [luxMeasured, setLuxMeasured] = useState('0 Lux (Cháy chip LED hoàn toàn)')
+  const [suggestedMaterialsNote, setSuggestedMaterialsNote] = useState('')
+  const [usedMaterialsNote, setUsedMaterialsNote] = useState('')
+  const [luxMeasured, setLuxMeasured] = useState('')
 
   if (!isOpen || !caseItem) return null
 
@@ -77,22 +73,12 @@ export const EngineerReportModal: React.FC<EngineerReportModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
           {/* Phase 1: Survey Form */}
           {currentPhase.phaseType === 'survey' && (
-            <>
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
-                <Video className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                <div>Quét video thực địa dọc tuyến. Hệ thống AI tự động phân tích và gắn toạ độ lỗi.</div>
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
+              <Video className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                Ảnh chụp và video quét thực địa được đồng bộ trực tiếp từ ứng dụng di động của kỹ sư hiện trường.
               </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700">File video khảo sát:</label>
-                <input
-                  type="text"
-                  readOnly
-                  value="survey_video_field_0510.mp4 (Đã upload MinIO 100%)"
-                  className="p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-700 outline-none"
-                />
-              </div>
-            </>
+            </div>
           )}
 
           {/* Phase 2: Inspection Form */}
@@ -109,6 +95,7 @@ export const EngineerReportModal: React.FC<EngineerReportModalProps> = ({
                   type="text"
                   value={luxMeasured}
                   onChange={(e) => setLuxMeasured(e.target.value)}
+                  placeholder="Ví dụ: 12 Lux hoặc 0 Lux (Mất sáng hoàn toàn)..."
                   className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

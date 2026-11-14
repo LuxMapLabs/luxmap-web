@@ -1,4 +1,6 @@
 import apiClient from '../../config/apiClient'
+import type { IotCommandRequest, IotCommandStatus } from '../../types/iot/nodes'
+import type { IotPoleControl } from '../../types/iot/poles'
 import type { ImportResult } from '../../types/assets/import'
 import type {
   SegmentListItemPagedResult,
@@ -345,6 +347,21 @@ export const assetAPI = {
    */
   setIotNodeRelay: async (nodeId: string, relayNo: number, data: SetRelayRequest): Promise<void> => {
     await apiClient.put(`/assets/iot-nodes/${encodeURIComponent(nodeId)}/relays/${relayNo}`, data)
+  },
+
+  sendIotNodeCommand: async (nodeId: string, data: IotCommandRequest, signal?: AbortSignal): Promise<IotCommandStatus> => {
+    const response = await apiClient.post<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`, data, { signal })
+    return response.data
+  },
+
+  getIotNodeCommand: async (nodeId: string, signal?: AbortSignal): Promise<IotCommandStatus> => {
+    const response = await apiClient.get<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`, { signal })
+    return response.data
+  },
+
+  getIotPoleControl: async (poleId: string): Promise<IotPoleControl> => {
+    const response = await apiClient.get<IotPoleControl>(`/iot/poles/${encodeURIComponent(poleId)}/control`)
+    return response.data
   },
 
   /**

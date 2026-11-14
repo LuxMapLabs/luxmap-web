@@ -132,44 +132,38 @@ export const ProposalFaultsModal: React.FC<ProposalFaultsModalProps> = ({
   proposalTitle,
   segmentName,
   faultIds,
-  poleIds = [],
 }) => {
   const [loading, setLoading] = useState(true)
   const [faults, setFaults] = useState<FaultItem[]>([])
+  const [failedIds, setFailedIds] = useState<string[]>([])
 
   useEffect(() => {
     if (!isOpen || faultIds.length === 0) {
       setFaults([])
+      setFailedIds([])
       setLoading(false)
       return
     }
 
     let isMounted = true
     setLoading(true)
+    setFailedIds([])
 
     // Tải chi tiết từng sự cố theo ID
     Promise.allSettled(faultIds.map((id) => faultAPI.getFaultDetail(id)))
       .then((results) => {
         if (!isMounted) return
         const loaded: FaultItem[] = []
+        const failed: string[] = []
         results.forEach((res, idx) => {
           if (res.status === 'fulfilled' && res.value) {
             loaded.push(res.value)
           } else {
-            // Nếu có ID chưa fetch được, tạo đối tượng giả lập để không bị thiếu thông tin
-            loaded.push({
-              fault_id: faultIds[idx],
-              pole_id: poleIds[idx] || null,
-              fault_type: 'lamp_out' as any,
-              severity: 'critical' as any,
-              detected_at: new Date().toISOString(),
-              location: { lat: 0, lng: 0 },
-              allowed_actions: [],
-              note: 'Sự cố đang chờ phân lịch kiểm tra hiện trường.',
-            } as FaultItem)
+            failed.push(faultIds[idx])
           }
         })
         setFaults(loaded)
+        setFailedIds(failed)
       })
       .catch((err) => {
         console.error('[ProposalFaultsModal] Failed to load faults:', err)
@@ -181,7 +175,7 @@ export const ProposalFaultsModal: React.FC<ProposalFaultsModalProps> = ({
     return () => {
       isMounted = false
     }
-  }, [isOpen, faultIds, poleIds])
+  }, [isOpen, faultIds])
 
   if (!isOpen) return null
 
@@ -227,12 +221,18 @@ export const ProposalFaultsModal: React.FC<ProposalFaultsModalProps> = ({
               <Loader2 className="w-7 h-7 animate-spin text-teal-600" />
               <span className="text-xs font-semibold">Đang tải chi tiết các sự cố...</span>
             </div>
-          ) : faults.length === 0 ? (
+          ) : faults.length === 0 && failedIds.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-xs">
               Không tìm thấy thông tin sự cố nào trong ca này.
             </div>
           ) : (
-            faults.map((f, idx) => {
+            <>
+              {failedIds.length > 0 && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                  Không thể tải chi tiết cho {failedIds.length} sự cố: {failedIds.join(', ')}.
+                </div>
+              )}
+              {faults.map((f, idx) => {
               const typeInfo = getFaultTypeLabel(f.fault_type)
               const sourceInfo = getSourceChannelInfo(f.source_channel)
               const sevBadge = getSeverityBadge(f.severity)
@@ -300,7 +300,8 @@ export const ProposalFaultsModal: React.FC<ProposalFaultsModalProps> = ({
                   </div>
                 </div>
               )
-            })
+            })}
+            </>
           )}
         </div>
 

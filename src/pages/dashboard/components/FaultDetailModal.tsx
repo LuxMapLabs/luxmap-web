@@ -65,8 +65,15 @@ export const FaultDetailModal: React.FC<FaultDetailModalProps> = ({
     </span>
   )
 
+  const rawNote = (fault.note || fault.review_note || '').trim()
+  const iotMatch = rawNote.match(/Thiết bị\s+(NODE-[\w-]+)\s+ở tủ\s+(CAB-[\w-]+)/i)
+
+  const targetLabel = fault.pole_id || (iotMatch ? iotMatch[1] : fault.fault_id || '-')
+
   const segmentName =
-    segmentNameMap[fault.segment_id || ''] || fault.segment_id || 'Chưa rõ tuyến'
+    segmentNameMap[fault.segment_id || ''] ||
+    fault.segment_id ||
+    (iotMatch ? iotMatch[2] : '-')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
@@ -78,8 +85,7 @@ export const FaultDetailModal: React.FC<FaultDetailModalProps> = ({
               <h3 className="font-bold text-slate-900 text-base">Chi Tiết Sự Cố Chiếu Sáng</h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Cột: <strong className="text-slate-800">{fault.pole_id || 'Chưa gán cột'}</strong> •{' '}
-              {segmentName}
+              <strong className="text-slate-800">{targetLabel}</strong> • {segmentName}
             </p>
           </div>
           <button

@@ -1,6 +1,6 @@
 import type { WorkOrderItem, WorkOrderDetail, WorkOrderAssignee } from '../../types/workorders/orders'
 import type { TaskKind } from '../../types/common/enums'
-import type { ScheduleCase, SchedulePhase } from '../../types/workSchedule'
+import type { ScheduleCase, SchedulePhase } from '../../feature/work-schedule/workScheduleSlice'
 
 type WorkOrderRawItem = WorkOrderItem & Partial<WorkOrderDetail> & {
   segment_name?: string | null
@@ -28,23 +28,24 @@ export function segmentLabelFromIds(
 }
 
 /**
- * Định dạng tên hiển thị đầy đủ và thân thiện của tuyến đường
+ * Định dạng tên hiển thị tuyến đường từ dữ liệu API
  */
 export function formatSegmentDisplay(
   segIdOrName?: string | null,
   fallbackTitle?: string | null
 ): string {
-  if (!segIdOrName || segIdOrName === 'Tuyến chiếu sáng phụ trách') {
-    if (fallbackTitle) {
-      const match = fallbackTitle.match(/SEG-\d+/i)
-      if (match) {
-        return `${match[0].toUpperCase()} - Tuyến đường phụ trách`
-      }
-    }
-    return 'Tuyến đường phụ trách'
+  if (segIdOrName && segIdOrName !== 'Tuyến chiếu sáng phụ trách') {
+    return segIdOrName
   }
 
-  return segIdOrName
+  if (fallbackTitle) {
+    const match = fallbackTitle.match(/SEG-[A-Za-z0-9_-]+/i)
+    if (match) {
+      return match[0].toUpperCase()
+    }
+  }
+
+  return '-'
 }
 
 
@@ -99,7 +100,7 @@ export function mapWorkOrdersToScheduleCases(
     const assigneeName =
       raw.assignee_name ||
       (assignedTo ? assigneeNameMap[assignedTo] || assignedTo : 'Chưa phân công')
-    const scheduledDate = raw.scheduled_date || raw.created_at || '2026-10-01'
+    const scheduledDate = raw.scheduled_date || raw.created_at || new Date().toISOString().slice(0, 10)
     const phaseDate = scheduledDate.substring(0, 10)
     const endReason = raw.end_reason || undefined
 
@@ -124,14 +125,30 @@ export function mapWorkOrdersToScheduleCases(
       }
     }
 
+    const isPoleGpsUpdate = rawKind === 'pole_gps_update'
     const isRepair = rawKind.includes('repair')
     const isSurvey = rawKind.includes('survey')
-    const phaseType: TaskKind = isRepair ? 'repair' : isSurvey ? 'survey' : 'inspection'
-    const phaseName = isRepair ? '3. Sửa chữa' : isSurvey ? '1. Khảo sát' : '2. Kiểm tra'
+    const phaseType: TaskKind = isPoleGpsUpdate
+      ? 'pole_gps_update'
+      : isRepair
+        ? 'repair'
+        : isSurvey
+          ? 'survey'
+          : 'inspection'
+    const phaseName = isPoleGpsUpdate
+      ? 'Cập nhật vị trí cột'
+      : isRepair
+        ? '3. Sửa chữa'
+        : isSurvey
+          ? '1. Khảo sát'
+          : '2. Kiểm tra'
 
     let status: 'pending' | 'reported' | 'ended' = 'pending'
     if (woStatus === 'done') status = 'reported'
     else if (woStatus === 'verified') status = 'ended'
+
+    const rawGpsLocations = raw.pole_locations && raw.pole_locations.length > 0 ? raw.pole_locations : undefined
+    const rawAttachments = raw.attachments && raw.attachments.length > 0 ? raw.attachments : undefined
 
     const phase: SchedulePhase = {
       phaseType,
@@ -146,6 +163,13 @@ export function mapWorkOrdersToScheduleCases(
       notes: raw.note || title,
       materialsNote: raw.materials_note || undefined,
       workOrderId,
+      poleIds: raw.pole_ids || undefined,
+      segmentId: raw.segment_id || undefined,
+      qrPdfFiles: rawAttachments,
+      returnReason:
+        isPoleGpsUpdate && woStatus !== 'done' && woStatus !== 'verified' && raw.review_note
+          ? raw.review_note
+          : undefined,
       cancellationRequest:
         raw.cancellation_request_status && raw.cancellation_request_status !== 'none'
           ? {
@@ -160,16 +184,17 @@ export function mapWorkOrdersToScheduleCases(
             }
           : undefined,
       report:
-        raw.report_note || woStatus === 'done' || woStatus === 'verified'
+        raw.report_note || woStatus === 'done' || woStatus === 'verified' || Boolean(rawGpsLocations)
           ? {
-            submittedAt: raw.created_at || `${phaseDate} 17:00`,
-            summary: raw.report_note || 'Báo cáo kỹ thuật hiện trường',
-            usedMaterialsNote: raw.materials_used || undefined,
-            suggestedMaterialsNote: raw.materials_note || undefined,
-            luxMeasured: raw.lux_measured || undefined,
-            videoUrl: raw.video_url || undefined,
-            aiDetections: raw.ai_detections || undefined,
-          }
+              submittedAt: raw.completed_at || raw.created_at || `${phaseDate} 17:00`,
+              summary: raw.report_note || 'Báo cáo kỹ thuật hiện trường',
+              usedMaterialsNote: raw.materials_used || undefined,
+              suggestedMaterialsNote: raw.materials_note || undefined,
+              luxMeasured: raw.lux_measured || undefined,
+              videoUrl: raw.video_url || undefined,
+              aiDetections: raw.ai_detections || undefined,
+              poleGpsLocations: rawGpsLocations,
+            }
           : undefined,
     }
 

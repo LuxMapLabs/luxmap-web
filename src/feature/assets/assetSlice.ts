@@ -126,6 +126,7 @@ export interface SetIotNodeRelayPayload {
 export interface IssueIotNodeCredentialPayload {
   nodeId: string
   onSuccess?: (credential: IotNodeCredential) => void
+  onError?: () => void
 }
 
 const assetSlice = createSlice({

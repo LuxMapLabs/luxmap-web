@@ -40,8 +40,8 @@ describe('mapWorkOrdersToScheduleCases - tên tuyến', () => {
     expect(c.segment).toBe('Tuyến K')
   })
 
-  it('không có tuyến nào thì hiện nhãn chung, không dùng tên viết cứng', () => {
+  it('không có tuyến nào thì hiện dấu gạch, không bịa tên', () => {
     const [c] = mapWorkOrdersToScheduleCases([order({})], [], names)
-    expect(c.segment).toBe('Tuyến đường phụ trách')
+    expect(c.segment).toBe('-')
   })
 })

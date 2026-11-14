@@ -49,8 +49,15 @@ export const ManagerDashboardPage: React.FC = () => {
     warrantyTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Handler khi click hàng sự cố "Chưa phân lịch" -> Trỏ sang tab Lịch làm việc & Mở popup Tạo sự vụ
+  // Navigate to work schedule creation for pole/segment faults, or open detail modal for unmapped/IoT faults
   const handleNavigateToCreateSchedule = (fault: FaultItem) => {
+    const type = String(fault.fault_type || '').toLowerCase()
+    const isOffline = type.includes('offline') || type.includes('node')
+    if (isOffline || (!fault.pole_id && !fault.segment_id)) {
+      setSelectedFault(fault)
+      return
+    }
+
     navigate('/work-schedule', {
       state: {
         openCreateModal: true,
@@ -235,8 +242,15 @@ export const ManagerDashboardPage: React.FC = () => {
     }).length
   }, [segmentFaults])
 
+  // Filter unassigned pole/segment faults for urgent scheduling card (excluding cabinet IoT offline alerts)
   const unassignedFaults = useMemo(
-    () => segmentFaults.filter((f) => getFaultProgressInfo(f).key === 'unassigned'),
+    () =>
+      segmentFaults.filter((f) => {
+        if (getFaultProgressInfo(f).key !== 'unassigned') return false
+        const type = String(f.fault_type || '').toLowerCase()
+        const isOffline = type.includes('offline') || type.includes('node')
+        return !isOffline && Boolean(f.pole_id || f.segment_id)
+      }),
     [segmentFaults]
   )
 

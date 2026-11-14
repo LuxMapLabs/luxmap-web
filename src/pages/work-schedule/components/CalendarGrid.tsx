@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react'
 import { Plus, User, FileText, AlertTriangle } from 'lucide-react'
-import { ScheduleCase } from '../../../types/workSchedule'
-import { WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
+import { ScheduleCase, WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
 import type { SurveyRecurringItem } from '../../../types/survey-schedules/recurring'
 
 interface CalendarGridProps {
@@ -262,6 +261,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   } else if (phase.phaseType === 'repair') {
                     badgeBg = 'bg-emerald-50 text-emerald-800 border-emerald-200'
                     phaseTitle = '🟢 3. Sửa chữa'
+                  } else if (phase.phaseType === 'pole_gps_update') {
+                    badgeBg = 'bg-violet-50 text-violet-900 border-violet-300'
+                    phaseTitle = '🟣 Cập nhật GPS cột'
                   }
 
                   if (isEnded) {
@@ -417,6 +419,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           <span className="flex items-center gap-1.5 font-medium">
             <span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300" />
             <span>Sửa chữa</span>
+          </span>
+          <span className="flex items-center gap-1.5 font-medium text-violet-800">
+            <span className="w-2.5 h-2.5 rounded-sm bg-violet-100 border border-violet-400" />
+            <span>Cập nhật vị trí cột</span>
           </span>
           <span className="flex items-center gap-1.5 font-bold text-rose-700">
             <span className="w-2.5 h-2.5 rounded-sm bg-rose-100 border border-rose-400 ring-1 ring-rose-400" />

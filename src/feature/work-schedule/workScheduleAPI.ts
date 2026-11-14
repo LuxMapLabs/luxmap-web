@@ -5,6 +5,7 @@ import type {
   WorkOrderItemPagedResult,
   WorkOrderAssigneePagedResult,
   WorkOrderPolePagedResult,
+  EvidenceItem,
   EvidenceItemPagedResult,
   CreateWorkOrderRequest,
   PatchWorkOrderRequest,
@@ -19,6 +20,7 @@ import type {
   AutoDispatchPreview,
   AutoDispatchRequest,
   BatchCreateWorkOrdersResponse,
+  WorkOrderAttachmentItem,
 } from '../../types/workorders/orders'
 import type {
   SurveyRecurringItem,
@@ -169,6 +171,49 @@ export const workScheduleAPI = {
   },
 
   /**
+   * Tải lên 1 file PDF mã QR đính kèm cho lệnh pole_gps_update
+   * POST /api/v1/work-orders/{id}/attachments
+   */
+  async uploadAttachment(id: string, file: File): Promise<WorkOrderAttachmentItem> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post<WorkOrderAttachmentItem>(
+      `/work-orders/${encodeURIComponent(id)}/attachments`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+    return response.data
+  },
+
+  /**
+   * Tải file PDF đính kèm qua Blob kèm Access Token Authorization Header
+   * GET /api/v1/work-orders/{id}/attachments/{attachmentId}
+   */
+  async fetchAttachmentBlob(id: string, attachmentId: string): Promise<string> {
+    const response = await apiClient.get<Blob>(
+      `/work-orders/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`,
+      {
+        responseType: 'blob',
+      }
+    )
+    return URL.createObjectURL(response.data)
+  },
+
+  /**
+   * Xóa mềm 1 file PDF đính kèm
+   * DELETE /api/v1/work-orders/{id}/attachments/{attachmentId}
+   */
+  async removeAttachment(id: string, attachmentId: string): Promise<void> {
+    await apiClient.delete(
+      `/work-orders/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`
+    )
+  },
+
+  /**
    * Lấy danh sách cột đèn theo lệnh công tác từ Backend
    */
   async getWorkOrderPoles(id: string, page = 1): Promise<WorkOrderPolePagedResult> {
@@ -186,6 +231,24 @@ export const workScheduleAPI = {
       params: { page },
     })
     return response.data
+  },
+
+  /**
+   * Lấy toàn bộ ảnh chụp bằng chứng qua tất cả các trang (đảm bảo không sót ảnh khi > 50 mục)
+   */
+  async getAllWorkOrderEvidence(id: string): Promise<EvidenceItem[]> {
+    const allItems: EvidenceItem[] = []
+    let page = 1
+    while (page <= 20) {
+      const res = await this.getWorkOrderEvidence(id, page)
+      const items = res.items || []
+      allItems.push(...items)
+      const pageSize = res.page_size || 50
+      const total = res.total ?? allItems.length
+      if (items.length === 0 || allItems.length >= total || items.length < pageSize) break
+      page += 1
+    }
+    return allItems
   },
 
   /**
@@ -312,6 +375,18 @@ export const workScheduleAPI = {
   async fetchPolePhotoBlob(workOrderId: string, photoId: string, original = false): Promise<string> {
     const variant = original ? 'original' : 'thumbnail'
     const endpoint = `/work-orders/${encodeURIComponent(workOrderId)}/pole-photos/${encodeURIComponent(photoId)}/${variant}`
+    const response = await apiClient.get<Blob>(endpoint, {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(response.data)
+  },
+
+  /**
+   * Tải video clip cột đèn qua Blob URL (tự động kèm Authorization Bearer token)
+   * GET /api/v1/work-orders/{id}/pole-photos/{photo_id}/video
+   */
+  async fetchPoleVideoBlob(workOrderId: string, photoId: string): Promise<string> {
+    const endpoint = `/work-orders/${encodeURIComponent(workOrderId)}/pole-photos/${encodeURIComponent(photoId)}/video`
     const response = await apiClient.get<Blob>(endpoint, {
       responseType: 'blob',
     })

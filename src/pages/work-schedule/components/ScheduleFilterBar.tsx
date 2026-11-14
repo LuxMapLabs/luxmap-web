@@ -9,8 +9,7 @@ import {
   ChevronDown,
   Zap,
 } from 'lucide-react'
-import { WorkScheduleState } from '../../../feature/work-schedule/workScheduleSlice'
-import { ScheduleCase } from '../../../types/workSchedule'
+import { WorkScheduleState, ScheduleCase } from '../../../feature/work-schedule/workScheduleSlice'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 
 interface ScheduleFilterBarProps {
@@ -70,6 +69,7 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
     let survey = 0
     let inspection = 0
     let repair = 0
+    let poleGpsUpdate = 0
 
     ;(cases || []).forEach((c) => {
       ;(c?.phases || []).forEach((p) => {
@@ -81,6 +81,7 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
           if (p.phaseType === 'survey') survey++
           else if (p.phaseType === 'inspection') inspection++
           else if (p.phaseType === 'repair') repair++
+          else if (p.phaseType === 'pole_gps_update') poleGpsUpdate++
 
           if (p.cancellationRequest?.status === 'pending') {
             pendingCancel++
@@ -101,6 +102,7 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
       survey,
       inspection,
       repair,
+      poleGpsUpdate,
       total: pendingCancel + pendingReport + inProgress + ended,
     }
   }, [cases])
@@ -129,10 +131,14 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
     (a, b) => a - b
   )
 
+  const hasPendingActions = metrics.pendingCancel > 0 || metrics.pendingReport > 0
+
   return (
-    <div className="ops-rise relative z-20 bg-white rounded-[20px] shadow-ops p-3.5 sm:p-4 mb-5 flex flex-wrap items-center justify-between gap-4">
-      {/* Cụm chọn Tháng & Năm bằng Popover chuyên nghiệp (Chỉ chọn Tháng và Năm, không có ngày) */}
-      <div className="flex items-center gap-2.5">
+    <div className="ops-rise relative z-20 bg-white rounded-[20px] shadow-ops p-3.5 sm:p-4 mb-5 flex flex-col gap-3">
+      {/* Hàng chính: Điều hướng thời gian + Bộ lọc & Nút hành động (luôn cố định vị trí, không bị đẩy dòng) */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        {/* Cụm chọn Tháng & Năm bằng Popover */}
+        <div className="flex items-center gap-2 shrink-0">
         <div className="relative" ref={dropdownRef}>
           {/* Nút bấm hiển thị Tháng / Năm và kích hoạt Popover */}
           <button
@@ -257,45 +263,8 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
         </button>
       </div>
 
-      {/* Cụm Action Chips Đếm Nhanh Cho Quản Lý */}
-      {(metrics.pendingCancel > 0 || metrics.pendingReport > 0) && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {metrics.pendingCancel > 0 && (
-            <button
-              type="button"
-              onClick={() => onFilterChange(filterPhase === 'has_cancel' ? 'all' : 'has_cancel')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                filterPhase === 'has_cancel'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-              }`}
-              title="Bấm để lọc các ca kỹ sư xin hủy"
-            >
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-              <span>⚠️ {metrics.pendingCancel} Xin hủy</span>
-            </button>
-          )}
-
-          {metrics.pendingReport > 0 && (
-            <button
-              type="button"
-              onClick={() => onFilterChange(filterPhase === 'has_report' ? 'all' : 'has_report')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                filterPhase === 'has_report'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-              }`}
-              title="Bấm để lọc các ca có báo cáo chờ duyệt"
-            >
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span>📄 {metrics.pendingReport} Chờ duyệt báo cáo</span>
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Cụm bộ lọc & Nút hành động */}
-      <div className="flex items-center gap-2.5 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         <OpsSelect
           value={filterPhase === 'has_report' || filterPhase === 'has_cancel' ? 'all' : filterPhase}
           onChange={(val) => onFilterChange(val as WorkScheduleState['filterPhase'])}
@@ -336,6 +305,14 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
               subLabel: 'Ca khắc phục & thay thế thiết bị',
               dotColor: 'bg-emerald-500',
               badge: metrics.repair,
+            },
+            {
+              value: 'pole_gps_update',
+              label: 'Cập nhật vị trí cột',
+              nativeLabel: '🟣 Cập nhật vị trí cột',
+              subLabel: 'Giai đoạn độc lập: Gắn QR & cập nhật GPS cột',
+              dotColor: 'bg-violet-500',
+              badge: metrics.poleGpsUpdate,
             },
             {
               value: 'ended',
@@ -389,6 +366,67 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
           <span>Tạo sự vụ</span>
         </button>
       </div>
+      </div>
+
+      {/* Hàng phụ (chỉ hiện khi có ca cần quản lý xử lý): Tách riêng để không đẩy các nút chính */}
+      {hasPendingActions && (
+        <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">
+              Cần xử lý:
+            </span>
+            {metrics.pendingCancel > 0 && (
+              <button
+                type="button"
+                onClick={() => onFilterChange(filterPhase === 'has_cancel' ? 'all' : 'has_cancel')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                  filterPhase === 'has_cancel'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                }`}
+                title="Bấm để lọc các ca kỹ sư xin hủy"
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                    filterPhase === 'has_cancel' ? 'bg-white' : 'bg-rose-500'
+                  }`}
+                />
+                <span>{metrics.pendingCancel} Xin hủy</span>
+              </button>
+            )}
+
+            {metrics.pendingReport > 0 && (
+              <button
+                type="button"
+                onClick={() => onFilterChange(filterPhase === 'has_report' ? 'all' : 'has_report')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                  filterPhase === 'has_report'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                }`}
+                title="Bấm để lọc các ca có báo cáo chờ duyệt"
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                    filterPhase === 'has_report' ? 'bg-white' : 'bg-blue-500'
+                  }`}
+                />
+                <span>{metrics.pendingReport} Chờ duyệt báo cáo</span>
+              </button>
+            )}
+          </div>
+
+          {(filterPhase === 'has_cancel' || filterPhase === 'has_report') && (
+            <button
+              type="button"
+              onClick={() => onFilterChange('all')}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+            >
+              Bỏ lọc nhanh
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
