@@ -25,20 +25,20 @@ export const FixtureTableSkeleton: React.FC<FixtureTableSkeletonProps> = ({ rowC
           <td className="py-3.5 px-3.5 text-center">
             <div className="h-5 w-14 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto" />
           </td>
-          {/* Loại Bóng / Nguồn */}
-          <td className="py-3.5 px-3.5">
+          {/* Loại Bóng / Nguồn — ẩn/hiện cùng ngưỡng với FixtureTable */}
+          <td className="py-3.5 px-3.5 hidden @min-[1180px]:table-cell">
             <div className="h-4 w-24 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
           {/* Ngày Lắp Đặt */}
-          <td className="py-3.5 px-3.5">
+          <td className="py-3.5 px-3.5 hidden @min-[1030px]:table-cell">
             <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
           {/* Hạn Bảo Hành */}
-          <td className="py-3.5 px-3.5">
+          <td className="py-3.5 px-3.5 hidden @min-[1030px]:table-cell">
             <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
           {/* Ngày Tháo Dỡ */}
-          <td className="py-3.5 px-3.5">
+          <td className="py-3.5 px-3.5 hidden @min-[1280px]:table-cell">
             <div className="h-4 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
           </td>
           {/* Trạng Thái */}

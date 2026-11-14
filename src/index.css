@@ -833,6 +833,10 @@ button:focus-visible {
   background-color: rgba(253, 244, 248, 0.85);
   box-shadow: inset 3px 0 0 #be457a;
 }
+/* Ô ghim (sticky, vd. cột Thao tác) phải có nền đặc để che nội dung cuộn bên dưới: dùng màu hover ở trên đã pha sẵn trên nền trắng */
+.ops-theme main table tbody tr:hover > td.sticky {
+  background-color: #fdf5f9;
+}
 /* Superior dùng dải xanh sương, không dùng vệt hồng của Manager */
 .superior-theme main table tbody tr:hover {
   background-color: rgba(243, 248, 252, 0.95);
