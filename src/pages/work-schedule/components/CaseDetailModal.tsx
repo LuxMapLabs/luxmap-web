@@ -166,6 +166,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const currentPhase = caseItem.phases[viewingPhaseIndex]
   const isActivePhase = viewingPhaseIndex === caseItem.currentPhaseIndex
   const isCurrentPhaseDetail = workOrderDetail?.work_order_id === currentPhase?.workOrderId
+  // Phiếu đã nghiệm thu thì không còn gì để duyệt (chi tiết đã tải có thể còn ở trạng thái cũ)
+  const isCurrentPhaseVerified = currentPhase?.status === 'ended' || currentPhase?.rawStatus === 'verified'
   const hasReport =
     currentPhase?.status === 'reported' ||
     currentPhase?.rawStatus === 'done' ||
@@ -653,7 +655,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         <span className="p-1 rounded-lg bg-white/20">
                           <Video className="w-4 h-4 text-white" />
                         </span>
-                        <span className="tracking-tight">Xem Báo Cáo Hiện Trường Thực Địa (Ảnh & Video)</span>
+                        <span className="tracking-tight">Xem Báo Cáo Hiện Trường Thực Địa</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
                         <span>Chi tiết hiện trường</span>
@@ -667,15 +669,12 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
                           <span className="font-bold text-blue-950">
-                            Khảo sát video hành trình đêm trên tuyến:
+                            Kết quả khảo sát trên tuyến:
                           </span>
                           <span className="font-extrabold text-blue-800 font-mono">
                             {surveyPoles.length > 0 ? `${surveyPoles.length} cột ghi nhận` : 'Toàn tuyến'}
                           </span>
                         </div>
-                        <span className="text-[11px] text-blue-700 font-semibold bg-blue-100 px-2 py-0.5 rounded-md">
-                          Video 1080P • AI Detector
-                        </span>
                       </div>
                     ) : (
                       /* Thư viện thumbnails bằng chứng hiện trường: CHỈ PREVIEW TĨNH, KHÔNG CLICK */
@@ -850,7 +849,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               {/* Giai đoạn 1: Khảo sát */}
               {currentPhase.phaseType === 'survey' && (
                 <>
-                  {isActivePhase && hasReport && (
+                  {isActivePhase && hasReport && !isCurrentPhaseVerified && (
                     <>
                       <button
                         type="button"
@@ -912,7 +911,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               {/* Giai đoạn 2: Kiểm tra */}
               {currentPhase.phaseType === 'inspection' && (
                 <>
-                  {isActivePhase && hasReport && !isInspectionApprovedLocal && (
+                  {isActivePhase && hasReport && !isCurrentPhaseVerified && !isInspectionApprovedLocal && (
                     <>
                       <button
                         type="button"
@@ -1007,7 +1006,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 <span className="p-1 rounded-lg bg-amber-100 text-amber-700">
                   <RotateCcw className="w-4 h-4" />
                 </span>
-                Yêu Cầu Làm Lại Báo Cáo
+                Yêu cầu làm lại báo cáo
               </h4>
               <button
                 type="button"
@@ -1130,7 +1129,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
         </div>
       )}
 
-      {/* Modal Xem Báo Cáo Hiện Trường Đa Phương Tiện (Ảnh & Video) */}
+      {/* Modal Xem Báo Cáo Hiện Trường (ảnh bằng chứng và kết quả AI) */}
       <FieldReportDetailModal
         isOpen={isFieldReportModalOpen}
         caseItem={caseItem}

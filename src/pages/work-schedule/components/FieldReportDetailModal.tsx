@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
   X,
-  Play,
-  Pause,
-  Video,
   Camera,
   Cpu,
   Gauge,
@@ -21,7 +18,6 @@ import { EvidenceItem, WorkOrderPole, PolePhotoItem } from '../../../types/worko
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { EvidenceImage } from './EvidenceImage'
 import { PolePhotoImage } from './PolePhotoImage'
-import fieldSurveyNightImg from '../../../assets/images/field-survey-night.jpg'
 
 interface FieldReportDetailModalProps {
   isOpen: boolean
@@ -44,8 +40,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   phase,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'video' | 'photos' | 'ai'>('video')
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [activeTab, setActiveTab] = useState<'photos' | 'ai'>('photos')
   const [zoomImage, setZoomImage] = useState<ZoomImageTarget | null>(null)
   const [backendEvidence, setBackendEvidence] = useState<EvidenceItem[]>([])
   const [poles, setPoles] = useState<WorkOrderPole[]>([])
@@ -96,17 +91,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
     }
   }, [isOpen, targetWorkOrderId])
 
-  // Tự động chuyển tab thích hợp theo từng giai đoạn:
-  // - Khảo sát: Ưu tiên xem Video hành trình đêm
-  // - Kiểm tra / Sửa chữa: Ưu tiên xem Ảnh chụp bằng chứng hiện trường
+  // Mỗi lần mở một giai đoạn mới thì quay về tab ảnh bằng chứng
   useEffect(() => {
-    if (isOpen && phase) {
-      if (phase.phaseType === 'survey') {
-        setActiveTab('video')
-      } else {
-        setActiveTab('photos')
-      }
-    }
+    if (isOpen && phase) setActiveTab('photos')
   }, [isOpen, phase?.phaseType])
 
   if (!isOpen || !caseItem || !phase) return null
@@ -136,7 +123,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
       (p.fixture_status && p.fixture_status !== 'normal' && p.fixture_status !== 'unknown') ||
       (p.open_fault_count && p.open_fault_count > 0)
   )
-  const highlightedPole = abnormalPoles[0] || poles[0] || null
 
   // Danh sách hình ảnh bằng chứng thực địa từ Backend
   const displayPhotos = backendEvidence.map((ev, idx) => ({
@@ -195,21 +181,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
         <div className="px-6 border-b border-slate-200 bg-white flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setActiveTab('video')}
-            className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-              activeTab === 'video'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Video className="w-4 h-4" />
-            <span>
-              {phase.phaseType === 'survey' ? 'Video Quét Thực Địa (Chính)' : 'Video Tuyến (Tham chiếu)'}
-            </span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('photos')}
             className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
               activeTab === 'photos'
@@ -249,109 +220,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 
         {/* Modal Content Body */}
         <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 custom-scrollbar bg-slate-50/50">
-          {/* TAB 1: VIDEO KHẢO SÁT BAN ĐÊM */}
-          {activeTab === 'video' && (
-            <div className="flex flex-col gap-4 animate-in fade-in duration-150">
-              <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-video shadow-xl border border-slate-800 group select-none">
-                {/* Ảnh nền video đêm */}
-                <img
-                  src={fieldSurveyNightImg}
-                  alt="Night Survey Video Frame"
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${
-                    isPlaying ? 'opacity-90 brightness-110' : 'opacity-70'
-                  }`}
-                />
-
-                {/* HUD Overlay Kỹ Thuật Số */}
-                <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none">
-                  <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[10px] text-white font-mono">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span>REC • NIGHT SURVEY CAM</span>
-                    <span className="text-slate-400">1080P/30FPS</span>
-                  </div>
-                  <div className="bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[10px] text-emerald-400 font-mono">
-                    TUYẾN: {formatSegmentDisplay(caseItem.segment)} • 25 km/h
-                  </div>
-                </div>
-
-                <div className="absolute top-3 right-3 pointer-events-none">
-                  <div className="bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[10px] text-amber-300 font-mono flex items-center gap-1.5">
-                    <Cpu className="w-3 h-3 text-amber-400" />
-                    <span>CV DETECTOR: ACTIVE</span>
-                  </div>
-                </div>
-
-                {/* Bounding Box AI phát hiện cột đèn trên video */}
-                {highlightedPole ? (
-                  <div className="absolute top-1/4 left-1/4 w-32 h-44 border-2 border-dashed border-amber-400/90 rounded-lg pointer-events-none flex flex-col justify-between p-1 bg-amber-500/10 animate-pulse">
-                    <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1 rounded w-fit">
-                      {highlightedPole.pole_id} [{highlightedPole.status_confidence ? `${Math.round(highlightedPole.status_confidence * 100)}%` : '92%'}]
-                    </span>
-                    <span className="text-[8px] text-amber-300 font-mono bg-slate-900/80 px-1 rounded uppercase">
-                      {highlightedPole.fixture_status || 'DETECTED'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="absolute top-1/4 left-1/4 w-36 h-44 border-2 border-dashed border-blue-400/90 rounded-lg pointer-events-none flex flex-col justify-between p-1 bg-blue-500/10">
-                    <span className="bg-blue-600 text-white text-[9px] font-black px-1 rounded w-fit">
-                      QUÉT TUYẾN
-                    </span>
-                    <span className="text-[8px] text-blue-200 font-mono bg-slate-900/80 px-1 rounded uppercase">
-                      AI CAMERA
-                    </span>
-                  </div>
-                )}
-
-                {/* Nút Play/Pause ở trung tâm */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="w-16 h-16 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-2xl transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-xs ring-4 ring-white/30"
-                  >
-                    {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
-                  </button>
-                </div>
-
-                {/* Thanh điều khiển Video Player dưới đáy */}
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-3 pt-6 flex flex-col gap-2">
-                  <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden cursor-pointer">
-                    <div
-                      className={`bg-blue-500 h-full rounded-full ${
-                        isPlaying ? 'w-2/3 transition-all duration-1000' : 'w-1/3'
-                      }`}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-white/90 font-mono">
-                    <div className="flex items-center gap-3">
-                      <span>{isPlaying ? '00:28' : '00:15'} / 00:45</span>
-                      <span className="text-slate-400">• Tệp: survey_video_night.mp4</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setZoomImage({ src: fieldSurveyNightImg })}
-                      className="flex items-center gap-1 hover:text-blue-400 cursor-pointer"
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                      <span>Xem toàn màn hình</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Thông tin mô tả video & báo cáo kỹ sư */}
-              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col gap-2">
-                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Video className="w-4 h-4 text-blue-600" />
-                  Ghi Nhận Báo Cáo Khảo Sát Thực Địa
-                </h4>
-                <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-line">
-                  {effectiveReportNote}
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* TAB 2: ẢNH CHỤP BẰNG CHỨNG HIỆN TRƯỜNG */}
           {activeTab === 'photos' && (
             <div className="flex flex-col gap-4 animate-in fade-in duration-150">
@@ -428,7 +296,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                 )}
                               </div>
                               <p className="text-[11px] text-slate-500 mt-1">
-                                Chụp lúc: {photo.captured_at ? new Date(photo.captured_at).toLocaleString('vi-VN') : 'Gần đây'}
+                                Chụp lúc: {photo.captured_at ? new Date(photo.captured_at).toLocaleString('vi-VN') : '-'}
                               </p>
                               {photo.review_note && (
                                 <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200 mt-1 line-clamp-2">
@@ -439,7 +307,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 
                             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10.5px] text-slate-500 font-medium">
                               <span>
-                                Độ tin cậy: <strong className="text-slate-700">{photo.confidence ? `${Math.round(photo.confidence * 100)}%` : '90%'}</strong>
+                                Độ tin cậy: <strong className="text-slate-700">{photo.confidence ? `${Math.round(photo.confidence * 100)}%` : '-'}</strong>
                               </span>
                               {photo.lat && photo.lng && (
                                 <span className="font-mono text-slate-400">
@@ -521,9 +389,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     <Cpu className="w-4 h-4 text-amber-500" />
                     Chẩn Đoán Tự Động Từ Mô Hình Computer Vision
                   </h4>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                    Mô hình v2.4 Đã Kiểm Định
-                  </span>
                 </div>
 
                 {/* Danh sách cột đèn được chẩn đoán */}
@@ -540,7 +405,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                             <span className="font-mono text-blue-700 font-bold">{p.pole_id}</span>
                             <span>Trạng thái: {p.fixture_status || 'Cần kiểm tra'}</span>
                             <span className="px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 text-[10px] font-mono font-bold">
-                              Độ tin cậy: {p.status_confidence ? `${Math.round(p.status_confidence * 100)}%` : '90%'}
+                              Độ tin cậy: {p.status_confidence ? `${Math.round(p.status_confidence * 100)}%` : '-'}
                             </span>
                             {p.open_fault_count && p.open_fault_count > 0 ? (
                               <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
@@ -549,7 +414,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                             ) : null}
                           </div>
                           <p className="text-[11px] text-amber-800 leading-relaxed">
-                            {p.note || 'Hệ thống AI phát hiện bất thường quang thông hoặc tình trạng đui đèn trên cột.'}
+                            {p.note || 'Chưa có ghi chú cho cột này.'}
                           </p>
                         </div>
                       </div>
@@ -559,12 +424,12 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>
-                      Đã khảo sát {poles.length} cột dọc tuyến <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Tất cả cột đèn đều hoạt động trong ngưỡng an toàn, không phát hiện sự cố nghiêm trọng.
+                      Đã khảo sát {poles.length} cột dọc tuyến <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Không có cột nào bị đánh dấu bất thường hoặc đang có sự cố mở.
                     </span>
                   </div>
                 ) : (
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
-                    Ghi nhận tuyến: <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Dữ liệu Computer Vision đã hoàn tất phân tích toàn tuyến.
+                    Tuyến: <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Chưa có dữ liệu cột đèn cho lệnh này.
                   </div>
                 )}
               </div>
@@ -592,12 +457,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                       <span className="text-3xl font-black text-rose-600 font-mono">{report.luxMeasured}</span>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-slate-700">Đo kiểm quang phổ tự động</span>
-                      <p className="text-[11px] text-slate-500">
-                        Đánh giá cường độ sáng liên tục qua cảm biến độ rọi gắn trên phương tiện khảo sát đêm.
-                      </p>
-                    </div>
+                    <span className="text-xs font-medium text-slate-500">Chưa có số liệu độ rọi cho lệnh này</span>
                   )}
                 </div>
 
@@ -607,7 +467,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     Vật tư đề xuất từ kỹ sư
                   </span>
                   <div className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    {effectiveSuggestedMaterials || effectiveUsedMaterials || 'Không phát sinh vật tư trong giai đoạn này'}
+                    {effectiveSuggestedMaterials || effectiveUsedMaterials || 'Kỹ sư không ghi nhận vật tư'}
                   </div>
                   <p className="text-[11px] text-slate-400">
                     Thông tin đề xuất phục vụ lập kế hoạch cho các giai đoạn tiếp theo của sự vụ.
