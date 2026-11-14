@@ -8,5 +8,6 @@ export interface IotPoleControl {
     node_id?: string | null
     relay_no?: number
     can_control_feeder?: boolean
+    control_channel?: string | null
 }
 
