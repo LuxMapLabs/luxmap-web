@@ -12,9 +12,12 @@ import type {
 } from '../../types/workorders/orders'
 import type { RootState } from '../../redux/rootReducer'
 import { fetchDashboardDataRequest } from '../dashboard/dashboardSlice'
+import { fetchSegmentsList } from '../dashboard/dashboardAPI'
+import type { SegmentListItem } from '../../types/assets/segments'
 import {
   fetchWorkOrdersRequest,
   fetchWorkOrdersSuccess,
+  fetchSegmentNamesSuccess,
   fetchWorkOrdersFailure,
   fetchWorkOrderDetailRequest,
   fetchWorkOrderDetailSuccess,
@@ -88,7 +91,16 @@ function* handleFetchWorkOrders(action: PayloadAction<GetWorkOrdersFilter | unde
         scheduled_to: endOfMonth,
       }
     }
-    const result: WorkOrderItemPagedResult = yield call(workScheduleAPI.getWorkOrders, effectiveFilter)
+    // Tên tuyến chỉ để hiển thị: không tải được thì lịch hiện mã tuyến
+    const [result, segments]: [WorkOrderItemPagedResult, SegmentListItem[]] = yield all([
+      call(workScheduleAPI.getWorkOrders, effectiveFilter),
+      call(fetchSegmentsList),
+    ])
+    const segmentNames: Record<string, string> = {}
+    segments.forEach((s) => {
+      if (s.segment_id && s.segment_name) segmentNames[s.segment_id] = s.segment_name
+    })
+    yield put(fetchSegmentNamesSuccess(segmentNames))
     yield put(fetchWorkOrdersSuccess(result))
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể tải lịch làm việc từ máy chủ')
