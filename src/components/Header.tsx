@@ -162,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
             <h1 className="text-base font-bold text-slate-900 leading-tight truncate">
               {isDashboard
                 ? isManagementAgency(user?.role)
-                  ? 'Tổng quan Giám sát Cấp trên'
+                  ? 'Tổng quan cấp giám sát'
                   : 'Bảng điều khiển Quản lý'
                 : isWorkSchedule
                 ? 'Lịch làm việc'

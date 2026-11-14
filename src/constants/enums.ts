@@ -9,8 +9,8 @@
  */
 export const USER_ROLE_LABELS: Record<string, string> = {
   system_admin: 'Quản trị hệ thống',
-  manager: 'Cán bộ quản lý',
-  superior: 'Lãnh đạo cấp trên',
+  manager: 'Quản lý',
+  superior: 'Cấp giám sát',
   field_engineer: 'Kỹ sư hiện trường',
 }
 
@@ -20,11 +20,11 @@ export const USER_ROLE_BADGES: Record<string, { label: string; colorClass: strin
     colorClass: 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
   },
   manager: {
-    label: 'Cán bộ quản lý',
+    label: 'Quản lý',
     colorClass: 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
   },
   superior: {
-    label: 'Lãnh đạo cấp trên',
+    label: 'Cấp giám sát',
     colorClass: 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
   },
   field_engineer: {
