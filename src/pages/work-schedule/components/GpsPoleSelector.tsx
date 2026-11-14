@@ -14,6 +14,10 @@ import {
 } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
 import { fetchAssetsRequest } from '../../../feature/assets/assetSlice'
+import {
+  fetchBusyGpsPolesRequest,
+  clearBusyGpsPoles,
+} from '../../../feature/work-schedule/workScheduleSlice'
 import type { PoleListItem } from '../../../types/assets/poles'
 
 interface GpsPoleSelectorProps {
@@ -39,6 +43,9 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
   const { poles, isLoadingAssets, loadAssetsError } = useSelector(
     (state: RootState) => state.assets
   )
+  const { busyGpsPoleIds, isLoadingBusyGpsPoles: isLoadingBusyPoles } = useSelector(
+    (state: RootState) => state.workSchedule
+  )
   const [isDropdownOpen, setIsDropdownOpen] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -48,11 +55,36 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
     }
   }, [dispatch, poles.length, isLoadingAssets, loadAssetsError])
 
-  // Lọc cột thuộc tuyến đang chọn và sort cột chưa có GPS lên đầu
+  // Tải danh sách các cột đang nằm trong phiếu pole_gps_update chưa đóng qua Redux-Saga
+  useEffect(() => {
+    if (!segmentId) {
+      dispatch(clearBusyGpsPoles())
+      return
+    }
+    dispatch(fetchBusyGpsPolesRequest(segmentId))
+  }, [dispatch, segmentId])
+
+  const busyPoleIds = useMemo(() => new Set(busyGpsPoleIds), [busyGpsPoleIds])
+
+  // Nếu danh sách chọn hiện tại có cột đang bận (ví dụ từ prefill), tự động loại bỏ
+  useEffect(() => {
+    if (busyPoleIds.size === 0 || selectedPoleIds.length === 0) return
+    const cleaned = selectedPoleIds.filter((id) => !busyPoleIds.has(id))
+    if (cleaned.length !== selectedPoleIds.length) {
+      onChange(cleaned)
+    }
+  }, [busyPoleIds, selectedPoleIds, onChange])
+
+  const totalSegmentPoleCount = useMemo(() => {
+    if (!segmentId) return 0
+    return poles.filter((p) => p.pole_id && p.segment_id === segmentId).length
+  }, [poles, segmentId])
+
+  // Lọc cột thuộc tuyến đang chọn, ẩn các cột đang nằm trong phiếu khác, và sort cột chưa có GPS lên đầu
   const sortedSegmentPoles = useMemo(() => {
     if (!segmentId) return []
     const inSegment = poles.filter(
-      (p) => p.pole_id && p.segment_id === segmentId
+      (p) => p.pole_id && p.segment_id === segmentId && !busyPoleIds.has(p.pole_id)
     )
     return [...inSegment].sort((a, b) => {
       const aHasGps = hasPoleGps(a)
@@ -64,7 +96,7 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
       const codeB = (b.external_ref || b.pole_id || '').toLowerCase()
       return codeA.localeCompare(codeB)
     })
-  }, [poles, segmentId])
+  }, [poles, segmentId, busyPoleIds])
 
   const noGpsPoleIds = useMemo(
     () =>
@@ -146,7 +178,7 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
       </p>
 
       {/* Trạng thái Loading */}
-      {isLoadingAssets && (
+      {(isLoadingAssets || isLoadingBusyPoles) && (
         <div className="py-5 flex items-center justify-center gap-2 text-xs font-medium text-slate-500 bg-white rounded-xl border border-slate-200">
           <Loader2 className="w-4 h-4 animate-spin text-violet-600" />
           <span>Đang tải danh sách cột đèn theo tuyến...</span>
@@ -154,7 +186,7 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
       )}
 
       {/* Trạng thái Lỗi */}
-      {!isLoadingAssets && loadAssetsError && (
+      {!isLoadingAssets && !isLoadingBusyPoles && loadAssetsError && (
         <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -171,14 +203,16 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
       )}
 
       {/* Trạng thái Rỗng */}
-      {!isLoadingAssets && !loadAssetsError && sortedSegmentPoles.length === 0 && (
+      {!isLoadingAssets && !isLoadingBusyPoles && !loadAssetsError && sortedSegmentPoles.length === 0 && (
         <div className="py-4 px-3 text-center rounded-xl bg-white border border-slate-200 text-xs text-slate-500">
-          Tuyến đường này hiện chưa có cột đèn nào được ghi nhận trong hệ thống.
+          {totalSegmentPoleCount > 0
+            ? 'Tất cả cột đèn trên tuyến này hiện đã nằm trong các phiếu cập nhật vị trí cột khác đang mở.'
+            : 'Tuyến đường này hiện chưa có cột đèn nào được ghi nhận trong hệ thống.'}
         </div>
       )}
 
       {/* Dropdown chọn cột có thanh tìm kiếm */}
-      {!isLoadingAssets && !loadAssetsError && sortedSegmentPoles.length > 0 && isDropdownOpen && (
+      {!isLoadingAssets && !isLoadingBusyPoles && !loadAssetsError && sortedSegmentPoles.length > 0 && isDropdownOpen && (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
           {/* Thanh tìm kiếm & Thao tác nhanh */}
           <div className="p-2 border-b border-slate-100 bg-slate-50/70 flex flex-col gap-2">

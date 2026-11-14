@@ -23,6 +23,9 @@ import {
   fetchAssigneesRequest,
   fetchAssigneesSuccess,
   fetchAssigneesFailure,
+  fetchBusyGpsPolesRequest,
+  fetchBusyGpsPolesSuccess,
+  fetchBusyGpsPolesFailure,
   createWorkOrderRequest,
   createWorkOrderSuccess,
   createWorkOrderFailure,
@@ -362,11 +365,49 @@ function* handleRejectCancellation(
   }
 }
 
+/**
+ * Worker saga tải danh sách cột đang nằm trong phiếu pole_gps_update chưa đóng theo tuyến
+ */
+function* handleFetchBusyGpsPoles(action: PayloadAction<string>) {
+  const segmentId = action.payload
+  try {
+    const busy = new Set<string>()
+    let page = 1
+    while (page <= 20) {
+      const res: WorkOrderItemPagedResult = yield call(workScheduleAPI.getWorkOrders, {
+        task_kind: 'pole_gps_update',
+        segment_id: segmentId,
+        page,
+      })
+      const items = res.items || []
+      for (const wo of items) {
+        if (wo.wo_status !== 'verified' && wo.wo_status !== 'cancelled') {
+          for (const pid of wo.pole_ids || []) {
+            if (pid) busy.add(pid)
+          }
+        }
+      }
+      const pageSize = res.page_size || 50
+      const total = res.total ?? 0
+      if (items.length === 0 || page * pageSize >= total) break
+      page += 1
+    }
+    yield put(fetchBusyGpsPolesSuccess(Array.from(busy)))
+  } catch (error: any) {
+    const errorMsg = extractApiErrorMessage(
+      error,
+      'Không thể kiểm tra các cột đang nằm trong phiếu cập nhật vị trí khác'
+    )
+    yield put(fetchBusyGpsPolesFailure(errorMsg))
+  }
+}
+
 export default function* workScheduleSaga() {
   yield all([
     takeLatest(fetchWorkOrdersRequest.type, handleFetchWorkOrders),
     takeLatest(fetchWorkOrderDetailRequest.type, handleFetchWorkOrderDetail),
     takeLatest(fetchAssigneesRequest.type, handleFetchAssignees),
+    takeLatest(fetchBusyGpsPolesRequest.type, handleFetchBusyGpsPoles),
     takeLatest(createWorkOrderRequest.type, handleCreateWorkOrder),
     takeLatest(patchWorkOrderRequest.type, handlePatchWorkOrder),
     takeLatest(followUpWorkOrderRequest.type, handleFollowUpWorkOrder),

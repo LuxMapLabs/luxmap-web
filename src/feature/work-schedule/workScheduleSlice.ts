@@ -80,6 +80,9 @@ export interface WorkScheduleState {
   detailError: string | null
   isLoadingAssignees: boolean
   assigneesError: string | null
+  busyGpsPoleIds: string[]
+  isLoadingBusyGpsPoles: boolean
+  busyGpsPolesError: string | null
   isSubmitting: boolean
   actionError: string | null
 
@@ -111,6 +114,9 @@ const initialState: WorkScheduleState = {
   detailError: null,
   isLoadingAssignees: false,
   assigneesError: null,
+  busyGpsPoleIds: [],
+  isLoadingBusyGpsPoles: false,
+  busyGpsPolesError: null,
   isSubmitting: false,
   actionError: null,
 
@@ -447,6 +453,26 @@ export const workScheduleSlice = createSlice({
       state.workOrders = []
       state.totalWorkOrders = 0
     },
+
+    fetchBusyGpsPolesRequest(state, _action: PayloadAction<string>) {
+      state.isLoadingBusyGpsPoles = true
+      state.busyGpsPolesError = null
+      state.busyGpsPoleIds = []
+    },
+    fetchBusyGpsPolesSuccess(state, action: PayloadAction<string[]>) {
+      state.isLoadingBusyGpsPoles = false
+      state.busyGpsPoleIds = action.payload
+    },
+    fetchBusyGpsPolesFailure(state, action: PayloadAction<string>) {
+      state.isLoadingBusyGpsPoles = false
+      state.busyGpsPolesError = action.payload
+      state.busyGpsPoleIds = []
+    },
+    clearBusyGpsPoles(state) {
+      state.isLoadingBusyGpsPoles = false
+      state.busyGpsPolesError = null
+      state.busyGpsPoleIds = []
+    },
   },
 })
 
@@ -461,6 +487,10 @@ export const {
   fetchAssigneesRequest,
   fetchAssigneesSuccess,
   fetchAssigneesFailure,
+  fetchBusyGpsPolesRequest,
+  fetchBusyGpsPolesSuccess,
+  fetchBusyGpsPolesFailure,
+  clearBusyGpsPoles,
   createWorkOrderRequest,
   createWorkOrderSuccess,
   createWorkOrderFailure,
