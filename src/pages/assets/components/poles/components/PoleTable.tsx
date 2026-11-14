@@ -95,7 +95,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               {showCommune && <th className="p-3.5">Địa bàn</th>}
               <th className="p-3.5">Mã bộ đèn</th>
               <th className="p-3.5">Trạng thái</th>
-              <th className="p-3.5 text-right">Thao tác</th>
+              <th className="p-3.5 text-right sticky right-0 bg-[#f8fafc] dark:bg-slate-950 shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)]">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
@@ -274,7 +274,14 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                     <td className="p-3.5">
                       <StatusBadge type="fixture" status={fixtureStatus} label={fixtureLabel} size="sm" />
                     </td>
-                    <td className="p-3.5 text-right whitespace-nowrap">
+                    {/* Thao tác: ghim bên phải để không bị cuộn khuất khi bảng rộng hơn khung; nền đặc vì ô sticky đè lên nội dung cuộn bên dưới (màu hover ở index.css) */}
+                    <td
+                      className={`p-3.5 text-right whitespace-nowrap sticky right-0 shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)] ${
+                        isPoleSelected(pole)
+                          ? 'bg-blue-50 dark:bg-slate-900'
+                          : 'bg-white dark:bg-slate-900'
+                      }`}
+                    >
                       <RowActions
                         viewLabel="Xem chi tiết cột đèn"
                         editLabel="Chỉnh sửa cột đèn"
