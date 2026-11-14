@@ -4,10 +4,12 @@ import {
   fetchSegmentsList,
   fetchWarrantyStatistics,
   fetchFaultsList,
+  fetchFixtureStatusStatistics,
 } from './dashboardAPI'
 import type { SegmentListItem } from '../../types/assets/segments'
 import type { WarrantyList } from '../../types/statistics/warranty'
 import type { FaultItem } from '../../types/faults/faults'
+import type { FixtureStatusStatistics } from '../../types/statistics/fixture-status'
 import {
   fetchDashboardDataRequest,
   fetchDashboardDataSuccess,
@@ -19,10 +21,11 @@ import {
  */
 function* handleFetchDashboardData() {
   try {
-    const [segments, warrantyRes, faultsRes]: [
+    const [segments, warrantyRes, faultsRes, fixtureStatusRes]: [
       SegmentListItem[],
       WarrantyList,
-      FaultItem[]
+      FaultItem[],
+      FixtureStatusStatistics
     ] = yield all([
       call(fetchSegmentsList),
       call(fetchWarrantyStatistics, {
@@ -34,6 +37,7 @@ function* handleFetchDashboardData() {
         sort: '-detected_at',
         page_size: 100,
       }),
+      call(fetchFixtureStatusStatistics, { group_by: 'segment' }),
     ])
 
     // Lọc các bóng đèn có ngày hạn rõ ràng (<= 30 ngày)
@@ -52,6 +56,7 @@ function* handleFetchDashboardData() {
         segments: segments || [],
         warranty: finalWarranty,
         faults: faultsRes || [],
+        fixtureStatusRows: fixtureStatusRes?.rows || [],
       })
     )
   } catch (error: any) {

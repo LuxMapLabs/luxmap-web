@@ -8,6 +8,7 @@ interface BarChartItem {
   normal: number
   dim: number
   out: number
+  unknown: number
 }
 
 interface DonutChartItem {
@@ -24,10 +25,11 @@ interface LightingStatusCardProps {
   totalPoles: number
 }
 
-const SEGMENT_PARTS: { key: 'normal' | 'dim' | 'out'; label: string; color: string }[] = [
+const SEGMENT_PARTS: { key: 'normal' | 'dim' | 'out' | 'unknown'; label: string; color: string }[] = [
   { key: 'normal', label: 'Bình thường', color: '#10b981' },
   { key: 'dim', label: 'Sáng yếu', color: '#f59e0b' },
   { key: 'out', label: 'Mất sáng', color: '#ef4444' },
+  { key: 'unknown', label: 'Chưa quét', color: '#cbd5e1' },
 ]
 
 // Thẻ gộp: biểu đồ tròn cơ cấu toàn mạng + thanh phân bố theo từng tuyến
@@ -106,7 +108,7 @@ export const LightingStatusCard: React.FC<LightingStatusCardProps> = ({
 
           <ul className="space-y-4">
             {barChartData.map((seg, idx) => {
-              const total = seg.normal + seg.dim + seg.out
+              const total = seg.normal + seg.dim + seg.out + seg.unknown
               return (
                 <li key={seg.name} className="group cursor-default">
                   <div className="flex items-baseline justify-between gap-3 mb-1.5">
@@ -117,6 +119,7 @@ export const LightingStatusCard: React.FC<LightingStatusCardProps> = ({
                       {total} cột
                       {seg.out > 0 && <span className="text-red-600 font-semibold"> · {seg.out} mất sáng</span>}
                       {seg.dim > 0 && <span className="text-amber-600 font-semibold"> · {seg.dim} sáng yếu</span>}
+                      {seg.unknown > 0 && <span className="text-slate-500 font-semibold"> · {seg.unknown} chưa quét</span>}
                     </span>
                   </div>
                   <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[#eaeff4] transition-all duration-200 group-hover:h-3.5">
