@@ -1,5 +1,5 @@
-import React from 'react'
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts'
+import React, { useState } from 'react'
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { OpsCard } from '../../../components/ops/OpsCard'
 
 interface BarChartItem {
@@ -41,6 +41,9 @@ export const LightingStatusCard: React.FC<LightingStatusCardProps> = ({
   totalPoles,
 }) => {
   const hasData = totalPoles > 0
+  // Phần đang trỏ vào: số liệu hiện ở giữa vòng tròn thay vì tooltip nổi đè lên
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const hovered = hoveredIndex !== null ? donutChartData[hoveredIndex] : undefined
 
   return (
     <OpsCard
@@ -74,20 +77,22 @@ export const LightingStatusCard: React.FC<LightingStatusCardProps> = ({
                     stroke="none"
                     cornerRadius={4}
                     animationDuration={1100}
+                    onMouseEnter={(_, index) => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
                   >
                     {donutChartData.map((entry, index) => (
                       <Cell key={`donut-cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    formatter={(value, name) => [`${value ?? 0} cột đèn`, String(name ?? '')]}
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                  />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-bold text-slate-800 leading-none tabular-nums">{totalPoles}</span>
-                <span className="text-[11px] font-medium text-slate-500 mt-1">cột đèn</span>
+                <span className="text-2xl font-bold text-slate-800 leading-none tabular-nums">
+                  {hovered ? hovered.value : totalPoles}
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 mt-1">
+                  {hovered ? `cột ${hovered.name.toLowerCase()}` : 'cột đèn'}
+                </span>
               </div>
             </div>
             <ul className="mt-2 space-y-1.5">
