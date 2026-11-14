@@ -232,33 +232,18 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
         {/* Navigation Tabs */}
         <div className="px-6 border-b border-slate-200 bg-white flex items-center gap-2 shrink-0">
           {phase.phaseType === 'pole_gps_update' ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setActiveTab('gps')}
-                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-                  activeTab === 'gps'
-                    ? 'border-violet-600 text-violet-700'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <MapIcon className="w-4 h-4" />
-                <span>Tọa Độ GPS Từng Cột ({effectivePoleGpsLocations.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('photos')}
-                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-                  activeTab === 'photos'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Camera className="w-4 h-4" />
-                <span>Ảnh Hiện Trường ({photoCount})</span>
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => setActiveTab('gps')}
+              className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                activeTab === 'gps'
+                  ? 'border-violet-600 text-violet-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <MapIcon className="w-4 h-4" />
+              <span>Tọa Độ GPS &amp; Ảnh Từng Cột ({effectivePoleGpsLocations.length})</span>
+            </button>
           ) : (
             <>
               <button
@@ -358,33 +343,79 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <thead>
                     <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200 text-[11px] uppercase">
                       <th className="py-2.5 px-3 font-extrabold">Mã cột</th>
+                      <th className="py-2.5 px-3 font-extrabold">Ảnh chụp</th>
                       <th className="py-2.5 px-3 font-extrabold">Vĩ độ (Lat)</th>
                       <th className="py-2.5 px-3 font-extrabold">Kinh độ (Lng)</th>
-                      <th className="py-2.5 px-3 font-extrabold">Sai số</th>
                       <th className="py-2.5 px-3 font-extrabold">Thời gian ghi nhận</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {effectivePoleGpsLocations.length > 0 ? (
-                      effectivePoleGpsLocations.map((g, idx) => (
-                        <tr key={g.pole_id || idx} className="hover:bg-violet-50/40">
-                          <td className="py-2.5 px-3 font-mono font-black text-slate-900">
-                            {g.pole_id || '-'}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
-                            {g.lat != null ? g.lat.toFixed(6) : '-'}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
-                            {g.lng != null ? g.lng.toFixed(6) : '-'}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
-                            {g.accuracy_m != null ? `±${g.accuracy_m}m` : '-'}
-                          </td>
-                          <td className="py-2.5 px-3 text-[11px] text-slate-500">
-                            {g.captured_at ? new Date(g.captured_at).toLocaleString('vi-VN') : '-'}
-                          </td>
-                        </tr>
-                      ))
+                      effectivePoleGpsLocations.map((g, idx) => {
+                        const polePhotoMatches = g.pole_id
+                          ? polePhotos.filter((p) => p.pole_id === g.pole_id)
+                          : []
+                        const matchedPhoto =
+                          polePhotoMatches.length > 0
+                            ? polePhotoMatches[polePhotoMatches.length - 1]
+                            : undefined
+
+                        return (
+                          <tr key={g.pole_id || idx} className="hover:bg-violet-50/40">
+                            <td className="py-2.5 px-3 font-mono font-black text-slate-900">
+                              {g.pole_id || '-'}
+                            </td>
+                            <td className="py-2 px-3">
+                              {matchedPhoto?.photo_id && targetWorkOrderId ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setZoomImage({
+                                      polePhotoId: matchedPhoto.photo_id,
+                                      workOrderId: targetWorkOrderId,
+                                      src:
+                                        matchedPhoto.original_url ||
+                                        matchedPhoto.thumbnail_url ||
+                                        undefined,
+                                      title: `Cột ${g.pole_id || ''}`,
+                                    })
+                                  }
+                                  title="Bấm để phóng to ảnh"
+                                  className="relative w-14 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-950 group cursor-pointer block shadow-2xs"
+                                >
+                                  <PolePhotoImage
+                                    workOrderId={targetWorkOrderId}
+                                    photoId={matchedPhoto.photo_id}
+                                    fallbackSrc={
+                                      matchedPhoto.thumbnail_url ||
+                                      matchedPhoto.original_url ||
+                                      undefined
+                                    }
+                                    alt={`Ảnh cột ${g.pole_id || ''}`}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                  />
+                                  <span className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
+                                    <Maximize2 className="w-3.5 h-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </span>
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 italic">
+                                  Chưa có ảnh
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
+                              {g.lat != null ? g.lat.toFixed(6) : '-'}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
+                              {g.lng != null ? g.lng.toFixed(6) : '-'}
+                            </td>
+                            <td className="py-2.5 px-3 text-[11px] text-slate-500">
+                              {g.captured_at ? new Date(g.captured_at).toLocaleString('vi-VN') : '-'}
+                            </td>
+                          </tr>
+                        )
+                      })
                     ) : (
                       <tr>
                         <td colSpan={5} className="py-6 text-center text-slate-400">
