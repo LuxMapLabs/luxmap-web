@@ -109,6 +109,7 @@ export interface EvidenceItem {
     evidence_id: string | null
     work_order_id?: string | null
     fault_id?: string | null
+    pole_id?: string | null
     kind?: EvidenceKind
     captured_at?: string | null
     lat?: number

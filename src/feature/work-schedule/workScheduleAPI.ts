@@ -5,6 +5,7 @@ import type {
   WorkOrderItemPagedResult,
   WorkOrderAssigneePagedResult,
   WorkOrderPolePagedResult,
+  EvidenceItem,
   EvidenceItemPagedResult,
   CreateWorkOrderRequest,
   PatchWorkOrderRequest,
@@ -230,6 +231,24 @@ export const workScheduleAPI = {
       params: { page },
     })
     return response.data
+  },
+
+  /**
+   * Lấy toàn bộ ảnh chụp bằng chứng qua tất cả các trang (đảm bảo không sót ảnh khi > 50 mục)
+   */
+  async getAllWorkOrderEvidence(id: string): Promise<EvidenceItem[]> {
+    const allItems: EvidenceItem[] = []
+    let page = 1
+    while (page <= 20) {
+      const res = await this.getWorkOrderEvidence(id, page)
+      const items = res.items || []
+      allItems.push(...items)
+      const pageSize = res.page_size || 50
+      const total = res.total ?? allItems.length
+      if (items.length === 0 || allItems.length >= total || items.length < pageSize) break
+      page += 1
+    }
+    return allItems
   },
 
   /**
