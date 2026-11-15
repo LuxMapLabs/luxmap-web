@@ -1,8 +1,9 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { store } from '../../../../redux/store'
+import { mapAPI } from '../../../../feature/map/mapAPI'
 import { GisMapLegend } from '../../../../pages/gis-map/components/GisMapLegend'
 import { GisDrawerPanel, type GisDrawerPanelProps } from '../../../../pages/gis-map/components/GisDrawerPanel'
 import type { PoleFeature } from '../../../../pages/gis-map/GisMapPage'
@@ -372,6 +373,67 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getByText('Trung bình')).toBeInTheDocument()
       expect(screen.getByText('Đã xác nhận')).toBeInTheDocument()
       expect(screen.getByText('Ưu tiên: 60đ')).toBeInTheDocument()
+    })
+
+    it('GisDrawerPanel dùng ảnh tài sản (tải qua blob có token) khi cột chưa có khung quét, và mở ảnh gốc ở lightbox', async () => {
+      const photoPole: PoleFeature = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [106.4899, 10.9705] },
+        properties: {
+          pole_id: 'POL-002',
+          segment_id: 'SEG-001',
+          fixture_status: 'normal',
+          open_fault_count: 0,
+        },
+      }
+      store.dispatch(
+        fetchPoleDetailSuccess({
+          ...mockPoleDetail,
+          pole_id: 'POL-002',
+          current_status: { fixture_status: 'normal' },
+          open_faults: [],
+          recent_frames: [],
+          asset_photos: [
+            {
+              photo_id: 'PH-1',
+              thumbnail_url: '/api/v1/assets/poles/POL-002/photos/PH-1/thumbnail',
+              original_url: '/api/v1/assets/poles/POL-002/photos/PH-1/original',
+            },
+          ],
+        })
+      )
+
+      const fetchBlob = vi
+        .spyOn(mapAPI, 'fetchPhotoBlob')
+        .mockImplementation(async (url) => new Blob([url], { type: 'image/jpeg' }))
+      const createUrl = vi.fn((blob: Blob) => `blob:${blob.size}`)
+      const originalCreate = URL.createObjectURL
+      const originalRevoke = URL.revokeObjectURL
+      URL.createObjectURL = createUrl
+      URL.revokeObjectURL = vi.fn()
+
+      try {
+        render(
+          <Provider store={store}>
+            <GisDrawerPanel {...defaultDrawerProps} selectedPole={photoPole} effectivePoles={[photoPole]} />
+          </Provider>
+        )
+
+        const thumb = await screen.findByRole('img', { name: 'POL-002' })
+        expect(thumb).toHaveAttribute('src', expect.stringMatching(/^blob:/))
+        expect(fetchBlob).toHaveBeenCalledWith('/api/v1/assets/poles/POL-002/photos/PH-1/thumbnail')
+        expect(fetchBlob).not.toHaveBeenCalledWith('/api/v1/assets/poles/POL-002/photos/PH-1/original')
+        expect(screen.queryByText('Chưa có ảnh cột đèn')).toBeNull()
+
+        fireEvent.click(thumb)
+        await waitFor(() =>
+          expect(fetchBlob).toHaveBeenCalledWith('/api/v1/assets/poles/POL-002/photos/PH-1/original')
+        )
+      } finally {
+        URL.createObjectURL = originalCreate
+        URL.revokeObjectURL = originalRevoke
+        fetchBlob.mockRestore()
+      }
     })
 
     it('GisDrawerPanel chế độ xem Tuyến đường chỉ hiển thị thông số hạ tầng và KHÔNG CÒN thông số IoT rác', () => {
