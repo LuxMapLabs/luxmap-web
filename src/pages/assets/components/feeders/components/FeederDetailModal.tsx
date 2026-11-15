@@ -3,12 +3,15 @@ import React from 'react'
 import { X, Cable, Zap, MapPin, Calendar, User, Lightbulb } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import { findByIdOrRef } from '../../../../../utils/assets/findByIdOrRef'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
 
 export interface FeederDetailModalProps {
   isOpen: boolean
   feeder: FeederListItem | null
   poles: PoleListItem[]
+  cabinets?: CabinetListItem[]
   onClose: () => void
 }
 
@@ -16,6 +19,7 @@ export const FeederDetailModal: React.FC<FeederDetailModalProps> = ({
   isOpen,
   feeder,
   poles,
+  cabinets = [],
   onClose,
 }) => {
   const showCommune = useShowCommune()
@@ -70,7 +74,7 @@ export const FeederDetailModal: React.FC<FeederDetailModalProps> = ({
               </p>
               {feeder.cabinet?.cabinet_id && (
                 <span className="inline-block font-mono text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">
-                  Mã tủ: {feeder.cabinet.cabinet_id}
+                  Mã tủ: {findByIdOrRef(cabinets, (c) => c.cabinet_id, feeder.cabinet.cabinet_id)?.external_ref || feeder.cabinet.cabinet_id}
                 </span>
               )}
             </div>

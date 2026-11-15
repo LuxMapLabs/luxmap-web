@@ -20,17 +20,24 @@ import {
   drawSegmentRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
+  updateFixtureRequest,
   createIotNodeRequest,
   updateIotNodeRequest,
   deleteIotNodeRequest,
   setIotNodeRelayRequest,
   issueIotNodeCredentialRequest,
 } from '../../feature/assets/assetSlice'
-import type { PoleListItem, CreatePoleRequest, UpdatePoleRequest } from '../../types/assets/poles'
+import type { PoleListItem, CreatePoleRequest } from '../../types/assets/poles'
+import { poleUpdateRequest } from '../../utils/assets/poleUpdateRequest'
 import type { CabinetListItem, CreateCabinetRequest, UpdateCabinetRequest } from '../../types/assets/cabinets'
 import type { SegmentListItem, CreateSegmentRequest, UpdateSegmentRequest } from '../../types/assets/segments'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../types/assets/feeders'
-import type { ActiveFixture, CreateFixtureRequest, RetireFixtureRequest } from '../../types/assets/fixtures'
+import type {
+  ActiveFixture,
+  CreateFixtureRequest,
+  RetireFixtureRequest,
+  UpdateFixtureRequest,
+} from '../../types/assets/fixtures'
 import type {
   IotNodeItem,
   CreateIotNodeRequest,
@@ -68,7 +75,6 @@ export function useAssetData() {
   const [segments, setSegments] = useState<SegmentListItem[]>([])
   const [feeders, setFeeders] = useState<FeederListItem[]>([])
   const [iotNodes, setIotNodes] = useState<IotNodeItem[]>([])
-  const [successBanner, setSuccessBanner] = useState<string | null>(null)
 
   // Fetch real assets from Backend API on mount
   useEffect(() => {
@@ -124,12 +130,6 @@ export function useAssetData() {
       })
   }, [poles])
 
-  const showBanner = useCallback((msg: string) => {
-    setSuccessBanner(msg)
-    toast.success(msg)
-    setTimeout(() => setSuccessBanner(null), 4000)
-  }, [])
-
   // --- Pole Handlers (Redux-Saga First) ---
   const handleAddPole = async (data: PoleListItem) => {
     await handleAddPoles([data])
@@ -176,17 +176,7 @@ export function useAssetData() {
       return
     }
 
-    const updateReq: UpdatePoleRequest = {
-      external_ref: updated.external_ref || updated.pole_id,
-      segment_id: updated.segment_id || null,
-      feeder_id: updated.feeder_id || null,
-      geom_wkt: updated.location ? `POINT(${updated.location.lng} ${updated.location.lat})` : null,
-      near_sensitive_poi: !!updated.near_sensitive_poi,
-      data_source: updated.data_source || 'field',
-      note: updated.note ?? null,
-    }
-
-    dispatch(updatePoleRequest({ poleId: updated.pole_id, data: updateReq }))
+    dispatch(updatePoleRequest({ poleId: updated.pole_id, data: poleUpdateRequest(updated) }))
   }
 
   const handleDeletePole = async (poleId: string) => {
@@ -203,22 +193,8 @@ export function useAssetData() {
     dispatch(createFixturesBulkRequest(dataList))
   }
 
-  const handleUpdateFixture = (updated: ManagedFixture) => {
-    setPoles((prev) =>
-      prev.map((p) => {
-        if (p.pole_id === updated.pole_id && p.active_fixture) {
-          return {
-            ...p,
-            active_fixture: {
-              ...p.active_fixture,
-              ...updated,
-            },
-          }
-        }
-        return p
-      })
-    )
-    showBanner(`Đã cập nhật thông số bộ đèn "${updated.fixture_id}"!`)
+  const handleUpdateFixture = (fixtureId: string, data: UpdateFixtureRequest) => {
+    dispatch(updateFixtureRequest({ fixtureId, data }))
   }
 
   const handleRetireFixture = async (fixtureId: string, req: RetireFixtureRequest) => {
@@ -378,7 +354,6 @@ export function useAssetData() {
     loadAssetsError,
     isMutating,
     mutationError,
-    successBanner,
     handleAddPole,
     handleAddPoles,
     handleUpdatePole,

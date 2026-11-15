@@ -2,13 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { Button } from '../../../../components/Button'
 import { Search, Plus, Upload, Filter, Zap } from 'lucide-react'
 import { OpsSelect } from '../../../../components/ops/OpsSelect'
-import type { CreateFixtureRequest, RetireFixtureRequest } from '../../../../types/assets/fixtures'
+import type { CreateFixtureRequest, RetireFixtureRequest, UpdateFixtureRequest } from '../../../../types/assets/fixtures'
 import type { ManagedFixture } from '../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../types/assets/segments'
 import { FixtureTable } from './components/FixtureTable'
 import { AddFixtureModal } from './components/AddFixtureModal'
-import { EditFixtureModal } from './components/EditFixtureModal'
 import { RetireFixtureModal } from './components/RetireFixtureModal'
 import { FixtureDetailModal } from './components/FixtureDetailModal'
 import { TablePagination } from '../common/TablePagination'
@@ -22,7 +21,7 @@ export interface FixturesTabProps {
   isLoading?: boolean
   onAddFixture: (data: CreateFixtureRequest) => void
   onAddFixtures?: (data: CreateFixtureRequest[]) => void
-  onUpdateFixture: (updated: ManagedFixture) => void
+  onUpdateFixture: (fixtureId: string, data: UpdateFixtureRequest) => void
   onRetireFixture?: (fixtureId: string, req: RetireFixtureRequest) => void
   onOpenImport: () => void
   onSelectPole?: (poleCode: string) => void
@@ -52,6 +51,18 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
   const [editingFixture, setEditingFixture] = useState<ManagedFixture | null>(null)
   const [retiringFixture, setRetiringFixture] = useState<ManagedFixture | null>(null)
   const [viewingFixture, setViewingFixture] = useState<ManagedFixture | null>(null)
+
+  // Sửa bộ đèn: chỉ bộ đang dùng có mã thật trên cột (không lấy mã dựng tạm của bảng)
+  const editTarget = useMemo(() => {
+    if (!editingFixture) return undefined
+    const pole = poles.find((p) => p.pole_id === editingFixture.pole_id)
+    const active = pole?.active_fixture
+    if (!active?.fixture_id) return undefined
+    return {
+      fixture: { ...active, fixture_id: active.fixture_id },
+      poleLabel: pole?.external_ref || pole?.pole_id || '',
+    }
+  }, [editingFixture, poles])
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -275,6 +286,7 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
       <FixtureTable
         fixtures={paginatedFixtures}
         poles={poles}
+        segments={segments}
         flashingFixtureCode={flashingFixtureCode}
         isLoading={isLoading}
         onViewDetail={(f) => setViewingFixture(f)}
@@ -312,12 +324,11 @@ export const FixturesTab: React.FC<FixturesTabProps> = ({
         onAddFixtures={onAddFixtures}
       />
 
-      <EditFixtureModal
-        isOpen={Boolean(editingFixture)}
+      <AddFixtureModal
+        isOpen={Boolean(editTarget)}
         onClose={() => setEditingFixture(null)}
-        fixture={editingFixture}
         poles={poles}
-        segments={segments}
+        editFixture={editTarget}
         onUpdateFixture={onUpdateFixture}
       />
 

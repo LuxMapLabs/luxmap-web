@@ -44,6 +44,8 @@ export interface PoleMapFixture {
     install_date?: string | null
     warranty_expiry?: string | null
     warranty_status?: WarrantyStatus
+    /** Ghi chú bộ đèn (trường hợp đặc biệt) — chờ backend, đã thống nhất. */
+    note?: string | null
 }
 
 export interface PoleMapFrame {

@@ -5,7 +5,7 @@ import type { PoleListItem, CreatePoleRequest, UpdatePoleRequest } from '../../t
 import type { CabinetListItem, CreateCabinetRequest, UpdateCabinetRequest } from '../../types/assets/cabinets'
 import type { SegmentListItem, CreateSegmentRequest, UpdateSegmentRequest } from '../../types/assets/segments'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../types/assets/feeders'
-import type { CreateFixtureRequest, RetireFixtureRequest } from '../../types/assets/fixtures'
+import type { CreateFixtureRequest, RetireFixtureRequest, UpdateFixtureRequest } from '../../types/assets/fixtures'
 import type {
   IotNodeItem,
   CreateIotNodeRequest,
@@ -90,6 +90,14 @@ export interface CreatePolePayload {
 export interface UpdatePolePayload {
   poleId: string
   data: UpdatePoleRequest
+  /** Sửa từ Bản đồ GIS: tải lại chi tiết cột và lớp bản đồ sau khi lưu. */
+  refreshMap?: boolean
+}
+
+export interface CreateFixturePayload {
+  data: CreateFixtureRequest
+  /** Gắn từ Bản đồ GIS: cột đang mở, để tải lại chi tiết cột và lớp bản đồ sau khi gắn. */
+  poleId?: string
 }
 
 export interface UpdateCabinetPayload {
@@ -107,9 +115,27 @@ export interface UpdateSegmentPayload {
   data: UpdateSegmentRequest
 }
 
+export interface UpdateFixturePayload {
+  fixtureId: string
+  data: UpdateFixtureRequest
+  /** Sửa từ Bản đồ GIS: cột đang mở, để tải lại chi tiết cột và lớp bản đồ. */
+  poleId?: string
+}
+
 export interface RetireFixturePayload {
   fixtureId: string
   data: RetireFixtureRequest
+  /** Tháo từ Bản đồ GIS: cột đang mở, để tải lại chi tiết cột và lớp bản đồ sau khi tháo. */
+  poleId?: string
+}
+
+/** Hình tuyến lấy theo đường trên bản đồ nền (Bản đồ GIS). */
+export interface ReshapeSegmentPayload {
+  segmentId: string
+  /** Tên hiển thị của tuyến, cho thông báo. */
+  label: string
+  geomWkt: string
+  lengthM: number
 }
 
 export interface UpdateIotNodePayload {
@@ -248,12 +274,22 @@ const assetSlice = createSlice({
       state.isMutating = true
       state.mutationError = null
     },
-    createFixtureRequest: (state, action: PayloadAction<CreateFixtureRequest>) => {
+    reshapeSegmentRequest: (state, action: PayloadAction<ReshapeSegmentPayload>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    createFixtureRequest: (state, action: PayloadAction<CreateFixturePayload>) => {
       void action
       state.isMutating = true
       state.mutationError = null
     },
     createFixturesBulkRequest: (state, action: PayloadAction<CreateFixtureRequest[]>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    updateFixtureRequest: (state, action: PayloadAction<UpdateFixturePayload>) => {
       void action
       state.isMutating = true
       state.mutationError = null
@@ -357,8 +393,10 @@ export const {
   updateSegmentRequest,
   deleteSegmentRequest,
   drawSegmentRequest,
+  reshapeSegmentRequest,
   createFixtureRequest,
   createFixturesBulkRequest,
+  updateFixtureRequest,
   retireFixtureRequest,
   createIotNodeRequest,
   updateIotNodeRequest,

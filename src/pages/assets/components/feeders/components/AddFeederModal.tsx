@@ -4,6 +4,7 @@ import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } 
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { CreateFeederRequest } from '../../../../../types/assets/feeders'
 import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
+import { findByIdOrRef } from '../../../../../utils/assets/findByIdOrRef'
 
 export interface AddFeederModalProps {
   isOpen: boolean
@@ -25,9 +26,7 @@ export const AddFeederModal: React.FC<AddFeederModalProps> = ({
 
   if (!isOpen) return null
 
-  const selectedCabinet = cabinets.find(
-    (c) => c.cabinet_id === cabinetId || c.external_ref === cabinetId
-  )
+  const selectedCabinet = findByIdOrRef(cabinets, (c) => c.cabinet_id, cabinetId)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,9 +73,7 @@ export const AddFeederModal: React.FC<AddFeederModalProps> = ({
               onChange={(newCabId) => {
                 setCabinetId(newCabId)
                 if (newCabId && !feederName) {
-                  const cab = cabinets.find(
-                    (c) => c.cabinet_id === newCabId || c.external_ref === newCabId
-                  )
+                  const cab = findByIdOrRef(cabinets, (c) => c.cabinet_id, newCabId)
                   if (cab) {
                     setFeederName(`Lộ 1 - ${cab.cabinet_name || cab.external_ref || cab.cabinet_id}`)
                   }

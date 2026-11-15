@@ -4,6 +4,7 @@ import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } 
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { FeederListItem, UpdateFeederRequest } from '../../../../../types/assets/feeders'
 import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
+import { findByIdOrRef } from '../../../../../utils/assets/findByIdOrRef'
 
 export interface EditFeederModalProps {
   isOpen: boolean
@@ -36,9 +37,7 @@ export const EditFeederModal: React.FC<EditFeederModalProps> = ({
 
   if (!isOpen || !feeder) return null
 
-  const selectedCabinet = cabinets.find(
-    (c) => c.cabinet_id === cabinetId || c.external_ref === cabinetId
-  )
+  const selectedCabinet = findByIdOrRef(cabinets, (c) => c.cabinet_id, cabinetId)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

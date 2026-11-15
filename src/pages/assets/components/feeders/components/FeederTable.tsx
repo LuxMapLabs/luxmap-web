@@ -3,10 +3,14 @@ import React from 'react'
 import { RowActions } from '../../common/RowActions'
 import { Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
+import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
+import { findByIdOrRef } from '../../../../../utils/assets/findByIdOrRef'
 
 export interface FeederTableProps {
   feeders: FeederListItem[]
+  /** Để hiện mã tủ (external_ref) thay vì mã nội bộ */
+  cabinets?: CabinetListItem[]
   isLoading?: boolean
   flashingFeederId?: string
   onViewDetail: (feeder: FeederListItem) => void
@@ -16,6 +20,7 @@ export interface FeederTableProps {
 
 export const FeederTable: React.FC<FeederTableProps> = ({
   feeders,
+  cabinets = [],
   isLoading = false,
   flashingFeederId,
   onViewDetail,
@@ -23,6 +28,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
   onDelete,
 }) => {
   const showCommune = useShowCommune()
+  const flashingFeeder = findByIdOrRef(feeders, (f) => f.feeder_id, flashingFeederId)
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
@@ -67,9 +73,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
             {feeders.map((feeder) => {
-              const isFlashing =
-                flashingFeederId &&
-                (feeder.feeder_id === flashingFeederId || feeder.external_ref === flashingFeederId)
+              const isFlashing = !!flashingFeederId && flashingFeeder === feeder
 
               return (
                 <tr
@@ -105,7 +109,8 @@ export const FeederTable: React.FC<FeederTableProps> = ({
                           ⚡ {feeder.cabinet.cabinet_name || feeder.cabinet.cabinet_id}
                         </span>
                         <span className="font-mono text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-full font-bold">
-                          {feeder.cabinet.cabinet_id}
+                          {findByIdOrRef(cabinets, (c) => c.cabinet_id, feeder.cabinet.cabinet_id)?.external_ref ||
+                            feeder.cabinet.cabinet_id}
                         </span>
                       </div>
                     ) : (

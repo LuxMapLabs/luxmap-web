@@ -7,14 +7,18 @@ import { StatusBadge } from '../../../../../components/StatusBadge'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
+import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { FixtureStatus } from '../../../../../types/common/enums'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
+import { findByIdOrRef, cabinetOfPole } from '../../../../../utils/assets/findByIdOrRef'
 import { PoleTableSkeleton } from './PoleTableSkeleton'
 
 export interface PoleTableProps {
   poles: PoleListItem[]
   cabinets: CabinetListItem[]
   segments: SegmentListItem[]
+  /** Để hiện mã mạch (external_ref) thay vì mã nội bộ */
+  feeders?: FeederListItem[]
   poleStatusMap?: Map<string, FixtureStatus>
   isLoading?: boolean
   flashingPoleCode?: string
@@ -34,6 +38,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
   poles,
   cabinets,
   segments,
+  feeders = [],
   poleStatusMap,
   isLoading = false,
   flashingPoleCode,
@@ -109,20 +114,13 @@ export const PoleTable: React.FC<PoleTableProps> = ({
               </tr>
             ) : (
               poles.map((pole) => {
-                const seg = segments.find(
-                  (s) => s.segment_id === pole.segment_id || (s.external_ref && s.external_ref.toLowerCase() === pole.segment_id?.toLowerCase())
-                )
+                const seg = findByIdOrRef(segments, (s) => s.segment_id, pole.segment_id)
                 const segmentName = seg?.segment_name || (seg?.external_ref ? `Tuyến ${seg.external_ref}` : 'Chưa gắn')
 
-                const targetCab = cabinets.find(
-                  (c) =>
-                    (pole.cabinet_id && (c.cabinet_id === pole.cabinet_id || c.external_ref === pole.cabinet_id)) ||
-                    c.cabinet_id === pole.feeder_id ||
-                    (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase()) ||
-                    (c.feeder_ids && pole.feeder_id && c.feeder_ids.includes(pole.feeder_id))
-                )
+                const targetCab = cabinetOfPole(cabinets, pole)
                 const cabName = targetCab?.cabinet_name || pole.cabinet_name || targetCab?.external_ref || ''
-                const feederLabel = pole.feeder_id ? (cabName ? `${cabName} • ${pole.feeder_id}` : pole.feeder_id) : (cabName || 'Chưa gắn')
+                const feederCode = findByIdOrRef(feeders, (f) => f.feeder_id, pole.feeder_id)?.external_ref || pole.feeder_id
+                const feederLabel = feederCode ? (cabName ? `${cabName} • ${feederCode}` : feederCode) : (cabName || 'Chưa gắn')
 
                 // Trạng thái đo sáng trắc quang đồng bộ từ GIS map
                 let fixtureStatus: FixtureStatus = 'unknown'

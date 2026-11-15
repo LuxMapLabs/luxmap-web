@@ -12,9 +12,11 @@ interface SegmentPoleOrderListProps {
   revealId: string | null
   onHover: (id: string | null) => void
   onFocus: (id: string) => void
-  onMove: (from: number, to: number) => void
+  /** Không truyền thì không kéo thả được (thứ tự do hình tuyến quyết). */
+  onMove?: (from: number, to: number) => void
   onRemove: (id: string) => void
-  onAutoSort: () => void
+  /** Không truyền thì ẩn nút "Sắp xếp tự động". */
+  onAutoSort?: () => void
 }
 
 const iconButton =
@@ -56,7 +58,7 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
   // Dòng đổi chỗ dưới con trỏ mà trình duyệt không báo rời chuột, nên phải tự bỏ vòng sáng
   // để nó không kẹt ở một cột không còn khớp với dòng đang rê.
   const moveAndClear = (from: number, to: number) => {
-    onMove(from, to)
+    onMove?.(from, to)
     onHover(null)
   }
 
@@ -67,6 +69,7 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
           <ListOrdered className="w-3.5 h-3.5 text-blue-500" />
           Thứ tự cột dọc tuyến
         </span>
+        {onAutoSort && (
         <button
           type="button"
           onClick={onAutoSort}
@@ -76,6 +79,7 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
         >
           Sắp xếp tự động
         </button>
+        )}
       </div>
 
       {route.length === 0 ? (
@@ -97,7 +101,7 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
               <li
                 key={pole.id}
                 data-pole-id={pole.id}
-                draggable
+                draggable={!!onMove}
                 onDragStart={(e) => {
                   setDragIndex(index)
                   onHover(null)
@@ -128,13 +132,15 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
                     : ''
                 }`}
               >
-                <span
-                  className="cursor-grab text-slate-300 dark:text-slate-600 shrink-0"
-                  title="Kéo để đổi vị trí"
-                  aria-hidden="true"
-                >
-                  <GripVertical className="w-3.5 h-3.5" />
-                </span>
+                {onMove && (
+                  <span
+                    className="cursor-grab text-slate-300 dark:text-slate-600 shrink-0"
+                    title="Kéo để đổi vị trí"
+                    aria-hidden="true"
+                  >
+                    <GripVertical className="w-3.5 h-3.5" />
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => onFocus(pole.id)}

@@ -324,13 +324,15 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
     it('AddFixtureModal khởi tạo form bóng đèn và các trường ngày tháng', () => {
       const onAddFixtureMock = vi.fn()
       render(
-        <AddFixtureModal
-          isOpen={true}
-          onClose={vi.fn()}
-          poles={[mockPoleWithoutFixture]}
-          segments={[mockSegment]}
-          onAddFixture={onAddFixtureMock}
-        />
+        <Provider store={configureStore({ reducer: rootReducer })}>
+          <AddFixtureModal
+            isOpen={true}
+            onClose={vi.fn()}
+            poles={[mockPoleWithoutFixture]}
+            segments={[mockSegment]}
+            onAddFixture={onAddFixtureMock}
+          />
+        </Provider>
       )
 
       // Kiểm tra nhãn 'Hạn bảo hành' có mặt trong form

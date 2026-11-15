@@ -14,6 +14,8 @@ export interface ActiveFixture {
     warranty_expiry?: string | null
     warranty_status?: WarrantyStatus
     data_source: DataSource
+    /** Ghi chú bộ đèn (trường hợp đặc biệt) — chờ backend, đã thống nhất. */
+    note?: string | null
 }
 
 export interface CreateFixtureRequest {
@@ -26,6 +28,22 @@ export interface CreateFixtureRequest {
     removed_date?: string | null
     warranty_expiry?: string | null
     data_source: DataSource
+    /** Ghi chú bộ đèn (trường hợp đặc biệt) — chờ backend, đã thống nhất. */
+    note?: string | null
+}
+
+/**
+ * PATCH /api/v1/assets/fixtures/{fixtureId} — CHỜ BACKEND (chưa có endpoint).
+ * Chỉ để sửa thông tin nhập sai của bộ đang dùng; đổi cột hoặc thay đèn thật = tháo rồi gắn bộ mới.
+ */
+export interface UpdateFixtureRequest {
+    fixture_type: FixtureType
+    power_source: PowerSource
+    lamp_watt: number
+    lamp_count: number
+    install_date: string | null
+    warranty_expiry: string | null
+    note: string | null
 }
 
 export interface RetireFixtureRequest {

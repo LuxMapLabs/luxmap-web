@@ -6,6 +6,7 @@ import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
+import { findByIdOrRef } from '../../../../../utils/assets/findByIdOrRef'
 
 export interface FixtureDetailModalProps {
   isOpen: boolean
@@ -37,15 +38,7 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
   })
 
   // Lookup segment information
-  const segment = segments.find((s) => {
-    if (pole?.segment_id) {
-      return (
-        s.segment_id === pole.segment_id ||
-        (s.external_ref && s.external_ref.toLowerCase() === pole.segment_id.toLowerCase())
-      )
-    }
-    return false
-  })
+  const segment = findByIdOrRef(segments, (s) => s.segment_id, pole?.segment_id)
 
   const isRetired = Boolean(fixture.removed_date)
   const lampCount = fixture.lamp_count || 1
@@ -223,6 +216,13 @@ export const FixtureDetailModal: React.FC<FixtureDetailModalProps> = ({
                   {fixture.warranty_expiry || 'Không có'}
                 </strong>
               </div>
+
+              {fixture.note && (
+                <div className="flex items-start justify-between gap-3">
+                  <span className="shrink-0">Ghi chú:</span>
+                  <span className="text-right text-slate-900 dark:text-slate-100">{fixture.note}</span>
+                </div>
+              )}
 
               {isRetired && (
                 <div className="flex items-center justify-between text-rose-600 dark:text-rose-400 font-bold">

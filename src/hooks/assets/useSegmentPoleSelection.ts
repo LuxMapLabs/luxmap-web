@@ -70,6 +70,22 @@ export const useSegmentPoleSelection = (candidates: PickablePole[], initial: Ord
     setSelected((prev) => dropEdgeBends(movePole(prev, from, to)))
   }, [])
 
+  /** Thêm nhiều cột một lần (gợi ý cột sát đường), mỗi cột tự chèn vào chỗ hợp lý. */
+  const addMany = useCallback(
+    (poleIds: string[]) => {
+      const toAdd = candidates.filter((c) => poleIds.includes(c.id))
+      setSelected((prev) =>
+        toAdd.reduce(
+          (route, pole) =>
+            route.some((p) => p.id === pole.id) ? route : insertPoleInRoute(route, { id: pole.id, coord: pole.coord }),
+          prev
+        )
+      )
+      setLastAddedId(null)
+    },
+    [candidates]
+  )
+
   /** Sắp lại theo chuỗi gần nhất, dùng khi danh sách bị xáo trộn nhiều. */
   const autoSort = useCallback(() => {
     setSelected((prev) => autoSortRoute(prev))
@@ -89,5 +105,5 @@ export const useSegmentPoleSelection = (candidates: PickablePole[], initial: Ord
   const poles = useMemo(() => polesOf(selected), [selected])
   const geometry = useMemo(() => buildSegmentGeometry(selected), [selected])
 
-  return { selected, poles, toggle, remove, move, autoSort, addBend, moveBend, lastAddedId, geometry }
+  return { selected, poles, toggle, addMany, remove, move, autoSort, addBend, moveBend, lastAddedId, geometry }
 }

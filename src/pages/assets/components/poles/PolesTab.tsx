@@ -10,6 +10,7 @@ import type { PolePropertiesFeature } from '../../../../types/map/poles'
 import type { PoleListItem } from '../../../../types/assets/poles'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../types/assets/segments'
+import type { FeederListItem } from '../../../../types/assets/feeders'
 import { PoleTable } from './components/PoleTable'
 import { AddPoleModal } from './components/AddPoleModal'
 import { EditPoleModal } from './components/EditPoleModal'
@@ -19,11 +20,13 @@ import { BulkPoleQrPrintModal } from './components/BulkPoleQrPrintModal'
 import { CabinetDetailModal } from '../cabinets/components/CabinetDetailModal'
 import { ConfirmDeleteAssetModal } from '../common/ConfirmDeleteAssetModal'
 import { TablePagination } from '../common/TablePagination'
+import { findByIdOrRef } from '../../../../utils/assets/findByIdOrRef'
 
 export interface PolesTabProps {
   poles: PoleListItem[]
   cabinets: CabinetListItem[]
   segments: SegmentListItem[]
+  feeders?: FeederListItem[]
   isLoading?: boolean
   activePoleCode?: string
   onClearActivePole?: () => void
@@ -41,6 +44,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
   poles,
   cabinets,
   segments,
+  feeders = [],
   isLoading = false,
   activePoleCode,
   onClearActivePole,
@@ -102,9 +106,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
       const q = searchQuery.toLowerCase().trim()
       const seg = segments.find((s) => s.segment_id === pole.segment_id)
       const segName = seg?.segment_name || pole.segment_id || ''
-      const cab = cabinets.find(
-        (c) => c.cabinet_id === pole.feeder_id || (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase())
-      )
+      const cab = findByIdOrRef(cabinets, (c) => c.cabinet_id, pole.feeder_id)
       const cabName = cab?.cabinet_name || cab?.external_ref || pole.feeder_id || ''
 
       const matchesQuery =
@@ -413,6 +415,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         poles={paginatedPoles}
         cabinets={cabinets}
         segments={segments}
+        feeders={feeders}
         poleStatusMap={poleStatusMap}
         isLoading={isLoading}
         flashingPoleCode={flashingPoleCode}
@@ -466,6 +469,7 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         pole={detailPole}
         segments={segments}
         cabinets={cabinets}
+        feeders={feeders}
         fixtureStatus={
           detailPole
             ? (detailPole.pole_id && poleStatusMap.get(detailPole.pole_id)) ||

@@ -109,6 +109,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
       {/* Main Table */}
       <FeederTable
         feeders={paginatedFeeders}
+        cabinets={cabinets}
         isLoading={isLoading}
         onViewDetail={(feeder) => setDetailFeeder(feeder)}
         onEdit={(feeder) => setEditFeeder(feeder)}
@@ -148,6 +149,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
         isOpen={Boolean(detailFeeder)}
         feeder={detailFeeder}
         poles={poles}
+        cabinets={cabinets}
         onClose={() => setDetailFeeder(null)}
       />
 

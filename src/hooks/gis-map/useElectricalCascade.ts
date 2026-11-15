@@ -6,6 +6,9 @@ import type { PolePropertiesFeature } from '../../types/map/poles'
 import type { SegmentPropertiesFeature } from '../../types/map/segments'
 import {
   searchAllCategories,
+  poleDisplayCode,
+  segmentDisplayCode,
+  cabinetDisplayCode,
   type SearchResultItem,
 } from '../../utils/gis-map/gisSearchUtils'
 import { fetchMapLayersRequest } from '../../feature/map/mapSlice'
@@ -252,11 +255,11 @@ export function useElectricalCascade({
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
-        const id = p.pole_id?.toLowerCase() || ''
+        const id = poleDisplayCode(p).toLowerCase()
         const lamp = (p.lamp_code || '').toLowerCase()
-        const seg = p.segment_id?.toLowerCase() || ''
-        const atlas = (p.atlas || p.atlas_note || '').toLowerCase()
         const segInfo = segmentInfoMap[p.segment_id || '']
+        const seg = segmentDisplayCode(segInfo).toLowerCase()
+        const atlas = (p.atlas || p.atlas_note || '').toLowerCase()
         const segName = segInfo?.name?.toLowerCase() || ''
         const road = segInfo?.road?.toLowerCase() || ''
 
@@ -290,13 +293,11 @@ export function useElectricalCascade({
       // 2. Filter by Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
-        const id = p.cabinet_id?.toLowerCase() || ''
-        const code = p.cabinet_code?.toLowerCase() || ''
+        const code = cabinetDisplayCode(p).toLowerCase()
         const name = p.cabinet_name?.toLowerCase() || ''
-        const seg = p.segment_id?.toLowerCase() || ''
+        const seg = segmentDisplayCode(segmentInfoMap[p.segment_id || '']).toLowerCase()
         const atlas = (p.atlas || p.landmark_note || '').toLowerCase()
         if (
-          !id.includes(q) &&
           !code.includes(q) &&
           !name.includes(q) &&
           !seg.includes(q) &&
@@ -308,7 +309,7 @@ export function useElectricalCascade({
 
       return true
     })
-  }, [cabinets, selectedSegment, searchQuery])
+  }, [cabinets, selectedSegment, searchQuery, segmentInfoMap])
 
   // 1. Road Segments Centerline Data (Tuyến đường giao thông từ Backend API - nét liền to bản)
   const roadSegmentsData = useMemo(() => {
