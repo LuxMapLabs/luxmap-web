@@ -28,6 +28,22 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>15/11/2026 — Ảnh dọc trên panel bản đồ</dt>
+        <dd>Ảnh cột chụp dọc bị khung rộng (h-44, object-cover) cắt phần giữa nên che bóng đèn ở đầu cột. Ảnh dọc giờ hiện nguyên khung (h-72, object-contain); ảnh ngang giữ nguyên.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/gis-map/components/GisDrawerPanel.tsx</code>; <code>src/test/pages/gis-map/components/GisDrawerAndMapFlow.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>fix(gis-map): show portrait pole photos uncropped in the drawer</code> (nhánh <code>feat/GIS-drawer-portrait-photo</code>, chưa push).</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ tsc exit 0; npm test đạt (có test mới); eslint file đã sửa sạch; npm run build đạt. ⚠️ Chưa xem trên production.</dd>
+        <dt>15/11/2026 — Ảnh cột trên panel bản đồ</dt>
+        <dd>Panel chi tiết cột dùng ảnh tài sản (<code>asset_photos</code>) khi cột chưa có khung quét (<code>recent_frames</code>), trước đây hiện "Chưa có ảnh cột đèn". Ảnh cần Bearer token nên tải qua blob; lightbox chỉ tải ảnh gốc khi người dùng mở.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/hooks/useAuthImage.ts</code>; <code>src/feature/map/mapAPI.ts</code>; <code>src/pages/gis-map/components/GisDrawerPanel.tsx</code>; <code>src/test/pages/gis-map/components/GisDrawerAndMapFlow.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(gis-map): show the asset photo in the pole drawer when there is no survey frame</code> (nhánh <code>feat/GIS-drawer-asset-photo</code>, chưa push).</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ npx tsc --noEmit: exit 0; npm test: 38 file, 342 test đạt; npm run lint: 0 lỗi, 31 cảnh báo nền; npm run build: exit 0. ⚠️ Chưa xem trên trình duyệt với dữ liệu production; chưa triển khai.</dd>
         <dt>14/11/2026 — Điều khiển đèn IoT</dt>
         <dd>Thêm POST/GET command và GET pole control bằng API client chung; bổ sung expires_at/control_channel. UI xác nhận phạm vi cả feeder, poll ACK đúng ID, xử lý lệnh bị thay thế/hết thời gian/lỗi, hủy khi đóng modal. Cấp secret thất bại giải phóng nút tạo.</dd>
         <dt>File thay đổi</dt>

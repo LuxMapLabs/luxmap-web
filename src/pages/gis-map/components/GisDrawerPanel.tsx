@@ -49,6 +49,7 @@ import {
   RetireFixtureModal,
   type RetirableFixture,
 } from '../../assets/components/fixtures/components/RetireFixtureModal'
+import { useAuthImage } from '../../../hooks/useAuthImage'
 
 // Nhãn trạng thái cột theo fixture_status do API trả về
 const poleStatusBadge = (status?: string | null) =>
@@ -163,6 +164,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     url: string
     title: string
   } | null>(null)
+  // Ảnh gốc của ảnh tài sản chỉ được tải khi người dùng mở lightbox
+  const [wantsAssetOriginal, setWantsAssetOriginal] = useState(false)
+  // Ảnh dọc hiện nguyên khung (object-contain) để không bị cắt mất bóng đèn ở đầu cột
+  const [isPortraitPhoto, setIsPortraitPhoto] = useState(false)
 
   // Maintenance Status
   const poleId = selectedPole?.properties?.pole_id || ''
@@ -287,7 +292,16 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     setIsHistoryOpen(hasIssue)
   }, [selectedPole?.properties?.pole_id, hasIssue])
 
-  const polePhotoUrl = poleDetail?.recent_frames?.[0]?.thumbnail_url || null
+  // Ảnh khung quét ưu tiên; cột chưa được quét thì dùng ảnh tài sản (cần token nên tải qua blob)
+  const frameThumbUrl = poleDetail?.recent_frames?.[0]?.thumbnail_url || null
+  const assetPhoto = frameThumbUrl ? undefined : poleDetail?.asset_photos?.[0]
+  const assetThumb = useAuthImage(assetPhoto?.thumbnail_url)
+  const assetOriginal = useAuthImage(assetPhoto?.original_url, wantsAssetOriginal)
+  const polePhotoUrl = frameThumbUrl || assetThumb.url
+
+  React.useEffect(() => {
+    setWantsAssetOriginal(false)
+  }, [selectedPole?.properties?.pole_id])
 
   // Dàn đèn do tủ phụ trách được xác định qua topology edges từ Redux Store
   const { cabinetTopologyEdges } = useSelector((state: RootState) => state.map)
@@ -509,18 +523,22 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               {/* 1. Actual Pole Photo */}
               {polePhotoUrl ? (
                 <div
-                  onClick={() =>
+                  onClick={() => {
+                    setWantsAssetOriginal(!!assetPhoto)
                     setLightboxImage({
                       url: polePhotoUrl,
                       title: `Ảnh cột đèn: ${selectedPole.properties.external_ref || selectedPole.properties.pole_id}`,
                     })
-                  }
-                  className="relative h-44 rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs"
+                  }}
+                  className={`relative ${isPortraitPhoto ? 'h-72' : 'h-44'} rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs`}
                 >
                   <img
                     src={polePhotoUrl}
                     alt={selectedPole.properties.external_ref || selectedPole.properties.pole_id}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    onLoad={(e) =>
+                      setIsPortraitPhoto(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth)
+                    }
+                    className={`w-full h-full ${isPortraitPhoto ? 'object-contain' : 'object-cover group-hover:scale-105'} transition-transform duration-200`}
                   />
                   <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent flex items-end justify-between p-2.5 text-white">
                     <span className="text-[11px] font-medium drop-shadow-sm font-mono">
@@ -531,6 +549,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     </div>
                   </div>
                 </div>
+              ) : assetThumb.isLoading ? (
+                <div className="h-28 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
               ) : (
                 <div className="h-28 rounded-xl border border-dashed border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/40 flex flex-col items-center justify-center p-3 text-center text-slate-400 dark:text-slate-500 text-xs">
                   <CameraOff className="w-6 h-6 mb-1 text-slate-300 dark:text-slate-600" />
@@ -1471,7 +1491,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
             </div>
             <div className="p-2 flex items-center justify-center bg-black min-h-72 max-h-[70vh]">
               <img
-                src={lightboxImage.url}
+                src={assetOriginal.url || lightboxImage.url}
                 alt={lightboxImage.title}
                 className="max-h-[65vh] w-auto object-contain rounded"
               />
