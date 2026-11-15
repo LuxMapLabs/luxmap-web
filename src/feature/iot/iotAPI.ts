@@ -11,9 +11,13 @@ import type {
 import type {
   IotCommandRequest,
   IotCommandStatus,
+  IotDiagnosticResult,
+  IotArchivedSamplePagedResult,
+  IotElectricalResult,
   IotNodeStatusPagedResult,
-  NodeProfile,
-  RegisteredSource,
+  IotTelemetryPage,
+  RegisterNodeRequest,
+  RegisteredNode,
 } from '../../types/iot/nodes'
 import type { IotPoleControl } from '../../types/iot/poles'
 
@@ -87,22 +91,53 @@ export const iotAPI = {
     return response.data
   },
 
-  // ---- Quản lý (ManageAssets): nguồn đo của node ----
+  // ---- Dữ liệu điện và chẩn đoán (mục 5) ----
 
-  /** POST /api/v1/iot/nodes/{nodeId}/source — 201, lần đầu gán nguồn. */
-  registerNodeSource: async (nodeId: string, profile: NodeProfile): Promise<RegisteredSource> => {
-    const response = await apiClient.post<RegisteredSource>(`/iot/nodes/${encodeURIComponent(nodeId)}/source`, profile)
+  /** GET /api/v1/iot/nodes/{nodeId}/electrical — mẫu mới nhất; `status` + `received_at` phân biệt mẫu mới / cũ. */
+  getElectrical: async (nodeId: string): Promise<IotElectricalResult> => {
+    const response = await apiClient.get<IotElectricalResult>(`/iot/nodes/${encodeURIComponent(nodeId)}/electrical`)
     return response.data
   },
 
-  /** PUT /api/v1/iot/nodes/{nodeId}/source — 204, gửi lại đầy đủ hồ sơ. */
-  updateNodeSource: async (nodeId: string, profile: NodeProfile): Promise<void> => {
-    await apiClient.put(`/iot/nodes/${encodeURIComponent(nodeId)}/source`, profile)
+  /**
+   * GET /api/v1/iot/nodes/{nodeId}/electrical/history?page=&page_size= — mới nhất trước (theo `received_at`).
+   * Dùng cho lần tải đầu của biểu đồ; sau đó lấy mẫu mới bằng `getElectricalHistory(after = cursor lớn nhất)`.
+   */
+  getElectricalHistoryPage: async (
+    nodeId: string,
+    params: { page: number; page_size: number }
+  ): Promise<IotArchivedSamplePagedResult> => {
+    const response = await apiClient.get<IotArchivedSamplePagedResult>(
+      `/iot/nodes/${encodeURIComponent(nodeId)}/electrical/history`,
+      { params: { ...params, sort_by: 'received_at' } }
+    )
+    return response.data
   },
 
-  /** DELETE /api/v1/iot/nodes/{nodeId}/source — 204; lịch sử, tuyến, secret trên bridge vẫn giữ. */
-  deleteNodeSource: async (nodeId: string): Promise<void> => {
-    await apiClient.delete(`/iot/nodes/${encodeURIComponent(nodeId)}/source`)
+  /** GET /api/v1/iot/nodes/{nodeId}/electrical/history?after=&limit= — dùng `next_cursor` làm `after` cho trang sau. */
+  getElectricalHistory: async (nodeId: string, after = 0, limit = 100): Promise<IotTelemetryPage> => {
+    const response = await apiClient.get<IotTelemetryPage>(
+      `/iot/nodes/${encodeURIComponent(nodeId)}/electrical/history`,
+      { params: { after, limit } }
+    )
+    return response.data
+  },
+
+  /** GET /api/v1/iot/nodes/{nodeId}/diagnostics — `anomalies[]` và ước lượng số bóng thiếu. */
+  getDiagnostics: async (nodeId: string): Promise<IotDiagnosticResult> => {
+    const response = await apiClient.get<IotDiagnosticResult>(`/iot/nodes/${encodeURIComponent(nodeId)}/diagnostics`)
+    return response.data
+  },
+
+  // ---- Admin (ManageSettings): đăng ký node ----
+
+  /**
+   * POST /api/v1/iot/nodes/register — tạo node ở tủ, gán mạch vào rơ-le #1, lưu nguồn đo và tuyến MQTT trong một lần.
+   * 201 khi tạo mới, 200 khi gửi lại đúng hồ sơ; hồ sơ khác cho cùng mạch / thiết bị → 409.
+   */
+  registerNode: async (body: RegisterNodeRequest): Promise<RegisteredNode> => {
+    const response = await apiClient.post<RegisteredNode>('/iot/nodes/register', body)
+    return response.data
   },
 }
 

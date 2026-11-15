@@ -226,7 +226,7 @@ export const AssetManagementPage: React.FC = () => {
 
         {/* Tab 4 Content: Thiết bị IoT */}
         {activeCategory === 'iot_nodes' && (
-          <IotNodesTab cabinets={cabinets} feeders={feeders} poles={poles} />
+          <IotNodesTab cabinets={cabinets} feeders={feeders} />
         )}
 
         {/* Tab 5 Content: Cột điện */}

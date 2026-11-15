@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Power, PowerOff, Sun, Clock, Loader2, Radio } from 'lucide-react'
+import { Activity, Power, PowerOff, Sun, Clock, Loader2, Radio } from 'lucide-react'
 import type { RootState } from '../../../redux/store'
 import iotAPI from '../../../feature/iot/iotAPI'
 import type { IotPoleControl } from '../../../types/iot/poles'
@@ -15,6 +15,7 @@ import {
   type IotCommandProgress,
 } from '../../../utils/iot/iotCommand'
 import { apiErrorMessage } from '../../../utils/iot/apiError'
+import { IotElectricalHistoryModal } from './IotElectricalHistoryModal'
 
 const POLL_MS = 3_000
 
@@ -43,6 +44,7 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [dayStart, setDayStart] = useState('')
   const [nightStart, setNightStart] = useState('')
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const nodeId = control?.node_id || null
   const viaBridge = Boolean(control?.can_control_feeder && control.control_channel === 'iot_bridge')
@@ -64,6 +66,7 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
     setTracked(null)
     setError(null)
     setScheduleOpen(false)
+    setHistoryOpen(false)
     iotAPI
       .getPoleControl(poleId)
       .then((result) => !cancelled && setControl(result))
@@ -159,10 +162,10 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
             <>
               <div className="flex gap-1.5">
                 <button type="button" disabled={sending} onClick={() => send('on')} className={buttonClass('on')}>
-                  <Power className="w-3.5 h-3.5" /> Bật mạch
+                  <Power className="w-3.5 h-3.5" /> Bật mạch {control.feeder_id}
                 </button>
                 <button type="button" disabled={sending} onClick={() => send('off')} className={buttonClass('off')}>
-                  <PowerOff className="w-3.5 h-3.5" /> Tắt mạch
+                  <PowerOff className="w-3.5 h-3.5" /> Tắt mạch {control.feeder_id}
                 </button>
                 <button type="button" disabled={sending} onClick={() => send('auto')} className={buttonClass('auto')}>
                   <Sun className="w-3.5 h-3.5" /> AUTO
@@ -224,6 +227,18 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
           {error && <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-300">{error}</p>}
           <p className="text-[10px] text-slate-400 dark:text-slate-500">Lệnh tác động lên cả mạch {feederLabel}, không riêng trụ này.</p>
         </>
+      )}
+
+      {/* Lịch sử điện: chỉ đọc, mọi vai trò xem bản đồ đều mở được. */}
+      <button
+        type="button"
+        onClick={() => setHistoryOpen(true)}
+        className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-800 cursor-pointer"
+      >
+        <Activity className="w-3.5 h-3.5" /> Lịch sử điện
+      </button>
+      {historyOpen && (
+        <IotElectricalHistoryModal nodeId={control.node_id} feederId={control.feeder_id} onClose={() => setHistoryOpen(false)} />
       )}
     </div>
   )

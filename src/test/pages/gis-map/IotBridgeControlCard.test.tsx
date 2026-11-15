@@ -10,6 +10,8 @@ vi.mock('../../../feature/iot/iotAPI', () => ({
     getPoleControl: vi.fn(),
     getCommand: vi.fn(),
     sendCommand: vi.fn(),
+    getElectricalHistoryPage: vi.fn(),
+    getElectricalHistory: vi.fn(),
   },
 }))
 
@@ -48,7 +50,32 @@ describe('IotBridgeControlCard', () => {
     api.getPoleControl.mockResolvedValue(bridgeControl)
     renderCard('superior')
     expect(await screen.findByText('AUTO')).toBeInTheDocument()
-    expect(screen.queryByText('Tắt mạch')).not.toBeInTheDocument()
+    expect(screen.queryByText('Tắt mạch FDR-001')).not.toBeInTheDocument()
+  })
+
+  it('shows no command buttons to system_admin (ControlLighting is the manager only)', async () => {
+    api.getPoleControl.mockResolvedValue(bridgeControl)
+    renderCard('system_admin')
+    expect(await screen.findByText('AUTO')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Bật mạch|Tắt mạch|Đặt lịch AUTO/ })).not.toBeInTheDocument()
+  })
+
+  it('labels the buttons with the feeder they switch, for the manager', async () => {
+    api.getPoleControl.mockResolvedValue(bridgeControl)
+    renderCard('manager')
+    expect(await screen.findByRole('button', { name: /Tắt mạch FDR-001/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Bật mạch FDR-001/ })).toBeInTheDocument()
+  })
+
+  it('lets a read-only role open the electrical history chart from the card', async () => {
+    api.getPoleControl.mockResolvedValue(bridgeControl)
+    api.getElectricalHistoryPage.mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] })
+    renderCard('superior')
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lịch sử điện/ }))
+
+    expect(await screen.findByRole('dialog', { name: 'Lịch sử điện NODE-001' })).toBeInTheDocument()
+    await waitFor(() => expect(api.getElectricalHistoryPage).toHaveBeenCalledWith('NODE-001', { page: 1, page_size: 200 }))
   })
 
   it('explains why a node on the feeder cannot be switched through the bridge', async () => {
@@ -70,7 +97,7 @@ describe('IotBridgeControlCard', () => {
     })
     renderCard('manager')
 
-    fireEvent.click(await screen.findByText('Tắt mạch'))
+    fireEvent.click(await screen.findByText('Tắt mạch FDR-001'))
 
     await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith('NODE-001', { mode: 'MANUAL', command: 'OFF' }))
     expect(await screen.findByText('Đang chờ node xác nhận…')).toBeInTheDocument()

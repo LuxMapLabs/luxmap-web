@@ -230,19 +230,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     dispatch(fetchPoleDetailRequest(poleId))
   }, [dispatch, poleId])
 
-  // Real IoT node from poleDetail or props
-  const poleIotNode = useMemo(() => {
-    if (poleDetail?.iot_node) {
-      return {
-        node_id: poleDetail.iot_node.node_id || 'IOT-NODE',
-        node_status: poleDetail.iot_node.node_status || 'online',
-        battery_pct: 95,
-        last_seen: poleDetail.iot_node.last_report_at || '',
-      }
-    }
-    return null
-  }, [poleDetail])
-
   // Real open faults from poleDetail
   const openFaults = poleDetail?.open_faults || []
 
@@ -606,16 +593,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           {formatDate(poleDetail?.fixture?.warranty_expiry || selectedPole.properties.warranty_expiry) || '—'}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Cảm biến IoT:</span>
-                        {poleIotNode ? (
-                          <strong className="text-blue-600 dark:text-blue-400 font-mono flex items-center gap-1">
-                            ⚡ {poleIotNode.node_id} (Pin {poleIotNode.battery_pct}%)
-                          </strong>
-                        ) : (
-                          <span className="text-slate-400 dark:text-slate-500">Không trang bị</span>
-                        )}
-                      </div>
                       {selectedPole.properties.near_sensitive_poi && (
                         <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 font-medium">
                           <span>Vị trí nhạy cảm:</span>
@@ -724,47 +701,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                             Gắn bộ đèn
                           </button>
                         )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 3. Dedicated Pole IoT Sensor Card (Only if pole has a sampled_fixture IoT node) */}
-                  {poleIotNode && (
-                    <div className="bg-blue-50/60 dark:bg-blue-950/30 p-3 rounded-xl border border-blue-200/70 dark:border-blue-800/50 space-y-2">
-                      <div className="flex items-center justify-between border-b border-blue-200/50 dark:border-blue-800/40 pb-1.5">
-                        <span className="font-bold text-xs text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          <span>Cảm biến IoT trên cột ({poleIotNode.node_id})</span>
-                        </span>
-                        <span
-                          className={`text-[10.5px] px-2 py-0.5 rounded font-semibold ${
-                            poleIotNode.node_status === 'online'
-                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                              : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
-                          }`}
-                        >
-                          {poleIotNode.node_status === 'online' ? 'Online' : 'Offline'}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-[11px] pt-0.5">
-                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Mức pin dự trữ</span>
-                          <strong className="text-slate-900 dark:text-white font-mono text-xs flex items-center gap-1">
-                            {poleIotNode.battery_pct}%
-                            {poleIotNode.battery_pct < 50 && (
-                              <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">(Pin yếu)</span>
-                            )}
-                          </strong>
-                        </div>
-                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Thời gian phát sáng</span>
-                          <strong className="text-slate-900 dark:text-white font-mono text-xs">
-                            {poleDetail?.runtime_history?.[0]?.runtime_hours !== undefined
-                              ? `${poleDetail.runtime_history[0].runtime_hours} h/đêm`
-                              : '—'}
-                          </strong>
-                        </div>
                       </div>
                     </div>
                   )}
@@ -1473,7 +1409,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       {lightboxImage && (
         <div
           onClick={() => setLightboxImage(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
