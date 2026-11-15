@@ -29,7 +29,7 @@ interface SuperiorToolbarProps {
   onSelectSegment: (segmentId: string) => void
   selectedPeriodDays: 7 | 30 | 90
   onChangePeriod: (days: 7 | 30 | 90) => void
-  onExportCsv: (types: SuperiorCsvExportType[]) => Promise<void>
+  onExportCsv: (types: SuperiorCsvExportType[]) => void
   onRefresh: () => void
   isRefreshing?: boolean
   isFullscreen?: boolean

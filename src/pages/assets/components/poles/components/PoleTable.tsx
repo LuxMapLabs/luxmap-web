@@ -150,7 +150,7 @@ export const PoleTable: React.FC<PoleTableProps> = ({
                   <tr
                     key={pole.external_ref || pole.pole_id || Math.random()}
                     id={poleExternal ? `pole-row-${poleExternal.toLowerCase()}` : undefined}
-                    className={`hover:bg-teal-50/40 dark:hover:bg-slate-800/80 hover:shadow-[inset_3px_0_0_#be457a] transition-all ${
+                    className={`hover:bg-teal-50/40 dark:hover:bg-slate-800/80 hover:shadow-[inset_3px_0_0_var(--color-blue-600)] transition-all ${
                       isFlashing ? 'animate-row-flash' : ''
                     } ${isPoleSelected(pole) ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''}`}
                   >

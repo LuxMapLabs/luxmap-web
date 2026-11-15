@@ -10,7 +10,9 @@ import {
   MAP_MAX_ZOOM,
   MAP_ASSET_PICKER_ZOOM,
   MAP_DEFAULT_MIN_ZOOM,
+  FIT_BOUNDS_COMMUNE_INSTANT,
 } from '../utils/gis-map/mapUtils'
+import type { CommuneBbox } from '../types/admin/communes'
 import { Crosshair, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 
 export interface LocationPickerMapProps {
@@ -22,6 +24,28 @@ export interface LocationPickerMapProps {
   height?: string
   readOnly?: boolean
   initialZoom?: number
+  /** Khung địa bàn (BBox xã): có thì vẽ viền và căn bản đồ vừa khung khi mở. */
+  boundary?: CommuneBbox | null
+  /** Chưa có vị trí: không vẽ ghim cho tới khi người dùng bấm lên bản đồ (`lat`/`lng` chỉ dùng để căn bản đồ). */
+  unpicked?: boolean
+}
+
+const BOUNDARY_SOURCE = 'picker-boundary-source'
+
+/** BBox đủ 4 cạnh hữu hạn và có diện tích; thiếu thì không vẽ. */
+const boundaryRing = (b?: CommuneBbox | null): [number, number][] | null => {
+  if (!b) return null
+  const { min_lng, min_lat, max_lng, max_lat } = b
+  const values = [min_lng, min_lat, max_lng, max_lat]
+  if (!values.every((v) => typeof v === 'number' && Number.isFinite(v))) return null
+  if (min_lng! >= max_lng! || min_lat! >= max_lat!) return null
+  return [
+    [min_lng!, min_lat!],
+    [max_lng!, min_lat!],
+    [max_lng!, max_lat!],
+    [min_lng!, max_lat!],
+    [min_lng!, min_lat!],
+  ]
 }
 
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
@@ -33,11 +57,17 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   height = '240px',
   readOnly = false,
   initialZoom = MAP_ASSET_PICKER_ZOOM,
+  boundary,
+  unpicked = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
   const isDraggingRef = useRef<boolean>(false)
+  // Chỉ đọc lúc mở: ghim xuất hiện ở lần bấm đầu tiên, sau đó bản đồ chạy như bình thường.
+  const startedEmptyRef = useRef(unpicked)
+  const placedRef = useRef(!unpicked)
+  const [placed, setPlaced] = useState(!unpicked)
 
   // Track initial/original coords for reset button
   const initialCoordsRef = useRef<{ lat: number; lng: number }>({
@@ -166,7 +196,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       anchor: 'bottom',
     })
       .setLngLat(initialCenter)
-      .addTo(map)
+    if (placedRef.current) marker.addTo(map)
 
     markerRef.current = marker
 
@@ -210,6 +240,11 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
         const newLat = roundCoord(e.lngLat.lat)
         const newLng = roundCoord(e.lngLat.lng)
         marker.setLngLat([newLng, newLat])
+        if (!placedRef.current) {
+          marker.addTo(map)
+          placedRef.current = true
+          setPlaced(true)
+        }
         setCurrentDisplayCoords({ lat: newLat, lng: newLng })
         onChange?.({ lat: newLat, lng: newLng })
         map.easeTo({ center: [newLng, newLat], duration: 300 })
@@ -242,6 +277,62 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       markerRef.current = null
     }
   }, [createMarkerElement, readOnly, initialZoom, mapBounds])
+
+  // Viền địa bàn: vẽ khung BBox xã (cùng kiểu trang Địa bàn & Khung BBox) và căn bản đồ vừa khung.
+  const ring = boundaryRing(boundary)
+  const ringKey = ring ? ring.flat().join(',') : ''
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ring) return
+    const draw = () => {
+      const data = {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'Polygon' as const, coordinates: [ring] },
+      }
+      const source = map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (source) {
+        source.setData(data)
+      } else {
+        map.addSource(BOUNDARY_SOURCE, { type: 'geojson', data })
+        map.addLayer({
+          id: 'picker-boundary-fill',
+          type: 'fill',
+          source: BOUNDARY_SOURCE,
+          paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.12 },
+        })
+        map.addLayer({
+          id: 'picker-boundary-line',
+          type: 'line',
+          source: BOUNDARY_SOURCE,
+          paint: { 'line-color': '#2563eb', 'line-width': 2.5, 'line-dasharray': [3, 2] },
+        })
+      }
+      // Giới hạn theo tài khoản (map_bounds) có thể trùng mép xã, làm fitBounds bị kẹp lệch sang một bên.
+      // Khi đã có khung xã thì giới hạn quanh khung đó, nới thêm nửa khung mỗi phía.
+      const [[minLng, minLat], , [maxLng, maxLat]] = ring
+      const padLng = (maxLng - minLng) / 2
+      const padLat = (maxLat - minLat) / 2
+      map.setMaxBounds([
+        [minLng - padLng, minLat - padLat],
+        [maxLng + padLng, maxLat + padLat],
+      ])
+      map.setMinZoom(MAP_DEFAULT_MIN_ZOOM)
+      map.fitBounds([ring[0], ring[2]], FIT_BOUNDS_COMMUNE_INSTANT)
+    }
+    if (map.isStyleLoaded()) draw()
+    else map.once('load', draw)
+    // Modal còn đang giãn kích thước lúc mở: căn lại khung theo mỗi lần resize trong giây đầu.
+    const refit = () => map.fitBounds([ring[0], ring[2]], FIT_BOUNDS_COMMUNE_INSTANT)
+    map.on('resize', refit)
+    const stopRefit = setTimeout(() => map.off('resize', refit), 1000)
+    return () => {
+      clearTimeout(stopRefit)
+      map.off('resize', refit)
+    }
+    // ringKey thay cho ring: chỉ vẽ lại khi toạ độ khung đổi, không phải mỗi lần render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ringKey])
 
   // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
   useEffect(() => {
@@ -321,15 +412,18 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
         >
           <ZoomOut className="w-3.5 h-3.5" />
         </button>
-        <button
-          type="button"
-          onClick={handleRecenter}
-          title="Căn giữa vào ghim"
-          className="w-7 h-7 bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 backdrop-blur-md rounded-lg shadow-md border border-slate-200/80 dark:border-slate-600/80 flex items-center justify-center transition cursor-pointer"
-        >
-          <Crosshair className="w-3.5 h-3.5" />
-        </button>
-        {!readOnly && (
+        {placed && (
+          <button
+            type="button"
+            onClick={handleRecenter}
+            title="Căn giữa vào ghim"
+            className="w-7 h-7 bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 backdrop-blur-md rounded-lg shadow-md border border-slate-200/80 dark:border-slate-600/80 flex items-center justify-center transition cursor-pointer"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {/* Mở lúc chưa có ghim thì không có "vị trí ban đầu" để khôi phục. */}
+        {!readOnly && !startedEmptyRef.current && (
           <button
             type="button"
             onClick={handleResetToInitial}
@@ -346,7 +440,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
         <div className="px-2 py-0.5 rounded-md bg-slate-950/85 backdrop-blur-md text-[10px] font-mono text-slate-300 border border-slate-800 flex items-center gap-1.5 shadow-md">
           <span className="text-amber-400 font-bold">GPS:</span>
           <span>
-            {currentDisplayCoords.lat.toFixed(6)}, {currentDisplayCoords.lng.toFixed(6)}
+            {placed
+              ? `${currentDisplayCoords.lat.toFixed(6)}, ${currentDisplayCoords.lng.toFixed(6)}`
+              : 'Bấm lên bản đồ để đặt ghim'}
           </span>
         </div>
       </div>

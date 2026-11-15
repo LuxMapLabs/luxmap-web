@@ -54,7 +54,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-extrabold text-slate-900">
-                Biên Bản Nghiệm Thu Kỹ Thuật
+                Biên bản nghiệm thu kỹ thuật
               </h2>
               <p className="text-xs text-slate-500 font-medium">
                 Mã lệnh công tác: <strong className="text-[#3B6385] font-mono">{report.workOrderId}</strong> • {report.communeName}
@@ -112,10 +112,10 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-5 mb-6 border-b-2 border-slate-800 gap-4">
               <div>
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  UBND HUYỆN NINH PHƯỚC
+                  Đơn vị quản lý
                 </h4>
                 <h3 className="text-xs sm:text-sm font-extrabold uppercase text-slate-900 mt-0.5">
-                  PHÒNG KINH TẾ & HẠ TẦNG
+                  {report.communeName}
                 </h3>
                 <p className="text-[11px] font-mono text-slate-500 mt-1">
                   Số: {report.workOrderId}/BB-NTCS-2026
@@ -131,7 +131,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                 </p>
                 <div className="w-24 h-0.5 bg-slate-300 mx-auto sm:ml-auto sm:mr-0 my-1.5" />
                 <p className="text-[11px] text-slate-500 italic">
-                  Ninh Phước, ngày {report.verifiedDate}
+                  {report.communeName}, ngày {report.verifiedDate}
                 </p>
               </div>
             </div>
@@ -167,7 +167,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                     Giai đoạn tác nghiệp:
                   </span>
                   <span className="font-bold text-slate-900">
-                    {report.taskKindName} ({report.taskKind})
+                    {report.taskKindName}
                   </span>
                 </div>
 
@@ -183,7 +183,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                     Địa bàn hành chính:
                   </span>
                   <span className="font-bold text-slate-900">
-                    {report.communeName}, Huyện Ninh Phước
+                    {report.communeName}
                   </span>
                 </div>
 

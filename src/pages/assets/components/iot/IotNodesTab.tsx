@@ -1,158 +1,116 @@
-import React, { useState, useMemo } from 'react'
-import { Button } from '../../../../components/Button'
-import { Search, Plus } from 'lucide-react'
-import type {
-  IotNodeItem,
-  CreateIotNodeRequest,
-  UpdateIotNodeRequest,
-  IotNodeCredential,
-} from '../../../../types/assets/iot-nodes'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import { Search, RefreshCw } from 'lucide-react'
+import iotAPI from '../../../../feature/iot/iotAPI'
+import type { IotNodeStatus } from '../../../../types/iot/nodes'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { FeederListItem } from '../../../../types/assets/feeders'
+import type { PoleListItem } from '../../../../types/assets/poles'
+import { apiErrorMessage } from '../../../../utils/iot/apiError'
 import { IotNodeTable } from './components/IotNodeTable'
-import { AddIotNodeModal } from './components/AddIotNodeModal'
-import { EditIotNodeModal } from './components/EditIotNodeModal'
-import { IotNodeDetailModal } from './components/IotNodeDetailModal'
-import { SetRelayModal } from './components/SetRelayModal'
-import { IssueCredentialModal } from './components/IssueCredentialModal'
-import { ConfirmDeleteIotNodeModal } from './components/ConfirmDeleteIotNodeModal'
+import { NodeSourceModal } from './components/NodeSourceModal'
 import { TablePagination } from '../common/TablePagination'
 
+/** `page_size` tối đa của API. Số node IoT (một node / tủ) nhỏ, nên tải một lần rồi lọc, phân trang ở client. */
+const FETCH_SIZE = 200
+
 export interface IotNodesTabProps {
-  iotNodes: IotNodeItem[]
   cabinets: CabinetListItem[]
   feeders: FeederListItem[]
-  isLoading?: boolean
-  onAddIotNode: (data: CreateIotNodeRequest) => void
-  onUpdateIotNode: (nodeId: string, data: UpdateIotNodeRequest) => void
-  onDeleteIotNode: (nodeId: string) => void
-  onSetRelay: (nodeId: string, relayNo: number, feederId: string | null) => void
-  onIssueCredential: (nodeId: string, onSuccess: (cred: IotNodeCredential) => void, onError?: () => void) => void
+  /** Trụ để chọn trụ đại diện khi gán nguồn đo IoT bridge. */
+  poles?: PoleListItem[]
 }
 
-export const IotNodesTab: React.FC<IotNodesTabProps> = ({
-  iotNodes,
-  cabinets,
-  feeders,
-  isLoading = false,
-  onAddIotNode,
-  onUpdateIotNode,
-  onDeleteIotNode,
-  onSetRelay,
-  onIssueCredential,
-}) => {
+/** Tab Thiết bị IoT của Quản lý: danh sách lấy từ `GET /iot/nodes` (nhóm IotDiagnostics). */
+export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders, poles = [] }) => {
+  const [nodes, setNodes] = useState<IotNodeStatus[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sourceNode, setSourceNode] = useState<IotNodeStatus | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
 
-  // Modals state
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [detailNode, setDetailNode] = useState<IotNodeItem | null>(null)
-  const [editNode, setEditNode] = useState<IotNodeItem | null>(null)
-  const [selectedRelayNodeId, setSelectedRelayNodeId] = useState<string | null>(null)
-  const [credentialNode, setCredentialNode] = useState<IotNodeItem | null>(null)
-  const [deleteNodeId, setDeleteNodeId] = useState<string | null>(null)
+  const load = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const result = await iotAPI.getNodes({ page: 1, page_size: FETCH_SIZE })
+      setNodes(result.items || [])
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Không đọc được danh sách thiết bị IoT.'))
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
-  // Luôn tìm node rơ-le mới nhất từ Redux store iotNodes
-  const activeRelayNode = useMemo(() => {
-    if (!selectedRelayNodeId) return null
-    return iotNodes.find((n) => n.node_id === selectedRelayNodeId) || null
-  }, [iotNodes, selectedRelayNodeId])
+  useEffect(() => {
+    load()
+  }, [load])
 
-  // Map cabinet lookup for search
   const cabinetMap = useMemo(() => {
     const map = new Map<string, string>()
     cabinets.forEach((c) => {
-      if (c.cabinet_id) {
-        map.set(c.cabinet_id, c.cabinet_name || c.external_ref || '')
-      }
+      if (c.cabinet_id) map.set(c.cabinet_id, c.cabinet_name || c.external_ref || '')
     })
     return map
   }, [cabinets])
 
-  // Filtered IoT Nodes
   const filteredNodes = useMemo(() => {
-    return iotNodes.filter((node) => {
-      const q = searchQuery.toLowerCase().trim()
-      if (!q) return true
-
+    const q = searchQuery.toLowerCase().trim()
+    if (!q) return nodes
+    return nodes.filter((node) => {
       const cabName = node.cabinet_id ? cabinetMap.get(node.cabinet_id)?.toLowerCase() || '' : ''
-      return (
-        (node.node_id && node.node_id.toLowerCase().includes(q)) ||
-        (node.cabinet_id && node.cabinet_id.toLowerCase().includes(q)) ||
-        cabName.includes(q) ||
-        (node.commune_id && node.commune_id.toLowerCase().includes(q)) ||
-        (node.data_source && node.data_source.toLowerCase().includes(q))
-      )
+      return [node.node_id, node.cabinet_id, node.commune_id, node.server_id]
+        .some((value) => value?.toLowerCase().includes(q)) || cabName.includes(q)
     })
-  }, [iotNodes, searchQuery, cabinetMap])
+  }, [nodes, searchQuery, cabinetMap])
 
   const totalPages = Math.max(1, Math.ceil(filteredNodes.length / pageSize))
-
   const paginatedNodes = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return filteredNodes.slice(start, start + pageSize)
   }, [filteredNodes, currentPage, pageSize])
 
-  const deleteTargetNode = useMemo(() => {
-    if (!deleteNodeId) return null
-    return iotNodes.find((n) => n.node_id === deleteNodeId) || null
-  }, [deleteNodeId, iotNodes])
-
-  const deleteNodeHasWiredRelays = useMemo(() => {
-    return Boolean(deleteTargetNode?.relays?.some((r) => !!r.feeder_id))
-  }, [deleteTargetNode])
-
-  const handleDeleteWithCheck = (nodeId: string) => {
-    setDeleteNodeId(nodeId)
-  }
-
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
-      {/* Action Toolbar */}
       <div className="ops-rise bg-white dark:bg-slate-900 p-3 rounded-[20px] shadow-ops flex flex-wrap items-center justify-between gap-3">
-        {/* Search Box - Chiều dài co giãn giống tab Bóng đèn */}
-        <div className="flex flex-1 flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-60 relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                setCurrentPage(1)
-              }}
-              placeholder="Tìm theo mã thiết bị, mã tủ, tên tủ, địa bàn..."
-              className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-xs focus:outline-none focus:border-primary dark:focus:border-blue-500 font-medium transition"
-            />
-            <Search className="w-4 h-4 text-slate-400 dark:text-slate-400 absolute left-2.5 top-2.5" />
-          </div>
+        <div className="flex-1 min-w-60 relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setCurrentPage(1)
+            }}
+            placeholder="Tìm theo mã thiết bị, mã tủ, tên tủ, địa bàn, server..."
+            className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-xs focus:outline-none focus:border-primary dark:focus:border-blue-500 font-medium transition"
+          />
+          <Search className="w-4 h-4 text-slate-400 dark:text-slate-400 absolute left-2.5 top-2.5" />
         </div>
-
-        {/* Action Button: Add IoT Node */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="primary"
-            onClick={() => setIsAddModalOpen(true)}
-            leftIcon={<Plus className="w-4 h-4" />}
-          >
-            Thêm thiết bị IoT
-          </Button>
-        </div>
+        <button
+          type="button"
+          onClick={load}
+          title="Tải lại"
+          className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
-      {/* IoT Node Table */}
+      {error && (
+        <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
+          {error}
+        </div>
+      )}
+
       <IotNodeTable
         iotNodes={paginatedNodes}
         cabinets={cabinets}
+        feeders={feeders}
         isLoading={isLoading}
-        onViewDetail={(node) => setDetailNode(node)}
-        onEdit={(node) => setEditNode(node)}
-        onDelete={handleDeleteWithCheck}
-        onSetRelay={(node) => setSelectedRelayNodeId(node.node_id)}
-        onIssueCredential={(node) => setCredentialNode(node)}
+        onSetSource={setSourceNode}
       />
 
-      {/* Pagination */}
       {filteredNodes.length > 0 && (
         <TablePagination
           currentListLength={filteredNodes.length}
@@ -164,59 +122,19 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({
         />
       )}
 
-      {/* Modals */}
-      <AddIotNodeModal
-        isOpen={isAddModalOpen}
-        cabinets={cabinets}
-        existingIotNodes={iotNodes}
-        onClose={() => setIsAddModalOpen(false)}
-        onSave={onAddIotNode}
-      />
-
-      <EditIotNodeModal
-        isOpen={!!editNode}
-        node={editNode}
-        cabinets={cabinets}
-        onClose={() => setEditNode(null)}
-        onSave={onUpdateIotNode}
-      />
-
-      <IotNodeDetailModal
-        isOpen={!!detailNode}
-        node={detailNode}
-        cabinets={cabinets}
-        onClose={() => setDetailNode(null)}
-        onEdit={(node) => setEditNode(node)}
-        onSetRelay={(node) => setSelectedRelayNodeId(node.node_id)}
-        onIssueCredential={(node) => setCredentialNode(node)}
-      />
-
-      <SetRelayModal
-        isOpen={!!selectedRelayNodeId}
-        node={activeRelayNode}
-        feeders={feeders}
-        allNodes={iotNodes}
-        onClose={() => setSelectedRelayNodeId(null)}
-        onSave={onSetRelay}
-      />
-
-      <IssueCredentialModal
-        isOpen={!!credentialNode}
-        node={credentialNode}
-        onClose={() => setCredentialNode(null)}
-        onIssue={onIssueCredential}
-      />
-
-      <ConfirmDeleteIotNodeModal
-        isOpen={!!deleteNodeId}
-        nodeId={deleteNodeId}
-        hasWiredRelays={deleteNodeHasWiredRelays}
-        onClose={() => setDeleteNodeId(null)}
-        onConfirm={(nodeId) => {
-          onDeleteIotNode(nodeId)
-          setDeleteNodeId(null)
-        }}
-      />
+      {sourceNode && (
+        <NodeSourceModal
+          key={sourceNode.node_id}
+          node={sourceNode}
+          feeders={feeders}
+          poles={poles}
+          onClose={() => setSourceNode(null)}
+          onSaved={() => {
+            setSourceNode(null)
+            load()
+          }}
+        />
+      )}
     </div>
   )
 }

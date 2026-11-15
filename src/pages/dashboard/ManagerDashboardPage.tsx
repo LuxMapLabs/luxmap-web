@@ -23,7 +23,7 @@ export const ManagerDashboardPage: React.FC = () => {
   const warrantyTableRef = useRef<HTMLDivElement>(null)
 
   // Redux Global State (được quản lý và nạp bởi Redux-Saga)
-  const { segmentsList, warrantyList, faultsList, loading } = useSelector(
+  const { segmentsList, warrantyList, faultsList, fixtureStatusRows, loading } = useSelector(
     (state: RootState) => state.dashboard
   )
 
@@ -89,42 +89,25 @@ export const ManagerDashboardPage: React.FC = () => {
 
   // --- TÍNH TOÁN DỮ LIỆU KPI & BIỂU ĐỒ (ĐỒNG BỘ 100% VỚI DATABASE) ---
 
-  // 1. Phân bố trạng thái từng tuyến đường tính toán động trực tiếp từ cơ sở dữ liệu sự cố
+  // 1. Phân bố trạng thái từng tuyến đường: lấy thẳng từ statistics/fixture-status (backend tính).
+  //    Cột chưa được quét phủ là "chưa quét", không tự coi là bình thường.
   const dynamicSegments = useMemo(() => {
     return segmentsList.map((seg) => {
       const segId = seg.segment_id || ''
-      const poleCount = seg.pole_count || 0
-      const segFaults = faultsList.filter((f) => f.segment_id === segId)
-      const out = segFaults.filter((f) => {
-        const type = String(f.fault_type).toLowerCase()
-        return (
-          !type.includes('offline') &&
-          !type.includes('node') &&
-          (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
-        )
-      }).length
-
-      const dim = segFaults.filter((f) => {
-        const type = String(f.fault_type).toLowerCase()
-        return (
-          !type.includes('offline') &&
-          !type.includes('node') &&
-          (type.includes('dim') || type.includes('runtime_decline'))
-        )
-      }).length
-
-      const normal = Math.max(0, poleCount - out - dim)
+      const rows = fixtureStatusRows.filter((r) => r.segment_id === segId)
+      const sum = (pick: (r: (typeof rows)[number]) => number) => rows.reduce((acc, r) => acc + pick(r), 0)
 
       return {
         id: segId,
         name: seg.segment_name || segId,
-        poleCount,
-        normal,
-        dim,
-        out,
+        poleCount: sum((r) => r.pole_count),
+        normal: sum((r) => r.normal),
+        dim: sum((r) => r.dim),
+        out: sum((r) => r.out),
+        unknown: sum((r) => r.unknown),
       }
     })
-  }, [segmentsList, faultsList])
+  }, [segmentsList, fixtureStatusRows])
 
   // 2. KPI Tình trạng đèn
   const fixtureKpis = useMemo(() => {
@@ -137,6 +120,7 @@ export const ManagerDashboardPage: React.FC = () => {
     const totalNormal = activeSegments.reduce((acc, s) => acc + s.normal, 0)
     const totalDim = activeSegments.reduce((acc, s) => acc + s.dim, 0)
     const totalOut = activeSegments.reduce((acc, s) => acc + s.out, 0)
+    const totalUnknown = activeSegments.reduce((acc, s) => acc + s.unknown, 0)
 
     const normalPct = totalPoles > 0 ? ((totalNormal / totalPoles) * 100).toFixed(1) : '0.0'
     const dimPct = totalPoles > 0 ? ((totalDim / totalPoles) * 100).toFixed(1) : '0.0'
@@ -147,6 +131,7 @@ export const ManagerDashboardPage: React.FC = () => {
       totalNormal,
       totalDim,
       totalOut,
+      totalUnknown,
       normalPct,
       dimPct,
       outPct,
@@ -184,6 +169,7 @@ export const ManagerDashboardPage: React.FC = () => {
             normal: seg.normal,
             dim: seg.dim,
             out: seg.out,
+            unknown: seg.unknown,
           },
         ]
       }
@@ -196,6 +182,7 @@ export const ManagerDashboardPage: React.FC = () => {
       normal: s.normal,
       dim: s.dim,
       out: s.out,
+      unknown: s.unknown,
     }))
   }, [dynamicSegments, selectedSegment])
 
@@ -205,6 +192,7 @@ export const ManagerDashboardPage: React.FC = () => {
       { name: 'Bình thường', value: fixtureKpis.totalNormal, color: '#10b981' },
       { name: 'Sáng yếu', value: fixtureKpis.totalDim, color: '#f59e0b' },
       { name: 'Mất sáng', value: fixtureKpis.totalOut, color: '#ef4444' },
+      { name: 'Chưa quét', value: fixtureKpis.totalUnknown, color: '#cbd5e1' },
     ]
   }, [fixtureKpis])
 

@@ -109,6 +109,8 @@ export async function fetchWarrantyStatistics(params: {
     if (params.page) cleanParams.page = params.page
 
     const res = await apiClient.get<WarrantyList>('/statistics/warranty', { params: cleanParams })
+    // Người gọi tự chọn status thì nhận nguyên danh sách; bộ lọc 30 ngày chỉ áp cho chế độ mặc định
+    if (params.status) return res.data
     if (res.data && res.data.items) {
       // Đảm bảo lọc chuẩn: Chỉ giữ lại bóng đã hết hạn (days_remaining < 0) hoặc sắp hết hạn trong 30 ngày (0 <= days_remaining <= 30)
       const validFilteredItems = res.data.items.filter(

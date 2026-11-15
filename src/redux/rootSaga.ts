@@ -16,6 +16,8 @@ import adminArtifactVersionSaga from '../feature/adminArtifactVersions/artifactV
 import lightingSaga from '../feature/lighting/lightingSaga'
 import passwordSaga from '../feature/password/passwordSaga'
 import avatarSaga from '../feature/avatar/avatarSaga'
+import superiorDashboardSaga from '../feature/dashboard/superiorDashboardSaga'
+import reportsSaga from '../feature/reports/reportsSaga'
 
 export default function* rootSaga() {
     yield all([
@@ -36,5 +38,7 @@ export default function* rootSaga() {
         fork(lightingSaga),
         fork(passwordSaga),
         fork(avatarSaga),
+        fork(superiorDashboardSaga),
+        fork(reportsSaga),
     ])
 }

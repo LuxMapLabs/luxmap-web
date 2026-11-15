@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import type { SegmentListItem } from '../../types/assets/segments'
 import type { WarrantyList } from '../../types/statistics/warranty'
 import type { FaultItem } from '../../types/faults/faults'
+import type { FixtureStatusRow } from '../../types/statistics/fixture-status'
 
 export interface DashboardState {
   loading: boolean
@@ -9,6 +10,8 @@ export interface DashboardState {
   segmentsList: SegmentListItem[]
   warrantyList: WarrantyList
   faultsList: FaultItem[]
+  /** statistics/fixture-status (group_by=segment): số cột theo trạng thái, tính ở backend */
+  fixtureStatusRows: FixtureStatusRow[]
   lastUpdated: string | null
 }
 
@@ -25,6 +28,7 @@ const initialState: DashboardState = {
     items: [],
   },
   faultsList: [],
+  fixtureStatusRows: [],
   lastUpdated: null,
 }
 
@@ -32,6 +36,7 @@ export interface FetchDashboardSuccessPayload {
   segments: SegmentListItem[]
   warranty: WarrantyList
   faults: FaultItem[]
+  fixtureStatusRows: FixtureStatusRow[]
 }
 
 const dashboardSlice = createSlice({
@@ -50,6 +55,7 @@ const dashboardSlice = createSlice({
       state.segmentsList = action.payload.segments
       state.warrantyList = action.payload.warranty
       state.faultsList = action.payload.faults
+      state.fixtureStatusRows = action.payload.fixtureStatusRows
       state.lastUpdated = new Date().toISOString()
       state.error = null
     },

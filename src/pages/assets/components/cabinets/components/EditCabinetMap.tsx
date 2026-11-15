@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { Layers, Eye, EyeOff } from 'lucide-react'
+import { Layers, Eye, EyeOff, X } from 'lucide-react'
 import { MapRecenterControl, CROSSHAIR_SVG } from '../../../../../utils/gis-map/MapRecenterControl'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
@@ -119,6 +119,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   }, [mapSegments, availableSegments])
 
   const [showOtherCabinets, setShowOtherCabinets] = useState(false)
+  const [showLegend, setShowLegend] = useState(true)
 
   const allRoutesGeoJsonRef = useRef(allRoutesGeoJson)
   allRoutesGeoJsonRef.current = allRoutesGeoJson
@@ -591,43 +592,62 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
       {/* Container bản đồ */}
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      {/* Legend & Bảng điều khiển trực quan */}
-      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-xl p-3 shadow-lg text-[11px] text-slate-800 max-w-[280px] space-y-2 select-none">
-        <div className="flex items-center justify-between gap-1.5 font-bold text-amber-700 pb-1 border-b border-blue-100">
-          <div className="flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5" />
-            <span>Định Vị Tủ Điện GIS</span>
+      {/* Legend thu gọn được để không che bản đồ */}
+      {!showLegend ? (
+        <button
+          type="button"
+          onClick={() => setShowLegend(true)}
+          title="Hiện chú thích"
+          className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-md border border-blue-100 rounded-lg px-2 py-1 shadow-md text-[10px] font-semibold text-slate-700 hover:bg-white cursor-pointer select-none"
+        >
+          <Layers className="w-3 h-3 text-amber-700" />
+          <span>Chú thích</span>
+        </button>
+      ) : (
+      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-lg px-2.5 py-2 shadow-md text-[10px] text-slate-800 max-w-[210px] space-y-1.5 select-none">
+        <div className="flex items-center justify-between gap-2 font-bold text-amber-700 pb-1 border-b border-blue-100">
+          <div className="flex items-center gap-1">
+            <Layers className="w-3 h-3" />
+            <span>Chú thích</span>
           </div>
-          <span className="text-[10px] text-blue-700 font-semibold">Zoom 18</span>
+          <button
+            type="button"
+            onClick={() => setShowLegend(false)}
+            title="Ẩn chú thích"
+            aria-label="Ẩn chú thích"
+            className="p-0.5 rounded text-slate-500 hover:text-slate-800 hover:bg-blue-50 cursor-pointer"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-md bg-purple-600 border border-white flex items-center justify-center text-[10px] text-yellow-300 font-bold shrink-0 shadow-xs">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 rounded bg-purple-600 border border-white flex items-center justify-center text-[8px] text-yellow-300 font-bold shrink-0 shadow-xs">
             ⚡
           </div>
-          <span className="text-slate-700 font-medium">Tủ đang sửa (Kéo hoặc nhấp chuột để đặt)</span>
+          <span className="text-slate-700 font-medium">Tủ đang sửa · kéo/nhấp để đặt</span>
         </div>
 
-        <div className="flex items-center gap-2 pt-0.5">
-          <div className="w-4 h-1.5 rounded-full bg-sky-400 shrink-0 shadow-xs" />
-          <span className="text-sky-700 font-medium text-[10px]">Tuyến đường liên kết</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-1 rounded-full bg-sky-400 shrink-0" />
+          <span className="text-sky-700 font-medium">Tuyến đường liên kết</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-1.5 rounded-full bg-slate-400 shrink-0" />
-          <span className="text-slate-600 font-medium text-[10px]">Các tuyến đường khác</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-1 rounded-full bg-slate-400 shrink-0" />
+          <span className="text-slate-600 font-medium">Các tuyến đường khác</span>
         </div>
 
         {/* Toggle ẩn/hiện các tủ khác để tránh rối mắt */}
         {filteredOtherCabinets.length > 0 && (
-          <div className="pt-1 border-t border-blue-100 flex items-center justify-between">
-            <span className="text-slate-600 text-[10px]">
+          <div className="pt-1 border-t border-blue-100 flex items-center justify-between gap-2">
+            <span className="text-slate-600">
               Tủ khác ({filteredOtherCabinets.length}):
             </span>
             <button
               type="button"
               onClick={() => setShowOtherCabinets(!showOtherCabinets)}
-              className="px-2 py-0.5 bg-white hover:bg-blue-50 border border-blue-200 text-slate-700 rounded text-[10px] font-medium flex items-center gap-1 cursor-pointer transition"
+              className="px-1.5 py-0.5 bg-white hover:bg-blue-50 border border-blue-200 text-slate-700 rounded font-medium flex items-center gap-1 cursor-pointer transition"
             >
               {showOtherCabinets ? (
                 <>
@@ -643,11 +663,8 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
             </button>
           </div>
         )}
-
-        <p className="text-[10px] text-amber-700 pt-1 border-t border-blue-100">
-          💡 Nhấp chuột lên bản đồ hoặc kéo ghim ⚡ để đặt vị trí thực địa chính xác.
-        </p>
       </div>
+      )}
 
       {/* Nút bấm quay về tâm vị trí tủ điện */}
     </div>

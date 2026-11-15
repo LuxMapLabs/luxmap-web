@@ -182,7 +182,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                {isEdit ? `Cập Nhật Địa Bàn: ${commune?.name || commune?.commune_id}` : 'Thêm Địa Bàn Hành Chính Mới'}
+                {isEdit ? `Cập nhật địa bàn: ${commune?.name || commune?.commune_id}` : 'Thêm địa bàn hành chính'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isEdit
@@ -206,7 +206,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
             {/* Tên địa bàn */}
             <div>
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 h-6 flex items-center mb-1.5">
-                Tên Địa Bàn Xã / Thị Trấn <span className="text-rose-500 ml-1">*</span>
+                Tên địa bàn (xã / thị trấn) <span className="text-rose-500 ml-1">*</span>
               </label>
               <input
                 type="text"
@@ -225,7 +225,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                    Khung Bao Bản Đồ (Bounding Box BBox)
+                    Khung bao bản đồ (BBox)
                   </h4>
                   <p className="text-[11px] text-slate-500">Giới hạn vùng camera khi người dùng mở bản đồ địa bàn này</p>
                 </div>
@@ -360,7 +360,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
           {/* Cột Phải: Bản đồ 2 lớp gán nhãn BBox */}
           <div className="lg:col-span-7 flex flex-col min-h-[420px]">
             <label className="text-xs font-bold text-slate-700 dark:text-slate-300 h-6 flex items-center mb-1.5 shrink-0">
-              Bản Đồ Vẽ & Tinh Chỉnh Khung BBox Trực Quan
+              Vẽ và tinh chỉnh khung BBox trên bản đồ
             </label>
             <div className="w-full flex-1 rounded-2xl overflow-hidden min-h-[400px]">
               <CommuneBboxMap
@@ -395,7 +395,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
             disabled={isSubmitting}
             className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary/90 active:scale-95 transition shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
           >
-            {isSubmitting ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Thêm Địa Bàn'}
+            {isSubmitting ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Thêm địa bàn'}
           </button>
         </div>
       </div>

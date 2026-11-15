@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useMemo } from 'react'
+import React, { useEffect, useRef, useMemo, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { Layers } from 'lucide-react'
+import { Layers, X } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { createManagedAreaControl } from '../../../../../utils/gis-map/MapRecenterControl'
@@ -505,26 +505,48 @@ export const AddCabinetMap: React.FC<AddCabinetMapProps> = ({
     }
   }, [segmentCoords])
 
+  const [showLegend, setShowLegend] = useState(true)
+
   return (
     <div className="relative w-full h-full min-h-[380px] md:min-h-[500px] bg-blue-50 overflow-hidden rounded-2xl md:rounded-r-3xl md:rounded-l-none border border-blue-200 shadow-inner">
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      {/* Legend & Chú thích */}
-      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-xl p-3 shadow-lg text-[11px] text-slate-800 max-w-[270px] space-y-1.5 select-none pointer-events-none">
-        <div className="flex items-center gap-1.5 font-bold text-amber-700 pb-1 border-b border-blue-100">
-          <Layers className="w-3.5 h-3.5" />
-          <span>Bản Đồ Định Vị Tủ Điện GIS</span>
+      {/* Legend thu gọn được để không che bản đồ */}
+      {!showLegend ? (
+        <button
+          type="button"
+          onClick={() => setShowLegend(true)}
+          title="Hiện chú thích"
+          className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-md border border-blue-100 rounded-lg px-2 py-1 shadow-md text-[10px] font-semibold text-slate-700 hover:bg-white cursor-pointer select-none"
+        >
+          <Layers className="w-3 h-3 text-amber-700" />
+          <span>Chú thích</span>
+        </button>
+      ) : (
+      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-lg px-2.5 py-2 shadow-md text-[10px] text-slate-800 max-w-[210px] space-y-1.5 select-none">
+        <div className="flex items-center justify-between gap-2 font-bold text-amber-700 pb-1 border-b border-blue-100">
+          <div className="flex items-center gap-1">
+            <Layers className="w-3 h-3" />
+            <span>Chú thích</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowLegend(false)}
+            title="Ẩn chú thích"
+            aria-label="Ẩn chú thích"
+            className="p-0.5 rounded text-slate-500 hover:text-slate-800 hover:bg-blue-50 cursor-pointer"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-purple-600 border border-white flex items-center justify-center text-[10px] text-yellow-300 font-bold shrink-0">
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-purple-600 border border-white flex items-center justify-center text-[7px] text-yellow-300 font-bold shrink-0">
             ⚡A
           </div>
-          <span className="text-slate-700 font-medium">Tủ điện mới khai báo (Kéo để chỉnh)</span>
+          <span className="text-slate-700 font-medium">Tủ mới · kéo/nhấp để đặt</span>
         </div>
-        <p className="text-[10px] text-blue-700 pt-1 italic border-t border-blue-100">
-          💡 Click trên ảnh vệ tinh để tự động gán tọa độ cho tủ đang chọn.
-        </p>
       </div>
+      )}
     </div>
   )
 }

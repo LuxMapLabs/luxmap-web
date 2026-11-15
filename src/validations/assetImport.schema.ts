@@ -59,6 +59,39 @@ export interface ValidationContext {
   feeders?: FeederListItem[]
 }
 
+/**
+ * Kiểm tra từng cặp "kinh độ vĩ độ" trong WKT nằm trong khoảng WGS84 (EPSG:4326).
+ * Bắt lỗi hay gặp nhất: đảo thứ tự, ví dụ POINT(10.98 106.51) (vĩ độ 106.51 là vô nghĩa).
+ */
+export function wktCoordinateError(wkt: string | null | undefined): string | null {
+  if (!wkt) return null
+  for (const m of wkt.matchAll(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/g)) {
+    const lng = Number(m[1])
+    const lat = Number(m[2])
+    if (lat < -90 || lat > 90) {
+      return `Vĩ độ ${lat} nằm ngoài khoảng -90 đến 90. WKT phải viết theo thứ tự (kinh độ vĩ độ), ví dụ POINT(106.49 10.97) — có thể file đang đảo kinh độ và vĩ độ`
+    }
+    if (lng < -180 || lng > 180) {
+      return `Kinh độ ${lng} nằm ngoài khoảng -180 đến 180. WKT phải viết theo thứ tự (kinh độ vĩ độ), ví dụ POINT(106.49 10.97)`
+    }
+  }
+  return null
+}
+
+/** Lấy (lat, lng) từ POINT WKT; null nếu không đọc được. */
+export function parsePointWkt(wkt: string | null | undefined): { lat: number; lng: number } | null {
+  if (!wkt) return null
+  const m = wkt.match(/POINT\s*\(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)/i)
+  if (!m) return null
+  return { lng: Number(m[1]), lat: Number(m[2]) }
+}
+
+/** Gộp mọi lỗi của một dòng (không chỉ lỗi đầu tiên) để người dùng sửa một lần */
+function issueMessages(error: z.ZodError, fallback: string): string {
+  const messages = Array.from(new Set(error.issues.map((i) => i.message).filter(Boolean)))
+  return messages.length > 0 ? messages.join('; ') : fallback
+}
+
 // ==========================================
 // 1. ZOD SCHEMAS FOR INDIVIDUAL CSV FORMATS
 // ==========================================
@@ -91,6 +124,10 @@ export const segmentImportSchema = z.object({
     })
     .transform((val) => (val && val.trim() ? val.trim() : null)),
 }).superRefine((val, ctx) => {
+  const coordError = wktCoordinateError(val.geom_wkt)
+  if (coordError) {
+    ctx.addIssue({ code: 'custom', path: ['geom_wkt'], message: coordError })
+  }
   if (val.geom_wkt && val.length_m === undefined) {
     ctx.addIssue({
       code: 'custom',
@@ -130,6 +167,12 @@ export const cabinetImportSchema = z
       path: ['cabinet_name'],
     }
   )
+  .superRefine((val, ctx) => {
+    const coordError = wktCoordinateError(val.geom_wkt)
+    if (coordError) {
+      ctx.addIssue({ code: 'custom', path: ['geom_wkt'], message: coordError })
+    }
+  })
 
 export const feederImportSchema = z.object({
   external_ref: z.string().min(1, 'Mã mạch điện (external_ref) không được để trống'),
@@ -153,6 +196,10 @@ export const poleImportSchema = z.object({
     .transform((val) => val?.trim() || null)
     .refine((val) => val === null || /^POINT\s*\(\s*([0-9.-]+)\s+([0-9.-]+)\s*\)/i.test(val), {
       message: 'Tọa độ cột điện phải là POINT(lng lat) WKT hợp lệ, hoặc để trống nếu chưa có GPS',
+    })
+    .superRefine((val, ctx) => {
+      const coordError = wktCoordinateError(val)
+      if (coordError) ctx.addIssue({ code: 'custom', message: coordError })
     }),
   near_sensitive_poi: z.preprocess((val) => {
     if (typeof val === 'string') return val.toLowerCase() === 'true'
@@ -319,51 +366,71 @@ export const REQUIRED_COLUMNS_BY_CATEGORY: Record<string, { key: string; label: 
   ],
 }
 
+type ImportCategory = 'segments' | 'cabinets' | 'feeders' | 'poles' | 'fixtures' | 'poles_and_fixtures'
+
 /**
- * Validate một dòng dữ liệu CSV tùy theo category, kiểm tra Schema + Ràng buộc quan hệ GIS
+ * Validate một dòng dữ liệu CSV tùy theo category, kiểm tra Schema + Ràng buộc quan hệ GIS.
+ * Mọi dòng lỗi đều bắt đầu bằng "Dòng N:" (N tính từ dòng dữ liệu đầu tiên, không kể dòng tiêu đề).
  */
 export function validateImportRow(
-  category: 'segments' | 'cabinets' | 'feeders' | 'poles' | 'fixtures' | 'poles_and_fixtures',
+  category: ImportCategory,
+  rowObj: Record<string, string>,
+  context: ValidationContext,
+  rowIndex: number
+): ParsedItemReview {
+  const review = validateRow(category, rowObj, context, rowIndex)
+  if (review.actionType === 'invalid' && review.errorMsg && !review.errorMsg.startsWith('Dòng ')) {
+    return { ...review, errorMsg: `Dòng ${rowIndex + 1}: ${review.errorMsg}` }
+  }
+  return review
+}
+
+function validateRow(
+  category: ImportCategory,
   rowObj: Record<string, string>,
   context: ValidationContext,
   rowIndex: number
 ): ParsedItemReview {
   const { segments, cabinets, poles, feeders = [] } = context
 
-  // 0. KIỂM TRA TÍNH TOÀN VẸN 100%: Mọi cột bắt buộc không được để trống bất kỳ ô nào
+  // 0. KIỂM TRA TÍNH TOÀN VẸN: mọi cột bắt buộc phải có dữ liệu — báo đủ các cột trống của dòng
   const requiredCols = REQUIRED_COLUMNS_BY_CATEGORY[category] || []
+  const emptyCols: string[] = []
   for (const col of requiredCols) {
-    if (category === 'cabinets' && col.key === 'cabinet_name') {
-      const cabName = rowObj['cabinet_name'] || rowObj['feeder_name']
-      if (!cabName || cabName.trim() === '') {
-        return {
-          category: 'cabinets',
-          externalRef: rowObj.external_ref || `CAB-ROW-${rowIndex + 1}`,
-          actionType: 'invalid',
-          errorMsg: `Dòng ${rowIndex + 1}: Cột 'cabinet_name' không có dữ liệu (bắt buộc điền đầy đủ).`,
-          data: {
-            external_ref: rowObj.external_ref || null,
-            cabinet_name: null,
-            commune_id: rowObj.commune_id || null,
-            geom_wkt: rowObj.geom_wkt || null,
-            data_source: (rowObj.data_source as DataSource) || 'field',
-          },
-          diffs: [],
-        }
-      }
-      continue
-    }
-
-    const val = rowObj[col.key]
-    if (val === undefined || val === null || val.trim() === '') {
+    const val =
+      category === 'cabinets' && col.key === 'cabinet_name'
+        ? rowObj['cabinet_name'] || rowObj['feeder_name']
+        : rowObj[col.key]
+    if (val === undefined || val === null || val.trim() === '') emptyCols.push(col.label)
+  }
+  if (emptyCols.length > 0) {
+    const errorMsg =
+      emptyCols.length === 1
+        ? `Dòng ${rowIndex + 1}: Cột '${emptyCols[0]}' không có dữ liệu (bắt buộc điền đầy đủ).`
+        : `Dòng ${rowIndex + 1}: Các cột ${emptyCols.map((c) => `'${c}'`).join(', ')} không có dữ liệu (bắt buộc điền đầy đủ).`
+    if (category === 'cabinets') {
       return {
-        category: category as any,
-        externalRef: rowObj.external_ref || rowObj.pole_external_ref || `ROW-${rowIndex + 1}`,
+        category: 'cabinets',
+        externalRef: rowObj.external_ref || `CAB-ROW-${rowIndex + 1}`,
         actionType: 'invalid',
-        errorMsg: `Dòng ${rowIndex + 1}: Cột '${col.label}' không có dữ liệu (bắt buộc điền đầy đủ).`,
-        data: {} as any,
+        errorMsg,
+        data: {
+          external_ref: rowObj.external_ref || null,
+          cabinet_name: null,
+          commune_id: rowObj.commune_id || null,
+          geom_wkt: rowObj.geom_wkt || null,
+          data_source: (rowObj.data_source as DataSource) || 'field',
+        },
         diffs: [],
       }
+    }
+    return {
+      category: category as any,
+      externalRef: rowObj.external_ref || rowObj.pole_external_ref || `ROW-${rowIndex + 1}`,
+      actionType: 'invalid',
+      errorMsg,
+      data: {} as any,
+      diffs: [],
     }
   }
 
@@ -374,7 +441,7 @@ export function validateImportRow(
   if (category === 'segments') {
     const parseResult = segmentImportSchema.safeParse(rowObj)
     if (!parseResult.success) {
-      const firstError = parseResult.error.issues[0]?.message || 'Lỗi định dạng dữ liệu tuyến đường'
+      const firstError = issueMessages(parseResult.error, 'Lỗi định dạng dữ liệu tuyến đường')
       return {
         category: 'segments',
         externalRef: rowObj.external_ref || `SEG-ROW-${rowIndex + 1}`,
@@ -490,7 +557,7 @@ export function validateImportRow(
   if (category === 'cabinets') {
     const parseResult = cabinetImportSchema.safeParse(rowObj)
     if (!parseResult.success) {
-      const firstError = parseResult.error.issues[0]?.message || 'Lỗi định dạng dữ liệu tủ điện'
+      const firstError = issueMessages(parseResult.error, 'Lỗi định dạng dữ liệu tủ điện')
       return {
         category: 'cabinets',
         externalRef: rowObj.external_ref || `CAB-ROW-${rowIndex + 1}`,
@@ -589,7 +656,7 @@ export function validateImportRow(
   if (category === 'fixtures') {
     const parseResult = fixtureImportSchema.safeParse(rowObj)
     if (!parseResult.success) {
-      const firstError = parseResult.error.issues[0]?.message || 'Lỗi định dạng dữ liệu bóng đèn'
+      const firstError = issueMessages(parseResult.error, 'Lỗi định dạng dữ liệu bóng đèn')
       const poleRef = rowObj.pole_external_ref || ''
       const pPole = poleRef
         ? poles.find((p) => p.external_ref && p.external_ref.toLowerCase() === poleRef.toLowerCase())
@@ -627,7 +694,7 @@ export function validateImportRow(
         category: 'fixtures',
         externalRef: poleRef,
         actionType: 'invalid',
-        errorMsg: `Cột điện [${poleRef}] chưa có trong hệ thống GIS. Cần có Cột điện trước khi nạp Bóng!`,
+        errorMsg: `Cột điện [${poleRef}] chưa có trong hệ thống GIS. Cần nạp Cột điện trước khi nạp Bộ đèn`,
         data: {
           pole_id: null,
           fixture_type: data.fixture_type,
@@ -755,7 +822,7 @@ export function validateImportRow(
   if (category === 'feeders') {
     const parseResult = feederImportSchema.safeParse(rowObj)
     if (!parseResult.success) {
-      const firstError = parseResult.error.issues[0]?.message || 'Lỗi định dạng dữ liệu mạch điện'
+      const firstError = issueMessages(parseResult.error, 'Lỗi định dạng dữ liệu mạch điện')
       return {
         category: 'feeders',
         externalRef: rowObj.external_ref || `FDR-ROW-${rowIndex + 1}`,
@@ -865,7 +932,7 @@ export function validateImportRow(
   // ----------------------------------------------------
   const parseResult = poleImportSchema.safeParse(rowObj)
   if (!parseResult.success) {
-    const firstError = parseResult.error.issues[0]?.message || 'Lỗi định dạng dữ liệu cột điện'
+    const firstError = issueMessages(parseResult.error, 'Lỗi định dạng dữ liệu cột điện')
     return {
       category: category as 'poles' | 'poles_and_fixtures',
       externalRef: rowObj.external_ref || `POLE-ROW-${rowIndex + 1}`,
@@ -893,24 +960,11 @@ export function validateImportRow(
     (s) => s.external_ref && s.external_ref.toLowerCase() === data.segment_external_ref.toLowerCase()
   )
 
+  const parentErrors: string[] = []
   if (!segObj) {
-    return {
-      category: category as 'poles' | 'poles_and_fixtures',
-      externalRef: data.external_ref,
-      actionType: 'invalid',
-      errorMsg: `Tuyến đường [${data.segment_external_ref}] chưa có trong hệ thống GIS. Cần có Tuyến đường trước khi nạp Cột!`,
-      data: {
-        external_ref: data.external_ref,
-        segment_id: data.segment_external_ref,
-        feeder_id: data.feeder_external_ref || null,
-        commune_id: data.commune_id,
-        geom_wkt: data.geom_wkt,
-        near_sensitive_poi: data.near_sensitive_poi,
-        data_source: data.data_source,
-        note: data.note || null,
-      },
-      diffs: [],
-    }
+    parentErrors.push(
+      `Tuyến đường [${data.segment_external_ref}] chưa có trong hệ thống GIS. Cần nạp Tuyến đường trước khi nạp Cột`
+    )
   }
 
   // 2. Kiểm tra ràng buộc Mạch điện / Tủ điện (nếu có cung cấp) theo feeder_external_ref
@@ -952,23 +1006,29 @@ export function validateImportRow(
     }
 
     if (!matchedFeeder && !matchedCab) {
-      return {
-        category: category as 'poles' | 'poles_and_fixtures',
-        externalRef: data.external_ref,
-        actionType: 'invalid',
-        errorMsg: `Mạch/Tủ điện [${data.feeder_external_ref}] chưa có trong hệ thống GIS. Vui lòng kiểm tra lại mã lộ hoặc nạp Mạch/Tủ trước!`,
-        data: {
-          external_ref: data.external_ref,
-          segment_id: segObj.segment_id || data.segment_external_ref,
-          feeder_id: data.feeder_external_ref,
-          commune_id: data.commune_id,
-          geom_wkt: data.geom_wkt,
-          near_sensitive_poi: data.near_sensitive_poi,
-          data_source: data.data_source,
-          note: data.note || null,
-        },
-        diffs: [],
-      }
+      parentErrors.push(
+        `Mạch/Tủ điện [${data.feeder_external_ref}] chưa có trong hệ thống GIS. Kiểm tra lại mã mạch hoặc nạp Tủ điện và Mạch điện trước`
+      )
+    }
+  }
+
+  if (!segObj || parentErrors.length > 0) {
+    return {
+      category: category as 'poles' | 'poles_and_fixtures',
+      externalRef: data.external_ref,
+      actionType: 'invalid',
+      errorMsg: parentErrors.join('; '),
+      data: {
+        external_ref: data.external_ref,
+        segment_id: segObj?.segment_id || data.segment_external_ref,
+        feeder_id: data.feeder_external_ref || null,
+        commune_id: data.commune_id,
+        geom_wkt: data.geom_wkt,
+        near_sensitive_poi: data.near_sensitive_poi,
+        data_source: data.data_source,
+        note: data.note || null,
+      },
+      diffs: [],
     }
   }
 

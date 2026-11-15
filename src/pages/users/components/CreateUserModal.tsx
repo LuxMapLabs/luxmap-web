@@ -116,7 +116,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Thêm Tài Khoản Người Dùng Mới
+                Thêm tài khoản người dùng
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Tạo tài khoản tác nghiệp và gửi thư mời kích hoạt
@@ -186,7 +186,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           {/* Role */}
           <div>
             <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Vai trò (Phân quyền tác nghiệp) <span className="text-rose-500">*</span>
+              Vai trò <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <Shield className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -197,7 +197,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               >
                 {Object.entries(USER_ROLE_LABELS).map(([k, label]) => (
                   <option key={k} value={k} className="dark:bg-slate-900">
-                    {label} ({k})
+                    {label}
                   </option>
                 ))}
               </select>
@@ -212,7 +212,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               </div>
               <div>
                 <div className="text-xs font-bold text-primary dark:text-secondary/30 flex items-center gap-1.5">
-                  <span>Phạm vi toàn hệ thống (System-wide Scope)</span>
+                  <span>Phạm vi toàn hệ thống</span>
                 </div>
                 <p className="text-[11px] text-primary dark:text-secondary/50 mt-0.5 leading-relaxed">
                   Vai trò Quản trị hệ thống tự động có quyền bao quát toàn bộ địa bàn và mọi trạm đèn trên toàn hệ thống. Không cần và không phân bổ địa bàn riêng lẻ.
