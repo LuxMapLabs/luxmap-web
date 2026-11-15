@@ -163,12 +163,10 @@ export const SuperiorDashboardPage: React.FC = () => {
       const segId = seg.segment_id || ''
       const segRows = rows.filter((r) => r.segment_id === segId)
       const name = seg.segment_name || segId
-      const shortLabel = name.length > 24 ? name.substring(0, 22) + '...' : name
 
       return {
         id: segId,
         name,
-        shortLabel,
         normal: segRows.reduce((acc, r) => acc + r.normal, 0),
         dim: segRows.reduce((acc, r) => acc + r.dim, 0),
         out: segRows.reduce((acc, r) => acc + r.out, 0),
@@ -271,7 +269,7 @@ export const SuperiorDashboardPage: React.FC = () => {
     for (const row of fixtureStats?.rows ?? []) {
       const id = String(row.data_source)
       const name = labels[id] ?? id
-      const item = bySource.get(id) ?? { id, name, shortLabel: name, normal: 0, dim: 0, out: 0, unknown: 0 }
+      const item = bySource.get(id) ?? { id, name, normal: 0, dim: 0, out: 0, unknown: 0 }
       item.normal += row.normal
       item.dim += row.dim
       item.out += row.out
