@@ -436,6 +436,41 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       }
     })
 
+    it('GisDrawerPanel hiện ảnh dọc nguyên khung (object-contain), ảnh ngang vẫn phủ kín (object-cover)', () => {
+      const pole: PoleFeature = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [106.4899, 10.9705] },
+        properties: { pole_id: 'POL-002', segment_id: 'SEG-001', fixture_status: 'normal', open_fault_count: 0 },
+      }
+      store.dispatch(
+        fetchPoleDetailSuccess({
+          ...mockPoleDetail,
+          pole_id: 'POL-002',
+          current_status: { fixture_status: 'normal' },
+          open_faults: [],
+          recent_frames: [{ frame_id: 'FRM-9', sweep_id: 'SWP-9', thumbnail_url: 'https://cdn.luxmap.vn/p.jpg' }],
+        })
+      )
+      render(
+        <Provider store={store}>
+          <GisDrawerPanel {...defaultDrawerProps} selectedPole={pole} effectivePoles={[pole]} />
+        </Provider>
+      )
+
+      const img = screen.getByRole('img', { name: 'POL-002' })
+      expect(img.className).toContain('object-cover')
+
+      Object.defineProperty(img, 'naturalWidth', { configurable: true, value: 240 })
+      Object.defineProperty(img, 'naturalHeight', { configurable: true, value: 320 })
+      fireEvent.load(img)
+      expect(screen.getByRole('img', { name: 'POL-002' }).className).toContain('object-contain')
+
+      Object.defineProperty(img, 'naturalWidth', { configurable: true, value: 320 })
+      Object.defineProperty(img, 'naturalHeight', { configurable: true, value: 240 })
+      fireEvent.load(img)
+      expect(screen.getByRole('img', { name: 'POL-002' }).className).toContain('object-cover')
+    })
+
     it('GisDrawerPanel chế độ xem Tuyến đường chỉ hiển thị thông số hạ tầng và KHÔNG CÒN thông số IoT rác', () => {
       render(
         <Provider store={store}>
