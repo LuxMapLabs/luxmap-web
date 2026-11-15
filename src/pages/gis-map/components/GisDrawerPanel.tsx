@@ -117,6 +117,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   } | null>(null)
   // Ảnh gốc của ảnh tài sản chỉ được tải khi người dùng mở lightbox
   const [wantsAssetOriginal, setWantsAssetOriginal] = useState(false)
+  // Ảnh dọc hiện nguyên khung (object-contain) để không bị cắt mất bóng đèn ở đầu cột
+  const [isPortraitPhoto, setIsPortraitPhoto] = useState(false)
 
   // Maintenance Status
   const poleId = selectedPole?.properties?.pole_id || ''
@@ -432,12 +434,15 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       title: `Ảnh cột đèn: ${selectedPole.properties.external_ref || selectedPole.properties.pole_id}`,
                     })
                   }}
-                  className="relative h-44 rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs"
+                  className={`relative ${isPortraitPhoto ? 'h-72' : 'h-44'} rounded-xl overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-2xs`}
                 >
                   <img
                     src={polePhotoUrl}
                     alt={selectedPole.properties.external_ref || selectedPole.properties.pole_id}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    onLoad={(e) =>
+                      setIsPortraitPhoto(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth)
+                    }
+                    className={`w-full h-full ${isPortraitPhoto ? 'object-contain' : 'object-cover group-hover:scale-105'} transition-transform duration-200`}
                   />
                   <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent flex items-end justify-between p-2.5 text-white">
                     <span className="text-[11px] font-medium drop-shadow-sm font-mono">
