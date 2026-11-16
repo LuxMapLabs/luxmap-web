@@ -1,23 +1,20 @@
-import { useEffect, useRef } from 'react'
 import type * as maplibregl from 'maplibre-gl'
 import { ROAD_CLASS_LIST, roadLinesFromFeatures, type LngLat } from '../../utils/gis-map/roadRouting'
 import { MIN_ROAD_ZOOM } from '../../utils/gis-map/segmentReshape'
 import { GOOGLE_HYBRID_STYLE } from '../../utils/gis-map/mapUtils'
-import { reshapeLine, type SegmentReshape } from '../../utils/gis-map/segmentReshape'
-
-const SOURCE_ID = 'segment-reshape'
-const LINE_LAYER = 'segment-reshape-line'
-const POINT_LAYER = 'segment-reshape-points'
-/** Gắn lên khung bản đồ khi đang bấm chọn điểm: chấm cột / tủ điện không bắt cú bấm. */
-export const PICKING_CLASS = 'gis-map-picking'
 
 /** Nguồn và lớp đường của bản đồ nền (`GOOGLE_HYBRID_STYLE`, lược đồ OpenMapTiles). */
 const BASE_MAP_SOURCE = 'maptiler_planet'
 const ROAD_SOURCE_LAYER = 'transportation'
+/**
+ * Nguồn riêng cho nét đường (cùng URL ô với bản đồ nền, ép `maxzoom` 14). Đọc thẳng nguồn nền thì ở zoom 16 - 16.9 ô phóng to
+ * trả về rỗng: lớp vàng và cú bấm theo đường mất đúng mức đó (đo trên Chrome); nguồn riêng thì đủ ở mọi mức.
+ */
+const ROAD_SOURCE = 'road-hint-source'
 
 /** Nét đường của bản đồ nền trong các ô đang tải. */
 export const queryBaseMapRoadLines = (map: maplibregl.Map): LngLat[][] =>
-  roadLinesFromFeatures(map.querySourceFeatures(BASE_MAP_SOURCE, { sourceLayer: ROAD_SOURCE_LAYER }))
+  roadLinesFromFeatures(map.querySourceFeatures(ROAD_SOURCE, { sourceLayer: ROAD_SOURCE_LAYER }))
 
 /** Lớp tô vàng các đường có trên bản đồ nền, chỉ hiện khi đang lấy hình: biết đường nào bấm theo được. */
 export const ROAD_HINT_LAYER = 'base-map-road-hint'
@@ -25,7 +22,10 @@ const BASE_SOURCES = new Set(Object.keys(GOOGLE_HYBRID_STYLE.sources))
 
 export const showRoadHint = (map: maplibregl.Map) => {
   try {
-    if (!map.getSource(BASE_MAP_SOURCE) || map.getLayer(ROAD_HINT_LAYER)) return
+    if (map.getLayer(ROAD_HINT_LAYER)) return
+    const base = map.getStyle().sources[BASE_MAP_SOURCE]
+    if (base?.type !== 'vector' || !base.url) return
+    if (!map.getSource(ROAD_SOURCE)) map.addSource(ROAD_SOURCE, { type: 'vector', url: base.url, maxzoom: 14 })
     // Nằm trên ảnh nền, dưới mọi lớp của web (cột, tuyến, nét đang lấy)
     const before = map
       .getStyle()
@@ -34,7 +34,7 @@ export const showRoadHint = (map: maplibregl.Map) => {
       {
         id: ROAD_HINT_LAYER,
         type: 'line',
-        source: BASE_MAP_SOURCE,
+        source: ROAD_SOURCE,
         'source-layer': ROAD_SOURCE_LAYER,
         minzoom: MIN_ROAD_ZOOM,
         filter: ['in', ['get', 'class'], ['literal', ROAD_CLASS_LIST]],
@@ -55,111 +55,8 @@ export const showRoadHint = (map: maplibregl.Map) => {
 export const hideRoadHint = (map: maplibregl.Map) => {
   try {
     if (map.getLayer(ROAD_HINT_LAYER)) map.removeLayer(ROAD_HINT_LAYER)
+    if (map.getSource(ROAD_SOURCE)) map.removeSource(ROAD_SOURCE)
   } catch {
     // Bản đồ đã bị huỷ (rời trang) - không còn gì để gỡ
   }
-}
-
-const removeLayers = (map: maplibregl.Map) => {
-  try {
-    if (map.getLayer(POINT_LAYER)) map.removeLayer(POINT_LAYER)
-    if (map.getLayer(LINE_LAYER)) map.removeLayer(LINE_LAYER)
-    if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
-  } catch {
-    // Bản đồ đã bị huỷ (rời trang) - không còn gì để gỡ
-  }
-}
-
-/**
- * Chế độ lấy hình tuyến: bấm vào bản đồ để thêm điểm (`onPick`), vẽ đoạn đã lấy và các điểm đã bấm.
- * Tắt khi `reshape` về null.
- */
-export function useSegmentReshapeMode(
-  map: maplibregl.Map | null,
-  isMapLoaded: boolean,
-  reshape: SegmentReshape | null,
-  onPick: (click: LngLat) => void
-) {
-  const onPickRef = useRef(onPick)
-  useEffect(() => {
-    onPickRef.current = onPick
-  })
-
-  const reshapingId = reshape?.segmentId ?? null
-
-  // Bấm vào bản đồ để thêm điểm. Cột nằm ngay trên đường và chặn cú bấm, nên trong lúc lấy hình
-  // `PICKING_CLASS` (index.css) cho cú bấm xuyên qua chấm cột / tủ điện, ẩn khung nổi, giữ con trỏ chữ thập.
-  useEffect(() => {
-    if (!map || !isMapLoaded || !reshapingId) return
-    const handleClick = (e: maplibregl.MapMouseEvent) => onPickRef.current([e.lngLat.lng, e.lngLat.lat])
-    map.on('click', handleClick)
-    const container = map.getContainer()
-    container.classList.add(PICKING_CLASS)
-    showRoadHint(map)
-    return () => {
-      map.off('click', handleClick)
-      container.classList.remove(PICKING_CLASS)
-      hideRoadHint(map)
-    }
-  }, [map, isMapLoaded, reshapingId])
-
-  // Đoạn đã lấy + các điểm đã bấm
-  useEffect(() => {
-    if (!map || !isMapLoaded) return
-    if (!reshape) {
-      removeLayers(map)
-      return
-    }
-    const line = reshapeLine(reshape)
-    const data: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: [
-        ...(line.length >= 2
-          ? [{ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: line } }]
-          : []),
-        ...reshape.points.map((p, i) => ({
-          type: 'Feature' as const,
-          properties: { first: i === 0 },
-          geometry: { type: 'Point' as const, coordinates: p },
-        })),
-      ],
-    }
-    try {
-      const source = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined
-      if (source) {
-        source.setData(data)
-        return
-      }
-      map.addSource(SOURCE_ID, { type: 'geojson', data })
-      map.addLayer({
-        id: LINE_LAYER,
-        type: 'line',
-        source: SOURCE_ID,
-        filter: ['==', ['geometry-type'], 'LineString'],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#f97316', 'line-width': 5, 'line-opacity': 0.95 },
-      })
-      map.addLayer({
-        id: POINT_LAYER,
-        type: 'circle',
-        source: SOURCE_ID,
-        filter: ['==', ['geometry-type'], 'Point'],
-        paint: {
-          'circle-radius': 6,
-          'circle-color': ['case', ['get', 'first'], '#16a34a', '#f97316'],
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 2,
-        },
-      })
-    } catch {
-      // Style chưa sẵn sàng - effect chạy lại ở lần bấm kế tiếp
-    }
-  }, [map, isMapLoaded, reshape])
-
-  // Rời trang khi đang lấy hình: gỡ lớp vẽ
-  useEffect(() => {
-    return () => {
-      if (map) removeLayers(map)
-    }
-  }, [map])
 }

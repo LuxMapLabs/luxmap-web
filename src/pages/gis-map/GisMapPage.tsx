@@ -1,5 +1,5 @@
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector } from 'react-redux'
 import type { RootState } from '../../redux/store'
 import {
   toLngLatBounds,
@@ -94,20 +94,6 @@ import { useGisMapInstance } from '../../hooks/gis-map/useGisMapInstance'
 import { useFeederLinesLayer } from '../../hooks/gis-map/useFeederLinesLayer'
 import { useGisMarkers } from '../../hooks/gis-map/useGisMarkers'
 import { useIotBridgeMarkers } from '../../hooks/gis-map/useIotBridgeMarkers'
-import { reshapeSegmentRequest } from '../../feature/assets/assetSlice'
-import { queryBaseMapRoadLines, useSegmentReshapeMode } from '../../hooks/gis-map/useSegmentReshapeMode'
-import { SegmentReshapeBar } from './components/SegmentReshapeBar'
-import {
-  MIN_ROAD_ZOOM,
-  addReshapePoint,
-  polesFarFromLine,
-  reshapeLine,
-  startReshape,
-  undoReshapePoint,
-  type SegmentReshape,
-} from '../../utils/gis-map/segmentReshape'
-import { lineToWkt, type LngLat } from '../../utils/gis-map/roadRouting'
-import { calculateRouteLengthMeters } from '../../utils/gis-map/routeUtils'
 import type { SearchResultItem } from '../../utils/gis-map/gisSearchUtils'
 import { ElectricalMonitorDock, type ElectricalMonitorTarget } from './components/ElectricalMonitorDock'
 import { buildMonitorTarget } from '../../utils/iot/electricalMonitor'
@@ -259,16 +245,6 @@ export const GisMapPage: React.FC = () => {
   const [selectedCabinet, setSelectedCabinet] = useState<any | null>(null)
   const [selectedFeeder, setSelectedFeeder] = useState<any | null>(null)
 
-  // 3b. Lấy hình tuyến đang chọn (Quản lý). Trong lúc làm, bấm vào bản đồ là thêm điểm, không chọn đối tượng khác.
-  const [reshape, setReshape] = useState<SegmentReshape | null>(null)
-  const [isSavingReshape, setIsSavingReshape] = useState(false)
-  const isEditingOnMapRef = useRef(false)
-  const reshapeRef = useRef<SegmentReshape | null>(null)
-  useEffect(() => {
-    isEditingOnMapRef.current = reshape !== null
-    reshapeRef.current = reshape
-  }, [reshape])
-
   // 4. Hook quản lý logic điện học cascade & danh mục phân tuyến
   const {
     cabinets,
@@ -324,7 +300,6 @@ export const GisMapPage: React.FC = () => {
   // 5. Chọn cột đèn
   const handleSelectPole = useCallback(
     (f: PoleFeature) => {
-      if (isEditingOnMapRef.current) return
       setSelectedPole(f)
       setSelectedCabinet(null)
       setSelectedFeeder(null)
@@ -344,7 +319,6 @@ export const GisMapPage: React.FC = () => {
   // 6. Chọn tủ điện
   const handleSelectCabinet = useCallback(
     (cabinetData: any, coords: [number, number]) => {
-      if (isEditingOnMapRef.current) return
       const p = cabinetData.properties || cabinetData
       setSelectedCabinet(p)
       setSelectedPole(null)
@@ -365,7 +339,6 @@ export const GisMapPage: React.FC = () => {
 
   // 7. Chọn tuyến cáp (Click trực tiếp lên đường dây)
   const handleSelectFeeder = useCallback((feederData: any) => {
-    if (isEditingOnMapRef.current) return
     setSelectedFeeder(feederData)
     setSelectedPole(null)
     setSelectedCabinet(null)
@@ -374,7 +347,6 @@ export const GisMapPage: React.FC = () => {
 
   // 7. Chọn tuyến cáp (Click trực tiếp lên đường dây)
   const handleSelectSegmentLine = useCallback((segId: string) => {
-    if (isEditingOnMapRef.current) return
     setSelectedSegmentId(segId)
     setSelectedPole(null)
     setSelectedCabinet(null)
@@ -416,67 +388,6 @@ export const GisMapPage: React.FC = () => {
 
   // 9b. Marker gateway và node của IoT bridge (GET /iot/servers, GET /iot/nodes)
   useIotBridgeMarkers(mapRef.current, isMapLoaded)
-
-  const dispatch = useDispatch()
-  const { isMutating, mutationError } = useSelector((state: RootState) => state.assets)
-
-  // 9d. Lấy hình tuyến theo đường trên bản đồ nền: mỗi lần bấm nối từ điểm trước dọc theo đường của bản đồ nền,
-  // lưu qua PUT /assets/segments/{id}. Cột của tuyến phải còn trong hành lang quanh hình mới.
-  const handleStartReshapeSegment = useCallback(() => {
-    if (!selectedSegmentId) return
-    const info = segmentInfoMap[selectedSegmentId]
-    const length = typeof info?.lengthM === 'number' && Number.isFinite(info.lengthM) ? info.lengthM : null
-    setReshape(startReshape(selectedSegmentId, info?.name || selectedSegmentId, length))
-    const map = mapRef.current
-    if (map && map.getZoom() < MIN_ROAD_ZOOM) map.easeTo({ zoom: MIN_ROAD_ZOOM })
-  }, [selectedSegmentId, segmentInfoMap, mapRef])
-
-  const handlePickReshapePoint = useCallback(
-    (click: LngLat) => {
-      const map = mapRef.current
-      const current = reshapeRef.current
-      if (!map || !current) return
-      setReshape(addReshapePoint(current, queryBaseMapRoadLines(map), click, map.getZoom()))
-    },
-    [mapRef]
-  )
-
-  useSegmentReshapeMode(mapRef.current, isMapLoaded, reshape, handlePickReshapePoint)
-
-  const reshapePath = useMemo(() => (reshape ? reshapeLine(reshape) : []), [reshape])
-  const reshapePolesFar = useMemo(() => {
-    if (!reshape) return []
-    // Mọi cột của tuyến có GPS (không theo bộ lọc trạng thái đang bật trên bản đồ)
-    const poles = effectivePoles
-      .filter((f) => f.properties?.segment_id === reshape.segmentId && Array.isArray(f.geometry?.coordinates))
-      .map((f) => ({ label: f.properties.external_ref || f.properties.pole_id, coord: f.geometry.coordinates }))
-    return polesFarFromLine(poles, reshapePath)
-  }, [reshape, reshapePath, effectivePoles])
-
-  const handleSaveReshape = useCallback(() => {
-    if (!reshape || reshapePath.length < 2) return
-    setIsSavingReshape(true)
-    dispatch(
-      reshapeSegmentRequest({
-        segmentId: reshape.segmentId,
-        label: reshape.label,
-        geomWkt: lineToWkt(reshapePath),
-        lengthM: calculateRouteLengthMeters(reshapePath),
-      })
-    )
-  }, [dispatch, reshape, reshapePath])
-
-  // Lưu xong thì thoát chế độ lấy hình; lỗi (saga đã báo) thì giữ để chỉnh tiếp
-  useEffect(() => {
-    if (!isSavingReshape || isMutating) return
-    setIsSavingReshape(false)
-    if (!mutationError) setReshape(null)
-  }, [isSavingReshape, isMutating, mutationError])
-
-  // Đóng khung tuyến (hoặc chọn sang tuyến / cột khác) thì bỏ lần lấy hình đang dở
-  useEffect(() => {
-    if (reshape && (selectedSegmentId !== reshape.segmentId || selectedPole)) setReshape(null)
-  }, [reshape, selectedSegmentId, selectedPole])
 
   // 10. Lọc tuyến từ Dropdown & Zoom vào tuyến (không mở Drawer)
   const handleSegmentSelect = useCallback(
@@ -622,22 +533,6 @@ export const GisMapPage: React.FC = () => {
           isPanelOpen={isPanelOpen}
         />
 
-        {/* Lấy hình tuyến theo đường trên bản đồ nền: chiều dài, cột ngoài hành lang, Lưu / Huỷ */}
-        {reshape && (
-          <SegmentReshapeBar
-            label={reshape.label}
-            pointCount={reshape.points.length}
-            lengthM={reshapePath.length >= 2 ? calculateRouteLengthMeters(reshapePath) : null}
-            oldLengthM={reshape.oldLengthM}
-            polesFar={reshapePolesFar}
-            error={reshape.error}
-            saving={isSavingReshape}
-            onUndo={() => setReshape((current) => (current ? undoReshapePoint(current) : current))}
-            onCancel={() => setReshape(null)}
-            onSave={handleSaveReshape}
-          />
-        )}
-
         {/* Bottom Left Legend Box */}
         <GisMapLegend />
 
@@ -664,8 +559,6 @@ export const GisMapPage: React.FC = () => {
           setSelectedFeeder={setSelectedFeeder}
           cabinets={cabinets}
           effectivePoles={effectivePoles}
-          onStartReshapeSegment={handleStartReshapeSegment}
-          isReshapingSegment={reshape !== null}
           onOpenElectricalMonitor={openElectricalMonitor}
         />
       )}

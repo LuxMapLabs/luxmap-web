@@ -17,7 +17,6 @@ import {
   Clock,
   History,
   Unplug,
-  Spline,
   ChevronRight,
   Pencil,
   PlugZap,
@@ -89,8 +88,6 @@ export interface GisDrawerPanelProps {
   effectivePoles?: PoleFeature[]
   /** Bắt đầu dời vị trí cột đang chọn trên bản đồ (Quản lý). */
   /** Quản lý: bật chế độ lấy hình tuyến theo đường trên bản đồ nền cho tuyến đang mở. */
-  onStartReshapeSegment?: () => void
-  isReshapingSegment?: boolean
   /** Mở bảng giám sát điện (dưới bản đồ) ở mạch này; `nodeId` khi nơi mở đã biết node của mạch. */
   onOpenElectricalMonitor?: (feederId: string, nodeId?: string | null) => void
 }
@@ -142,11 +139,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   selectedFeeder,
   setSelectedFeeder,
   effectivePoles: propsEffectivePoles = [],
-  onStartReshapeSegment,
-  isReshapingSegment = false,
   onOpenElectricalMonitor,
 }) => {
-  // Khung cột / mạch điện → khung tuyến của nó (nút "Lấy hình theo đường" nằm ở khung tuyến). Bấm đường tuyến trên
+  // Khung cột / mạch điện → khung tuyến của nó. Bấm đường tuyến trên
   // bản đồ thường trúng dây mạch nằm chồng lên, nên đây là lối mở khung tuyến chắc chắn.
   const openSegmentPanel = () => {
     if (!activeSegmentDetail.id) return
@@ -711,7 +706,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1 flex items-center justify-between gap-2">
                         <span className="flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          <span>Thao tác trên cột</span>
+                          <span>Thao tác</span>
                         </span>
                         <button
                           type="button"
@@ -1386,28 +1381,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
                 </div>
               </div>
-
-              {/* Hình tuyến (Quản lý): lấy theo con đường có sẵn trên bản đồ nền */}
-              {canEditAssets && activeSegmentDetail.id && (
-                <div className="bg-white dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-2xs space-y-2">
-                  <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1 flex items-center gap-1.5">
-                    <Spline className="w-3.5 h-3.5 text-orange-500" />
-                    <span>Hình tuyến</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Lấy hình theo con đường có sẵn trên bản đồ nền: bấm điểm đầu, rồi bấm dọc đường tới điểm cuối.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={onStartReshapeSegment}
-                    disabled={!onStartReshapeSegment || isReshapingSegment}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-semibold text-[11.5px] hover:bg-orange-100 dark:hover:bg-orange-900/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Spline className="w-3.5 h-3.5" />
-                    {isReshapingSegment ? 'Đang lấy hình trên bản đồ…' : 'Lấy hình theo đường trên bản đồ'}
-                  </button>
-                </div>
-              )}
 
               {/* 2. Pole List on this Segment */}
               <div className="space-y-2">
