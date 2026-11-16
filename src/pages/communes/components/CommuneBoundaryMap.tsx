@@ -11,6 +11,7 @@ import {
 } from '../../../utils/gis-map/mapUtils'
 import {
   countVertices,
+  ringSelfIntersects,
   geometryToPolygons,
   polygonsToBbox,
   polygonsToGeometry,
@@ -34,6 +35,7 @@ export interface CommuneBoundaryMapProps {
 // ~4 m: đủ mịn để giữ hình dạng ranh giới nhưng polygon OSM hàng nghìn đỉnh vẫn kéo chỉnh được
 const SIMPLIFY_TOLERANCE = 0.00004
 const BOUNDARY_COLOR = '#ef4444'
+const CROSSED_NOTICE = 'Ranh giới đang tự cắt chéo nhau. Hãy kéo lại các đỉnh cho hết chéo.'
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 interface VertexRef {
@@ -126,12 +128,16 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
       })
     }
 
+    // Vòng tự cắt nhau làm vùng tối vẽ sai nên tạm bỏ lớp tối và báo cho người dùng
+    const crossed = polys.some((polygon) => polygon.some(ringSelfIntersects))
+    setNotice((n) => (crossed ? CROSSED_NOTICE : n === CROSSED_NOTICE ? '' : n))
+
     const set = (id: string, features: GeoJSON.Feature[]) =>
       (map.getSource(id) as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features })
     set('cb-area', areas)
     set(
       'cb-mask',
-      polys.length > 0
+      polys.length > 0 && !crossed
         ? [
             {
               type: 'Feature',

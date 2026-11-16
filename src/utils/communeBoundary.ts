@@ -142,3 +142,23 @@ export const bboxToGeometry = (bbox: CommuneBbox | null | undefined): Geometry |
     ],
   ])
 }
+
+const cross = (a: BoundaryPoint, b: BoundaryPoint, c: BoundaryPoint) =>
+  (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+/** Vòng (mở) có hai cạnh không kề nhau cắt chéo nhau hay không. */
+export const ringSelfIntersects = (ring: BoundaryRing): boolean => {
+  const n = ring.length
+  if (n < 4) return false
+  for (let i = 0; i < n; i++) {
+    const a = ring[i]
+    const b = ring[(i + 1) % n]
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue
+      const c = ring[j]
+      const d = ring[(j + 1) % n]
+      if (cross(a, b, c) * cross(a, b, d) < 0 && cross(c, d, a) * cross(c, d, b) < 0) return true
+    }
+  }
+  return false
+}
