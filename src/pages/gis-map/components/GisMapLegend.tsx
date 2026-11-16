@@ -1,33 +1,29 @@
 import React, { useState } from 'react'
 import { Activity, Minus } from 'lucide-react'
+import { FEEDER_LINE_UI, POLE_LAMP_UI, type FeederLineStatus, type PoleLampState } from '../../../utils/gis-map/poleLampState'
+
+// Thứ tự chú giải cột: 'on' và 'normal' cùng màu nên gộp một dòng
+const LEGEND_POLES: { status: PoleLampState; label: string }[] = [
+  { status: 'normal', label: 'Bình thường' },
+  { status: 'off', label: POLE_LAMP_UI.off.label },
+  { status: 'dim', label: POLE_LAMP_UI.dim.label },
+  { status: 'out', label: POLE_LAMP_UI.out.label },
+  { status: 'unknown', label: POLE_LAMP_UI.unknown.label },
+]
+
+const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="col-span-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{children}</div>
+)
+
+const LEGEND_LINES: FeederLineStatus[] = ['active', 'off', 'fault', 'unknown']
 
 interface PoleLegendIconProps {
-  status: 'normal' | 'dim' | 'out' | 'unknown'
+  status: PoleLampState
   size?: number
 }
 
 const PoleLegendIcon: React.FC<PoleLegendIconProps> = ({ status, size = 15 }) => {
-  let cHighlight = '#86efac'
-  let cBody = '#10b981'
-  let cDeep = '#047857'
-  let cShadow = '#022c22'
-
-  if (status === 'dim') {
-    cHighlight = '#fef08a'
-    cBody = '#f59e0b'
-    cDeep = '#b45309'
-    cShadow = '#451a03'
-  } else if (status === 'out') {
-    cHighlight = '#fecdd3'
-    cBody = '#f43f5e'
-    cDeep = '#be123c'
-    cShadow = '#4c0519'
-  } else if (status === 'unknown') {
-    cHighlight = '#f1f5f9'
-    cBody = '#64748b'
-    cDeep = '#334155'
-    cShadow = '#0f172a'
-  }
+  const { highlight: cHighlight, body: cBody, deep: cDeep, shadow: cShadow } = POLE_LAMP_UI[status].sphere
 
   return (
     <div
@@ -187,7 +183,7 @@ export const GisMapLegend: React.FC = () => {
   }
 
   return (
-    <div className="absolute bottom-4 left-4 z-30 bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 rounded-2xl p-3 text-[11.5px] text-slate-600 space-y-2.5 pointer-events-auto min-w-58 select-none transition-all duration-200">
+    <div className="absolute bottom-4 left-4 z-30 bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 rounded-2xl p-3 text-[11.5px] text-slate-600 space-y-2 pointer-events-auto min-w-52 select-none transition-all duration-200">
       <div className="font-bold text-slate-800 text-xs flex items-center justify-between border-b border-slate-200 pb-1.5">
         <div className="flex items-center gap-1.5">
           <Activity className="w-4 h-4 text-blue-600" />
@@ -204,55 +200,42 @@ export const GisMapLegend: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3.5 gap-y-2">
-        {/* Pole states */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+        <SectionTitle>Cột đèn</SectionTitle>
+        {LEGEND_POLES.map((item) => (
+          <div key={item.status} className="flex items-center gap-2">
+            <PoleLegendIcon status={item.status} size={14} />
+            <span className="font-medium text-slate-700">{item.label}</span>
+          </div>
+        ))}
         <div className="flex items-center gap-2">
-          <PoleLegendIcon status="normal" size={14} />
-          <span className="font-medium text-slate-700">Đạt chuẩn</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <PoleLegendIcon status="dim" size={14} />
-          <span className="font-medium text-slate-700">Đèn mờ</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <PoleLegendIcon status="out" size={14} />
-          <span className="font-medium text-slate-700">Hỏng / Tắt</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <PoleLegendIcon status="unknown" size={14} />
-          <span className="font-medium text-slate-700">Chưa quét</span>
-        </div>
-
-        {/* POI alert */}
-        <div className="flex items-center gap-2 col-span-2 pt-0.5">
           <span className="w-3.5 h-3.5 rounded-full bg-violet-600 text-[8px] text-white flex items-center justify-center font-bold shrink-0 border border-white shadow-2xs">
             !
           </span>
           <span className="font-medium text-slate-700">Gần trường, cầu</span>
         </div>
 
-        {/* Cabinets */}
-        <div className="flex items-center gap-2 col-span-2 pt-1.5 border-t border-slate-200">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <CabinetLegendIcon color="#4f46e5" size={15} isRoot={false} />
-            </div>
-          <span className="font-medium text-slate-700 text-[11px]">Tủ điện điều khiển</span>
-        </div>
+        <div className="col-span-2 border-t border-slate-200 mt-1" />
+        <SectionTitle>Mạch điện</SectionTitle>
+        {LEGEND_LINES.map((status) => (
+          <div key={status} className="flex items-center gap-2">
+            <span
+              className="w-4 h-[3px] rounded-full shrink-0 ring-1 ring-slate-400/70"
+              style={{ background: FEEDER_LINE_UI[status].color }}
+            />
+            <span className="font-medium text-slate-700">{FEEDER_LINE_UI[status].label}</span>
+          </div>
+        ))}
 
-        {/* Electrical Feeder lines & Topology */}
-        <div className="col-span-2 pt-1.5 border-t border-slate-200 space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="w-4 h-[2px] rounded-full bg-emerald-500 shrink-0" />
-            <span className="font-medium text-slate-700 text-[11px]">Sơ đồ cấp nguồn (Trụ → Cột)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-4 h-[2px] rounded-full bg-rose-500 shrink-0" />
-            <span className="font-medium text-slate-700 text-[11px]">Lộ ngắt điện / Mất nguồn</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-4 h-[4.5px] rounded-sm bg-slate-400 shrink-0" />
-            <span className="font-medium text-slate-600 text-[11px]">Tuyến đường giao thông (Trục tim đường)</span>
-          </div>
+        <div className="col-span-2 border-t border-slate-200 mt-1" />
+        <div className="flex items-center gap-2">
+          <CabinetLegendIcon color="#4f46e5" size={15} isRoot={false} />
+          <span className="font-medium text-slate-700">Tủ điện</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Cùng màu lớp đường giao thông (#64748b), dày hơn nét mạch "Chưa rõ" */}
+          <span className="w-4 h-1.5 rounded-sm bg-slate-500 shrink-0" />
+          <span className="font-medium text-slate-700">Tuyến đường</span>
         </div>
       </div>
     </div>

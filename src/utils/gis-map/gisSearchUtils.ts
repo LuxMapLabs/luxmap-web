@@ -1,4 +1,5 @@
 import type { PoleFeature, SegmentInfo } from '../../pages/gis-map/GisMapPage'
+import { POLE_LAMP_UI, poleFeatureLampState } from './poleLampState'
 
 export type SearchCategory = 'segment' | 'cabinet' | 'pole'
 
@@ -110,7 +111,6 @@ export function searchAllCategories({
     const segInfo = segmentById.get(p.segment_id || '')
     const seg = segInfo ? segInfo.fullName || segInfo.name : ''
     const segCode = segmentDisplayCode(segInfo)
-    const status = p.fixture_status || 'normal'
     const atlas = p.atlas || p.atlas_note || ''
 
     const idMatch = code.toLowerCase().includes(trimmed)
@@ -118,14 +118,7 @@ export function searchAllCategories({
     const atlasMatch = atlas.toLowerCase().includes(trimmed)
 
     if (idMatch || segMatch || atlasMatch) {
-      const dotColor =
-        status === 'normal'
-          ? 'bg-emerald-500'
-          : status === 'dim'
-          ? 'bg-amber-500'
-          : status === 'out'
-          ? 'bg-rose-500'
-          : 'bg-slate-400'
+      const dotColor = POLE_LAMP_UI[poleFeatureLampState(p)].dot
 
       results.push({
         id: id,

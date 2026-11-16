@@ -221,13 +221,19 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
 
       // Chú giải bản đồ
       expect(screen.getByText('Chú giải bản đồ')).toBeInTheDocument()
-      expect(screen.getByText('Đạt chuẩn')).toBeInTheDocument()
+      expect(screen.getByText('Cột đèn')).toBeInTheDocument()
+      expect(screen.getByText('Bình thường')).toBeInTheDocument()
       expect(screen.getByText('Đèn mờ')).toBeInTheDocument()
-      expect(screen.getByText('Hỏng / Tắt')).toBeInTheDocument()
+      expect(screen.getByText('Hỏng')).toBeInTheDocument()
+      expect(screen.getByText('Mạch điện')).toBeInTheDocument()
+      // "Đang tắt" có ở cả mục cột lẫn mục mạch
+      expect(screen.getAllByText('Đang tắt')).toHaveLength(2)
       expect(screen.getByText('Chưa quét')).toBeInTheDocument()
-      expect(screen.getByText('Tủ điện điều khiển')).toBeInTheDocument()
-      expect(screen.getByText('Sơ đồ cấp nguồn (Trụ → Cột)')).toBeInTheDocument()
-      expect(screen.getByText('Tuyến đường giao thông (Trục tim đường)')).toBeInTheDocument()
+      expect(screen.getByText('Tủ điện')).toBeInTheDocument()
+      expect(screen.getByText('Có điện')).toBeInTheDocument()
+      expect(screen.getByText('Sự cố')).toBeInTheDocument()
+      expect(screen.getByText('Chưa rõ')).toBeInTheDocument()
+      expect(screen.getByText('Tuyến đường')).toBeInTheDocument()
     })
 
     it('GisDrawerPanel hiển thị nhãn "Chưa quét" cho cột chưa qua AI camera quét đêm', () => {
@@ -571,13 +577,13 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       fireEvent.click(collapseBtn)
 
       // Bảng thu gọn chỉ còn nút icon
-      expect(screen.queryByText('Đạt chuẩn')).toBeNull()
+      expect(screen.queryByText('Bình thường')).toBeNull()
       const expandBtn = screen.getByTitle('Mở chú giải bản đồ')
       expect(expandBtn).toBeInTheDocument()
 
       // Mở lại
       fireEvent.click(expandBtn)
-      expect(screen.getByText('Đạt chuẩn')).toBeInTheDocument()
+      expect(screen.getByText('Bình thường')).toBeInTheDocument()
     })
 
     it('GisDrawerPanel hiển thị danh sách Mạch điện của tủ, nút toggle switch từng mạch và không còn nút Aptomat đơn lẻ', () => {

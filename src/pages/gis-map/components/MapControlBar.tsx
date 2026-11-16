@@ -239,7 +239,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
               : 'bg-emerald-500'
           }`}
         />
-        <span>Đạt chuẩn</span>
+        <span>Bình thường</span>
         <span
           className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
             statusFilter === 'normal'
@@ -278,7 +278,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
         </span>
       </button>
 
-      {/* 4. Hỏng / Tắt */}
+      {/* 4. Hỏng */}
       <button
         type="button"
         onClick={() => setStatusFilter('out')}
@@ -293,7 +293,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
             statusFilter === 'out' ? 'text-rose-700 dark:text-rose-400' : 'text-rose-500'
           }`}
         />
-        <span>Hỏng / Tắt</span>
+        <span>Hỏng</span>
         <span
           className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
             statusFilter === 'out'

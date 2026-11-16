@@ -131,6 +131,8 @@ export function useElectricalCascade({
           ...p,
           external_ref: externalRef,
           feeder_id: feederId,
+          // Cùng nguồn với màu đường feeder (useFeederLinesLayer đọc /assets/feeders) để cột và đường không lệch nhau
+          power_state: assetFeeder?.power_state ?? p.power_state,
           feeder_external_ref: feederExternalRef,
           feeder_name: feederName,
           cabinet_id: rawCabinetId,

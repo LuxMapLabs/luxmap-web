@@ -6,6 +6,7 @@ import type { SegmentInfo } from '../../pages/gis-map/GisMapPage'
 import { getFeederTooltipHtml, getRoadSegmentTooltipHtml } from '../../utils/gis-map/tooltipUtils'
 import { fetchCabinetTopologyRequest, clearCabinetTopology } from '../../feature/map/mapSlice'
 import { findByIdOrRef } from '../../utils/assets/findByIdOrRef'
+import { feederLineStyle } from '../../utils/gis-map/poleLampState'
 
 interface UseFeederLinesLayerProps {
   map: maplibregl.Map | null
@@ -437,33 +438,12 @@ export function useFeederLinesLayer({
         p.status === 'fault' ||
         feederStatus === 'fault' ||
         cabinetStatus === 'fault' ||
-        powerState === 'off' ||
         (selectedCabinet?.cabinet_id &&
           (selectedCabinet.cabinet_id === linkedCabinetId ||
             selectedCabinet.cabinet_id === p.cabinet_id) &&
           selectedCabinet.status === 'fault')
 
-      // Tuân thủ 100% dữ liệu thực từ API: CHỈ sáng xanh khi powerState thực sự là 'on'
-      const isPoweredOn = !isFault && powerState === 'on'
-      const isUnknownPower = !isFault && !isPoweredOn
-
-      let lineColor = '#94a3b8'
-      let glowColor = '#64748b'
-      let lineStatus = 'unknown'
-
-      if (isFault) {
-        lineColor = '#ef4444'
-        glowColor = '#dc2626'
-        lineStatus = 'fault'
-      } else if (isPoweredOn) {
-        lineColor = '#10b981'
-        glowColor = '#059669'
-        lineStatus = 'active'
-      } else if (isUnknownPower) {
-        lineColor = '#94a3b8' // Xám trung tính khi power_state là unknown
-        glowColor = '#64748b'
-        lineStatus = 'unknown'
-      }
+      const { status: lineStatus, color: lineColor, glow: glowColor } = feederLineStyle(Boolean(isFault), powerState)
 
       return {
         ...feat,

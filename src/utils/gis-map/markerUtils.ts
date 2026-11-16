@@ -1,5 +1,6 @@
 import * as maplibregl from 'maplibre-gl'
 import type { PoleFeature } from '../../pages/gis-map/GisMapPage'
+import { POLE_LAMP_UI, poleFeatureLampState } from './poleLampState'
 
 export function getCabinetSvgString({
   size = 24,
@@ -121,7 +122,7 @@ export function createPoleMarkerElement({
   onLeave,
 }: CreatePoleMarkerParams): HTMLDivElement {
   const p = feature.properties || {}
-  const status = p.fixture_status || 'unknown'
+  const lamp = poleFeatureLampState(p)
   const isNearPoi = p.near_sensitive_poi === true
 
   // Cột đang chọn nổi hơn cột thường vừa đủ; phóng thêm bằng CSS `.is-selected`, nhỏ lại khi bản đồ thu nhỏ (`.gis-zoom-out`)
@@ -130,36 +131,11 @@ export function createPoleMarkerElement({
   const half = size / 2
   const poleId = p.pole_id || Math.random().toString(36).substring(2, 6)
 
-  // Rich Apple-style 3D Spherical Gradients
-  let cHighlight = '#86efac'
-  let cBody = '#10b981'
-  let cDeep = '#047857'
-  let cShadow = '#022c22'
-  let glowCol = isManagedBySelectedCabinet
-    ? 'rgba(16, 185, 129, 0.7)'
-    : 'rgba(16, 185, 129, 0.35)'
+  // Màu khối cầu theo trạng thái hiển thị (fixture_status + power_state của mạch, xem poleLampState)
+  const { highlight: cHighlight, body: cBody, deep: cDeep, shadow: cShadow, glow } = POLE_LAMP_UI[lamp].sphere
+  const glowCol = isManagedBySelectedCabinet && (lamp === 'on' || lamp === 'normal') ? 'rgba(16, 185, 129, 0.7)' : glow
 
-  if (status === 'dim') {
-    cHighlight = '#fef08a'
-    cBody = '#f59e0b'
-    cDeep = '#b45309'
-    cShadow = '#451a03'
-    glowCol = 'rgba(245, 158, 11, 0.4)'
-  } else if (status === 'out') {
-    cHighlight = '#fecdd3'
-    cBody = '#f43f5e'
-    cDeep = '#be123c'
-    cShadow = '#4c0519'
-    glowCol = 'rgba(244, 63, 94, 0.45)'
-  } else if (status === 'unknown') {
-    cHighlight = '#f1f5f9'
-    cBody = '#64748b'
-    cDeep = '#334155'
-    cShadow = '#0f172a'
-    glowCol = 'rgba(100, 116, 139, 0.2)'
-  }
-
-  const isPulsing = status === 'out' || isSelected || isManagedBySelectedCabinet
+  const isPulsing = lamp === 'out' || isSelected || isManagedBySelectedCabinet
 
   const el = document.createElement('div')
   el.className = 'select-none pointer-events-none'
