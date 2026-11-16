@@ -27,12 +27,13 @@ import {
   OUTSIDE_MANAGED_AREA_MESSAGE,
   getCommuneBboxInfo,
 } from '../../../../../utils/gis-map/mapUtils'
-import { parseLineStringWkt } from '../../../../../utils/gis-map/routeUtils'
+import type { OrderedPole } from '../../../../../utils/gis-map/segmentPoleOrder'
 import {
-  buildSegmentGeometry,
-  reconcileRoute,
-  type OrderedPole,
-} from '../../../../../utils/gis-map/segmentPoleOrder'
+  isRoadShape,
+  offRoadShapeMessage,
+  polesOffRoadShape,
+  segmentLineAfter,
+} from '../../../../../utils/gis-map/segmentRoadShape'
 import { clearSegmentDetail, fetchSegmentDetailRequest } from '../../../../../feature/assets/assetSlice'
 import { fetchMapLayersRequest } from '../../../../../feature/map/mapSlice'
 import type { RootState } from '../../../../../redux/rootReducer'
@@ -40,6 +41,8 @@ import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import { CabinetSearchSelect } from '../../common/CabinetSearchSelect'
+import { CollapsibleMapLegend } from '../../../../../components/CollapsibleMapLegend'
+import { findByIdOrRef } from '../../../../../utils/assets/findByIdOrRef'
 
 interface AddPoleModalProps {
   isOpen: boolean
@@ -246,9 +249,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     })
   }, [availableCabinets, selectedSegmentId, noGps, allPoles, existingPolesOnSegment, currentSegment])
 
-  const currentCabinet = availableCabinetsOnSegment.find(
-    (c) => c.cabinet_id === selectedCabinetId || c.external_ref === selectedCabinetId
-  )
+  const currentCabinet = findByIdOrRef(availableCabinetsOnSegment, (c) => c.cabinet_id, selectedCabinetId)
 
   // Danh sách mạch điện khả dụng của Tủ điện đang chọn
   const availableFeedersOnCabinet = useMemo(() => {
@@ -285,20 +286,19 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       dispatch(clearSegmentDetail())
     }
   }, [dispatch, isOpen, selectedSegmentId])
-  const storedGeomWkt =
-    segmentDetail?.segmentId === selectedSegmentId && segmentDetail.isSettled ? segmentDetail.geomWkt : null
+  const isSegmentDetailReady = segmentDetail?.segmentId === selectedSegmentId && segmentDetail.isSettled
+  const storedGeomWkt = isSegmentDetailReady ? segmentDetail.geomWkt : null
 
-  // Cột đặt tự do nên đường tuyến chạy theo cột: hình đang lưu + cột hiện hữu + cột đang thêm (điểm uốn đã đặt được giữ).
-  // Chỉ để xem; hình tuyến thật được cập nhật khi lưu.
+  // Tuyến chưa có hình hoặc là đường nối cột: đường chạy theo cột (hình đang lưu + cột hiện hữu + cột đang thêm,
+  // điểm uốn đã đặt được giữ), cập nhật khi lưu. Tuyến có hình thật (theo con đường): hình giữ nguyên.
   const existingRoute = useMemo<OrderedPole[]>(
     () => existingPolesOnSegment.map((p) => ({ id: p.pole_id, coord: [p.lng, p.lat] as [number, number] })),
     [existingPolesOnSegment]
   )
+  const roadShape = useMemo(() => isRoadShape(existingRoute, storedGeomWkt), [existingRoute, storedGeomWkt])
   const buildPreviewCoords = useCallback(
-    (draft: OrderedPole[]): [number, number][] => {
-      const geometry = buildSegmentGeometry(reconcileRoute(existingRoute, storedGeomWkt, [...existingRoute, ...draft]))
-      return geometry ? parseLineStringWkt(geometry.geomWkt) : []
-    },
+    (draft: OrderedPole[]): [number, number][] =>
+      segmentLineAfter(existingRoute, storedGeomWkt, [...existingRoute, ...draft]).line,
     [existingRoute, storedGeomWkt]
   )
   const buildPreviewCoordsRef = useRef(buildPreviewCoords)
@@ -317,6 +317,22 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const segmentCoords = useMemo(
     () => buildPreviewCoords(draftPolesOf(rows)),
     [buildPreviewCoords, rows]
+  )
+  // Hình thật không chạy theo cột, và backend không đo khi thêm cột: cột mới phải nằm trong hành lang quanh hình
+  const rowsOffRoad = useMemo(
+    () =>
+      roadShape
+        ? polesOffRoadShape(
+            rows.flatMap((r, i) => {
+              const lat = parseFloat(r.lat)
+              const lng = parseFloat(r.lng)
+              if (Number.isNaN(lat) || Number.isNaN(lng)) return []
+              return [{ label: r.pole_id.trim() || `Hàng #${i + 1}`, coord: [lng, lat] as [number, number] }]
+            }),
+            segmentCoords
+          )
+        : [],
+    [roadShape, rows, segmentCoords]
   )
 
   // Keep refs synchronized for event callbacks
@@ -952,6 +968,17 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
       })
     }
 
+    if (!noGps && selectedSegmentId) {
+      if (!isSegmentDetailReady) {
+        setErrorMsg('Đang tải hình tuyến để kiểm tra vị trí cột, thử lại sau giây lát.')
+        return
+      }
+      if (rowsOffRoad.length > 0) {
+        setErrorMsg(offRoadShapeMessage(rowsOffRoad))
+        return
+      }
+    }
+
     if (onAddPoles) {
       onAddPoles(validatedDataList)
     } else if (onAddPole && validatedDataList.length > 0) {
@@ -1249,11 +1276,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
               <div ref={mapContainerRef} className="w-full h-full" />
 
               {/* Map overlay legend */}
-              <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-xl p-2.5 shadow-lg text-[11px] text-slate-800 space-y-1.5 pointer-events-none">
-                <div className="font-bold flex items-center gap-1.5 text-xs text-amber-700">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Bản Đồ Cắm Mốc Cột Đèn</span>
-                </div>
+              <CollapsibleMapLegend
+                title="Bản Đồ Cắm Mốc Cột Đèn"
+                icon={<MapPin className="w-3.5 h-3.5 text-emerald-600" />}
+              >
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#059669] border border-white inline-block"></span>
                   <span>Cột đang thêm ({rows.length}) - Kéo để đặt vị trí</span>
@@ -1272,7 +1298,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                     <span>Tủ điện: {currentCabinet.cabinet_name || currentCabinet.cabinet_id}</span>
                   </div>
                 )}
-              </div>
+              </CollapsibleMapLegend>
 
               {/* Status overlays */}
               {!selectedSegmentId ? (
@@ -1287,6 +1313,17 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                 <div className="absolute inset-x-3 top-3 bg-sky-600/90 text-white px-3 py-1.5 rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs font-bold backdrop-blur-xs z-10 pointer-events-none animate-in fade-in">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>Tuyến chưa có đường. Click bản đồ hoặc bấm Thêm Cột để đặt cột; đường sẽ vẽ khi có từ 2 cột.</span>
+                </div>
+              ) : rowsOffRoad.length > 0 ? (
+                <div
+                  role="alert"
+                  className="absolute inset-x-3 top-3 bg-rose-600/90 text-white px-3 py-1.5 rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs font-bold backdrop-blur-xs z-10 pointer-events-none"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>
+                    {rowsOffRoad.length} cột đang đặt xa hình tuyến quá 25 m ({rowsOffRoad.slice(0, 3).join(', ')}
+                    {rowsOffRoad.length > 3 ? '…' : ''}). Kéo về sát đường.
+                  </span>
                 </div>
               ) : null}
             </div>

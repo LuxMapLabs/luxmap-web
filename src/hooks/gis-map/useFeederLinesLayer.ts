@@ -5,6 +5,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { SegmentInfo } from '../../pages/gis-map/GisMapPage'
 import { getFeederTooltipHtml, getRoadSegmentTooltipHtml } from '../../utils/gis-map/tooltipUtils'
 import { fetchCabinetTopologyRequest, clearCabinetTopology } from '../../feature/map/mapSlice'
+import { findByIdOrRef } from '../../utils/assets/findByIdOrRef'
 
 interface UseFeederLinesLayerProps {
   map: maplibregl.Map | null
@@ -275,7 +276,7 @@ export function useFeederLinesLayer({
       // BẮT BUỘC: Khi click vào đường dây điện chạy dọc theo tuyến đường, luôn mở Panel Tuyến đường (Segment), tuyệt đối không mở panel Feeder hay Cabinet.
       const fId = p.feeder_id
       if (onSelectFeeder && fId) {
-        const found = assetFeeders?.find((f: any) => f.feeder_id === fId || f.external_ref === fId)
+        const found = findByIdOrRef(assetFeeders ?? [], (f: any) => f.feeder_id, fId)
         onSelectFeeder({
           ...p,
           ...(found || {}),

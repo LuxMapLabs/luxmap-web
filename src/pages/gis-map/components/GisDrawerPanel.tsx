@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   Zap,
   X,
-  Activity,
   Info,
   Radio,
   Wrench,
@@ -17,6 +16,11 @@ import {
   Moon,
   Clock,
   History,
+  Unplug,
+  Spline,
+  ChevronRight,
+  Pencil,
+  PlugZap,
 } from 'lucide-react'
 
 import type { SegmentInfo, PoleFeature } from '../GisMapPage'
@@ -28,8 +32,23 @@ import { previewLightingRequest, openHistoryModal } from '../../../feature/light
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
 import { IotBridgeControlCard } from './IotBridgeControlCard'
+import { FeederElectricalSummary } from './FeederElectricalSummary'
+import { segmentDisplayCode } from '../../../utils/gis-map/gisSearchUtils'
 import { formatDate } from '../../../utils/dateUtils'
 import { isManager } from '../../../utils/roleUtils'
+import {
+  retireFixtureRequest,
+  createFixtureRequest,
+  updateFixtureRequest,
+  updatePoleRequest,
+} from '../../../feature/assets/assetSlice'
+import { AddFixtureModal } from '../../assets/components/fixtures/components/AddFixtureModal'
+import { EditPoleModal } from '../../assets/components/poles/components/EditPoleModal'
+import { poleUpdateRequest } from '../../../utils/assets/poleUpdateRequest'
+import {
+  RetireFixtureModal,
+  type RetirableFixture,
+} from '../../assets/components/fixtures/components/RetireFixtureModal'
 import { useAuthImage } from '../../../hooks/useAuthImage'
 
 // Nhãn trạng thái cột theo fixture_status do API trả về
@@ -60,6 +79,12 @@ export interface GisDrawerPanelProps {
   setSelectedFeeder?: (f: any) => void
   cabinets?: any[]
   effectivePoles?: PoleFeature[]
+  /** Bắt đầu dời vị trí cột đang chọn trên bản đồ (Quản lý). */
+  /** Quản lý: bật chế độ lấy hình tuyến theo đường trên bản đồ nền cho tuyến đang mở. */
+  onStartReshapeSegment?: () => void
+  isReshapingSegment?: boolean
+  /** Mở bảng giám sát điện (dưới bản đồ) ở mạch này; `nodeId` khi nơi mở đã biết node của mạch. */
+  onOpenElectricalMonitor?: (feederId: string, nodeId?: string | null) => void
 }
 
 const FAULT_TYPE_LABELS: Record<FaultType, string> = {
@@ -109,7 +134,34 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   selectedFeeder,
   setSelectedFeeder,
   effectivePoles: propsEffectivePoles = [],
+  onStartReshapeSegment,
+  isReshapingSegment = false,
+  onOpenElectricalMonitor,
 }) => {
+  // Khung cột / mạch điện → khung tuyến của nó (nút "Lấy hình theo đường" nằm ở khung tuyến). Bấm đường tuyến trên
+  // bản đồ thường trúng dây mạch nằm chồng lên, nên đây là lối mở khung tuyến chắc chắn.
+  const openSegmentPanel = () => {
+    if (!activeSegmentDetail.id) return
+    setSelectedPole(null)
+    setSelectedCabinet?.(null)
+    setSelectedFeeder?.(null)
+    setSelectedSegmentId(activeSegmentDetail.id)
+  }
+  const segmentLink = (label: React.ReactNode) =>
+    activeSegmentDetail.id ? (
+      <button
+        type="button"
+        onClick={openSegmentPanel}
+        title="Mở khung tuyến"
+        className="inline-flex items-center gap-0.5 font-semibold text-blue-700 dark:text-blue-400 hover:underline cursor-pointer"
+      >
+        {label}
+        <ChevronRight className="w-3 h-3" />
+      </button>
+    ) : (
+      <strong className="text-slate-900 dark:text-white">{label}</strong>
+    )
+
   // Lightbox Modal state
   const [lightboxImage, setLightboxImage] = useState<{
     url: string
@@ -124,9 +176,22 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   const poleId = selectedPole?.properties?.pole_id || ''
   const dispatch = useDispatch<AppDispatch>()
   const { poleDetail } = useSelector((state: RootState) => state.map)
-  const { feeders: assetFeeders } = useSelector((state: RootState) => state.assets)
+  const {
+    feeders: assetFeeders,
+    poles: assetPoles,
+    segments: assetSegments,
+    cabinets: assetCabinets,
+  } = useSelector((state: RootState) => state.assets)
   // Bật/Tắt/Auto là capability ControlLighting: chỉ Quản lý; Cấp giám sát chỉ xem
   const canControlLighting = useSelector((state: RootState) => isManager(state.auth.user?.role))
+  // Dời cột (EditPoleLocation), tháo bóng và sửa hình tuyến (ManageAssets): trên web chỉ Quản lý có các quyền này
+  const canEditAssets = canControlLighting
+  const [retiringFixture, setRetiringFixture] = useState<RetirableFixture | null>(null)
+  // Sửa thông tin cột / gắn bộ đèn: cùng form với tab Quản lý tài sản, dữ liệu lấy từ danh sách tài sản đã tải
+  const [isEditingPole, setIsEditingPole] = useState(false)
+  const [isAddingFixture, setIsAddingFixture] = useState(false)
+  const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null)
+  const poleItem = poleId ? (assetPoles ?? []).find((p) => p.pole_id === poleId) ?? null : null
 
   const handleControlFeederMode = (feederId: string, mode: FeederControlMode) => {
     dispatch(
@@ -168,21 +233,40 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     dispatch(fetchPoleDetailRequest(poleId))
   }, [dispatch, poleId])
 
-  // Real IoT node from poleDetail or props
-  const poleIotNode = useMemo(() => {
-    if (poleDetail?.iot_node) {
-      return {
-        node_id: poleDetail.iot_node.node_id || 'IOT-NODE',
-        node_status: poleDetail.iot_node.node_status || 'online',
-        battery_pct: 95,
-        last_seen: poleDetail.iot_node.last_report_at || '',
-      }
-    }
-    return null
-  }, [poleDetail])
-
   // Real open faults from poleDetail
   const openFaults = poleDetail?.open_faults || []
+
+  // Bộ đèn đang dùng của cột đang mở (luật web: 1 bộ / cột; bóng trong bộ giống nhau). Chi tiết cột của cột trước còn trong store thì chưa tính.
+  const detailOfThisPole = poleDetail?.pole_id === poleId ? poleDetail : null
+  const poleFixtures = detailOfThisPole
+    ? detailOfThisPole.fixtures?.length
+      ? detailOfThisPole.fixtures
+      : detailOfThisPole.fixture
+      ? [detailOfThisPole.fixture]
+      : []
+    : []
+  const poleLabel = selectedPole?.properties?.external_ref || poleId
+  // Sửa bộ đèn: cùng form gắn, điền sẵn từ chi tiết cột
+  const editingFixture = editingFixtureId ? poleFixtures.find((f) => f.fixture_id === editingFixtureId) : undefined
+  const editFixtureTarget =
+    editingFixture?.fixture_id && poleItem
+      ? {
+          fixture: {
+            fixture_id: editingFixture.fixture_id,
+            fixture_type: editingFixture.fixture_type ?? 'led_road_lamp',
+            power_source: editingFixture.power_source ?? 'grid',
+            lamp_watt: editingFixture.lamp_watt ?? 100,
+            lamp_count: editingFixture.lamp_count ?? 1,
+            install_date: editingFixture.install_date ?? null,
+            warranty_expiry: editingFixture.warranty_expiry ?? null,
+            data_source: poleItem.data_source,
+            note: editingFixture.note ?? null,
+          },
+          poleLabel: poleLabel || '',
+        }
+      : undefined
+  /** Chỉ gắn khi cột chưa có bộ đèn đang dùng; bộ cũ phải tháo trước (như trang Tài sản). */
+  const canAddFixture = !!detailOfThisPole && !!poleItem && poleFixtures.length === 0
 
   // Accordion state: auto-open if pole has issue, otherwise collapsed
   const hasIssue =
@@ -300,6 +384,11 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     }))
   }, [selectedCabinet, assetFeeders, cabinetConnectedPoles])
 
+  // Node IoT của mạch: mỗi IoT gán đúng một mạch (feeder.control.node_id)
+  const feederNodeId = (feederId: string, feeder?: any): string | null =>
+    (assetFeeders || []).find((af: any) => af.feeder_id === feederId)?.control?.node_id || feeder?.control?.node_id || null
+  const cabinetIotCount = cabinetFeeders.filter((f: any) => feederNodeId(f.feeder_id, f)).length
+
   return (
     <>
       <aside className="w-97.5 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
@@ -394,11 +483,13 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   ? [
                       selectedFeeder.external_ref || selectedFeeder.feeder_id,
                       selectedFeeder.cabinet_name ? `Tủ: ${selectedFeeder.cabinet_name}` : null,
-                      selectedFeeder.segment_id ? `Tuyến: ${selectedFeeder.segment_id}` : null
+                      selectedFeeder.segment_id
+                        ? `Tuyến: ${activeSegmentDetail.id === selectedFeeder.segment_id ? segmentDisplayCode(activeSegmentDetail) : selectedFeeder.segment_id}`
+                        : null
                     ]
                       .filter(Boolean)
                       .join(' · ')
-                  : `${activeSegmentDetail.id} · ${activeSegmentDetail.name}`}
+                  : `${segmentDisplayCode(activeSegmentDetail)} · ${activeSegmentDetail.name}`}
               </div>
             </div>
           </div>
@@ -472,7 +563,11 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                       <div className="flex justify-between">
                         <span>Tuyến:</span>
-                        <strong className="text-slate-900 dark:text-white">{activeSegmentDetail.fullName || activeSegmentDetail.name}</strong>
+                        {selectedPole.properties.segment_id === activeSegmentDetail.id ? (
+                          segmentLink(activeSegmentDetail.fullName || activeSegmentDetail.name)
+                        ) : (
+                          <strong className="text-slate-900 dark:text-white">Chưa gán</strong>
+                        )}
                       </div>
                       <div className="flex justify-between">
                         <span>Nguồn cấp:</span>
@@ -481,7 +576,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         </strong>
                       </div>
                       <div className="flex justify-between">
-                        <span>Bóng đèn:</span>
+                        <span>Bộ đèn:</span>
                         <strong className="text-slate-900 dark:text-white">
                           {fixtureTypeLabel(poleDetail?.fixture?.fixture_type || selectedPole.properties.fixture_type)}
                           {(poleDetail?.fixture?.lamp_watt || selectedPole.properties.lamp_watt) &&
@@ -506,16 +601,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           {formatDate(poleDetail?.fixture?.warranty_expiry || selectedPole.properties.warranty_expiry) || '—'}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Cảm biến IoT:</span>
-                        {poleIotNode ? (
-                          <strong className="text-blue-600 dark:text-blue-400 font-mono flex items-center gap-1">
-                            ⚡ {poleIotNode.node_id} (Pin {poleIotNode.battery_pct}%)
-                          </strong>
-                        ) : (
-                          <span className="text-slate-400 dark:text-slate-500">Không trang bị</span>
-                        )}
-                      </div>
                       {selectedPole.properties.near_sensitive_poi && (
                         <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 font-medium">
                           <span>Vị trí nhạy cảm:</span>
@@ -537,91 +622,99 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* 3. Dedicated Pole IoT Sensor Card (Only if pole has a sampled_fixture IoT node) */}
-                  {poleIotNode && (
-                    <div className="bg-blue-50/60 dark:bg-blue-950/30 p-3 rounded-xl border border-blue-200/70 dark:border-blue-800/50 space-y-2">
-                      <div className="flex items-center justify-between border-b border-blue-200/50 dark:border-blue-800/40 pb-1.5">
-                        <span className="font-bold text-xs text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          <span>Cảm biến IoT trên cột ({poleIotNode.node_id})</span>
+                  {/* Thao tác trên cột (Quản lý): sửa cột (cả vị trí GPS, trong form), gắn / tháo từng bộ đèn */}
+                  {canEditAssets && (
+                    <div className="bg-white dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-2xs space-y-2">
+                      <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1 flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5">
+                          <Wrench className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          <span>Thao tác trên cột</span>
                         </span>
-                        <span
-                          className={`text-[10.5px] px-2 py-0.5 rounded font-semibold ${
-                            poleIotNode.node_status === 'online'
-                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                              : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
-                          }`}
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingPole(true)}
+                          disabled={!poleItem}
+                          title={poleItem ? 'Sửa mã, tuyến, mạch, ghi chú và vị trí GPS của cột' : 'Đang tải danh sách cột…'}
+                          className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold text-[11px] hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {poleIotNode.node_status === 'online' ? 'Online' : 'Offline'}
-                        </span>
+                          <Pencil className="w-3 h-3" />
+                          Sửa cột
+                        </button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-[11px] pt-0.5">
-                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Mức pin dự trữ</span>
-                          <strong className="text-slate-900 dark:text-white font-mono text-xs flex items-center gap-1">
-                            {poleIotNode.battery_pct}%
-                            {poleIotNode.battery_pct < 50 && (
-                              <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">(Pin yếu)</span>
-                            )}
-                          </strong>
-                        </div>
-                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Thời gian phát sáng</span>
-                          <strong className="text-slate-900 dark:text-white font-mono text-xs">
-                            {poleDetail?.runtime_history?.[0]?.runtime_hours !== undefined
-                              ? `${poleDetail.runtime_history[0].runtime_hours} h/đêm`
-                              : '—'}
-                          </strong>
-                        </div>
+                      <div className="space-y-1.5">
+                        {poleFixtures.length > 0 ? (
+                          poleFixtures.map((fixture, idx) => (
+                            <div
+                              key={fixture.fixture_id || idx}
+                              className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800 text-[11px]"
+                            >
+                              <span className="text-slate-700 dark:text-slate-300">
+                                <span className="font-mono font-bold text-slate-900 dark:text-white">
+                                  {fixture.fixture_id || 'Bộ đèn'}
+                                </span>
+                                {typeof fixture.lamp_watt === 'number' &&
+                                  ` · ${fixture.lamp_watt} W (${fixture.lamp_count || 1} bóng)`}
+                                {fixture.install_date && ` · lắp ${formatDate(fixture.install_date)}`}
+                                {fixture.note && (
+                                  <span className="block italic text-slate-500 dark:text-slate-400">
+                                    Ghi chú: {fixture.note}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="shrink-0 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setEditingFixtureId(fixture.fixture_id)}
+                                disabled={!fixture.fixture_id || !poleItem}
+                                title="Sửa thông tin nhập sai của bộ đèn"
+                                className="flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Pencil className="w-3 h-3" />
+                                Sửa
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRetiringFixture({
+                                    fixture_id: fixture.fixture_id,
+                                    pole_id: poleId,
+                                    pole_external_ref: poleLabel,
+                                    install_date: fixture.install_date ?? null,
+                                    lamp_watt: fixture.lamp_watt,
+                                    lamp_count: fixture.lamp_count,
+                                  })
+                                }
+                                disabled={!fixture.fixture_id}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Unplug className="w-3 h-3" />
+                                Tháo bộ đèn
+                              </button>
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-1.5 text-center text-slate-400 dark:text-slate-500 text-[11px]">
+                            {detailOfThisPole ? 'Cột chưa có bộ đèn đang dùng' : 'Đang tải bộ đèn…'}
+                          </div>
+                        )}
+                        {canAddFixture && (
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingFixture(true)}
+                            className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold text-[11px] hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <PlugZap className="w-3.5 h-3.5" />
+                            Gắn bộ đèn
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
 
                   {/* Điều khiển mạch của trụ qua IoT bridge (chỉ hiện khi mạch có node IoT) */}
-                  <IotBridgeControlCard poleId={poleId} />
-
-                  {/* 3. Luminance Baseline History (Operational Telemetry) */}
-                  <div className="bg-white dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-2xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
-                        <Activity className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                        <span>Độ sáng 3 đêm gần nhất</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Baseline</span>
-                    </div>
-
-                    <div className="space-y-1 pt-0.5">
-                      {poleDetail?.luminance_history && poleDetail.luminance_history.length > 0 ? (
-                        poleDetail.luminance_history.slice(0, 3).map((item: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800 text-[11px]"
-                          >
-                            <span className="font-mono text-slate-600 dark:text-slate-400">
-                              {item.observed_at ? item.observed_at.split('T')[0] : 'Gần đây'}
-                            </span>
-                            <span className="font-bold text-slate-900 dark:text-white">
-                              {Math.round((item.baseline_ratio || 1) * 100)}%
-                            </span>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
-                                item.classified_as === 'normal'
-                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                                  : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                              }`}
-                            >
-                              {item.classified_as === 'normal' ? 'Sáng' : 'Mờ'}
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="py-2.5 text-center text-slate-400 dark:text-slate-500 text-[11px]">
-                          Chưa có dữ liệu đo quang thông từ các đợt quét gần nhất
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <IotBridgeControlCard poleId={poleId} onOpenElectricalMonitor={onOpenElectricalMonitor} />
 
                   {/* 4. Collapsible Active Faults & Issues (Accordion at the bottom) */}
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden bg-white dark:bg-slate-800/50 shadow-2xs">
@@ -776,7 +869,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <span>Hệ thống IoT Giám sát từ xa</span>
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">
-                    {selectedCabinet.iot_gateway_id || selectedCabinet.iot_node_id || 'Chưa gắn thiết bị'}
+                    {cabinetIotCount > 0 ? `${cabinetIotCount}/${cabinetFeeders.length} mạch có IoT` : 'Chưa gắn thiết bị'}
                   </span>
                 </div>
 
@@ -921,6 +1014,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           </div>
                           )}
                         </div>
+                        <FeederElectricalSummary
+                          nodeId={feederNodeId(fId, feeder)}
+                          onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(fId, feederNodeId(fId, feeder)) : undefined}
+                        />
                       </div>
                     )
                   })}
@@ -930,6 +1027,20 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               </div>
           ) : selectedFeeder ? (
             <div className="space-y-4 text-xs">
+              {/* Số đo điện của mạch (từ node IoT gán cho mạch) */}
+              {(() => {
+                const selId = selectedFeeder.feeder_id || selectedFeeder.external_ref
+                const nodeId = feederNodeId(selId, selectedFeeder)
+                return (
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">Số đo điện của mạch</span>
+                    <FeederElectricalSummary
+                      nodeId={nodeId}
+                      onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(selId, nodeId) : undefined}
+                    />
+                  </div>
+                )
+              })()}
               {/* 1. Feeder Control Card with 3-Mode Tri-State Buttons */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-3">
                 <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">
@@ -1074,9 +1185,13 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
                   <div className="flex justify-between">
                     <span>Tuyến đường:</span>
-                    <strong className="text-blue-700 dark:text-blue-400 font-semibold">
-                      {selectedFeeder.segment_name || activeSegmentDetail.name || selectedFeeder.segment_id}
-                    </strong>
+                    {activeSegmentDetail.id === selectedFeeder.segment_id ? (
+                      segmentLink(selectedFeeder.segment_name || activeSegmentDetail.name)
+                    ) : (
+                      <strong className="text-blue-700 dark:text-blue-400 font-semibold">
+                        {selectedFeeder.segment_name || selectedFeeder.segment_id || 'Chưa gán'}
+                      </strong>
+                    )}
                   </div>
                   <div className="flex justify-between">
                     <span>Số cột đèn quản lý:</span>
@@ -1162,7 +1277,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
                   <div className="flex justify-between">
                     <span>Mã tuyến:</span>
-                    <strong className="text-slate-900 dark:text-white font-mono">{activeSegmentDetail.id}</strong>
+                    <strong className="text-slate-900 dark:text-white font-mono">{segmentDisplayCode(activeSegmentDetail)}</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Tên tuyến:</span>
@@ -1190,6 +1305,28 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Hình tuyến (Quản lý): lấy theo con đường có sẵn trên bản đồ nền */}
+              {canEditAssets && activeSegmentDetail.id && (
+                <div className="bg-white dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-2xs space-y-2">
+                  <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1 flex items-center gap-1.5">
+                    <Spline className="w-3.5 h-3.5 text-orange-500" />
+                    <span>Hình tuyến</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Lấy hình theo con đường có sẵn trên bản đồ nền: bấm điểm đầu, rồi bấm dọc đường tới điểm cuối.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onStartReshapeSegment}
+                    disabled={!onStartReshapeSegment || isReshapingSegment}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-semibold text-[11.5px] hover:bg-orange-100 dark:hover:bg-orange-900/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Spline className="w-3.5 h-3.5" />
+                    {isReshapingSegment ? 'Đang lấy hình trên bản đồ…' : 'Lấy hình theo đường trên bản đồ'}
+                  </button>
+                </div>
+              )}
 
               {/* 2. Pole List on this Segment */}
               <div className="space-y-2">
@@ -1256,7 +1393,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       {lightboxImage && (
         <div
           onClick={() => setLightboxImage(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1282,6 +1419,48 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Tháo bộ đèn: cùng form với tab Quản lý tài sản; xong thì tải lại chi tiết cột và lớp bản đồ */}
+      <RetireFixtureModal
+        isOpen={retiringFixture !== null}
+        onClose={() => setRetiringFixture(null)}
+        fixture={retiringFixture}
+        onConfirm={(fixtureId, req) => dispatch(retireFixtureRequest({ fixtureId, data: req, poleId }))}
+      />
+
+      {/* Gắn bộ đèn / sửa thông tin cột: xong thì tải lại chi tiết cột và lớp bản đồ */}
+      {poleItem && (
+        <AddFixtureModal
+          isOpen={isAddingFixture}
+          onClose={() => setIsAddingFixture(false)}
+          poles={[poleItem]}
+          fixedPole={poleItem}
+          onAddFixture={(data) => dispatch(createFixtureRequest({ data, poleId }))}
+        />
+      )}
+      {editFixtureTarget && (
+        <AddFixtureModal
+          isOpen
+          onClose={() => setEditingFixtureId(null)}
+          poles={poleItem ? [poleItem] : []}
+          editFixture={editFixtureTarget}
+          onUpdateFixture={(fixtureId, data) => dispatch(updateFixtureRequest({ fixtureId, data, poleId }))}
+        />
+      )}
+      <EditPoleModal
+        isOpen={isEditingPole}
+        pole={poleItem}
+        segments={assetSegments}
+        cabinets={assetCabinets}
+        allPoles={assetPoles}
+        onClose={() => setIsEditingPole(false)}
+        onSave={(updated) => {
+          if (!updated.pole_id) return
+          dispatch(
+            updatePoleRequest({ poleId: updated.pole_id, data: poleUpdateRequest(updated), refreshMap: true })
+          )
+        }}
+      />
     </>
   )
 }

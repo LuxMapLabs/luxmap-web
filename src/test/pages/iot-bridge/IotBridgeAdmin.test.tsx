@@ -61,9 +61,19 @@ describe('IotServerFormModal', () => {
     expect(api.registerServer).not.toHaveBeenCalled()
   })
 
+  it('hides the map until a commune is chosen', () => {
+    render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
+    expect(screen.queryByText('Ghim trên bản đồ')).not.toBeInTheDocument()
+    expect(screen.getByTestId('iot-server-map-placeholder')).toHaveTextContent('Chọn xã / phường để hiện bản đồ')
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
+
+    expect(screen.getByText('Ghim trên bản đồ')).toBeInTheDocument()
+    expect(screen.queryByTestId('iot-server-map-placeholder')).not.toBeInTheDocument()
+  })
+
   it('outlines the selected commune on the map and drops it when switching to a commune without a frame', () => {
     render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
-    expect(screen.getByText('Ghim trên bản đồ')).toHaveAttribute('data-boundary-min-lng', '')
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
     expect(screen.getByText('Ghim trên bản đồ')).toHaveAttribute('data-boundary-min-lng', '106.3')
@@ -77,7 +87,6 @@ describe('IotServerFormModal', () => {
     expect(screen.getByRole('combobox')).toHaveValue('')
 
     fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'iot-server-01' } })
-    fireEvent.click(screen.getByText('Ghim trên bản đồ'))
     fireEvent.click(submitButton())
 
     expect(await screen.findByText('Cần chọn xã/phường.')).toBeInTheDocument()
@@ -92,11 +101,10 @@ describe('IotServerFormModal', () => {
 
   it('opens a new registration without a pin and never sends the commune centre as the gateway location', async () => {
     render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
-    expect(screen.getByText('Ghim trên bản đồ')).toHaveAttribute('data-unpicked', 'true')
-    expect(screen.getByTestId('iot-server-location')).toHaveTextContent('Chưa chọn')
-
     fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'iot-server-01' } })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
+    expect(screen.getByText('Ghim trên bản đồ')).toHaveAttribute('data-unpicked', 'true')
+    expect(screen.getByTestId('iot-server-location')).toHaveTextContent('Chưa chọn')
     fireEvent.click(submitButton())
 
     expect(await screen.findByText('Hãy bấm lên bản đồ để đặt vị trí gateway.')).toBeInTheDocument()

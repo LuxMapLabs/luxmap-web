@@ -67,7 +67,7 @@ export const autoSortRoute = (route: OrderedPole[]): OrderedPole[] =>
   route.filter(isBend).reduce(insertBendInRoute, orderPolesByChain(polesOf(route)))
 
 // Đỉnh của đường cũ coi như trùng cột nếu cách nhau không quá ngần này (mét)
-const VERTEX_MATCH_METERS = 3
+export const VERTEX_MATCH_METERS = 3
 
 /** Chiếu cột lên đường: trả đoạn gần nhất, tham số t trên đoạn và khoảng cách dọc đường từ đầu. */
 const projectOnLine = (coord: [number, number], line: [number, number][]) => {

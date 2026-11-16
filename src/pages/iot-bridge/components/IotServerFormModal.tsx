@@ -6,6 +6,7 @@ import type { CommuneItem } from '../../../types/admin/communes'
 import { apiErrorMessage } from '../../../utils/iot/apiError'
 import { isValidServerId } from '../../../utils/iot/iotRegistration'
 import { LocationPickerMap } from '../../../components/LocationPickerMap'
+import { Field, inputClass } from './IotBridgeModal'
 import {
   AssetModalError,
   AssetModalFooter,
@@ -30,17 +31,6 @@ const COMMUNE_HINT: Record<CommuneLoadStatus | 'empty', string> = {
   failed: 'Không tải được danh sách xã / phường. Đóng hộp thoại rồi bấm "Tải lại" trên trang.',
   empty: 'Chưa có xã / phường nào — tạo ở trang "Địa bàn & Khung BBox" trước.',
 }
-
-const inputClass =
-  'w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition'
-
-const Field: React.FC<{ label: string; hint?: React.ReactNode; children: React.ReactNode }> = ({ label, hint, children }) => (
-  <label className="block space-y-1.5">
-    <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">{label}</span>
-    {children}
-    {hint && <span className="block text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{hint}</span>}
-  </label>
-)
 
 /**
  * Đăng ký server IoT Bridge (`server` null) hoặc sửa xã / vị trí gateway của server đã có.
@@ -110,34 +100,6 @@ export const IotServerFormModal: React.FC<{
       <form onSubmit={submit} className="flex-1 min-h-0 flex flex-col">
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
           <div className="lg:col-span-5 space-y-5">
-            {!editing && (
-              <section className="space-y-4">
-                <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100">
-                  <Server className="w-4 h-4 text-blue-600" /> Thông tin server
-                </h4>
-                <Field label="Server ID" hint='Chữ, số, "-" hoặc "_", tối đa 64 ký tự.'>
-                  <input
-                    className={`${inputClass} font-mono`}
-                    value={serverId}
-                    onChange={(e) => setServerId(e.target.value)}
-                    placeholder="iot-server-01"
-                    autoFocus
-                  />
-                </Field>
-                <Field
-                  label="Địa chỉ HTTP của bridge"
-                  hint={
-                    <>
-                      Địa chỉ backend gọi tới bridge, phải nằm trong allowlist{' '}
-                      <code className="font-mono text-[10.5px]">IotDiagnostics:AllowedOrigins</code>.
-                    </>
-                  }
-                >
-                  <input className={`${inputClass} font-mono`} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-                </Field>
-              </section>
-            )}
-
             <section className="space-y-4">
               <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100">
                 <Globe className="w-4 h-4 text-blue-600" /> Địa bàn
@@ -146,6 +108,7 @@ export const IotServerFormModal: React.FC<{
                 <select
                   className={`${inputClass} cursor-pointer`}
                   value={communeId}
+                  autoFocus
                   onChange={(e) => {
                     // Đổi xã thì bỏ ghim cũ, bản đồ về tâm xã mới.
                     setCommuneId(e.target.value)
@@ -164,6 +127,33 @@ export const IotServerFormModal: React.FC<{
               </Field>
             </section>
 
+            {!editing && (
+              <section className="space-y-4">
+                <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100">
+                  <Server className="w-4 h-4 text-blue-600" /> Thông tin server
+                </h4>
+                <Field label="Server ID" hint='Chữ, số, "-" hoặc "_", tối đa 64 ký tự.'>
+                  <input
+                    className={`${inputClass} font-mono`}
+                    value={serverId}
+                    onChange={(e) => setServerId(e.target.value)}
+                    placeholder="iot-server-01"
+                  />
+                </Field>
+                <Field
+                  label="Địa chỉ HTTP của bridge"
+                  hint={
+                    <>
+                      Địa chỉ backend gọi tới bridge, phải nằm trong allowlist{' '}
+                      <code className="font-mono text-[10.5px]">IotDiagnostics:AllowedOrigins</code>.
+                    </>
+                  }
+                >
+                  <input className={`${inputClass} font-mono`} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+                </Field>
+              </section>
+            )}
+
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-1">
               <p className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
                 <MapPin className="w-4 h-4 text-amber-500" /> Vị trí gateway
@@ -174,7 +164,9 @@ export const IotServerFormModal: React.FC<{
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {picked
                   ? 'Đã ghim. Bấm chỗ khác hoặc kéo ghim để đổi.'
-                  : 'Bấm lên bản đồ, trong khung xã, đúng chỗ đặt gateway.'}
+                  : communeId
+                    ? 'Bấm lên bản đồ, trong khung xã, đúng chỗ đặt gateway.'
+                    : 'Chọn xã / phường trước, rồi bấm lên bản đồ đúng chỗ đặt gateway.'}
               </p>
             </div>
           </div>
@@ -183,16 +175,27 @@ export const IotServerFormModal: React.FC<{
             <span className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
               <MapPin className="w-4 h-4 text-blue-600" /> Bản đồ vệ tinh (GIS)
             </span>
-            {/* Chưa ghim: không vẽ ghim, bản đồ căn theo khung/tâm xã (xã chưa có tâm thì về tâm mặc định). */}
-            <LocationPickerMap
-              key={communeId}
-              lat={mapCenter?.lat ?? Number.NaN}
-              lng={mapCenter?.lng ?? Number.NaN}
-              height="380px"
-              boundary={commune?.bbox}
-              unpicked={!picked}
-              onChange={(coords) => setPicked(coords)}
-            />
+            {communeId ? (
+              // Chưa ghim: không vẽ ghim, bản đồ căn theo khung/tâm xã (xã chưa có tâm thì về tâm mặc định).
+              <LocationPickerMap
+                key={communeId}
+                lat={mapCenter?.lat ?? Number.NaN}
+                lng={mapCenter?.lng ?? Number.NaN}
+                height="380px"
+                boundary={commune?.bbox}
+                unpicked={!picked}
+                onChange={(coords) => setPicked(coords)}
+              />
+            ) : (
+              // Gateway luôn nằm trong một xã: chọn xã trước rồi mới ghim, bản đồ mở ra đúng khung xã đó.
+              <div
+                data-testid="iot-server-map-placeholder"
+                className="h-[380px] rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 flex flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400"
+              >
+                <Globe className="w-6 h-6 text-slate-400" />
+                <span className="font-semibold">Chọn xã / phường để hiện bản đồ</span>
+              </div>
+            )}
           </div>
         </div>
 

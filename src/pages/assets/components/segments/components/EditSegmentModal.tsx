@@ -9,13 +9,32 @@ import {
 } from '../../common/AssetModal'
 import { SegmentPolePickerMap } from '../../../../../components/SegmentPolePickerMap'
 import { SegmentPoleOrderList } from '../../../../../components/SegmentPoleOrderList'
-import { SegmentNoGpsPolePicker, noGpsPolesFor } from '../../../../../components/SegmentNoGpsPolePicker'
+import {
+  SegmentNoGpsPolePicker,
+  noGpsPolesFor,
+} from '../../../../../components/SegmentNoGpsPolePicker'
+import { SegmentShapePanel } from '../../../../../components/SegmentShapePanel'
+import { useSegmentRoadPick } from '../../../../../hooks/assets/useSegmentRoadPick'
+import { lineToWkt } from '../../../../../utils/gis-map/roadRouting'
+import { polesNearLine } from '../../../../../utils/gis-map/segmentReshape'
 import {
   toPickablePoles,
   useSegmentPoleSelection,
 } from '../../../../../hooks/assets/useSegmentPoleSelection'
 import { useSegmentPoleLink } from '../../../../../hooks/assets/useSegmentPoleLink'
-import { deriveInitialOrder } from '../../../../../utils/gis-map/segmentPoleOrder'
+import {
+  deriveInitialOrder,
+  orderPolesAlongLine,
+} from '../../../../../utils/gis-map/segmentPoleOrder'
+import {
+  calculateRouteLengthMeters,
+  parseLineStringWkt,
+} from '../../../../../utils/gis-map/routeUtils'
+import {
+  isRoadShape,
+  offRoadShapeMessage,
+  polesOffRoadShape,
+} from '../../../../../utils/gis-map/segmentRoadShape'
 import {
   fetchSegmentDetailRequest,
   clearSegmentDetail,
@@ -65,13 +84,17 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
     const ownIds = new Set(
       allPoles.filter((p) => p.segment_id === segment.segment_id).map((p) => p.pole_id)
     )
-    const own = candidates.filter((c) => ownIds.has(c.id))
-    return deriveInitialOrder(
-      own.map((p) => ({ id: p.id, coord: p.coord })),
-      geomWkt
-    )
+    const own = candidates
+      .filter((c) => ownIds.has(c.id))
+      .map((p) => ({ id: p.id, coord: p.coord }))
+    return { ...deriveInitialOrder(own, geomWkt), roadShape: isRoadShape(own, geomWkt) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // Hình thật của con đường: giữ nguyên khi lưu ở đây, không dựng lại từ cột
+  const storedLine = useMemo(
+    () => (initial.roadShape ? parseLineStringWkt(geomWkt) : []),
+    [initial.roadShape, geomWkt]
+  )
 
   const [segmentName, setSegmentName] = useState(segment.segment_name || '')
   const [roadClass, setRoadClass] = useState<RoadClass>(
@@ -79,11 +102,32 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   )
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const { selected, poles, toggle, remove, move, autoSort, addBend, moveBend, lastAddedId, geometry } =
-    useSegmentPoleSelection(candidates, initial.ordered)
+  const {
+    selected,
+    poles,
+    toggle,
+    addMany,
+    remove,
+    move,
+    autoSort,
+    addBend,
+    moveBend,
+    lastAddedId,
+    geometry,
+  } = useSegmentPoleSelection(candidates, initial.ordered)
   // Cột chưa có GPS cũng gán được vào tuyến (không vào hình tuyến)
-  const noGpsPoles = useMemo(() => noGpsPolesFor(allPoles, segment.segment_id), [allPoles, segment.segment_id])
-  const [noGpsIds, setNoGpsIds] = useState<Set<string>>(() => new Set(allPoles.filter((p) => p.pole_id && !p.location && p.segment_id === segment.segment_id).map((p) => p.pole_id as string)))
+  const noGpsPoles = useMemo(
+    () => noGpsPolesFor(allPoles, segment.segment_id),
+    [allPoles, segment.segment_id]
+  )
+  const [noGpsIds, setNoGpsIds] = useState<Set<string>>(
+    () =>
+      new Set(
+        allPoles
+          .filter((p) => p.pole_id && !p.location && p.segment_id === segment.segment_id)
+          .map((p) => p.pole_id as string)
+      )
+  )
   const toggleNoGps = (id: string) =>
     setNoGpsIds((prev) => {
       const next = new Set(prev)
@@ -97,12 +141,62 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
     [candidates]
   )
 
-  // Đủ 2 cột có GPS thì có hình và chiều dài đo được
-  const route = geometry && poles.length >= 2 ? geometry : null
+  // Lấy (lại) hình theo đường ngay trong form: bấm trên bản đồ nền
+  const roadPick = useSegmentRoadPick()
+  const newRoadLine = roadPick.line
+  const roadLine = newRoadLine ?? (initial.roadShape ? storedLine : null)
+
+  // Hình mới lấy: gửi hình đó và chiều dài đo trên nó. Hình thật đang lưu: gửi lại đúng hình và chiều dài đang lưu.
+  // Còn lại: đủ 2 cột có GPS thì có hình nháp nối cột và chiều dài đo được
+  const route = newRoadLine
+    ? { geomWkt: lineToWkt(newRoadLine), lengthM: calculateRouteLengthMeters(newRoadLine) }
+    : initial.roadShape && geomWkt
+      ? { geomWkt, lengthM: segment.length_m || calculateRouteLengthMeters(storedLine) }
+      : geometry && poles.length >= 2
+        ? geometry
+        : null
+  const shapeKind = roadLine ? 'road' : route ? 'draft' : 'none'
+  // Hình không chạy theo cột nên cột của tuyến phải nằm trong hành lang quanh hình.
+  // Hình mới lấy: mọi cột phải nằm trong (backend đo lại cả tuyến khi hình đổi).
+  // Hình đang lưu: cột chọn thêm phải nằm trong; cột đã thuộc tuyến từ trước mà nằm xa thì chỉ nhắc,
+  // để vẫn đổi được tên / cấp đường.
+  const { polesOffRoad, earlierPolesOffRoad } = useMemo(() => {
+    if (!roadLine) return { polesOffRoad: [], earlierPolesOffRoad: [] }
+    const far = (list: typeof poles) =>
+      polesOffRoadShape(
+        list.map((p) => ({ label: poleCodes[p.id] || p.id, coord: p.coord })),
+        roadLine
+      )
+    if (newRoadLine) return { polesOffRoad: far(poles), earlierPolesOffRoad: [] }
+    const earlierIds = new Set(initial.ordered.map((p) => p.id))
+    return {
+      polesOffRoad: far(poles.filter((p) => !earlierIds.has(p.id))),
+      earlierPolesOffRoad: far(poles.filter((p) => earlierIds.has(p.id))),
+    }
+  }, [initial, poles, poleCodes, roadLine, newRoadLine])
+  const suggestedIds = useMemo(() => {
+    if (!roadLine) return [] as string[]
+    const chosen = new Set(poles.map((p) => p.id))
+    return polesNearLine(
+      candidates.filter((c) => !chosen.has(c.id)),
+      roadLine
+    )
+  }, [roadLine, poles, candidates])
+  const suggestedSet = useMemo(() => new Set(suggestedIds), [suggestedIds])
+  // Có hình theo đường thì thứ tự cột do đường quyết, không kéo thả
+  const listRoute = useMemo(
+    () => (roadLine ? orderPolesAlongLine(poles, roadLine) : selected),
+    [roadLine, poles, selected]
+  )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitError(null)
+
+    if (polesOffRoad.length > 0) {
+      setSubmitError(offRoadShapeMessage(polesOffRoad))
+      return
+    }
 
     // Tuyến đã có hình không thể quay về chưa có hình; tuyến chưa có hình thì cho lưu tiếp
     if (!route && segment.has_geometry) {
@@ -110,7 +204,11 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
       return
     }
     // Chưa có hình thì không gửi geom_wkt và length_m: BE giữ tuyến chưa có hình, chưa có chiều dài
-    const { geom_wkt: _unused, length_m: _len, ...rest } = segment as SegmentListItem & { geom_wkt?: string }
+    const {
+      geom_wkt: _unused,
+      length_m: _len,
+      ...rest
+    } = segment as SegmentListItem & { geom_wkt?: string }
     void _unused
     void _len
     onSave(
@@ -144,7 +242,9 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
         <AssetModalError message={submitError} />
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden">
           {/* CỘT TRÁI */}
-          <div className={`${candidates.length === 0 ? 'md:col-span-12' : 'md:col-span-5'} p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800`}>
+          <div
+            className={`md:col-span-5 p-5 space-y-4 text-xs text-slate-800 dark:text-slate-200 overflow-y-auto border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800`}
+          >
             <div className="space-y-1">
               <label className="font-bold text-slate-700 dark:text-slate-300">
                 Tên tuyến đường:
@@ -192,7 +292,8 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                       className="w-full p-2.5 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-200 cursor-not-allowed select-none focus:outline-none"
                     />
                     <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Chưa đủ 2 cột có GPS nên tuyến chưa có hình và chưa đo được chiều dài. Hình và chiều dài có khi vẽ tuyến từ các cột có GPS.
+                      Chưa có hình nên chưa đo được chiều dài. Lấy hình theo đường trên bản đồ, hoặc
+                      chọn từ 2 cột có GPS để có hình nháp.
                     </p>
                   </>
                 )}
@@ -208,23 +309,74 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
               </span>
             </div>
 
+            <SegmentShapePanel
+              kind={shapeKind}
+              lengthM={route ? route.lengthM : null}
+              picking={roadPick.picking}
+              pointCount={roadPick.points.length}
+              error={roadPick.error}
+              onStart={roadPick.start}
+              freehand={roadPick.freehand}
+              onFreehandChange={roadPick.setFreehand}
+              onUndo={roadPick.undo}
+              onFinish={roadPick.finish}
+              onCancel={roadPick.cancel}
+              suggestedCount={suggestedIds.length}
+              onAddSuggested={() => addMany(suggestedIds)}
+              onEditDraft={() => route && roadPick.setLine(parseLineStringWkt(route.geomWkt))}
+            />
+
             {candidates.length > 0 && (
               <SegmentPoleOrderList
-                route={selected}
+                route={listRoute}
                 codes={poleCodes}
                 highlightId={link.highlightId}
                 revealId={link.revealId}
                 onHover={link.hoverFromList}
                 onFocus={link.focusPole}
-                onMove={move}
+                onMove={roadLine ? undefined : move}
                 onRemove={remove}
-                onAutoSort={autoSort}
+                onAutoSort={roadLine ? undefined : autoSort}
               />
             )}
 
             <SegmentNoGpsPolePicker poles={noGpsPoles} selected={noGpsIds} onToggle={toggleNoGps} />
 
-            {!initial.exact && (
+            {initial.roadShape && !newRoadLine && (
+              <div className="p-3 rounded-xl border border-sky-200 dark:border-sky-900/60 bg-sky-50 dark:bg-sky-950/30 text-sky-800 dark:text-sky-300 flex gap-2">
+                <Route className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  Tuyến đã có hình theo con đường (nét xanh trên bản đồ) nên lưu ở đây giữ nguyên
+                  hình, không nối lại theo cột. Cột chọn vào tuyến phải nằm trong 25 m quanh hình.
+                  Muốn đổi hình: kéo chấm trắng trên bản đồ để uốn, hoặc bấm "Lấy lại hình theo
+                  đường trên bản đồ" ở trên.
+                </span>
+              </div>
+            )}
+
+            {polesOffRoad.length > 0 && (
+              <div
+                role="alert"
+                className="p-3 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 flex gap-2"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{offRoadShapeMessage(polesOffRoad)}</span>
+              </div>
+            )}
+
+            {earlierPolesOffRoad.length > 0 && (
+              <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 flex gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  {earlierPolesOffRoad.length} cột của tuyến đang nằm cách hình tuyến quá 25 m (
+                  {earlierPolesOffRoad.slice(0, 5).join(', ')}
+                  {earlierPolesOffRoad.length > 5 ? '…' : ''}): khảo sát sẽ không thấy các cột này.
+                  Vẫn lưu được; nên dời cột về sát đường ở Bản đồ GIS.
+                </span>
+              </div>
+            )}
+
+            {!initial.exact && !roadLine && (
               <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 flex gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
@@ -236,15 +388,21 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
           </div>
 
           {/* CỘT PHẢI: BẢN ĐỒ */}
-          {candidates.length > 0 && (
           <div className="md:col-span-7 p-4 bg-slate-950 flex flex-col justify-between min-h-[480px] relative">
             <div className="min-h-[480px] h-[480px] rounded-2xl overflow-hidden border border-slate-700/80 shadow-inner relative">
               <SegmentPolePickerMap
                 poles={candidates}
                 selected={selected}
+                fixedLine={roadLine ?? undefined}
                 onTogglePole={toggle}
-                onAddBend={addBend}
                 onMoveBend={moveBend}
+                onInsertBend={roadLine ? undefined : addBend}
+                onRemoveBend={remove}
+                onEditLine={roadLine ? roadPick.setLine : undefined}
+                pickMode={roadPick.picking}
+                onPickRoadPoint={roadPick.pick}
+                pickedPoints={roadPick.points}
+                suggestedIds={suggestedSet}
                 highlightId={link.highlightId}
                 onHoverPole={link.hoverFromMap}
                 focusRequest={link.focusRequest}
@@ -253,12 +411,15 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
               />
             </div>
             <p className="text-[10px] text-slate-400 mt-2 italic text-center shrink-0">
-              💡 Mẹo: Chấm xanh là cột thuộc tuyến, chấm vàng là cột chưa thuộc tuyến nào. Click để
-              thêm hoặc bỏ cột; cột thêm mới tự chèn vào chỗ hợp lý, kéo thả trong danh sách bên
-              trái nếu cần đổi. Đường cong hoặc góc rẽ thì bấm "Thêm điểm uốn" trên bản đồ.
+              {roadPick.picking && roadPick.freehand
+                ? '💡 Vẽ tay: bấm từng điểm dọc con đường trên ảnh vệ tinh, không chọn cột. Bấm "Xong" khi tới điểm cuối.'
+                : roadPick.picking
+                  ? '💡 Đang lấy hình: bấm trên con đường, không chọn cột. Bấm "Xong" khi tới điểm cuối.'
+                  : roadLine
+                    ? '💡 Uốn hình: kéo chấm trắng; kéo chấm mờ giữa hai chấm trắng để thêm chỗ uốn; nhấp đúp chấm trắng để xoá. Chấm xanh là cột thuộc tuyến, viền cam là cột nằm sát đường.'
+                    : '💡 Mẹo: Chấm xanh là cột thuộc tuyến, chấm vàng là cột chưa thuộc tuyến nào. Click để thêm hoặc bỏ cột; máy tự xếp thứ tự và nối thành hình nháp. Kéo chấm mờ giữa hai cột để uốn hình.'}
             </p>
           </div>
-          )}
         </div>
 
         <AssetModalFooter

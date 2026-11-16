@@ -58,7 +58,7 @@ const NAV_ITEMS: AdminNavItem[] = [
   {
     to: '/admin/iot-bridge',
     label: 'IoT Bridge',
-    title: 'IoT Bridge — server, gateway & secret MQTT',
+    title: 'IoT Bridge',
     icon: RadioTower,
     isActive: (p) => p.startsWith('/admin/iot-bridge'),
   },

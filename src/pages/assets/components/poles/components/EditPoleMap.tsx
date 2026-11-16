@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react'
+import { CollapsibleMapLegend } from '../../../../../components/CollapsibleMapLegend'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers } from 'lucide-react'
@@ -502,11 +503,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Map overlay legend */}
-      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-md border border-blue-100 rounded-xl p-2.5 shadow-lg text-[11px] text-slate-800 space-y-1.5 pointer-events-none">
-        <div className="font-bold flex items-center gap-1.5 text-xs text-amber-700">
-          <Layers className="w-3.5 h-3.5" />
-          <span>Bản Đồ Ngữ Cảnh Tuyến</span>
-        </div>
+      <CollapsibleMapLegend title="Bản Đồ Ngữ Cảnh Tuyến" icon={<Layers className="w-3.5 h-3.5 text-amber-700" />}>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-orange-500 ring-2 ring-white"></span>
           <span>Cột đang sửa (kéo hoặc click để đặt vị trí)</span>
@@ -525,7 +522,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
             <span>Tủ điện: {currentCabinet.cabinet_name || currentCabinet.cabinet_id}</span>
           </div>
         )}
-      </div>
+      </CollapsibleMapLegend>
     </div>
   )
 }

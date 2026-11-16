@@ -4,10 +4,9 @@ import iotAPI from '../../../../feature/iot/iotAPI'
 import type { IotNodeStatus } from '../../../../types/iot/nodes'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { FeederListItem } from '../../../../types/assets/feeders'
-import type { PoleListItem } from '../../../../types/assets/poles'
 import { apiErrorMessage } from '../../../../utils/iot/apiError'
 import { IotNodeTable } from './components/IotNodeTable'
-import { NodeSourceModal } from './components/NodeSourceModal'
+import { IotNodeDetailModal } from './components/IotNodeDetailModal'
 import { TablePagination } from '../common/TablePagination'
 
 /** `page_size` tối đa của API. Số node IoT (một node / tủ) nhỏ, nên tải một lần rồi lọc, phân trang ở client. */
@@ -16,17 +15,18 @@ const FETCH_SIZE = 200
 export interface IotNodesTabProps {
   cabinets: CabinetListItem[]
   feeders: FeederListItem[]
-  /** Trụ để chọn trụ đại diện khi gán nguồn đo IoT bridge. */
-  poles?: PoleListItem[]
 }
 
-/** Tab Thiết bị IoT của Quản lý: danh sách lấy từ `GET /iot/nodes` (nhóm IotDiagnostics). */
-export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders, poles = [] }) => {
+/**
+ * Tab Thiết bị IoT của Quản lý: danh sách `GET /iot/nodes`, CHỈ XEM. Đăng ký và chỉnh node / server là việc của
+ * Quản trị hệ thống ở trang IoT Bridge; Quản lý chỉ xem chi tiết và điều khiển mạch trên bản đồ.
+ */
+export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders }) => {
   const [nodes, setNodes] = useState<IotNodeStatus[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [sourceNode, setSourceNode] = useState<IotNodeStatus | null>(null)
+  const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
 
@@ -108,7 +108,7 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders, pol
         cabinets={cabinets}
         feeders={feeders}
         isLoading={isLoading}
-        onSetSource={setSourceNode}
+        onShowDetail={(node) => node.node_id && setDetailNodeId(node.node_id)}
       />
 
       {filteredNodes.length > 0 && (
@@ -122,19 +122,7 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders, pol
         />
       )}
 
-      {sourceNode && (
-        <NodeSourceModal
-          key={sourceNode.node_id}
-          node={sourceNode}
-          feeders={feeders}
-          poles={poles}
-          onClose={() => setSourceNode(null)}
-          onSaved={() => {
-            setSourceNode(null)
-            load()
-          }}
-        />
-      )}
+      {detailNodeId && <IotNodeDetailModal key={detailNodeId} nodeId={detailNodeId} onClose={() => setDetailNodeId(null)} />}
     </div>
   )
 }

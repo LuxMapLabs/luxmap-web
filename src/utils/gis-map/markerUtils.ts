@@ -124,7 +124,8 @@ export function createPoleMarkerElement({
   const status = p.fixture_status || 'unknown'
   const isNearPoi = p.near_sensitive_poi === true
 
-  const baseSize = isSelected ? 24 : isManagedBySelectedCabinet ? 20 : isOtherCabinetSelected ? 15 : 17
+  // Cột đang chọn nổi hơn cột thường vừa đủ; phóng thêm bằng CSS `.is-selected`, nhỏ lại khi bản đồ thu nhỏ (`.gis-zoom-out`)
+  const baseSize = isSelected ? 20 : isManagedBySelectedCabinet ? 20 : isOtherCabinetSelected ? 15 : 17
   const size = baseSize
   const half = size / 2
   const poleId = p.pole_id || Math.random().toString(36).substring(2, 6)

@@ -36,3 +36,15 @@ export const primaryButtonClass =
   'px-4 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition cursor-pointer'
 export const secondaryButtonClass =
   'px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer'
+
+/** Ô nhập của form IoT Bridge dạng AssetModal (đăng ký server, đăng ký node). */
+export const inputClass =
+  'w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed'
+
+export const Field: React.FC<{ label: string; hint?: React.ReactNode; children: React.ReactNode }> = ({ label, hint, children }) => (
+  <label className="block space-y-1.5">
+    <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">{label}</span>
+    {children}
+    {hint && <span className="block text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{hint}</span>}
+  </label>
+)

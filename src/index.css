@@ -195,13 +195,36 @@ button:focus-visible {
 }
 
 .gis-marker-wrap.gis-marker-visible.is-selected {
-  transform: scale(1.35) !important;
+  transform: scale(1.2) !important;
   z-index: 60 !important;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
 }
 
 .gis-marker-wrap.gis-marker-visible.is-selected:hover {
-  transform: scale(1.45) !important;
+  transform: scale(1.3) !important;
+}
+
+/* Bản đồ thu nhỏ (dưới zoom 15, `useGisMarkers`): chấm có cỡ cố định theo pixel nên cột đang chọn không phóng thêm,
+   nếu không nó to lấn cả con đường */
+.gis-zoom-out .gis-marker-wrap.gis-marker-visible.is-selected,
+.gis-zoom-out .gis-marker-wrap.gis-marker-visible.is-selected:hover {
+  transform: scale(1) !important;
+}
+
+/* Đang bấm chọn điểm trên bản đồ (lấy hình tuyến): cú bấm xuyên qua chấm cột / tủ điện xuống bản đồ,
+   chấm mờ đi để thấy nét đang lấy nằm bên dưới; khung nổi khi rê chuột không che thanh lấy hình;
+   con trỏ giữ hình chữ thập (hàm rê chuột qua tuyến / tuyến điện tự đặt lại con trỏ) */
+.gis-map-picking .gis-marker-wrap.gis-marker-visible {
+  pointer-events: none !important;
+  opacity: 0.35 !important;
+}
+
+.gis-map-picking .maplibregl-popup {
+  display: none !important;
+}
+
+.gis-map-picking .maplibregl-canvas {
+  cursor: crosshair !important;
 }
 
 .gis-marker-wrap.gis-marker-hidden {

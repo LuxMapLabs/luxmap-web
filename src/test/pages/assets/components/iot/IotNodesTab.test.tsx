@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { IotNodesTab } from '../../../../../pages/assets/components/iot/IotNodesTab'
 import iotAPI from '../../../../../feature/iot/iotAPI'
 import assetReducer, {
@@ -15,7 +15,12 @@ import type { FeederListItem } from '../../../../../types/assets/feeders'
 vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
 
 vi.mock('../../../../../feature/iot/iotAPI', () => ({
-  default: { getNodes: vi.fn(), getServers: vi.fn() },
+  default: {
+    getNodes: vi.fn(),
+    getServers: vi.fn(),
+    getElectrical: vi.fn(),
+    getDiagnostics: vi.fn(),
+  },
 }))
 
 const api = vi.mocked(iotAPI)
@@ -55,6 +60,8 @@ describe('IotNodesTab (GET /iot/nodes)', () => {
     vi.clearAllMocks()
     api.getNodes.mockResolvedValue({ page: 1, page_size: 200, total: 2, items: nodes })
     api.getServers.mockResolvedValue([])
+    api.getElectrical.mockResolvedValue({ node_id: 'IOT-NODE-001', status: 'online' })
+    api.getDiagnostics.mockResolvedValue({ node_id: 'IOT-NODE-001', anomalies: [] })
   })
 
   it('lists the nodes from /iot/nodes with bridge status, server and the feeder on relay 1', async () => {
@@ -94,14 +101,18 @@ describe('IotNodesTab (GET /iot/nodes)', () => {
     expect(await screen.findByText('Bạn không có quyền.')).toBeInTheDocument()
   })
 
-  it('opens the bridge source dialog for the row, with the feeder on relay 1', async () => {
+  it('is view-only for the manager: each row offers only a read-only detail, no create / edit / delete', async () => {
     render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
     const row1 = (await screen.findByText('IOT-NODE-001')).closest('tr')!
 
-    fireEvent.click(within(row1).getByRole('button', { name: /Nguồn đo/ }))
+    expect(within(row1).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual(['Chi tiết'])
+    expect(screen.queryByRole('button', { name: /Nguồn đo|Thêm|Sửa|Xoá|Xóa|Đăng ký/ })).not.toBeInTheDocument()
 
-    expect(await screen.findByRole('dialog', { name: 'Nguồn đo IoT bridge' })).toBeInTheDocument()
-    expect(screen.getByDisplayValue('FDR-001')).toBeInTheDocument()
+    fireEvent.click(within(row1).getByRole('button', { name: /Chi tiết/ }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Chi tiết node IOT-NODE-001' })
+    await waitFor(() => expect(api.getElectrical).toHaveBeenCalledWith('IOT-NODE-001'))
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument()
   })
 })
 

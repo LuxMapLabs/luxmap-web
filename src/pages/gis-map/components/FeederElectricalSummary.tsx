@@ -1,0 +1,65 @@
+import React from 'react'
+import { LineChart as LineChartIcon, Radio } from 'lucide-react'
+import { Line, LineChart, ResponsiveContainer, YAxis } from 'recharts'
+import { useElectricalSeries } from '../../../hooks/iot/useElectricalSeries'
+import { formatMetric } from '../../../utils/iot/electricalSeries'
+
+/** Số mẫu gần nhất vẽ sparkline trong khung tủ. */
+export const SPARKLINE_SAMPLES = 30
+
+/**
+ * Một dòng trong mạch của khung tủ GIS: node IoT, số điện mới nhất (W / mA / V), sparkline công suất,
+ * và nút mở bảng giám sát. Mạch chưa gắn IoT thì chỉ báo vậy, không gọi API.
+ */
+export const FeederElectricalSummary: React.FC<{ nodeId: string | null; onOpenChart?: () => void }> = ({ nodeId, onOpenChart }) => {
+  const { points, latest, loading, error } = useElectricalSeries(nodeId, { initial: SPARKLINE_SAMPLES, maxPoints: SPARKLINE_SAMPLES })
+
+  if (!nodeId) {
+    return <p className="mt-1.5 text-[10.5px] text-slate-400 dark:text-slate-500 italic">Mạch chưa gắn IoT, không có số đo điện.</p>
+  }
+
+  return (
+    <div className="mt-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 flex items-center gap-2" data-testid="feeder-electrical-summary">
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+          <Radio className="w-3 h-3 text-indigo-500 shrink-0" />
+          <span className="font-mono truncate">{nodeId}</span>
+          {latest && <span className="shrink-0">· {new Date(latest.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>}
+        </div>
+        {error && !latest ? (
+          <p className="text-[10.5px] text-rose-600 dark:text-rose-300 truncate" title={error}>{error}</p>
+        ) : loading ? (
+          <p className="text-[10.5px] text-slate-400">Đang tải số đo…</p>
+        ) : latest ? (
+          <p className="text-[11px] font-mono text-slate-800 dark:text-slate-100">
+            <strong>{formatMetric(latest.power, 'power')}</strong>
+            <span className="text-slate-500 dark:text-slate-400"> · {formatMetric(latest.current, 'current')} · {formatMetric(latest.voltage, 'voltage')}</span>
+          </p>
+        ) : (
+          <p className="text-[10.5px] text-slate-400 italic">Chưa có mẫu điện.</p>
+        )}
+      </div>
+      {points.length > 1 && (
+        <div className="w-20 h-8 shrink-0" aria-hidden="true">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={points} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
+              <YAxis hide domain={['dataMin', 'dataMax']} />
+              <Line type="monotone" dataKey="power" stroke="#059669" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+      {onOpenChart && (
+        <button
+          type="button"
+          onClick={onOpenChart}
+          className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer"
+        >
+          <LineChartIcon className="w-3 h-3" /> Biểu đồ
+        </button>
+      )}
+    </div>
+  )
+}
+
+export default FeederElectricalSummary

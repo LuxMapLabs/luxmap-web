@@ -8,6 +8,7 @@ import type { SegmentListItem, CreateSegmentRequest } from '../types/assets/segm
 import type { CreateFixtureRequest } from '../types/assets/fixtures'
 import type { ManagedFixture } from '../hooks/assets/useAssetData'
 import { formatCommuneDisplayName } from '../utils/assets/communeUtils'
+import { findByIdOrRef } from '../utils/assets/findByIdOrRef'
 
 /**
  * Interface cho các trường thay đổi khi so khớp bản ghi
@@ -1089,12 +1090,8 @@ function validateRow(
       null
 
     if (data.feeder_external_ref && currentFeederId !== effectiveNewFeederId) {
-      const oldFeeder = feeders.find(
-        (f) => f.feeder_id === currentFeederId || f.external_ref === currentFeederId
-      )
-      const oldCab = cabinets.find(
-        (c) => c.cabinet_id === existingPole.cabinet_id || c.external_ref === existingPole.cabinet_id
-      )
+      const oldFeeder = findByIdOrRef(feeders, (f) => f.feeder_id, currentFeederId)
+      const oldCab = findByIdOrRef(cabinets, (c) => c.cabinet_id, existingPole.cabinet_id)
       const oldLabel =
         oldFeeder?.feeder_name ||
         (oldCab

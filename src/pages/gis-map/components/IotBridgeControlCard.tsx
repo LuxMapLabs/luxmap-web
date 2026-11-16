@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Power, PowerOff, Sun, Clock, Loader2, Radio } from 'lucide-react'
+import { Activity, Power, PowerOff, Sun, Clock, Loader2, Radio } from 'lucide-react'
 import type { RootState } from '../../../redux/store'
 import iotAPI from '../../../feature/iot/iotAPI'
 import type { IotPoleControl } from '../../../types/iot/poles'
-import type { IotCommandStatus } from '../../../types/iot/nodes'
+import type { IotCommandStatus, IotElectricalResult } from '../../../types/iot/nodes'
 import { isManager } from '../../../utils/roleUtils'
 import {
   commandBody,
@@ -15,6 +15,7 @@ import {
   type IotCommandProgress,
 } from '../../../utils/iot/iotCommand'
 import { apiErrorMessage } from '../../../utils/iot/apiError'
+import { formatMetric } from '../../../utils/iot/electricalSeries'
 
 const POLL_MS = 3_000
 
@@ -32,7 +33,11 @@ const PROGRESS_TEXT: Record<IotCommandProgress, { text: string; className: strin
  * Nút chỉ dành cho Quản lý (`ControlLighting`) và chỉ khi backend báo `can_control_feeder` qua kênh `iot_bridge`.
  * Lệnh tác động lên CẢ mạch, không riêng trụ đang chọn.
  */
-export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) => {
+export const IotBridgeControlCard: React.FC<{
+  poleId: string
+  /** Mở bảng giám sát điện dưới bản đồ ở mạch của trụ (số đo thuộc mạch, không thuộc trụ). */
+  onOpenElectricalMonitor?: (feederId: string, nodeId?: string | null) => void
+}> = ({ poleId, onOpenElectricalMonitor }) => {
   const role = useSelector((state: RootState) => state.auth.user?.role)
   const [control, setControl] = useState<IotPoleControl | null>(null)
   const [current, setCurrent] = useState<IotCommandStatus | null>(null)
@@ -43,6 +48,7 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [dayStart, setDayStart] = useState('')
   const [nightStart, setNightStart] = useState('')
+  const [electrical, setElectrical] = useState<IotElectricalResult | null>(null)
 
   const nodeId = control?.node_id || null
   const viaBridge = Boolean(control?.can_control_feeder && control.control_channel === 'iot_bridge')
@@ -64,6 +70,7 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
     setTracked(null)
     setError(null)
     setScheduleOpen(false)
+    setElectrical(null)
     iotAPI
       .getPoleControl(poleId)
       .then((result) => !cancelled && setControl(result))
@@ -76,6 +83,19 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
   useEffect(() => {
     if (nodeId && viaBridge) refreshCommand(nodeId)
   }, [nodeId, viaBridge, refreshCommand])
+
+  // Tóm tắt số đo mới nhất của mạch: đọc một lần; theo dõi liên tục ở bảng giám sát điện.
+  useEffect(() => {
+    if (!nodeId) return
+    let cancelled = false
+    iotAPI
+      .getElectrical(nodeId)
+      .then((result) => !cancelled && setElectrical(result))
+      .catch(() => !cancelled && setElectrical(null))
+    return () => {
+      cancelled = true
+    }
+  }, [nodeId])
 
   const progress = tracked ? commandProgress(tracked, current, now) : null
 
@@ -159,10 +179,10 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
             <>
               <div className="flex gap-1.5">
                 <button type="button" disabled={sending} onClick={() => send('on')} className={buttonClass('on')}>
-                  <Power className="w-3.5 h-3.5" /> Bật mạch
+                  <Power className="w-3.5 h-3.5" /> Bật mạch {control.feeder_id}
                 </button>
                 <button type="button" disabled={sending} onClick={() => send('off')} className={buttonClass('off')}>
-                  <PowerOff className="w-3.5 h-3.5" /> Tắt mạch
+                  <PowerOff className="w-3.5 h-3.5" /> Tắt mạch {control.feeder_id}
                 </button>
                 <button type="button" disabled={sending} onClick={() => send('auto')} className={buttonClass('auto')}>
                   <Sun className="w-3.5 h-3.5" /> AUTO
@@ -225,6 +245,24 @@ export const IotBridgeControlCard: React.FC<{ poleId: string }> = ({ poleId }) =
           <p className="text-[10px] text-slate-400 dark:text-slate-500">Lệnh tác động lên cả mạch {feederLabel}, không riêng trụ này.</p>
         </>
       )}
+
+      {/* Tóm tắt điện của mạch: chỉ đọc, mọi vai trò xem bản đồ đều mở được bảng giám sát. */}
+      <button
+        type="button"
+        onClick={() => control.feeder_id && onOpenElectricalMonitor?.(control.feeder_id, control.node_id)}
+        disabled={!onOpenElectricalMonitor || !control.feeder_id}
+        title="Mở biểu đồ điện của mạch"
+        className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800 cursor-pointer disabled:cursor-default"
+      >
+        <Activity className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+        <span className="font-semibold">Mạch {feederLabel}</span>
+        <span className="font-mono text-slate-500 dark:text-slate-400 truncate">
+          {electrical?.measurement
+            ? `· ${formatMetric(electrical.measurement.power_mw ?? null, 'power')} · ${formatMetric(electrical.measurement.current_ma ?? null, 'current')}`
+            : '· chưa có số đo'}
+        </span>
+        {onOpenElectricalMonitor && <span className="ml-auto shrink-0 text-indigo-700 dark:text-indigo-300 font-bold">Biểu đồ</span>}
+      </button>
     </div>
   )
 }

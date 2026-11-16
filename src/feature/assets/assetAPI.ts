@@ -24,10 +24,13 @@ import type {
   PoleListItemPagedResult,
   CreatePoleRequest,
   UpdatePoleRequest,
+  SetPoleLocationRequest,
+  PoleLocationResponse,
 } from '../../types/assets/poles'
 import type {
   CreateFixtureRequest,
   RetireFixtureRequest,
+  UpdateFixtureRequest,
 } from '../../types/assets/fixtures'
 import type {
   IotNodeItemPagedResult,
@@ -151,6 +154,18 @@ export const assetAPI = {
   },
 
   /**
+   * Dời cột tới vị trí mới (chỉ vị trí; backend đo hành lang tuyến của cột và ghi audit)
+   * PUT /api/v1/assets/poles/{poleId}/location
+   */
+  setPoleLocation: async (poleId: string, data: SetPoleLocationRequest): Promise<PoleLocationResponse> => {
+    const response = await apiClient.put<PoleLocationResponse>(
+      `/assets/poles/${encodeURIComponent(poleId)}/location`,
+      data
+    )
+    return response.data
+  },
+
+  /**
    * Xóa Cột điện
    * DELETE /api/v1/assets/poles/{poleId}
    */
@@ -224,6 +239,11 @@ export const assetAPI = {
    * Tháo gỡ bóng đèn (Retire fixture)
    * PUT /api/v1/assets/fixtures/{fixtureId}/removal
    */
+  updateFixture: async (fixtureId: string, data: UpdateFixtureRequest): Promise<void> => {
+    // PUT /api/v1/assets/fixtures/{fixtureId} — thay toàn bộ thông số, 204
+    await apiClient.put(`/assets/fixtures/${encodeURIComponent(fixtureId)}`, data)
+  },
+
   retireFixture: async (fixtureId: string, data: RetireFixtureRequest): Promise<void> => {
     await apiClient.put(`/assets/fixtures/${encodeURIComponent(fixtureId)}/removal`, data)
   },

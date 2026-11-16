@@ -9,8 +9,12 @@ import {
   MAP_MAX_ZOOM,
   toLngLatBounds,
   getCommuneBboxInfo,
+  toBboxPolygonGeoJSON,
 } from '../utils/gis-map/mapUtils'
 import { isBend, polesOf, type OrderedPole } from '../utils/gis-map/segmentPoleOrder'
+import { MIN_ROAD_ZOOM } from '../utils/gis-map/segmentReshape'
+import { edgeMidpoints, insertVertex, moveVertex, removeVertex } from '../utils/gis-map/lineEdit'
+import { hideRoadHint, queryBaseMapRoadLines, showRoadHint } from '../hooks/gis-map/useSegmentReshapeMode'
 
 export interface PickablePole extends OrderedPole {
   code?: string
@@ -21,6 +25,8 @@ interface SegmentPolePickerMapProps {
   poles: PickablePole[]
   /** Các cột đã chọn (xen điểm uốn nếu có), đã sắp theo thứ tự dọc tuyến. */
   selected: OrderedPole[]
+  /** Hình thật của tuyến (theo con đường): có thì vẽ đường này thay cho đường nối các cột đã chọn. */
+  fixedLine?: [number, number][]
   onTogglePole: (poleId: string) => void
   /** Có truyền thì hiện nút "Thêm điểm uốn": bật lên rồi click chỗ trống trên bản đồ để đặt điểm uốn. */
   onAddBend?: (coord: [number, number]) => void
@@ -34,10 +40,33 @@ interface SegmentPolePickerMapProps {
   focusRequest?: { id: string; tick: number } | null
   communeId?: string | null
   height?: string
+  /**
+   * Đang lấy hình theo đường: cú bấm trên bản đồ thành một điểm (`onPickRoadPoint`, kèm nét đường của bản đồ nền
+   * và mức phóng), không chọn / bỏ cột (cột nằm ngay trên đường).
+   */
+  pickMode?: boolean
+  onPickRoadPoint?: (click: [number, number], roadLines: [number, number][][], zoom: number) => void
+  /** Các điểm đã bấm khi lấy hình (điểm đầu xanh lá). */
+  pickedPoints?: [number, number][]
+  /** Cột gợi ý (nằm sát hình tuyến, chưa chọn): viền cam. */
+  suggestedIds?: ReadonlySet<string>
+  /**
+   * Có truyền thì `fixedLine` uốn được bằng kéo thả: kéo chấm trắng (đỉnh) để uốn, kéo chấm mờ giữa hai đỉnh để thêm
+   * chỗ uốn, nhấp đúp chấm trắng để xoá. Trả về cả hình mới.
+   */
+  onEditLine?: (line: [number, number][]) => void
+  /** Hình nháp nối cột: kéo chấm mờ giữa hai cột để thêm điểm uốn tại chỗ thả. */
+  onInsertBend?: (coord: [number, number]) => void
+  /** Nhấp đúp tay nắm điểm uốn để xoá. */
+  onRemoveBend?: (bendId: string) => void
 }
 
 const POLES_SRC = 'pick-poles'
 const LINE_SRC = 'pick-line'
+const PICKED_SRC = 'pick-road-points'
+const COMMUNE_SRC = 'pick-commune-outline'
+/** Viền khung xã (web chỉ có bbox của xã, chưa có ranh giới thật); không có khung thì không vẽ gì. */
+const communeOutline = (bbox: unknown) => toBboxPolygonGeoJSON(bbox) ?? emptyFc
 const emptyFc = { type: 'FeatureCollection' as const, features: [] }
 
 // Nhãn nhỏ ĐẦU / CUỐI trên cột đầu và cột cuối của tuyến
@@ -72,6 +101,31 @@ const createBendHandle = () => {
   return el
 }
 
+// Tay nắm đỉnh của hình tuyến (uốn được): chấm trắng viền xanh
+const createVertexHandle = () => {
+  const el = createBendHandle()
+  el.title = 'Kéo để uốn · nhấp đúp để xoá chỗ uốn này'
+  el.style.width = '12px'
+  el.style.height = '12px'
+  el.dataset.handle = 'vertex'
+  return el
+}
+
+// Chấm mờ giữa hai đỉnh: kéo ra để thêm chỗ uốn
+const createMidHandle = () => {
+  const el = document.createElement('div')
+  el.title = 'Kéo để thêm chỗ uốn'
+  el.style.width = '10px'
+  el.style.height = '10px'
+  el.style.borderRadius = '50%'
+  el.style.background = 'rgba(255,255,255,0.55)'
+  el.style.border = '2px solid #0284c7'
+  el.style.opacity = '0.75'
+  el.style.cursor = 'grab'
+  el.dataset.handle = 'mid'
+  return el
+}
+
 const createEndBadge = (isStart: boolean) => {
   const el = document.createElement('div')
   el.style.pointerEvents = 'none'
@@ -90,6 +144,7 @@ const createEndBadge = (isStart: boolean) => {
 export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
   poles,
   selected,
+  fixedLine,
   onTogglePole,
   onAddBend,
   onMoveBend,
@@ -98,6 +153,13 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
   focusRequest = null,
   communeId,
   height = '480px',
+  pickMode = false,
+  onPickRoadPoint,
+  pickedPoints,
+  suggestedIds,
+  onEditLine,
+  onInsertBend,
+  onRemoveBend,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -117,6 +179,17 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
   onMoveBendRef.current = onMoveBend
   const onHoverRef = useRef(onHoverPole)
   onHoverRef.current = onHoverPole
+  const pickModeRef = useRef(pickMode)
+  pickModeRef.current = pickMode
+  const onEditLineRef = useRef(onEditLine)
+  onEditLineRef.current = onEditLine
+  const onInsertBendRef = useRef(onInsertBend)
+  onInsertBendRef.current = onInsertBend
+  const onRemoveBendRef = useRef(onRemoveBend)
+  onRemoveBendRef.current = onRemoveBend
+  const lineHandlesRef = useRef<maplibregl.Marker[]>([])
+  const onPickRoadPointRef = useRef(onPickRoadPoint)
+  onPickRoadPointRef.current = onPickRoadPoint
 
   const currentUser = useSelector((state: RootState) => state?.auth?.user)
   const adminCommunes = useSelector((state: RootState) => state?.adminCommunes?.communes)
@@ -126,29 +199,49 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
     [communeId, currentUser?.communes, adminCommunes, mapBounds]
   )
 
+  // Khung xã (bbox của xã, hoặc khung bản đồ của tài khoản khi không biết xã) để vẽ viền
+  const communeBbox = communeInfo.bbox ?? mapBounds?.bbox ?? null
+  const communeBboxRef = useRef(communeBbox)
+  communeBboxRef.current = communeBbox
+
   // Dữ liệu mới nhất, để lần vẽ đầu (sau sự kiện 'load') và các lần cập nhật dùng chung
-  const dataRef = useRef({ poles, selected, highlightId })
-  dataRef.current = { poles, selected, highlightId }
+  const dataRef = useRef({ poles, selected, highlightId, fixedLine, pickedPoints, suggestedIds })
+  dataRef.current = { poles, selected, highlightId, fixedLine, pickedPoints, suggestedIds }
 
   const pushData = () => {
     const map = mapRef.current
     if (!map || !loadedRef.current) return
-    const { poles: allPoles, selected: chosen } = dataRef.current
+    const { poles: allPoles, selected: chosen, fixedLine: fixed, pickedPoints: picked, suggestedIds: suggested } =
+      dataRef.current
     const chosenIds = new Set(chosen.map((p) => p.id))
+    const lineCoords = fixed ?? chosen.map((p) => p.coord)
 
     ;(map.getSource(POLES_SRC) as maplibregl.GeoJSONSource | undefined)?.setData({
       type: 'FeatureCollection',
       features: allPoles.map((p) => ({
         type: 'Feature' as const,
         geometry: { type: 'Point' as const, coordinates: p.coord },
-        properties: { id: p.id, code: p.code || p.id, selected: chosenIds.has(p.id) },
+        properties: {
+          id: p.id,
+          code: p.code || p.id,
+          selected: chosenIds.has(p.id),
+          suggested: !chosenIds.has(p.id) && !!suggested?.has(p.id),
+        },
+      })),
+    })
+    ;(map.getSource(PICKED_SRC) as maplibregl.GeoJSONSource | undefined)?.setData({
+      type: 'FeatureCollection',
+      features: (picked ?? []).map((coord, i) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: coord },
+        properties: { first: i === 0 },
       })),
     })
     ;(map.getSource(LINE_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(
-      chosen.length >= 2
+      lineCoords.length >= 2
         ? {
             type: 'Feature',
-            geometry: { type: 'LineString', coordinates: chosen.map((p) => p.coord) },
+            geometry: { type: 'LineString', coordinates: lineCoords },
             properties: {},
           }
         : emptyFc
@@ -187,8 +280,14 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
         return
       }
       const el = createBendHandle()
+      el.title = 'Điểm uốn: kéo để chỉnh đường · nhấp đúp để xoá'
       // Click vào tay nắm không được tính là click bản đồ (tránh đặt thêm điểm uốn)
       el.addEventListener('click', (ev) => ev.stopPropagation())
+      el.addEventListener('dblclick', (ev) => {
+        ev.stopPropagation()
+        ev.preventDefault()
+        onRemoveBendRef.current?.(bend.id)
+      })
       const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(bend.coord).addTo(map)
       // Đang kéo: vẽ đường xanh ngay theo con trỏ (không đợi state), thả ra mới cập nhật state
       marker.on('drag', () => {
@@ -205,6 +304,70 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
         onMoveBendRef.current?.(bend.id, [at.lng, at.lat])
       })
       bendMarkersRef.current.set(bend.id, marker)
+    })
+  }
+
+  /**
+   * Tay nắm để uốn hình bằng kéo thả. Hình uốn được (`onEditLine`): chấm trắng ở mỗi đỉnh + chấm mờ giữa hai đỉnh.
+   * Hình nháp nối cột (`onInsertBend`): chỉ chấm mờ giữa hai điểm liền nhau (đỉnh là cột, chọn / bỏ bằng click).
+   * Dựng lại toàn bộ mỗi lần dữ liệu đổi; đang kéo thì chỉ vẽ lại đường, thả ra mới báo lên.
+   */
+  const syncLineHandles = () => {
+    const map = mapRef.current
+    lineHandlesRef.current.forEach((m) => m.remove())
+    lineHandlesRef.current = []
+    if (!map || !loadedRef.current || pickModeRef.current) return
+    const { fixedLine: fixed, selected: chosen } = dataRef.current
+    const editable = !!fixed && fixed.length >= 2 && !!onEditLineRef.current
+    const draft = !fixed && !!onInsertBendRef.current && polesOf(chosen).length >= 2
+    if (!editable && !draft) return
+    const line = editable ? (fixed as [number, number][]) : chosen.map((p) => p.coord)
+
+    const drawLine = (coords: [number, number][]) =>
+      (map.getSource(LINE_SRC) as maplibregl.GeoJSONSource | undefined)?.setData({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: coords },
+        properties: {},
+      })
+    const stop = (el: HTMLElement) => el.addEventListener('click', (ev) => ev.stopPropagation())
+
+    if (editable) {
+      line.forEach((coord, index) => {
+        const el = createVertexHandle()
+        stop(el)
+        el.addEventListener('dblclick', (ev) => {
+          ev.stopPropagation()
+          ev.preventDefault()
+          if (line.length > 2) onEditLineRef.current?.(removeVertex(line, index))
+        })
+        const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(coord).addTo(map)
+        marker.on('drag', () => {
+          const at = marker.getLngLat()
+          drawLine(moveVertex(line, index, [at.lng, at.lat]))
+        })
+        marker.on('dragend', () => {
+          const at = marker.getLngLat()
+          onEditLineRef.current?.(moveVertex(line, index, [at.lng, at.lat]))
+        })
+        lineHandlesRef.current.push(marker)
+      })
+    }
+
+    edgeMidpoints(line).forEach((mid, i) => {
+      const el = createMidHandle()
+      stop(el)
+      const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(mid).addTo(map)
+      marker.on('drag', () => {
+        const at = marker.getLngLat()
+        drawLine(insertVertex(line, i + 1, [at.lng, at.lat]))
+      })
+      marker.on('dragend', () => {
+        const at = marker.getLngLat()
+        const to: [number, number] = [at.lng, at.lat]
+        if (editable) onEditLineRef.current?.(insertVertex(line, i + 1, to))
+        else onInsertBendRef.current?.(to)
+      })
+      lineHandlesRef.current.push(marker)
     })
   }
 
@@ -251,6 +414,18 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
     map.on('load', () => {
+      // Viền khung xã của tuyến: nằm dưới mọi lớp khác, để biết đâu là địa bàn mình
+      map.addSource(COMMUNE_SRC, {
+        type: 'geojson',
+        data: communeOutline(communeBboxRef.current),
+      })
+      map.addLayer({
+        id: 'pick-commune-outline',
+        type: 'line',
+        source: COMMUNE_SRC,
+        paint: { 'line-color': '#facc15', 'line-width': 2.5, 'line-dasharray': [3, 2], 'line-opacity': 0.9 },
+      })
+
       map.addSource(LINE_SRC, { type: 'geojson', data: emptyFc })
       map.addLayer({
         id: 'pick-line-glow',
@@ -279,6 +454,19 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
           'circle-stroke-color': ['case', ['get', 'selected'], '#ffffff', '#0f172a'],
         },
       })
+      // Viền cam quanh cột gợi ý (sát hình tuyến, chưa chọn)
+      map.addLayer({
+        id: 'pick-suggested',
+        type: 'circle',
+        source: POLES_SRC,
+        filter: ['==', ['get', 'suggested'], true],
+        paint: {
+          'circle-radius': 9,
+          'circle-opacity': 0,
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#f97316',
+        },
+      })
       // Vòng sáng quanh cột đang được làm nổi (lọc theo id, rỗng thì không vẽ gì)
       map.addLayer({
         id: 'pick-highlight',
@@ -293,32 +481,58 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
         },
       })
 
+      // Điểm đã bấm khi lấy hình theo đường
+      map.addSource(PICKED_SRC, { type: 'geojson', data: emptyFc })
+      map.addLayer({
+        id: 'pick-road-points',
+        type: 'circle',
+        source: PICKED_SRC,
+        paint: {
+          'circle-radius': 6,
+          'circle-color': ['case', ['get', 'first'], '#16a34a', '#f97316'],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2,
+        },
+      })
+
       map.on('click', 'pick-poles-circle', (e) => {
+        // Đang lấy hình: cú bấm là một điểm trên đường, không chọn cột
+        if (pickModeRef.current) return
         const id = e.features?.[0]?.properties?.id
         if (typeof id === 'string') onToggleRef.current(id)
       })
       map.on('mousemove', 'pick-poles-circle', (e) => {
-        map.getCanvas().style.cursor = 'pointer'
+        map.getCanvas().style.cursor = pickModeRef.current ? 'crosshair' : 'pointer'
         const id = e.features?.[0]?.properties?.id
         if (typeof id === 'string') onHoverRef.current?.(id)
       })
       map.on('mouseleave', 'pick-poles-circle', () => {
-        map.getCanvas().style.cursor = bendModeRef.current ? 'crosshair' : ''
+        map.getCanvas().style.cursor = bendModeRef.current || pickModeRef.current ? 'crosshair' : ''
         onHoverRef.current?.(null)
       })
       // Chế độ điểm uốn: click chỗ trống (không trúng cột) để đặt điểm uốn
       map.on('click', (e) => {
+        if (pickModeRef.current) {
+          onPickRoadPointRef.current?.([e.lngLat.lng, e.lngLat.lat], queryBaseMapRoadLines(map), map.getZoom())
+          return
+        }
         if (!bendModeRef.current || !onAddBendRef.current) return
         if (map.queryRenderedFeatures(e.point, { layers: ['pick-poles-circle'] }).length > 0) return
         onAddBendRef.current([e.lngLat.lng, e.lngLat.lat])
       })
 
       loadedRef.current = true
+      if (pickModeRef.current) showRoadHint(map)
       pushData()
       pushHighlight()
       syncBends()
+      syncLineHandles()
 
-      const pts = [...dataRef.current.poles.map((p) => p.coord), ...dataRef.current.selected.map((p) => p.coord)]
+      const pts = [
+        ...dataRef.current.poles.map((p) => p.coord),
+        ...dataRef.current.selected.map((p) => p.coord),
+        ...(dataRef.current.fixedLine ?? []),
+      ]
       if (pts.length > 0) {
         const lngs = pts.map((p) => p[0])
         const lats = pts.map((p) => p[1])
@@ -352,6 +566,8 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
       endBadgesRef.current = []
       bendMarkersRef.current.forEach((m) => m.remove())
       bendMarkersRef.current.clear()
+      lineHandlesRef.current.forEach((m) => m.remove())
+      lineHandlesRef.current = []
       map.remove()
       mapRef.current = null
     }
@@ -362,12 +578,47 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
   useEffect(() => {
     pushData()
     syncBends()
-  }, [poles, selected])
+    syncLineHandles()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poles, selected, fixedLine, pickedPoints, suggestedIds, pickMode, !!onEditLine, !!onInsertBend])
+
+  // Đổi xã (dữ liệu xã tải xong sau khi mở form): vẽ lại viền
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loadedRef.current) return
+    ;(map.getSource(COMMUNE_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeOutline(communeBbox))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(communeBbox)])
 
   useEffect(() => {
     const canvas = mapRef.current?.getCanvas()
-    if (canvas) canvas.style.cursor = bendMode ? 'crosshair' : ''
-  }, [bendMode])
+    if (canvas) canvas.style.cursor = bendMode || pickMode ? 'crosshair' : ''
+  }, [bendMode, pickMode])
+
+  // Bắt đầu lấy hình: phóng tới mức có đủ đường nhỏ; chấm cột mờ đi để thấy đường bên dưới
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loadedRef.current) return
+    if (map.getLayer?.('pick-poles-circle')) {
+      map.setPaintProperty('pick-poles-circle', 'circle-opacity', pickMode ? 0.2 : 1)
+      map.setPaintProperty('pick-poles-circle', 'circle-stroke-opacity', pickMode ? 0.2 : 1)
+    }
+    // Nét đang lấy: màu cam như các điểm đã bấm, nằm TRÊN lớp cột. Tuyến nhiều cột thì chấm cột dày đặc trên đường,
+    // nằm dưới là không thấy nét lấy được đi đâu (vòng vào hẻm, sai nhánh)
+    if (map.getLayer?.('pick-line-core') && map.getLayer?.('pick-line-glow')) {
+      map.setPaintProperty('pick-line-core', 'line-color', pickMode ? '#f97316' : '#38bdf8')
+      map.setPaintProperty('pick-line-glow', 'line-color', pickMode ? '#c2410c' : '#0284c7')
+      const above = pickMode ? 'pick-road-points' : 'pick-poles-circle'
+      map.moveLayer('pick-line-glow', above)
+      map.moveLayer('pick-line-core', above)
+    }
+    if (pickMode && (map.getZoom?.() ?? MIN_ROAD_ZOOM) < MIN_ROAD_ZOOM) {
+      map.easeTo({ zoom: MIN_ROAD_ZOOM, duration: 400 })
+    }
+    // Tô vàng các đường có trên bản đồ nền: đường không có nét vàng thì phải vẽ tay
+    if (pickMode) showRoadHint(map)
+    else hideRoadHint(map)
+  }, [pickMode])
 
   useEffect(() => {
     pushHighlight()

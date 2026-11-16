@@ -24,6 +24,10 @@ interface UseGisMarkersProps {
   onSelectCabinet: (cabinetData: any, coords: [number, number]) => void
 }
 
+/** Gắn lên khung bản đồ khi thu nhỏ dưới `SELECTED_FULL_SIZE_ZOOM`: cột đang chọn thôi phóng to (index.css). */
+export const ZOOM_OUT_CLASS = 'gis-zoom-out'
+export const SELECTED_FULL_SIZE_ZOOM = 15
+
 export function useGisMarkers({
   map,
   isMapLoaded,
@@ -47,6 +51,7 @@ export function useGisMarkers({
     const zoom = map.getZoom()
     const showPolesAndLines = zoom >= 13.0
     const showCabinets = zoom >= 9.5
+    map.getContainer().classList.toggle(ZOOM_OUT_CLASS, zoom < SELECTED_FULL_SIZE_ZOOM)
 
     // 1. Pole Markers
     poleMarkersRef.current.forEach((m) => {

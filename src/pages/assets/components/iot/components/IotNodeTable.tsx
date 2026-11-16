@@ -1,6 +1,6 @@
 import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
-import { Cpu, Zap, Clock, Cable, RadioTower } from 'lucide-react'
+import { Cpu, Zap, Clock, Cable, Eye } from 'lucide-react'
 import type { IotNodeStatus } from '../../../../../types/iot/nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
@@ -15,7 +15,8 @@ export interface IotNodeTableProps {
   cabinets: CabinetListItem[]
   feeders: FeederListItem[]
   isLoading?: boolean
-  onSetSource: (node: IotNodeStatus) => void
+  /** Mở chi tiết chỉ đọc (mẫu điện, chẩn đoán, lịch sử). */
+  onShowDetail: (node: IotNodeStatus) => void
 }
 
 const formatDateTime = (dateStr?: string | null) => {
@@ -25,7 +26,7 @@ const formatDateTime = (dateStr?: string | null) => {
   return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export const IotNodeTable: React.FC<IotNodeTableProps> = ({ iotNodes, cabinets, feeders, isLoading = false, onSetSource }) => {
+export const IotNodeTable: React.FC<IotNodeTableProps> = ({ iotNodes, cabinets, feeders, isLoading = false, onShowDetail }) => {
   const showCommune = useShowCommune()
   const cabinetOf = (cabinetId?: string | null) => cabinets.find((c) => c.cabinet_id === cabinetId)
 
@@ -142,10 +143,10 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({ iotNodes, cabinets, 
                     <td className="py-3.5 px-4 text-right">
                       <button
                         type="button"
-                        onClick={() => onSetSource(node)}
+                        onClick={() => onShowDetail(node)}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer whitespace-nowrap"
                       >
-                        <RadioTower className="w-3.5 h-3.5" /> Nguồn đo
+                        <Eye className="w-3.5 h-3.5" /> Chi tiết
                       </button>
                     </td>
                   </tr>

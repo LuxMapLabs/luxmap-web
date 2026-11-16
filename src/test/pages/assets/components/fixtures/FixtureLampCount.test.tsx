@@ -1,20 +1,28 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import { configureStore } from '@reduxjs/toolkit'
+import rootReducer from '../../../../../redux/rootReducer'
+import { updateFixtureRequest, mutationSuccess } from '../../../../../feature/assets/assetSlice'
 import { FixtureTable } from '../../../../../pages/assets/components/fixtures/components/FixtureTable'
 import { PoleDetailModal } from '../../../../../pages/assets/components/poles/components/PoleDetailModal'
 import { PoleTable } from '../../../../../pages/assets/components/poles/components/PoleTable'
 import { AddFixtureModal } from '../../../../../pages/assets/components/fixtures/components/AddFixtureModal'
-import { EditFixtureModal } from '../../../../../pages/assets/components/fixtures/components/EditFixtureModal'
 import { RetireFixtureModal } from '../../../../../pages/assets/components/fixtures/components/RetireFixtureModal'
 import { FixtureDetailModal } from '../../../../../pages/assets/components/fixtures/components/FixtureDetailModal'
 import { validateImportRow } from '../../../../../validations/assetImport.schema'
 import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
-import type { CreateFixtureRequest } from '../../../../../types/assets/fixtures'
+import type { ActiveFixture, CreateFixtureRequest } from '../../../../../types/assets/fixtures'
 
 
 vi.mock('../../../../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
+
+// Form bộ đèn đọc trạng thái lưu từ store để chờ lưu xong mới đóng
+const makeStore = () => configureStore({ reducer: rootReducer })
+const renderWithStore = (ui: React.ReactElement, store = makeStore()) =>
+  render(<Provider store={store}>{ui}</Provider>)
 
 describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Tests', () => {
   const mockPoles: PoleListItem[] = [
@@ -219,7 +227,7 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
   })
 
   it('6. AddFixtureModal chỉ hiển thị cột chưa lắp đặt (loại bỏ cột đã có active_fixture)', () => {
-    render(
+    renderWithStore(
       <AddFixtureModal
         isOpen={true}
         onClose={vi.fn()}
@@ -248,7 +256,7 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
       active_fixture: undefined,
     }))
     const onAddFixtures = vi.fn()
-    render(
+    renderWithStore(
       <AddFixtureModal
         isOpen={true}
         onClose={vi.fn()}
@@ -269,50 +277,86 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
     expect(requests.every((r) => r.lamp_count === 2)).toBe(true)
   })
 
-  it('7. EditFixtureModal có dropdown Tuyến đường, mặc định tuyến hiện tại và hiển thị cột [Đang lắp] cùng cột [Chưa lắp]', () => {
-    render(
-      <EditFixtureModal
-        isOpen={true}
-        onClose={vi.fn()}
-        fixture={mockFixtures[0]}
-        poles={mockPoles}
-        segments={mockSegments}
-        onUpdateFixture={vi.fn()}
-      />
+  const EDIT_TARGET = {
+    fixture: {
+      ...(mockFixtures[0] as ActiveFixture),
+      fixture_id: 'FIX-0001',
+      lamp_watt: 60,
+      lamp_count: 2,
+      install_date: '2023-01-15',
+      warranty_expiry: '2025-01-15',
+    },
+    poleLabel: 'POLE-0001',
+  }
+
+  it('7. Sửa bộ đèn dùng chung form gắn: điền sẵn thông số, không có bước chọn tuyến / cột', () => {
+    renderWithStore(
+      <AddFixtureModal isOpen={true} onClose={vi.fn()} poles={mockPoles} segments={mockSegments} editFixture={EDIT_TARGET} />
     )
 
-    // Dropdown tuyến đường đã tự động chọn SEG-001
-    const selects = screen.getAllByRole('combobox')
-    const segmentSelect = selects[0] as HTMLSelectElement
-    expect(segmentSelect.value).toBe('SEG-001')
+    expect(screen.getByText('Sửa bộ đèn FIX-0001 (cột POLE-0001)')).toBeInTheDocument()
+    // Nhắc phân biệt sửa nhập sai với thay đèn thật
+    expect(screen.getByText(/tháo bộ cũ rồi gắn bộ mới/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Tuyến đường/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Chọn Cột Điện/)).not.toBeInTheDocument()
 
-    const poleSelect = selects[1] as HTMLSelectElement
-    expect(poleSelect.value).toBe('POLE-001')
-
-    // Dropdown cột điện chứa POLE-0001 [Đang lắp] và POLE-0003 [Chưa lắp]
-    // Loại trừ POLE-0002 vì POLE-0002 đã có bộ đèn khác đang lắp
-    expect(screen.getByText(/POLE-0001 \[Đang lắp\]/i)).toBeInTheDocument()
-    expect(screen.getByText(/POLE-0003 \[Chưa lắp\]/i)).toBeInTheDocument()
-    expect(screen.queryByText(/POLE-0002/i)).not.toBeInTheDocument()
+    expect((screen.getByLabelText('Số bóng / bộ') as HTMLSelectElement).value).toBe('2')
+    expect((screen.getByLabelText('Công suất (W)') as HTMLSelectElement).value).toBe('60')
+    expect((screen.getByLabelText('Ngày lắp') as HTMLInputElement).value).toBe('2023-01-15')
+    expect((screen.getByLabelText('Hạn bảo hành') as HTMLInputElement).value).toBe('2025-01-15')
   })
-  it('8. EditFixtureModal không còn trường input Ngày Tháo Dỡ và không hiển thị thông tin Tủ nguồn trong dropdown', () => {
-    render(
-      <EditFixtureModal
+
+  it('8. Lưu sửa bộ đèn: gửi đúng mã bộ đèn và thông số đã sửa, không gửi cột / nguồn dữ liệu', () => {
+    const store = makeStore()
+    const onUpdateFixture = vi.fn((fixtureId: string, data) => store.dispatch(updateFixtureRequest({ fixtureId, data })))
+    const onClose = vi.fn()
+    renderWithStore(
+      <AddFixtureModal
         isOpen={true}
-        onClose={vi.fn()}
-        fixture={mockFixtures[0]}
+        onClose={onClose}
         poles={mockPoles}
-        segments={mockSegments}
-        onUpdateFixture={vi.fn()}
-      />
+        editFixture={EDIT_TARGET}
+        onUpdateFixture={onUpdateFixture}
+      />,
+      store
     )
 
-    // Không còn nhãn hay input Ngày Tháo Dỡ trong modal edit
-    expect(screen.queryByText('Ngày Tháo Dỡ')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Công suất (W)'), { target: { value: '100' } })
+    fireEvent.change(screen.getByLabelText('Ghi chú'), { target: { value: '  thực tế chỉ thay 1 bóng ' } })
+    fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/ }))
 
-    // Dropdown không chứa thông tin nguồn/tủ (Nguồn:...)
-    expect(screen.queryByText(/Nguồn:/i)).not.toBeInTheDocument()
-    expect(screen.getByText('POLE-0001 [Đang lắp]')).toBeInTheDocument()
+    expect(onUpdateFixture).toHaveBeenCalledWith('FIX-0001', {
+      fixture_type: 'led_road_lamp',
+      power_source: 'grid',
+      lamp_watt: 100,
+      lamp_count: 2,
+      install_date: '2023-01-15',
+      warranty_expiry: '2025-01-15',
+      note: 'thực tế chỉ thay 1 bóng',
+    })
+    // Chờ lưu xong mới đóng
+    expect(onClose).not.toHaveBeenCalled()
+    act(() => {
+      store.dispatch(mutationSuccess())
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('8b. Sửa bộ đèn: thiếu ngày lắp thì không gửi (BE bắt buộc)', () => {
+    const onUpdateFixture = vi.fn()
+    renderWithStore(
+      <AddFixtureModal
+        isOpen={true}
+        onClose={vi.fn()}
+        poles={mockPoles}
+        editFixture={EDIT_TARGET}
+        onUpdateFixture={onUpdateFixture}
+      />
+    )
+    fireEvent.change(screen.getByLabelText('Ngày lắp'), { target: { value: '' } })
+    fireEvent.submit(screen.getByRole('button', { name: /Lưu thay đổi/ }).closest('form')!)
+    expect(onUpdateFixture).not.toHaveBeenCalled()
+    expect(screen.getByText('Vui lòng nhập Ngày lắp.')).toBeInTheDocument()
   })
 
   it('9. FixtureTable hiển thị nút Tháo dỡ khi bộ đèn đang hoạt động và ẩn khi đã tháo dỡ', () => {
@@ -414,5 +458,27 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
     const closeBtn = screen.getByText("Đóng")
     fireEvent.click(closeBtn)
     expect(onCloseMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Bảng bộ đèn: cột Tuyến đường', () => {
+  it('ghi tên tuyến theo mã nội bộ của cột, không in mã nội bộ, không lấy nhầm tuyến có mã hiển thị trùng', () => {
+    const poles = [
+      { pole_id: 'POLE-0084', external_ref: 'POLE-0061', segment_id: 'SEG-003', data_source: 'field' },
+    ] as unknown as PoleListItem[]
+    const segments = [
+      { segment_id: 'SEG-001', external_ref: 'SEG-003', segment_name: 'Tuyến C - Huỳnh Văn Cọ' },
+      { segment_id: 'SEG-003', external_ref: 'SEG-002', segment_name: 'Tuyến B - Nguyễn Văn Ni' },
+    ] as unknown as SegmentListItem[]
+    const fixtures = [
+      { fixture_id: 'FIX-0001', pole_id: 'POLE-0084', pole_external_ref: 'POLE-0061', fixture_type: 'led_road_lamp',
+        power_source: 'grid', lamp_watt: 60, lamp_count: 1, install_date: '2026-01-10', data_source: 'field' },
+    ] as unknown as ManagedFixture[]
+
+    render(<FixtureTable fixtures={fixtures} poles={poles} segments={segments} onEditFixture={vi.fn()} />)
+
+    expect(screen.getByText('Tuyến B - Nguyễn Văn Ni')).toBeInTheDocument()
+    expect(screen.queryByText(/SEG-003/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Huỳnh Văn Cọ/)).not.toBeInTheDocument()
   })
 })

@@ -15,6 +15,15 @@ export interface SearchResultItem {
   atlasNote?: string
 }
 
+/**
+ * Mã người dùng thấy (mã hiển thị `external_ref`), không phải mã nội bộ. Hai loại mã trùng dạng nhau
+ * (`POLE-0056` nội bộ có mã hiển thị `POLE-0002`; tuyến nội bộ `SEG-003` hiển thị `SEG-002`), nên tìm theo mã nội bộ
+ * là mở nhầm. Chưa có mã hiển thị thì mới dùng mã nội bộ.
+ */
+export const poleDisplayCode = (p: any): string => p?.external_ref || p?.pole_id || ''
+export const segmentDisplayCode = (s: SegmentInfo | undefined): string => s?.externalRef || s?.id || ''
+export const cabinetDisplayCode = (p: any): string => p?.external_ref || p?.cabinet_code || p?.cabinet_id || ''
+
 interface SearchOptions {
   query: string
   segmentsList: SegmentInfo[]
@@ -44,7 +53,7 @@ export function searchAllCategories({
   // 1. Tuyến đường (Segments / Routes)
   segmentsList.forEach((s) => {
     const nameMatch = s.name.toLowerCase().includes(trimmed)
-    const idMatch = s.id.toLowerCase().includes(trimmed)
+    const idMatch = segmentDisplayCode(s).toLowerCase().includes(trimmed)
     const roadMatch = (s.road || '').toLowerCase().includes(trimmed)
 
     if (nameMatch || idMatch || roadMatch) {
@@ -65,16 +74,15 @@ export function searchAllCategories({
   cabinets.forEach((cab) => {
     const p = (cab.properties || {}) as any
     const name = p.cabinet_name || ''
-    const code = p.cabinet_code || ''
+    const code = cabinetDisplayCode(p)
     const id = p.cabinet_id || ''
     const atlas = p.atlas || p.landmark_note || ''
 
     const nameMatch = name.toLowerCase().includes(trimmed)
     const codeMatch = code.toLowerCase().includes(trimmed)
-    const idMatch = id.toLowerCase().includes(trimmed)
     const atlasMatch = atlas.toLowerCase().includes(trimmed)
 
-    if (nameMatch || codeMatch || idMatch || atlasMatch) {
+    if (nameMatch || codeMatch || atlasMatch) {
       const coords = cab.geometry?.coordinates as [number, number] | undefined
       const isFault = p.status === 'fault'
 
@@ -94,15 +102,19 @@ export function searchAllCategories({
   })
 
   // 3. Cột đèn (Poles) - Khớp mã cột, phân đoạn, và Ghi chú Atlas
+  const segmentById = new Map(segmentsList.map((s) => [s.id, s]))
   poles.forEach((f: PoleFeature) => {
     const p = (f.properties || {}) as any
     const id = p.pole_id || ''
-    const seg = p.segment_id || ''
+    const code = poleDisplayCode(p)
+    const segInfo = segmentById.get(p.segment_id || '')
+    const seg = segInfo ? segInfo.fullName || segInfo.name : ''
+    const segCode = segmentDisplayCode(segInfo)
     const status = p.fixture_status || 'normal'
     const atlas = p.atlas || p.atlas_note || ''
 
-    const idMatch = id.toLowerCase().includes(trimmed)
-    const segMatch = seg.toLowerCase().includes(trimmed)
+    const idMatch = code.toLowerCase().includes(trimmed)
+    const segMatch = segCode.toLowerCase().includes(trimmed)
     const atlasMatch = atlas.toLowerCase().includes(trimmed)
 
     if (idMatch || segMatch || atlasMatch) {
@@ -117,8 +129,8 @@ export function searchAllCategories({
 
       results.push({
         id: id,
-        title: id,
-        subtitle: atlas || seg,
+        title: code,
+        subtitle: atlas || seg || segCode,
         category: 'pole',
         coordinates: f.geometry.coordinates as [number, number],
         data: f,

@@ -70,6 +70,25 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
     }
   }, [isSegmentOpen])
 
+  // Danh sách gợi ý tìm kiếm: bấm ra ngoài ô hoặc Escape thì đóng, như ô chọn tuyến
+  const searchBoxRef = useRef<HTMLDivElement>(null)
+  const showSuggestions = isSearchFocused && Boolean(searchQuery.trim())
+  useEffect(() => {
+    if (!showSuggestions) return
+    const handleMouseDown = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) setIsSearchFocused(false)
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsSearchFocused(false)
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showSuggestions, setIsSearchFocused])
+
   const selectedSegmentObj =
     selectedSegment === 'all'
       ? null
@@ -80,7 +99,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
 
   // Reusable Search Input Node
   const searchInputNode = (widthClass: string) => (
-    <div className={`relative ${widthClass} bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md border border-slate-200 dark:border-slate-700/80 rounded-xl overflow-visible`}>
+    <div ref={searchBoxRef} className={`relative ${widthClass} bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-md border border-slate-200 dark:border-slate-700/80 rounded-xl overflow-visible`}>
       <div className="flex items-center px-3 py-2">
         <button
           type="button"

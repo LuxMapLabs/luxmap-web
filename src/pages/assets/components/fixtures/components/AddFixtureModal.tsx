@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Lightbulb, CheckCircle2, Route, MapPin } from 'lucide-react'
 import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
-import type { CreateFixtureRequest } from '../../../../../types/assets/fixtures'
+import type { ActiveFixture, CreateFixtureRequest, UpdateFixtureRequest } from '../../../../../types/assets/fixtures'
 import type { FixtureType, PowerSource, DataSource } from '../../../../../types/common/enums'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
+import { useCloseAfterMutation } from '../../../../../hooks/assets/useCloseAfterMutation'
 
 export interface AddFixtureModalProps {
   isOpen: boolean
@@ -13,6 +14,17 @@ export interface AddFixtureModalProps {
   segments?: SegmentListItem[]
   onAddFixture?: (data: CreateFixtureRequest) => void
   onAddFixtures?: (data: CreateFixtureRequest[]) => void
+  /**
+   * Gắn bộ đèn cho đúng một cột (Bản đồ GIS): bỏ bước chọn tuyến / cột. Chỉ mở khi cột chưa có bộ đèn đang dùng.
+   * Nguồn dữ liệu lấy theo cột, không mặc định `field`.
+   */
+  fixedPole?: PoleListItem
+  /**
+   * Sửa bộ đèn đang dùng (cùng form với gắn): chỉ sửa thông tin nhập sai, không đổi cột.
+   * Thay đèn thật ngoài hiện trường = tháo bộ cũ rồi gắn bộ mới, để giữ lịch sử và bảo hành.
+   */
+  editFixture?: { fixture: ActiveFixture & { fixture_id: string }; poleLabel: string }
+  onUpdateFixture?: (fixtureId: string, data: UpdateFixtureRequest) => void
 }
 
 interface FixtureConfig {
@@ -23,6 +35,7 @@ interface FixtureConfig {
   install_date: string
   warranty_expiry: string
   data_source: DataSource
+  note: string
 }
 
 const DEFAULT_WATTS = [60, 100, 120, 150, 200, 250]
@@ -38,7 +51,12 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
   segments = [],
   onAddFixture,
   onAddFixtures,
+  fixedPole,
+  editFixture,
+  onUpdateFixture,
 }) => {
+  const isEdit = !!editFixture
+  const { isSaving, markSent } = useCloseAfterMutation(onClose)
   const today = useMemo(() => new Date().toISOString().split('T')[0], [])
   const defaultWarranty = useMemo(() => {
     const d = new Date()
@@ -54,6 +72,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
     install_date: today,
     warranty_expiry: defaultWarranty,
     data_source: 'field',
+    note: '',
   })
 
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>('')
@@ -79,9 +98,23 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setValidationError(null)
-      setSelectedSegmentId('')
-      setSelectedPoleIds([])
-      setConfig(makeDefaultConfig())
+      setSelectedSegmentId(fixedPole?.segment_id || '')
+      setSelectedPoleIds(fixedPole?.pole_id ? [fixedPole.pole_id] : [])
+      const current = editFixture?.fixture
+      setConfig(
+        current
+          ? {
+              lamp_watt: current.lamp_watt || 100,
+              lamp_count: current.lamp_count || 1,
+              fixture_type: current.fixture_type || 'led_road_lamp',
+              power_source: current.power_source || 'grid',
+              install_date: current.install_date || '',
+              warranty_expiry: current.warranty_expiry || '',
+              data_source: current.data_source,
+              note: current.note || '',
+            }
+          : makeDefaultConfig()
+      )
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
@@ -109,7 +142,26 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!selectedSegmentId) {
+    if (editFixture) {
+      if (!config.install_date) {
+        setValidationError('Vui lòng nhập Ngày lắp.')
+        return
+      }
+      setValidationError(null)
+      onUpdateFixture?.(editFixture.fixture.fixture_id, {
+        fixture_type: config.fixture_type,
+        power_source: config.power_source,
+        lamp_watt: Number(config.lamp_watt) || 100,
+        lamp_count: Number(config.lamp_count) || 1,
+        install_date: config.install_date,
+        warranty_expiry: config.warranty_expiry || null,
+        note: config.note.trim() || null,
+      })
+      markSent()
+      return
+    }
+
+    if (!fixedPole && !selectedSegmentId) {
       setValidationError('Vui lòng chọn Tuyến đường trước!')
       return
     }
@@ -120,7 +172,8 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
     setValidationError(null)
 
     // Giữ đúng thứ tự cột trong danh sách, mỗi cột một bộ đèn cùng cấu hình
-    const requests: CreateFixtureRequest[] = availablePoles
+    const targets = fixedPole ? [fixedPole] : availablePoles
+    const requests: CreateFixtureRequest[] = targets
       .filter((p) => p.pole_id && selectedPoleIds.includes(p.pole_id))
       .map((p) => ({
         pole_id: p.pole_id || null,
@@ -131,7 +184,8 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
         install_date: config.install_date || null,
         removed_date: null,
         warranty_expiry: config.warranty_expiry || null,
-        data_source: config.data_source,
+        data_source: fixedPole ? p.data_source || config.data_source : config.data_source,
+        note: config.note.trim() || null,
       }))
 
     if (onAddFixtures) {
@@ -140,7 +194,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
       requests.forEach((req) => onAddFixture(req))
     }
 
-    onClose()
+    markSent()
   }
 
   if (!isOpen) return null
@@ -150,14 +204,28 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
       <AssetModalHeader
         icon={<Lightbulb className="w-5 h-5" />}
         accent="amber"
-        title="Thêm bộ đèn chiếu sáng"
-        subtitle="Chọn tuyến đường, tick các cột cần gắn và cấu hình bộ đèn dùng chung"
+        title={
+          editFixture
+            ? `Sửa bộ đèn ${editFixture.fixture.fixture_id} (cột ${editFixture.poleLabel})`
+            : fixedPole
+              ? `Gắn bộ đèn cho cột ${fixedPole.external_ref || fixedPole.pole_id}`
+              : 'Thêm bộ đèn chiếu sáng'
+        }
+        subtitle={
+          editFixture
+            ? 'Chỉ để sửa thông tin nhập sai. Thay đèn ngoài hiện trường: tháo bộ cũ rồi gắn bộ mới.'
+            : fixedPole
+              ? 'Chọn số bóng và công suất của bộ đèn bên dưới'
+              : 'Chọn tuyến đường, tick các cột cần gắn và cấu hình bộ đèn dùng chung'
+        }
         onClose={onClose}
       />
 
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 text-xs">
         <AssetModalError message={validationError} />
         <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
+          {fixedPole || isEdit ? null : (
+          <>
           {/* ===== 1. TUYẾN ĐƯỜNG ===== */}
           <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
             <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 text-xs">
@@ -258,13 +326,16 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
             )}
           </div>
 
+          </>
+          )}
+
           {/* ===== 3. CẤU HÌNH BỘ ĐÈN CHUNG ===== */}
-          <fieldset className="space-y-3" disabled={selectedPoleIds.length === 0}>
+          <fieldset className="space-y-3" disabled={!isEdit && selectedPoleIds.length === 0}>
             <legend className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mb-2">
               <Lightbulb className="w-4 h-4 text-amber-500" aria-hidden="true" />
-              <span>3. Cấu Hình Bộ Đèn (áp dụng cho mọi cột đã chọn)</span>
+              <span>{fixedPole || isEdit ? 'Cấu hình bộ đèn' : '3. Cấu Hình Bộ Đèn (áp dụng cho mọi cột đã chọn)'}</span>
             </legend>
-            {selectedPoleIds.length === 0 && (
+            {!isEdit && selectedPoleIds.length === 0 && (
               <p className="text-[11px] text-slate-500 dark:text-slate-400">Chọn ít nhất một cột để cấu hình bộ đèn.</p>
             )}
 
@@ -328,6 +399,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                   id="add-fixture-install"
                   type="date"
                   value={config.install_date}
+                  required={isEdit}
                   onChange={(e) => updateConfig('install_date', e.target.value)}
                   className={FIELD_CLASS}
                 />
@@ -343,14 +415,35 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                 />
               </div>
             </div>
+            <div>
+              <label htmlFor="add-fixture-note" className={LABEL_CLASS}>Ghi chú</label>
+              <textarea
+                id="add-fixture-note"
+                rows={2}
+                maxLength={1000}
+                value={config.note}
+                onChange={(e) => updateConfig('note', e.target.value)}
+                placeholder="Trường hợp đặc biệt, ví dụ: thực tế chỉ thay 1 bóng"
+                className={`${FIELD_CLASS} cursor-text resize-y`}
+              />
+            </div>
           </fieldset>
         </div>
 
         <AssetModalFooter
           onCancel={onClose}
-          submitLabel={`Xác nhận thêm (${selectedPoleIds.length} Bộ Đèn)`}
+          submitLabel={
+            isSaving
+              ? 'Đang lưu…'
+              : isEdit
+                ? 'Lưu thay đổi'
+                : fixedPole
+                  ? 'Gắn bộ đèn'
+                  : `Xác nhận thêm (${selectedPoleIds.length} Bộ Đèn)`
+          }
           submitIcon={<CheckCircle2 className="w-4 h-4" />}
-          disabled={selectedPoleIds.length === 0}
+          loading={isSaving}
+          disabled={!isEdit && selectedPoleIds.length === 0}
         />
       </form>
     </AssetModalFrame>

@@ -38,6 +38,7 @@ import {
   type ParsedItemReview,
 } from '../../../validations/assetImport.schema'
 import { formatCommuneDisplayName, getCommuneName } from '../../../utils/assets/communeUtils'
+import { findByIdOrRef } from '../../../utils/assets/findByIdOrRef'
 
 export type { FieldDiff, ParsedItemReview }
 
@@ -727,16 +728,8 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                       (p.pole_id && p.pole_id === item.data.pole_id) ||
                                       (p.external_ref && p.external_ref.toLowerCase() === item.externalRef.toLowerCase())
                                   )
-                                  const seg = segments.find(
-                                    (s) =>
-                                      (parentPole?.segment_id && s.segment_id === parentPole.segment_id) ||
-                                      (parentPole?.segment_id && s.external_ref?.toLowerCase() === parentPole.segment_id.toLowerCase())
-                                  )
-                                  const cab = cabinets.find(
-                                    (c) =>
-                                      (parentPole?.feeder_id && (c.cabinet_id === parentPole.feeder_id || c.external_ref === parentPole.feeder_id)) ||
-                                      (parentPole?.feeder_id && c.external_ref?.toLowerCase() === parentPole.feeder_id.toLowerCase())
-                                  )
+                                  const seg = findByIdOrRef(segments, (s) => s.segment_id, parentPole?.segment_id)
+                                  const cab = findByIdOrRef(cabinets, (c) => c.cabinet_id, parentPole?.feeder_id)
                                   return (
                                     <>
                                       <div
@@ -788,11 +781,7 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                 }
 
                                 if (item.category === 'feeders') {
-                                  const cab = cabinets.find(
-                                    (c) =>
-                                      (item.data.cabinet_id && c.cabinet_id === item.data.cabinet_id) ||
-                                      (c.external_ref && c.external_ref === item.data.cabinet_id)
-                                  )
+                                  const cab = findByIdOrRef(cabinets, (c) => c.cabinet_id, item.data.cabinet_id)
                                   return (
                                     <>
                                       <div className="font-semibold text-slate-800 dark:text-slate-100">
@@ -806,20 +795,11 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                                 }
 
                                 // Poles
-                                const seg = segments.find(
-                                  (s) =>
-                                    (item.data.segment_id && s.segment_id === item.data.segment_id) ||
-                                    (item.data.segment_id && s.external_ref?.toLowerCase() === item.data.segment_id.toLowerCase())
-                                )
-                                const fdr = feeders.find(
-                                  (f) =>
-                                    (item.data.feeder_id && f.feeder_id === item.data.feeder_id) ||
-                                    (item.data.feeder_id && f.external_ref?.toLowerCase() === item.data.feeder_id.toLowerCase())
-                                )
-                                const cab = fdr?.cabinet?.cabinet_name || cabinets.find(
-                                  (c) =>
-                                    (item.data.feeder_id && (c.cabinet_id === item.data.feeder_id || c.external_ref === item.data.feeder_id))
-                                )?.cabinet_name
+                                const seg = findByIdOrRef(segments, (s) => s.segment_id, item.data.segment_id)
+                                const fdr = findByIdOrRef(feeders, (f) => f.feeder_id, item.data.feeder_id)
+                                const cab =
+                                  fdr?.cabinet?.cabinet_name ||
+                                  findByIdOrRef(cabinets, (c) => c.cabinet_id, item.data.feeder_id)?.cabinet_name
                                 return (
                                   <>
                                     <div className="font-medium text-slate-800 truncate max-w-[170px]" title={seg?.segment_name || ''}>
