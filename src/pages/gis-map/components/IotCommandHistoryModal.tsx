@@ -7,8 +7,8 @@ import type { IotCommandHistoryStatus } from '../../../types/common/enums'
 import { currentChoice, type IotCommandChoice } from '../../../utils/iot/iotCommand'
 import { apiErrorMessage } from '../../../utils/iot/apiError'
 
-/** Số lệnh mỗi lần tải (trang của GET command/history, mới nhất trước). */
-export const HISTORY_PAGE_SIZE = 50
+/** Số lệnh mỗi trang (GET command/history, mới nhất trước). */
+export const HISTORY_PAGE_SIZE = 10
 /** Đọc lại trang đầu khi còn lệnh đang chờ node xác nhận. */
 export const HISTORY_POLL_MS = 5_000
 
@@ -56,12 +56,31 @@ const STATUS: Record<IotCommandHistoryStatus, { label: string; icon: React.React
 
 const FILTERS: Array<'all' | IotCommandHistoryStatus> = ['all', 'success', 'pending', 'expired']
 
+/** Backend cũ chưa trả `status`: hiện rõ là chưa rõ, không để trống. */
+const NO_STATUS = {
+  label: 'Chưa rõ trạng thái',
+  icon: <AlertCircle className="w-3.5 h-3.5" />,
+  className: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+}
+
+/** Số trang hiện quanh trang đang xem: 1 … 4 5 [6] 7 8 … 20 */
+function pageNumbers(page: number, pages: number): Array<number | '…'> {
+  const set = new Set([1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages))
+  const sorted = [...set].sort((a, b) => a - b)
+  const out: Array<number | '…'> = []
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) out.push('…')
+    out.push(n)
+  })
+  return out
+}
+
 const formatTime = (value?: string | null) => (value ? new Date(value).toLocaleString('vi-VN') : '—')
 
 /**
  * Nhật ký lệnh Bật / Tắt / AUTO của node IoT gán cho mạch: GET /iot/nodes/{nodeId}/command/history
- * (mới nhất trước, `status` success | pending | expired). Tủ nhiều mạch thì chọn mạch ở thanh trên; lọc trạng thái
- * trên các lệnh đã tải. Còn lệnh đang chờ thì đọc lại trang đầu mỗi `HISTORY_POLL_MS`.
+ * (mới nhất trước, `status` success | pending | expired), phân trang `HISTORY_PAGE_SIZE` lệnh. Tủ nhiều mạch thì chọn
+ * mạch ở thanh trên; lọc trạng thái trên trang đang xem. Trang có lệnh đang chờ thì đọc lại mỗi `HISTORY_POLL_MS`.
  */
 export const IotCommandHistoryModal: React.FC<{
   title: string
@@ -89,16 +108,12 @@ export const IotCommandHistoryModal: React.FC<{
   }, [onClose])
 
   const loadPage = useCallback(
-    async (id: string, nextPage: number, append: boolean) => {
+    async (id: string, nextPage: number) => {
       setLoading(true)
       try {
         const result = await iotAPI.getCommandHistory(id, { page: nextPage, page_size: HISTORY_PAGE_SIZE })
         const fresh = result.items || []
-        setItems((prev) => {
-          if (!append) return fresh
-          const seen = new Set(prev.map((item) => item.command_id))
-          return [...prev, ...fresh.filter((item) => !seen.has(item.command_id))]
-        })
+        setItems(fresh)
         setTotal(result.total ?? fresh.length)
         setPage(nextPage)
         setError(null)
@@ -115,16 +130,18 @@ export const IotCommandHistoryModal: React.FC<{
     setItems([])
     setTotal(0)
     setFilter('all')
-    if (nodeId) loadPage(nodeId, 1, false)
+    if (nodeId) loadPage(nodeId, 1)
   }, [nodeId, loadPage])
 
   const hasPending = items.some((item) => item.status === 'pending')
-  // Lệnh đang chờ node xác nhận: đọc lại trang đầu để thấy nó thành success / expired (chỉ khi đang xem trang đầu)
+  // Lệnh đang chờ node xác nhận: đọc lại trang đang xem để thấy nó thành success / expired
   useEffect(() => {
-    if (!nodeId || !hasPending || page !== 1) return
-    const timer = window.setInterval(() => loadPage(nodeId, 1, false), HISTORY_POLL_MS)
+    if (!nodeId || !hasPending) return
+    const timer = window.setInterval(() => loadPage(nodeId, page), HISTORY_POLL_MS)
     return () => window.clearInterval(timer)
   }, [nodeId, hasPending, page, loadPage])
+
+  const pages = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE))
 
   const counts = useMemo(() => {
     const map = { all: items.length, success: 0, pending: 0, expired: 0 }
@@ -213,7 +230,7 @@ export const IotCommandHistoryModal: React.FC<{
 
           {shown.map((item) => {
             const choice = currentChoice(item)
-            const status = item.status ? STATUS[item.status] : null
+            const status = item.status ? STATUS[item.status] : NO_STATUS
             return (
               <div
                 key={item.command_id || `${item.requested_at}`}
@@ -228,11 +245,9 @@ export const IotCommandHistoryModal: React.FC<{
                   ) : (
                     <span className="font-mono">{item.mode || '—'}</span>
                   )}
-                  {status && (
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold ${status.className}`}>
-                      {status.icon} {status.label}
-                    </span>
-                  )}
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold ${status.className}`}>
+                    {status.icon} {status.label}
+                  </span>
                   {choice === 'auto' && item.auto_schedule?.day_start && item.auto_schedule.night_start && (
                     <span className="text-slate-500 dark:text-slate-400">
                       ngày từ {item.auto_schedule.day_start} · đêm từ {item.auto_schedule.night_start}
@@ -271,16 +286,56 @@ export const IotCommandHistoryModal: React.FC<{
               <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
             </div>
           )}
-          {nodeId && !loading && items.length < total && (
-            <button
-              type="button"
-              onClick={() => loadPage(nodeId, page + 1, true)}
-              className="w-full py-2 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-            >
-              Tải thêm lệnh cũ hơn
-            </button>
-          )}
         </div>
+
+        {nodeId && total > HISTORY_PAGE_SIZE && (
+          <nav
+            aria-label="Phân trang"
+            className="flex flex-wrap items-center justify-between gap-2 px-6 py-3 border-t border-slate-100 dark:border-slate-800 text-xs"
+          >
+            <span className="text-slate-500 dark:text-slate-400">
+              Trang {page} / {pages} · {total} lệnh
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={loading || page <= 1}
+                onClick={() => loadPage(nodeId, page - 1)}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 font-semibold disabled:opacity-40 cursor-pointer"
+              >
+                Trước
+              </button>
+              {pageNumbers(page, pages).map((n, i) =>
+                n === '…' ? (
+                  <span key={`gap-${i}`} className="px-1 text-slate-400">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-current={n === page ? 'page' : undefined}
+                    disabled={loading}
+                    onClick={() => loadPage(nodeId, n)}
+                    className={`min-w-7 px-2 py-1 rounded-lg font-semibold cursor-pointer ${
+                      n === page ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                disabled={loading || page >= pages}
+                onClick={() => loadPage(nodeId, page + 1)}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 font-semibold disabled:opacity-40 cursor-pointer"
+              >
+                Sau
+              </button>
+            </div>
+          </nav>
+        )}
       </div>
     </div>,
     document.body

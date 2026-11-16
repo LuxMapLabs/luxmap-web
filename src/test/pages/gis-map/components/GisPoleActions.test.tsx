@@ -323,6 +323,14 @@ describe('Khung cột trên Bản đồ GIS: sửa thông tin cột và gắn b�
     expect(screen.getByRole('button', { name: /Lưu thay đổi/ })).toBeEnabled()
   })
 
+  it('khung cột không có thẻ IoT: không đọc mạch IoT của cột, IoT chỉ xem ở tủ điện', async () => {
+    vi.mocked(iotAPI.getPoleControl).mockClear()
+    setup('manager')
+    await act(async () => {})
+    expect(iotAPI.getPoleControl).not.toHaveBeenCalled()
+    expect(screen.queryByText(/qua IoT/)).not.toBeInTheDocument()
+  })
+
   it('khung cột không còn mục "Độ sáng 3 đêm gần nhất"', () => {
     setup('manager')
     expect(screen.queryByText('Độ sáng 3 đêm gần nhất')).not.toBeInTheDocument()
@@ -348,8 +356,16 @@ describe('Khung mạch điện: Bật / Tắt / AUTO gửi POST /iot/nodes/{node
     vi.mocked(iotAPI.sendCommand).mockReset().mockResolvedValue({ node_id: 'NODE-004', command_id: 'c1' })
     setup('manager', { selectedPole: null, selectedFeeder: feeder('NODE-004') })
 
+    // Bật / Tắt hỏi lại trước khi gửi
     fireEvent.click(screen.getByRole('button', { name: 'Bật' }))
+    const confirm = await screen.findByRole('dialog', { name: 'Xác nhận bật mạch FDR-010' })
+    // Hộp ghi mạch bằng mã hiển thị như khung mạch, kèm node
+    expect(confirm).toHaveTextContent('FDR-CAB-TL8-B')
+    expect(confirm).toHaveTextContent('NODE-004')
+    expect(iotAPI.sendCommand).not.toHaveBeenCalled()
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Xác nhận Bật' }))
     await waitFor(() => expect(iotAPI.sendCommand).toHaveBeenCalledWith('NODE-004', { mode: 'MANUAL', command: 'ON' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Xác nhận bật mạch FDR-010' })).not.toBeInTheDocument())
     // AUTO luôn kèm lịch: bấm Auto mở form (điền lịch đang có trên node), chưa gửi gì
     vi.mocked(iotAPI.getCommand).mockResolvedValueOnce({ node_id: 'NODE-004', auto_schedule: { day_start: '05:45', night_start: '17:50' } })
     fireEvent.click(screen.getByRole('button', { name: 'Auto' }))
@@ -397,7 +413,19 @@ describe('Khung mạch điện: Bật / Tắt / AUTO gửi POST /iot/nodes/{node
     fireEvent.click(screen.getByRole('button', { name: /Lịch sử lệnh/ }))
 
     expect(await screen.findByRole('dialog', { name: 'Nhật ký lệnh điều khiển' })).toBeInTheDocument()
-    await waitFor(() => expect(iotAPI.getCommandHistory).toHaveBeenCalledWith('NODE-004', { page: 1, page_size: 50 }))
+    await waitFor(() => expect(iotAPI.getCommandHistory).toHaveBeenCalledWith('NODE-004', { page: 1, page_size: 10 }))
+  })
+
+  it('Tắt: huỷ ở hộp xác nhận thì không gửi lệnh', async () => {
+    vi.mocked(iotAPI.sendCommand).mockReset()
+    setup('manager', { selectedPole: null, selectedFeeder: feeder('NODE-004') })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tắt' }))
+    const confirm = await screen.findByRole('dialog', { name: 'Xác nhận tắt mạch FDR-010' })
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Huỷ' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(iotAPI.sendCommand).not.toHaveBeenCalled()
   })
 })
 
