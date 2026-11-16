@@ -89,8 +89,6 @@ export interface GisStats {
 import { MapControlBar } from './components/MapControlBar'
 import { GisMapLegend } from './components/GisMapLegend'
 import { GisDrawerPanel } from './components/GisDrawerPanel'
-import { LightingPreviewModal } from './components/LightingPreviewModal'
-import { LightingCommandHistoryModal } from './components/LightingCommandHistoryModal'
 import { useElectricalCascade } from '../../hooks/gis-map/useElectricalCascade'
 import { useGisMapInstance } from '../../hooks/gis-map/useGisMapInstance'
 import { useFeederLinesLayer } from '../../hooks/gis-map/useFeederLinesLayer'
@@ -671,12 +669,6 @@ export const GisMapPage: React.FC = () => {
           onOpenElectricalMonitor={openElectricalMonitor}
         />
       )}
-
-      {/* Global Lighting Control Preview & Confirmation Modal */}
-      <LightingPreviewModal />
-
-      {/* Global Lighting Control History Modal */}
-      <LightingCommandHistoryModal />
     </div>
   )
 }

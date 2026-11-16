@@ -22,6 +22,7 @@ export interface CabinetProperties {
     commune_id: string | null
     feeder_ids: string[]
     feeders: CabinetFeederState[]
+    iot_node_ids: string[]
     iot_node_id?: string | null
 }
 

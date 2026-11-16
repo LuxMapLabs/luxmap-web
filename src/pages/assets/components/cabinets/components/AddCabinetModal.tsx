@@ -283,6 +283,7 @@ export const AddCabinetModal: React.FC<AddCabinetModalProps> = ({
           lng: parsedLng,
         },
         feeder_ids: [],
+        iot_node_ids: [],
         updated_at: new Date().toISOString(),
       })
     }

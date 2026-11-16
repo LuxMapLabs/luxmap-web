@@ -1,4 +1,7 @@
-import type { IotCommandStatus } from '../../types/iot/nodes'
+import type { IotCommandHistoryItem, IotCommandStatus } from '../../types/iot/nodes'
+
+/** Lịch AUTO mặc định khi node chưa có lịch nào. */
+export const DEFAULT_AUTO_SCHEDULE = { day_start: '06:00', night_start: '18:00' }
 
 /** Nút người dùng bấm, ánh xạ sang body của POST /iot/nodes/{id}/command. */
 export type IotCommandChoice = 'on' | 'off' | 'auto'
@@ -10,11 +13,20 @@ export function commandBody(choice: IotCommandChoice) {
 }
 
 /** Lệnh đang hiệu lực trên node, đọc từ GET command: `AUTO` hoặc `MANUAL` + `ON`/`OFF`. */
-export function currentChoice(status?: IotCommandStatus | null): IotCommandChoice | null {
+export function currentChoice(status?: Pick<IotCommandStatus, 'mode' | 'command'> | null): IotCommandChoice | null {
   if (!status?.mode) return null
   if (status.mode.toUpperCase() === 'AUTO') return 'auto'
   const command = status.command?.toUpperCase()
   return command === 'ON' ? 'on' : command === 'OFF' ? 'off' : null
+}
+
+/**
+ * Chế độ thật của mạch: lệnh mới nhất có `status = success` trong lịch sử lệnh (mới nhất trước).
+ * Lệnh pending / expired chưa hoặc không bao giờ được node thực hiện nên không tính. Không có lệnh success → null.
+ */
+export function latestSuccessChoice(items?: IotCommandHistoryItem[] | null): IotCommandChoice | null {
+  const latest = (items || []).find((item) => item.status === 'success')
+  return latest ? currentChoice(latest) : null
 }
 
 export type IotCommandProgress = 'pending' | 'acknowledged' | 'superseded' | 'expired'

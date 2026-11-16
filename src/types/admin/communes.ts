@@ -14,6 +14,7 @@ export interface CommuneItem {
     name?: string | null
     bbox?: CommuneBbox
     center?: MapCenter
+    has_boundary?: boolean
     created_at?: string | null
     updated_at?: string | null
 }
@@ -33,6 +34,10 @@ export interface CreateCommuneRequest {
 export interface MapCenter {
     lat?: number
     lng?: number
+}
+
+export interface UpdateCommuneBoundaryRequest {
+    boundary: any
 }
 
 export interface UpdateCommuneRequest {

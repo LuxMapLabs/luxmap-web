@@ -91,9 +91,9 @@ describe('IotBridgeAdminPage role gating (server và node: Admin tạo / chỉnh
 
 describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
   const cabinets = [
-    { cabinet_id: 'CAB-001', cabinet_name: 'Tủ A', commune_id: 'COM-001', iot_node_id: 'NODE-001' },
-    { cabinet_id: 'CAB-002', cabinet_name: 'Tủ B', commune_id: 'COM-001', iot_node_id: null },
-    { cabinet_id: 'CAB-009', cabinet_name: 'Tủ xã khác', commune_id: 'COM-009', iot_node_id: null },
+    { cabinet_id: 'CAB-001', cabinet_name: 'Tủ A', commune_id: 'COM-001', iot_node_ids: ['NODE-001'] },
+    { cabinet_id: 'CAB-002', cabinet_name: 'Tủ B', commune_id: 'COM-001', iot_node_ids: ['NODE-003'] },
+    { cabinet_id: 'CAB-009', cabinet_name: 'Tủ xã khác', commune_id: 'COM-009', iot_node_ids: [] },
   ]
   const communeList = [
     { commune_id: 'COM-001', name: 'Xã Một' },
@@ -106,6 +106,8 @@ describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
   const feeders = [
     { feeder_id: 'FDR-001', feeder_name: 'Mạch 1', cabinet: { cabinet_id: 'CAB-001' } },
     { feeder_id: 'FDR-002', feeder_name: 'Mạch 2', cabinet: { cabinet_id: 'CAB-002' } },
+    // Mạch đã gắn node: không chọn lại được (mỗi mạch một node), dù tủ vẫn nhận node cho mạch khác
+    { feeder_id: 'FDR-003', feeder_name: 'Mạch 3', cabinet: { cabinet_id: 'CAB-002' }, control: { node_id: 'NODE-003', relay_no: 1 } },
   ]
 
   beforeEach(() => {
@@ -119,12 +121,14 @@ describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
     fireEvent.change(select('Xã / phường'), { target: { value: 'COM-001' } })
     const [cabinet, feeder, server] = [select('Tủ điện'), select('Mạch (rơ-le #1)'), select('Server IoT')]
     await waitFor(() => expect(within(cabinet).queryByText(/CAB-002/)).toBeInTheDocument())
-    // Tủ đã có node không được chọn lại (mỗi tủ tối đa một node); tủ xã khác không hiện.
-    expect(within(cabinet).queryByText(/CAB-001/)).not.toBeInTheDocument()
+    // Tủ đã có node vẫn chọn được (một tủ nhiều node, mỗi node một mạch); tủ xã khác không hiện.
+    expect(within(cabinet).getByText(/CAB-001/)).toBeInTheDocument()
     expect(within(cabinet).queryByText(/CAB-009/)).not.toBeInTheDocument()
     fireEvent.change(cabinet, { target: { value: 'CAB-002' } })
-    // Chỉ mạch của tủ đã chọn, chỉ server cùng xã.
+    // Chỉ mạch chưa gắn node của tủ đã chọn, chỉ server cùng xã.
     expect(within(feeder).queryByText(/FDR-001/)).not.toBeInTheDocument()
+    expect(within(feeder).queryByText(/FDR-003/)).not.toBeInTheDocument()
+    expect(within(feeder).getByText(/FDR-002/)).toBeInTheDocument()
     expect(within(server).queryByText('iot-server-09')).not.toBeInTheDocument()
     fireEvent.change(feeder, { target: { value: 'FDR-002' } })
     fireEvent.change(server, { target: { value: 'iot-server-01' } })

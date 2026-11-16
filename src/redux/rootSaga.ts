@@ -13,7 +13,6 @@ import dashboardSaga from '../feature/dashboard/dashboardSaga'
 import settingsSaga from '../feature/settings/settingsSaga'
 import adminSystemSaga from '../feature/adminSystem/adminSystemSaga'
 import adminArtifactVersionSaga from '../feature/adminArtifactVersions/artifactVersionSaga'
-import lightingSaga from '../feature/lighting/lightingSaga'
 import passwordSaga from '../feature/password/passwordSaga'
 import avatarSaga from '../feature/avatar/avatarSaga'
 import superiorDashboardSaga from '../feature/dashboard/superiorDashboardSaga'
@@ -35,7 +34,6 @@ export default function* rootSaga() {
         fork(settingsSaga),
         fork(adminSystemSaga),
         fork(adminArtifactVersionSaga),
-        fork(lightingSaga),
         fork(passwordSaga),
         fork(avatarSaga),
         fork(superiorDashboardSaga),

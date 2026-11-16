@@ -2,6 +2,7 @@
  * Auto-generated Types for: iot/nodes
  * Sinh tự động từ endpoint Backend
  */
+import type { DataSource, FeederPowerState, IotCommandHistoryStatus } from '../common/enums'
 import type { IotLocation } from './servers'
 
 export interface IotAnomaly {
@@ -35,17 +36,38 @@ export interface IotArchivedSample {
     reading?: IotArchivedReading
 }
 
-/** `GET /iot/nodes/{nodeId}/electrical/history?page=&page_size=` — mới nhất trước. */
 export interface IotArchivedSamplePagedResult {
-    page: number
-    page_size: number
-    total: number
-    items: IotArchivedSample[]
+    page?: number
+    page_size?: number
+    total?: number
+    items?: IotArchivedSample[]
 }
 
 export interface IotAutoSchedule {
     day_start?: string | null
     night_start?: string | null
+}
+
+export interface IotCommandHistoryItem {
+    command_id?: string | null
+    node_id?: string | null
+    feeder_id?: string | null
+    server_id?: string | null
+    device_id?: string | null
+    mode?: string | null
+    command?: string | null
+    auto_schedule?: IotAutoSchedule
+    requested_by?: string | null
+    requested_at?: string | null
+    bridge_accepted_at?: string | null
+    status?: IotCommandHistoryStatus
+}
+
+export interface IotCommandHistoryItemPagedResult {
+    page?: number
+    page_size?: number
+    total?: number
+    items?: IotCommandHistoryItem[]
 }
 
 export interface IotCommandRequest {
@@ -62,40 +84,12 @@ export interface IotCommandStatus {
     command_acknowledged?: boolean
     auto_schedule?: IotAutoSchedule
     expires_at?: string | null
-    power_state?: IotPowerState
-}
-
-/** Trạng thái tải của mạch suy từ mẫu điện (backend `FeederPowerState`). */
-export type IotPowerState = 'unknown' | 'on' | 'off'
-
-/** Body của `POST /iot/nodes/register` (Admin, `ManageSettings`): tạo node + gán rơ-le #1 + nguồn đo + tuyến MQTT trong một lần. */
-export interface RegisterNodeRequest {
-    server_id: string
-    cabinet_id: string
-    feeder_id: string
-    device_id: string
-    gateway_id?: string | null
-    data_source: 'calibration_rig' | 'simulated'
-    supports_remote_control: boolean
-    nominal_voltage: number
-    nominal_current_ma: number
-    nominal_power_mw: number
-}
-
-/** `201` khi tạo mới, `200` khi gửi lại đúng hồ sơ đã đăng ký. */
-export interface RegisteredNode {
-    node_id: string
-    server_id: string
-    device_id: string
-    feeder_id: string
-    gateway_id: string
+    power_state?: FeederPowerState
 }
 
 export interface IotDiagnosticResult {
     node_id?: string | null
     feeder_id?: string | null
-    pole_id?: string | null
-    relay_no?: number
     status?: string | null
     measurement?: IotMeasurement
     anomalies?: IotAnomaly[]
@@ -107,7 +101,7 @@ export interface IotElectricalResult {
     server_id?: string | null
     status?: string | null
     measurement?: IotMeasurement
-    power_state?: IotPowerState
+    power_state?: FeederPowerState
 }
 
 export interface IotMeasurement {
@@ -152,3 +146,46 @@ export interface LampCountEstimate {
     ambiguous_samples?: number
     outside_range_samples?: number
 }
+
+export interface NodeProfile {
+    server_id?: string | null
+    device_id?: string | null
+    feeder_id?: string | null
+    nominal_voltage?: number
+    nominal_current_ma?: number
+    nominal_power_mw?: number
+    voltage_tolerance_percent?: number
+    current_tolerance_percent?: number
+    power_tolerance_percent?: number
+    off_current_limit_ma?: number
+    max_silence_seconds?: number
+    use_ten_lamp_calibration?: boolean
+}
+
+export interface RegisterNodeRequest {
+    server_id: string | null
+    cabinet_id: string | null
+    feeder_id: string | null
+    device_id: string | null
+    data_source: DataSource
+    supports_remote_control?: boolean
+    nominal_voltage: number
+    nominal_current_ma: number
+    nominal_power_mw: number
+    gateway_id?: string | null
+}
+
+export interface RegisteredNode {
+    node_id?: string | null
+    server_id?: string | null
+    device_id?: string | null
+    feeder_id?: string | null
+    gateway_id?: string | null
+}
+
+export interface RegisteredSource {
+    node_id?: string | null
+    server_id?: string | null
+    device_id?: string | null
+}
+
