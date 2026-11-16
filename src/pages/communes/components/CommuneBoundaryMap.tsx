@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Check, Eraser, MapPin, PenLine, Search, X } from 'lucide-react'
-import type { CommuneBbox } from '../../../types/admin/communes'
 import type { Geometry } from '../../../types/common/base'
 import {
   GOOGLE_HYBRID_STYLE,
@@ -28,8 +27,6 @@ export interface CommuneBoundaryMapProps {
   /** Chỉ xem: không tìm kiếm, không vẽ, không kéo đỉnh */
   readOnly?: boolean
   height?: string
-  /** Khung cũ của địa bàn: chưa có ranh giới thì bản đồ mở đúng vùng này */
-  fallbackBbox?: CommuneBbox | null
   /** Gọi khi người dùng chọn một gợi ý xã/phường (để form tự điền tên) */
   onPickName?: (name: string) => void
 }
@@ -52,7 +49,6 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
   onChange,
   height = '400px',
   readOnly = false,
-  fallbackBbox = null,
   onPickName,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -70,8 +66,6 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
   onChangeRef.current = onChange
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
-  const fallbackBboxRef = useRef(fallbackBbox)
-  fallbackBboxRef.current = fallbackBbox
   const onPickNameRef = useRef(onPickName)
   onPickNameRef.current = onPickName
 
@@ -199,8 +193,6 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
     const map = mapRef.current
     if (map) {
       map.getCanvas().style.cursor = next ? 'crosshair' : ''
-      if (next) map.doubleClickZoom.disable()
-      else map.doubleClickZoom.enable()
     }
   }, [])
 
@@ -217,19 +209,11 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
       attributionControl: false,
     })
     mapRef.current = map
+    // Bấm đúp dùng để xóa đỉnh khi chỉnh sửa nên không zoom theo bấm đúp
+    if (!readOnlyRef.current) map.doubleClickZoom.disable()
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right')
 
     map.on('load', () => {
-      const f = fallbackBboxRef.current
-      if (f && !polysRef.current.length) {
-        map.fitBounds(
-          [
-            [f.min_lng ?? 0, f.min_lat ?? 0],
-            [f.max_lng ?? 0, f.max_lat ?? 0],
-          ],
-          { padding: 40, duration: 0 }
-        )
-      }
       for (const id of ['cb-area', 'cb-mask', 'cb-vertices', 'cb-mids', 'cb-draft']) {
         map.addSource(id, { type: 'geojson', data: EMPTY_FC })
       }
@@ -256,13 +240,12 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
         id: 'cb-mids',
         type: 'circle',
         source: 'cb-mids',
-        minzoom: 14,
         paint: {
-          'circle-radius': 3,
-          'circle-color': '#ffffff',
-          'circle-opacity': 0.55,
-          'circle-stroke-color': BOUNDARY_COLOR,
-          'circle-stroke-width': 1,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 15, 6.5],
+          'circle-color': BOUNDARY_COLOR,
+          'circle-opacity': 0.85,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5,
         },
       })
       map.addLayer({
@@ -347,20 +330,28 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
     map.on('mouseup', endDrag)
     window.addEventListener('mouseup', endDrag)
 
-    // Chuột phải vào đỉnh: xóa đỉnh (giữ tối thiểu 3 đỉnh)
-    map.on('contextmenu', (e) => {
-      if (readOnlyRef.current || isDrawingRef.current) return
-      const props = map.queryRenderedFeatures(e.point, { layers: ['cb-vertices'] })[0]?.properties
-      if (!props) return
-      e.originalEvent.preventDefault()
+    // Chuột phải hoặc bấm đúp vào đỉnh: xóa đỉnh, cạnh thẳng lại (giữ tối thiểu 3 đỉnh)
+    const removeVertexAt = (point: maplibregl.PointLike): boolean => {
+      const props = map.queryRenderedFeatures(point, { layers: ['cb-vertices'] })[0]?.properties
+      if (!props) return false
       const ring = polysRef.current[Number(props.p)]?.[Number(props.r)]
       if (!ring || ring.length <= 3) {
         setNotice('Mỗi vòng ranh giới cần tối thiểu 3 đỉnh.')
-        return
+        return true
       }
       ring.splice(Number(props.i), 1)
       renderLayers()
       commit()
+      return true
+    }
+    map.on('contextmenu', (e) => {
+      if (readOnlyRef.current || isDrawingRef.current) return
+      if (removeVertexAt(e.point)) e.originalEvent.preventDefault()
+    })
+    map.on('dblclick', (e) => {
+      if (readOnlyRef.current || isDrawingRef.current) return
+      // Bấm đúp vào đỉnh thì không để bản đồ zoom
+      removeVertexAt(e.point)
     })
 
     // Chế độ vẽ tay: mỗi lần bấm thêm một đỉnh
@@ -605,13 +596,8 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
 
       {!readOnly && hasBoundary && !isDrawing && (
         <div className="absolute bottom-3 left-3 z-30 max-w-[75%] px-3 py-1.5 rounded-xl bg-white/95 border border-slate-200/90 text-slate-700 text-[10.5px] shadow-md pointer-events-none">
-          <strong className="font-mono">{vertexCount}</strong> đỉnh · kéo chấm để chỉnh · bấm chấm mờ giữa
-          cạnh để thêm đỉnh · chuột phải vào đỉnh để xóa
-        </div>
-      )}
-      {readOnly && isMapLoaded && !hasBoundary && (
-        <div className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-xl bg-white/95 border border-slate-200/90 text-slate-700 text-[11px] font-medium shadow-md pointer-events-none">
-          Chưa có ranh giới — đang hiện vùng khung cũ
+          <strong className="font-mono">{vertexCount}</strong> đỉnh · kéo chấm để chỉnh · kéo chấm đỏ giữa
+          cạnh để thêm đỉnh · bấm đúp hoặc chuột phải vào đỉnh để xóa
         </div>
       )}
     </div>

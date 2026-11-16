@@ -34,6 +34,7 @@ import {
   setCommunePage,
 } from '../../../feature/communes/communeSlice'
 import { CommuneBoundaryMap } from './CommuneBoundaryMap'
+import { bboxToGeometry } from '../../../utils/communeBoundary'
 import { CommuneFormModal } from './CommuneFormModal'
 import { CommuneDetailModal } from './CommuneDetailModal'
 
@@ -132,6 +133,13 @@ export const CommunesTab: React.FC = () => {
   useEffect(() => {
     if (previewCommuneId && !isFormModalOpen) dispatch(fetchCommuneBoundaryRequest(previewCommuneId))
   }, [dispatch, previewCommuneId, previewUpdatedAt, isFormModalOpen])
+
+  // Xã chưa có ranh giới thì vẽ khung cũ như một polygon; giữ nguyên tham chiếu để bản đồ không nạp lại mỗi lần render
+  const previewBbox = activeCommune?.bbox
+  const previewBoundary = useMemo(
+    () => (isLoadingBoundary ? null : (boundary ?? bboxToGeometry(previewBbox))),
+    [isLoadingBoundary, boundary, previewBbox]
+  )
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '—'
@@ -539,8 +547,7 @@ export const CommunesTab: React.FC = () => {
               <div className="w-full flex-1 relative bg-slate-900">
                 <CommuneBoundaryMap
                   key={activeCommune.commune_id || 'none'}
-                  boundary={isLoadingBoundary ? null : boundary}
-                  fallbackBbox={activeCommune.bbox}
+                  boundary={previewBoundary}
                   readOnly
                   height="100%"
                 />

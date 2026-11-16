@@ -4,7 +4,7 @@ import { X, Compass, RotateCcw, CheckCircle2, Loader2 } from 'lucide-react'
 import type { CommuneItem, CommuneBbox } from '../../../types/admin/communes'
 import type { Geometry } from '../../../types/common/base'
 import { CommuneBoundaryMap } from './CommuneBoundaryMap'
-import { countVertices, geometryToPolygons, polygonsToBbox } from '../../../utils/communeBoundary'
+import { bboxToGeometry, countVertices, geometryToPolygons, polygonsToBbox } from '../../../utils/communeBoundary'
 
 export interface CommuneFormModalProps {
   isOpen: boolean
@@ -41,18 +41,24 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
   }>({ isOpen: false, communeId: null, initialBoundary: null })
 
   const currentCommuneId = commune?.commune_id ?? null
+
+  // Xã chưa có ranh giới: dùng khung cũ (bbox) làm polygon 4 đỉnh để vẫn có viền và kéo chỉnh được
+  const baseBoundary = useMemo(
+    () => initialBoundary ?? (isEdit && !isLoadingBoundary ? bboxToGeometry(commune?.bbox) : null),
+    [initialBoundary, isEdit, isLoadingBoundary, commune]
+  )
   if (
     prevSync.isOpen !== isOpen ||
     prevSync.communeId !== currentCommuneId ||
-    prevSync.initialBoundary !== initialBoundary
+    prevSync.initialBoundary !== baseBoundary
   ) {
-    setPrevSync({ isOpen, communeId: currentCommuneId, initialBoundary })
+    setPrevSync({ isOpen, communeId: currentCommuneId, initialBoundary: baseBoundary })
     if (isOpen) {
       if (prevSync.isOpen !== isOpen || prevSync.communeId !== currentCommuneId) {
         setName(commune?.name || '')
         setErrors({})
       }
-      setBoundary(initialBoundary)
+      setBoundary(baseBoundary)
     }
   }
 
@@ -73,7 +79,7 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
     const bbox = boundary
       ? polygonsToBbox(geometryToPolygons(boundary))
       : (commune?.bbox ?? null)
-    const changed = boundary !== initialBoundary
+    const changed = boundary !== baseBoundary
     onSubmit({
       name: trimmed,
       bbox,
@@ -137,10 +143,10 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                   <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs">Ranh giới hành chính</h4>
                   <p className="text-[11px] text-slate-500">Viền đứt đỏ trên bản đồ là phạm vi quản lý của địa bàn này</p>
                 </div>
-                {isEdit && boundary !== initialBoundary && (
+                {isEdit && boundary !== baseBoundary && (
                   <button
                     type="button"
-                    onClick={() => setBoundary(initialBoundary)}
+                    onClick={() => setBoundary(baseBoundary)}
                     className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/50 transition cursor-pointer"
                     title="Khôi phục ranh giới về bản đang lưu"
                   >
@@ -185,7 +191,6 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
                 key={commune?.commune_id || 'new-commune-modal'}
                 boundary={boundary}
                 onChange={setBoundary}
-                fallbackBbox={commune?.bbox ?? null}
                 onPickName={(picked) => setName((current) => current.trim() ? current : picked)}
                 height="400px"
               />
