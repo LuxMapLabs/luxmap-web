@@ -67,7 +67,7 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
       <div className="flex items-center justify-between">
         <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
           <ListOrdered className="w-3.5 h-3.5 text-blue-500" />
-          Thứ tự cột dọc tuyến
+          {onMove ? 'Thứ tự cột dọc tuyến' : 'Cột thuộc tuyến'}
         </span>
         {onAutoSort && (
         <button
@@ -157,12 +157,12 @@ export const SegmentPoleOrderList: React.FC<SegmentPoleOrderListProps> = ({
                       {codes[pole.id] || pole.id}
                     </span>
                   )}
-                  {isFirst && (
+                  {onMove && isFirst && (
                     <span className="shrink-0 px-1.5 py-px rounded bg-emerald-500 text-white text-[9px] font-bold">
                       Đầu tuyến
                     </span>
                   )}
-                  {isLast && poleIndexes.length > 1 && (
+                  {onMove && isLast && poleIndexes.length > 1 && (
                     <span className="shrink-0 px-1.5 py-px rounded bg-rose-500 text-white text-[9px] font-bold">
                       Cuối tuyến
                     </span>

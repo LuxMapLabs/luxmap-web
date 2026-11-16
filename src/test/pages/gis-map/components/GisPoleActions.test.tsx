@@ -132,7 +132,7 @@ describe('Panel cột trên Bản đồ GIS: sửa cột và tháo bộ đèn', 
 
   it('Cấp giám sát chỉ xem: không có thao tác sửa cột', () => {
     setup('superior')
-    expect(screen.queryByText('Thao tác trên cột')).not.toBeInTheDocument()
+    expect(screen.queryByText('Thao tác')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Sửa cột/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Tháo bộ đèn/ })).not.toBeInTheDocument()
   })

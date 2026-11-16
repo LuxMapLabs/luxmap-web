@@ -13,6 +13,7 @@ import {
   SegmentNoGpsPolePicker,
   noGpsPolesFor,
 } from '../../../../../components/SegmentNoGpsPolePicker'
+import { insertVertex } from '../../../../../utils/gis-map/lineEdit'
 import { SegmentShapePanel } from '../../../../../components/SegmentShapePanel'
 import { useSegmentRoadPick } from '../../../../../hooks/assets/useSegmentRoadPick'
 import { lineToWkt } from '../../../../../utils/gis-map/roadRouting'
@@ -25,6 +26,7 @@ import { polesNearLine } from '../../../../../utils/gis-map/segmentReshape'
 import {
   offRoadShapeMessage,
   polesOffRoadShape,
+  roadShapeDetourMessage,
 } from '../../../../../utils/gis-map/segmentRoadShape'
 import {
   toPickablePoles,
@@ -75,7 +77,6 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
     remove,
     move,
     autoSort,
-    addBend,
     moveBend,
     lastAddedId,
     geometry,
@@ -105,6 +106,10 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
       ? geometry
       : null
   const shapeKind = roadLine ? 'road' : route ? 'draft' : 'none'
+  const detourWarning = useMemo(
+    () => (roadLine && !roadPick.picking ? roadShapeDetourMessage(roadLine, poles) : null),
+    [roadLine, roadPick.picking, poles]
+  )
   // Hình theo con đường thì mọi cột có GPS của tuyến phải nằm trong hành lang khảo sát quanh nó
   const polesOffRoad = useMemo(
     () =>
@@ -247,7 +252,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                     className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-200 cursor-not-allowed select-none focus:outline-none"
                   />
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                    Chưa có hình nên chưa đo được chiều dài. Lấy hình theo đường trên bản đồ, hoặc
+                    Chưa có hình nên chưa đo được chiều dài. Vẽ hình tuyến trên bản đồ, hoặc
                     chọn từ 2 cột có GPS để có hình nháp.
                   </p>
                 </>
@@ -278,7 +283,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
               onCancel={roadPick.cancel}
               suggestedCount={suggestedIds.length}
               onAddSuggested={() => addMany(suggestedIds)}
-              onEditDraft={() => route && roadPick.setLine(parseLineStringWkt(route.geomWkt))}
+              warning={detourWarning}
             />
 
             {polesOffRoad.length > 0 && (
@@ -324,7 +329,12 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                 fixedLine={roadLine ?? undefined}
                 onTogglePole={toggle}
                 onMoveBend={moveBend}
-                onInsertBend={roadLine ? undefined : addBend}
+                onInsertBend={
+                  roadLine
+                    ? undefined
+                    : (to, edge) =>
+                        route && roadPick.setLine(insertVertex(parseLineStringWkt(route.geomWkt), edge + 1, to))
+                }
                 onRemoveBend={remove}
                 onEditLine={roadLine ? roadPick.setLine : undefined}
                 pickMode={roadPick.picking}

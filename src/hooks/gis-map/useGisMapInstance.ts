@@ -61,10 +61,15 @@ export function useGisMapInstance() {
       setIsMapLoaded(true)
     })
 
-    // Canvas phải co giãn theo khung chứa (đổi cỡ cửa sổ, thu gọn sidebar...), nếu không sẽ lộ viền trống
+    // Canvas phải co giãn theo khung chứa (đổi cỡ cửa sổ, thu gọn sidebar...), nếu không sẽ lộ viền trống.
+    // `resize()` xoá canvas và chỉ vẽ lại ở khung hình kế: sidebar đang chạy hiệu ứng thì mỗi khung bị trắng một nhịp
+    // (nháy, khựng). `redraw()` vẽ lại ngay trong cùng khung.
     let resizeObserver: ResizeObserver | null = null
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => map.resize())
+      resizeObserver = new ResizeObserver(() => {
+        map.resize()
+        map.redraw()
+      })
       resizeObserver.observe(mapContainerRef.current)
     }
 

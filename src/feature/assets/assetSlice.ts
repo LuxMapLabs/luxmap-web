@@ -129,15 +129,6 @@ export interface RetireFixturePayload {
   poleId?: string
 }
 
-/** Hình tuyến lấy theo đường trên bản đồ nền (Bản đồ GIS). */
-export interface ReshapeSegmentPayload {
-  segmentId: string
-  /** Tên hiển thị của tuyến, cho thông báo. */
-  label: string
-  geomWkt: string
-  lengthM: number
-}
-
 export interface UpdateIotNodePayload {
   nodeId: string
   data: UpdateIotNodeRequest
@@ -274,11 +265,6 @@ const assetSlice = createSlice({
       state.isMutating = true
       state.mutationError = null
     },
-    reshapeSegmentRequest: (state, action: PayloadAction<ReshapeSegmentPayload>) => {
-      void action
-      state.isMutating = true
-      state.mutationError = null
-    },
     createFixtureRequest: (state, action: PayloadAction<CreateFixturePayload>) => {
       void action
       state.isMutating = true
@@ -393,7 +379,6 @@ export const {
   updateSegmentRequest,
   deleteSegmentRequest,
   drawSegmentRequest,
-  reshapeSegmentRequest,
   createFixtureRequest,
   createFixturesBulkRequest,
   updateFixtureRequest,

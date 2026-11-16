@@ -7,13 +7,14 @@
  * - **Hình thật**: lấy theo đường của bản đồ nền hoặc vẽ tay, cột đứng bên lề nên không trùng đỉnh. Web không bao giờ
  *   dựng lại hình này từ cột; cột phải nằm trong hành lang khảo sát quanh nó.
  */
-import { calculateDistanceMeters, parseLineStringWkt } from './routeUtils'
+import { calculateDistanceMeters, calculateRouteLengthMeters, parseLineStringWkt } from './routeUtils'
 import { ROUTE_CORRIDOR_M } from './poleMove'
 import { polesFarFromLine } from './segmentReshape'
 import {
   VERTEX_MATCH_METERS,
   buildSegmentGeometry,
   deriveInitialOrder,
+  orderPolesAlongLine,
   reconcileRoute,
   type OrderedPole,
 } from './segmentPoleOrder'
@@ -59,6 +60,28 @@ export const offRoadShapeMessage = (labels: string[]): string => {
   return (
     `${labels.length} cột nằm cách hình tuyến quá ${ROUTE_CORRIDOR_M} m (${shown}). ` +
     'Tuyến đã có hình theo con đường nên hình không chạy theo cột. Đặt cột sát đường hơn, hoặc lấy lại hình tuyến ở ' +
-    'Bản đồ GIS (chọn tuyến, bấm "Lấy hình theo đường trên bản đồ").'
+    'form "Sửa tuyến" (Quản lý tài sản, nút "Vẽ lại hình tuyến trên bản đồ").'
+  )
+}
+
+/** Hình dài hơn chuỗi cột nối nhau quá tỉ lệ này (và dư quá ngần này mét) thì nghi đi vòng / quay ngược. */
+const DETOUR_RATIO = 1.15
+const DETOUR_EXTRA_M = 60
+
+/**
+ * Cảnh báo (không chặn) khi hình mới dài hơn nhiều so với chuỗi cột của tuyến: thường là bấm nhầm sang nét đường song song
+ * nên máy đi vòng qua ngã tư rồi quay ngược, hoặc kéo một chấm ra xa. Cột vẫn nằm trong 25 m nên luật hành lang không bắt được.
+ */
+export const roadShapeDetourMessage = (line: LngLat[], poles: OrderedPole[]): string | null => {
+  if (line.length < 2 || poles.length < 2) return null
+  const ordered = orderPolesAlongLine(poles, line)
+  let chain = 0
+  for (let i = 1; i < ordered.length; i++) chain += calculateDistanceMeters(ordered[i - 1].coord, ordered[i].coord)
+  const shape = calculateRouteLengthMeters(line)
+  if (shape <= chain * DETOUR_RATIO || shape - chain < DETOUR_EXTRA_M) return null
+  const fmt = (m: number) => `${Math.round(m).toLocaleString('vi-VN')} m`
+  return (
+    `Hình dài ${fmt(shape)} nhưng các cột của tuyến nối nhau chỉ dài ${fmt(chain)}. Có thể hình đi vòng hoặc quay ngược ` +
+    '(bấm nhầm sang nét đường song song, hoặc kéo một chấm ra xa). Xem lại trên bản đồ; đúng rồi thì cứ lưu.'
   )
 }

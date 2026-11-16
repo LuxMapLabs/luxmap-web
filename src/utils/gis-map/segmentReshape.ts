@@ -39,7 +39,15 @@ export const startReshape = (segmentId: string, label: string, oldLengthM: numbe
   error: null,
 })
 
+/** Khung xã dạng [[minLng, minLat], [maxLng, maxLat]] (web chỉ có khung chữ nhật, chưa có ranh giới thật). */
+export type CommuneFrame = [[number, number], [number, number]]
+
+const insideFrame = (frame: CommuneFrame | null | undefined, [lng, lat]: LngLat): boolean =>
+  !frame || (lng >= frame[0][0] && lng <= frame[1][0] && lat >= frame[0][1] && lat <= frame[1][1])
+
 export const RESHAPE_MESSAGES = {
+  outsideCommune:
+    'Chỗ vừa bấm nằm ngoài khung xã (khung nét đứt trên bản đồ). Tuyến chỉ vẽ trong địa bàn xã đang quản lý, hãy bấm vào trong khung.',
   zoom: 'Phóng to bản đồ thêm rồi bấm lại: ở mức này bản đồ nền chưa hiện đủ đường nhỏ.',
   offRoad:
     'Chỗ vừa bấm không nằm trên con đường nào của bản đồ nền (đường có trên bản đồ nền hiện nét vàng). Bấm sát vào nét vàng. Đường không có nét vàng thì chọn "Vẽ tay" rồi bấm từng điểm dọc đường.',
@@ -63,8 +71,10 @@ export const addReshapePoint = (
   current: SegmentReshape,
   roadLines: LngLat[][],
   click: LngLat,
-  zoom: number
+  zoom: number,
+  frame?: CommuneFrame | null
 ): SegmentReshape => {
+  if (!insideFrame(frame, click)) return { ...current, error: RESHAPE_MESSAGES.outsideCommune }
   if (zoom < MIN_ROAD_ZOOM) return { ...current, error: RESHAPE_MESSAGES.zoom }
   const graph = buildRoadGraph(roadLines)
   const last = current.points[current.points.length - 1]
@@ -97,7 +107,12 @@ const addLeg = (current: SegmentReshape, leg: LngLat[], freehand: boolean): Segm
  * Vẽ tay: đặt điểm đúng chỗ bấm, nối thẳng từ điểm trước. Dùng cho đường chưa có trên bản đồ nền
  * (đường đất, bờ kênh); Quản lý bấm dọc con đường trên ảnh vệ tinh, khúc cua thì bấm dày hơn.
  */
-export const addFreehandPoint = (current: SegmentReshape, click: LngLat): SegmentReshape => {
+export const addFreehandPoint = (
+  current: SegmentReshape,
+  click: LngLat,
+  frame?: CommuneFrame | null
+): SegmentReshape => {
+  if (!insideFrame(frame, click)) return { ...current, error: RESHAPE_MESSAGES.outsideCommune }
   const last = current.points[current.points.length - 1]
   if (!last) return { ...current, points: [click], freehand: [true], error: null }
   return addLeg(current, [last, click], true)

@@ -65,13 +65,11 @@ import {
   deleteIotNodeRequest,
   setIotNodeRelayRequest,
   issueIotNodeCredentialRequest,
-  reshapeSegmentRequest,
   mutationSuccess,
   mutationFailure,
   type ImportAssetPayload,
   type CreatePolePayload,
   type UpdatePolePayload,
-  type ReshapeSegmentPayload,
   type UpdateCabinetPayload,
   type UpdateFeederPayload,
   type UpdateSegmentPayload,
@@ -737,58 +735,6 @@ function poleOffSegmentMessage(error: unknown): string | null {
   return `Vị trí mới ${far}nằm ngoài hành lang${limit} quanh tuyến của cột nên không lưu. Muốn đưa cột sang tuyến khác thì sửa cột ở Quản lý tài sản.`
 }
 
-/** 409 `POLE_OFF_SEGMENT` khi đổi hình tuyến: hình mới để cột của tuyến nằm xa đường quá hành lang khảo sát. */
-function segmentOffCorridorMessage(error: unknown): string | null {
-  const body = (
-    error as {
-      response?: {
-        data?: {
-          error?: {
-            code?: string
-            details?: { pole_ids?: string[]; pole_count?: number; corridor_m?: number }
-          }
-        }
-      }
-    }
-  )?.response?.data?.error
-  if (body?.code !== 'POLE_OFF_SEGMENT') return null
-  const { pole_ids: ids, pole_count: count, corridor_m: corridor } = body.details ?? {}
-  const howMany = typeof count === 'number' ? `${count} cột` : 'Có cột'
-  const which = ids?.length ? ` (${ids.slice(0, 5).join(', ')}${ids.length > 5 ? '…' : ''})` : ''
-  const limit = typeof corridor === 'number' ? ` ${formatMeters(corridor)}` : ''
-  return `${howMany} của tuyến${which} nằm xa hình mới quá${limit} nên không lưu. Chọn đường đi qua gần các cột đó, hoặc dời cột trước.`
-}
-
-/**
- * Lấy hình tuyến theo đường trên bản đồ nền (Bản đồ GIS): ghi hình mới qua PUT /assets/segments/{id}, giữ nguyên các
- * thông tin khác của tuyến và danh sách cột. Chiều dài lấy theo hình mới, như mọi chỗ khác web ghi hình tuyến.
- */
-export function* handleReshapeSegment(action: PayloadAction<ReshapeSegmentPayload>) {
-  const { segmentId, label, geomWkt, lengthM } = action.payload
-  try {
-    const detail: SegmentDetail = yield call(assetAPI.getSegmentDetail, segmentId)
-    const seg = detail.segment
-    yield call(assetAPI.updateSegment, segmentId, {
-      external_ref: seg.external_ref,
-      segment_name: seg.segment_name,
-      road_class: seg.road_class,
-      length_m: lengthM,
-      geom_wkt: geomWkt,
-      data_source: seg.data_source,
-    })
-
-    yield put(mutationSuccess())
-    toast.success(`Đã cập nhật hình tuyến "${label}" (dài ${formatMeters(lengthM)})`)
-    yield put(fetchMapLayersRequest())
-    yield put(fetchAssetsRequest())
-  } catch (error: unknown) {
-    const errorMsg =
-      segmentOffCorridorMessage(error) ?? getErrorMessage(error, 'Không thể cập nhật hình tuyến')
-    yield put(mutationFailure(errorMsg))
-    toast.error(`Lỗi khi lưu hình tuyến: ${errorMsg}`)
-  }
-}
-
 function* handleCreateIotNode(action: PayloadAction<CreateIotNodeRequest>) {
   try {
     yield call(assetAPI.createIotNode, action.payload)
@@ -889,7 +835,6 @@ export default function* assetSaga() {
   yield takeLatest(updateSegmentRequest.type, handleUpdateSegment)
   yield takeLatest(deleteSegmentRequest.type, handleDeleteSegment)
   yield takeLatest(drawSegmentRequest.type, handleDrawSegment)
-  yield takeLatest(reshapeSegmentRequest.type, handleReshapeSegment)
   yield takeLatest(createFixtureRequest.type, handleCreateFixture)
   yield takeLatest(createFixturesBulkRequest.type, handleCreateFixturesBulk)
   yield takeLatest(updateFixtureRequest.type, handleUpdateFixture)

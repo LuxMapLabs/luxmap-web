@@ -44,6 +44,15 @@ describe('SegmentPoleOrderList', () => {
     expect(items[2]).toHaveTextContent('Cuối tuyến')
   })
 
+  it('không kéo thả được (hình theo đường) thì đổi tên "Cột thuộc tuyến" và bỏ nhãn đầu / cuối tuyến', () => {
+    setup({ onMove: undefined, onAutoSort: undefined })
+    expect(screen.getByText('Cột thuộc tuyến')).toBeInTheDocument()
+    expect(screen.queryByText('Thứ tự cột dọc tuyến')).not.toBeInTheDocument()
+    expect(screen.queryByText('Đầu tuyến')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cuối tuyến')).not.toBeInTheDocument()
+    expect(rows()).toHaveLength(3)
+  })
+
   it('danh sách rỗng thì hiện hướng dẫn thay vì để trống', () => {
     setup({ route: [] })
     expect(screen.getByText(/Chưa chọn cột nào/)).toBeInTheDocument()

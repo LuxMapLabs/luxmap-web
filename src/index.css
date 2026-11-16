@@ -211,22 +211,6 @@ button:focus-visible {
   transform: scale(1) !important;
 }
 
-/* Đang bấm chọn điểm trên bản đồ (lấy hình tuyến): cú bấm xuyên qua chấm cột / tủ điện xuống bản đồ,
-   chấm mờ đi để thấy nét đang lấy nằm bên dưới; khung nổi khi rê chuột không che thanh lấy hình;
-   con trỏ giữ hình chữ thập (hàm rê chuột qua tuyến / tuyến điện tự đặt lại con trỏ) */
-.gis-map-picking .gis-marker-wrap.gis-marker-visible {
-  pointer-events: none !important;
-  opacity: 0.35 !important;
-}
-
-.gis-map-picking .maplibregl-popup {
-  display: none !important;
-}
-
-.gis-map-picking .maplibregl-canvas {
-  cursor: crosshair !important;
-}
-
 .gis-marker-wrap.gis-marker-hidden {
   opacity: 0 !important;
   transform: scale(0.2) !important;
@@ -1055,4 +1039,21 @@ button:focus-visible {
     box-shadow: none !important;
     border: none !important;
   }
+}
+
+/* Biểu đồ giám sát điện đổi theo phút / giờ: vào bằng co giãn ngang quanh giữa, `--swap-from` < 1 thì rộng ra, > 1 thì thu vào */
+@keyframes electrical-chart-swap {
+  from {
+    transform: scaleX(var(--swap-from, 0.5));
+    opacity: 0.3;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.electrical-chart-swap {
+  transform-origin: center;
+  animation: electrical-chart-swap 600ms cubic-bezier(0.45, 0, 0.2, 1);
 }

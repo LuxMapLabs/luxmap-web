@@ -149,19 +149,4 @@ describe('Sửa tuyến mà hình chỉ là bản nháp nối cột', () => {
     expect(onSave.mock.calls[0][0].geom_wkt).toBe('LINESTRING(106.8 10.8, 106.801 10.8, 106.802 10.8)')
   })
 
-  it('bấm "Sửa hình bằng kéo thả": hình thôi chạy theo cột, cột chọn thêm không nối vào nữa', () => {
-    const onSave = open([...own, pole('POLE-0003', 106.8005, 10.80005, null)], JOINED)
-
-    fireEvent.click(screen.getByRole('button', { name: /Sửa hình bằng kéo thả/ }))
-    expect(JSON.parse(screen.getByTestId('picker-map').dataset.fixedLine as string)).toEqual([
-      [106.8, 10.8],
-      [106.801, 10.8],
-    ])
-    fireEvent.click(screen.getByRole('button', { name: 'chọn POLE-0003' }))
-    save()
-
-    expect(onSave).toHaveBeenCalledTimes(1)
-    expect(onSave.mock.calls[0][0].geom_wkt).toBe('LINESTRING(106.8 10.8, 106.801 10.8)')
-    expect(onSave.mock.calls[0][1]).toContain('POLE-0003')
-  })
 })

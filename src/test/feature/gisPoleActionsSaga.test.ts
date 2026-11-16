@@ -21,13 +21,11 @@ vi.mock('../../feature/assets/assetAPI', () => ({
 import assetAPI from '../../feature/assets/assetAPI'
 import {
   handleRetireFixture,
-  handleReshapeSegment,
   handleCreateFixture,
   handleUpdateFixture,
 } from '../../feature/assets/assetSaga'
 import {
   retireFixtureRequest,
-  reshapeSegmentRequest,
   createFixtureRequest,
   updateFixtureRequest,
   mutationSuccess,
@@ -84,79 +82,6 @@ describe('Tháo bóng (PUT /assets/fixtures/{id}/removal)', () => {
     )
 
     expect(types(dispatched)).toEqual([mutationSuccess.type, fetchAssetsRequest.type])
-  })
-})
-
-describe('Lấy hình tuyến theo đường trên bản đồ nền (PUT /assets/segments/{id})', () => {
-  const reshape = reshapeSegmentRequest({
-    segmentId: 'SEG-003',
-    label: 'Tuyến B',
-    geomWkt: 'LINESTRING(106.49 10.97, 106.5 10.98)',
-    lengthM: 1214,
-  })
-  const detail = {
-    segment: {
-      segment_id: 'SEG-003',
-      external_ref: 'osm-way-1',
-      segment_name: 'Tuyến B',
-      road_class: 'inter_village',
-      length_m: 1213,
-      commune_id: 'COM-001',
-      commune_name: 'Phước Thiện',
-      data_source: 'field',
-    },
-    geom_wkt: 'LINESTRING(0 0, 1 1)',
-    created_at: null,
-  }
-
-  it('giữ nguyên thông tin tuyến, chỉ thay hình và chiều dài; không gửi danh sách cột', async () => {
-    vi.mocked(assetAPI.getSegmentDetail).mockResolvedValue(detail as never)
-    vi.mocked(assetAPI.updateSegment).mockResolvedValue(undefined)
-
-    const dispatched = await run(handleReshapeSegment, reshape)
-
-    expect(assetAPI.updateSegment).toHaveBeenCalledWith('SEG-003', {
-      external_ref: 'osm-way-1',
-      segment_name: 'Tuyến B',
-      road_class: 'inter_village',
-      length_m: 1214,
-      geom_wkt: 'LINESTRING(106.49 10.97, 106.5 10.98)',
-      data_source: 'field',
-    })
-    expect(types(dispatched)).toEqual([
-      mutationSuccess.type,
-      fetchMapLayersRequest.type,
-      fetchAssetsRequest.type,
-    ])
-  })
-
-  it('409 POLE_OFF_SEGMENT: báo số cột, mã cột và hành lang do backend gửi', async () => {
-    vi.mocked(assetAPI.getSegmentDetail).mockResolvedValue(detail as never)
-    vi.mocked(assetAPI.updateSegment).mockRejectedValue({
-      response: {
-        status: 409,
-        data: {
-          error: {
-            code: 'POLE_OFF_SEGMENT',
-            message: 'That line leaves 2 pole(s) of the segment more than 25 m away…',
-            details: {
-              segment_id: 'SEG-003',
-              pole_ids: ['POLE-0041', 'POLE-0042'],
-              pole_count: 2,
-              corridor_m: 25,
-            },
-          },
-        },
-      },
-    })
-
-    const dispatched = await run(handleReshapeSegment, reshape)
-
-    expect(types(dispatched)).toEqual([mutationFailure.type])
-    const message = (dispatched[0] as ReturnType<typeof mutationFailure>).payload
-    expect(message).toContain('2 cột')
-    expect(message).toContain('POLE-0041, POLE-0042')
-    expect(message).toContain('25 m')
   })
 })
 

@@ -3,6 +3,7 @@ import {
   isRoadShape,
   offRoadShapeMessage,
   polesOffRoadShape,
+  roadShapeDetourMessage,
   segmentLineAfter,
 } from '../../utils/gis-map/segmentRoadShape'
 import type { OrderedPole } from '../../utils/gis-map/segmentPoleOrder'
@@ -95,11 +96,36 @@ describe('offRoadShapeMessage', () => {
   it('nêu số cột, hành lang 25 m và cách sửa', () => {
     const message = offRoadShapeMessage(['KS-01', 'KS-02'])
     expect(message).toMatch(/^2 cột nằm cách hình tuyến quá 25 m \(KS-01, KS-02\)\./)
-    expect(message).toContain('Lấy hình theo đường trên bản đồ')
+    expect(message).toContain('form "Sửa tuyến"')
+    expect(message).not.toContain('Bản đồ GIS')
   })
 
   it('nhiều hơn 5 cột thì chỉ nêu 5 mã đầu', () => {
     const message = offRoadShapeMessage(['A1', 'A2', 'A3', 'A4', 'A5', 'A6'])
     expect(message).toMatch(/^6 cột .* \(A1, A2, A3, A4, A5…\)\./)
+  })
+})
+
+describe('roadShapeDetourMessage', () => {
+  const poles = [A, B, C]
+  // Hình đi thẳng qua ba cột
+  const STRAIGHT: [number, number][] = [A.coord, B.coord, C.coord]
+  // Hình đi qua cột A rồi vọt ra xa ~220 m về phía bắc, quay lại qua B, C: đi vòng
+  const SPUR: [number, number][] = [A.coord, [106.8005, 10.802], B.coord, C.coord]
+
+  it('hình đi dọc các cột: không cảnh báo', () => {
+    expect(roadShapeDetourMessage(STRAIGHT, poles)).toBeNull()
+  })
+
+  it('hình có mũi nhọn quay ngược: cảnh báo, nêu chiều dài hình và chuỗi cột', () => {
+    const message = roadShapeDetourMessage(SPUR, poles)
+    expect(message).toMatch(/^Hình dài .* m nhưng các cột của tuyến nối nhau chỉ dài .* m\./)
+    expect(message).toContain('đi vòng hoặc quay ngược')
+  })
+
+  it('dư ít mét thì bỏ qua dù tỉ lệ cao; chưa đủ 2 cột thì không so', () => {
+    const slight: [number, number][] = [A.coord, [106.8005, 10.80035], B.coord, C.coord]
+    expect(roadShapeDetourMessage(slight, poles)).toBeNull()
+    expect(roadShapeDetourMessage(SPUR, [A])).toBeNull()
   })
 })

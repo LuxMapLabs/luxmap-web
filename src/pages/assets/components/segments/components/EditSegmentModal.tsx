@@ -13,6 +13,7 @@ import {
   SegmentNoGpsPolePicker,
   noGpsPolesFor,
 } from '../../../../../components/SegmentNoGpsPolePicker'
+import { insertVertex } from '../../../../../utils/gis-map/lineEdit'
 import { SegmentShapePanel } from '../../../../../components/SegmentShapePanel'
 import { useSegmentRoadPick } from '../../../../../hooks/assets/useSegmentRoadPick'
 import { lineToWkt } from '../../../../../utils/gis-map/roadRouting'
@@ -34,6 +35,7 @@ import {
   isRoadShape,
   offRoadShapeMessage,
   polesOffRoadShape,
+  roadShapeDetourMessage,
 } from '../../../../../utils/gis-map/segmentRoadShape'
 import {
   fetchSegmentDetailRequest,
@@ -110,7 +112,6 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
     remove,
     move,
     autoSort,
-    addBend,
     moveBend,
     lastAddedId,
     geometry,
@@ -156,6 +157,10 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
         ? geometry
         : null
   const shapeKind = roadLine ? 'road' : route ? 'draft' : 'none'
+  const detourWarning = useMemo(
+    () => (newRoadLine && !roadPick.picking ? roadShapeDetourMessage(newRoadLine, poles) : null),
+    [newRoadLine, roadPick.picking, poles]
+  )
   // Hình không chạy theo cột nên cột của tuyến phải nằm trong hành lang quanh hình.
   // Hình mới lấy: mọi cột phải nằm trong (backend đo lại cả tuyến khi hình đổi).
   // Hình đang lưu: cột chọn thêm phải nằm trong; cột đã thuộc tuyến từ trước mà nằm xa thì chỉ nhắc,
@@ -292,7 +297,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                       className="w-full p-2.5 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-800 dark:text-slate-200 cursor-not-allowed select-none focus:outline-none"
                     />
                     <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Chưa có hình nên chưa đo được chiều dài. Lấy hình theo đường trên bản đồ, hoặc
+                      Chưa có hình nên chưa đo được chiều dài. Vẽ hình tuyến trên bản đồ, hoặc
                       chọn từ 2 cột có GPS để có hình nháp.
                     </p>
                   </>
@@ -323,7 +328,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
               onCancel={roadPick.cancel}
               suggestedCount={suggestedIds.length}
               onAddSuggested={() => addMany(suggestedIds)}
-              onEditDraft={() => route && roadPick.setLine(parseLineStringWkt(route.geomWkt))}
+              warning={detourWarning}
             />
 
             {candidates.length > 0 && (
@@ -348,8 +353,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 <span>
                   Tuyến đã có hình theo con đường (nét xanh trên bản đồ) nên lưu ở đây giữ nguyên
                   hình, không nối lại theo cột. Cột chọn vào tuyến phải nằm trong 25 m quanh hình.
-                  Muốn đổi hình: kéo chấm trắng trên bản đồ để uốn, hoặc bấm "Lấy lại hình theo
-                  đường trên bản đồ" ở trên.
+                  Muốn đổi hình: kéo chấm trắng trên bản đồ để uốn, hoặc bấm "Vẽ lại hình tuyếntrên bản đồ" ở trên.
                 </span>
               </div>
             )}
@@ -396,7 +400,12 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 fixedLine={roadLine ?? undefined}
                 onTogglePole={toggle}
                 onMoveBend={moveBend}
-                onInsertBend={roadLine ? undefined : addBend}
+                onInsertBend={
+                  roadLine
+                    ? undefined
+                    : (to, edge) =>
+                        route && roadPick.setLine(insertVertex(parseLineStringWkt(route.geomWkt), edge + 1, to))
+                }
                 onRemoveBend={remove}
                 onEditLine={roadLine ? roadPick.setLine : undefined}
                 pickMode={roadPick.picking}

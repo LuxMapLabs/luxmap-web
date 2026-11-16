@@ -7,6 +7,7 @@ import {
   reshapeLine,
   startReshape,
   undoReshapePoint,
+  type CommuneFrame,
   type SegmentReshape,
 } from '../../utils/gis-map/segmentReshape'
 
@@ -37,12 +38,12 @@ export const useSegmentRoadPick = () => {
   }, [edited])
 
   const pick = useCallback(
-    (click: LngLat, roadLines: LngLat[][], zoom: number) => {
+    (click: LngLat, roadLines: LngLat[][], zoom: number, frame?: CommuneFrame | null) => {
       setState((prev) =>
         prev
           ? freehand
-            ? addFreehandPoint(prev, click)
-            : addReshapePoint(prev, roadLines, click, zoom)
+            ? addFreehandPoint(prev, click, frame)
+            : addReshapePoint(prev, roadLines, click, zoom, frame)
           : prev
       )
     },

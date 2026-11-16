@@ -26,6 +26,35 @@ const ROADS: LngLat[][] = [
 ]
 const Z = MIN_ROAD_ZOOM + 1
 
+describe('khung xã: không cho bấm điểm ngoài địa bàn xã', () => {
+  // Khung 300 m x 300 m quanh đường chữ L
+  const FRAME: [[number, number], [number, number]] = [at(-50, -50), at(250, 200)]
+
+  it('lấy theo đường: điểm ngoài khung bị từ chối, trong khung vẫn nhận', () => {
+    const start = startReshape('SEG-1', 'Tuyến 1', 300)
+    const out = addReshapePoint(start, ROADS, at(10, 0), Z, [at(500, 500), at(600, 600)])
+    expect(out.points).toHaveLength(0)
+    expect(out.error).toBe(RESHAPE_MESSAGES.outsideCommune)
+
+    const inside = addReshapePoint(start, ROADS, at(10, 0), Z, FRAME)
+    expect(inside.error).toBeNull()
+    expect(inside.points).toHaveLength(1)
+  })
+
+  it('vẽ tay: điểm ngoài khung bị từ chối và không đổi các điểm đã có', () => {
+    const first = addFreehandPoint(startReshape('SEG-1', 'Tuyến 1', 300), at(50, 60), FRAME)
+    const out = addFreehandPoint(first, at(900, 60), FRAME)
+    expect(out.points).toEqual(first.points)
+    expect(out.error).toBe(RESHAPE_MESSAGES.outsideCommune)
+  })
+
+  it('không có khung (xã chưa khai khung) thì không chặn', () => {
+    const r = addFreehandPoint(startReshape('SEG-1', 'Tuyến 1', 300), at(9000, 9000), null)
+    expect(r.error).toBeNull()
+    expect(r.points).toHaveLength(1)
+  })
+})
+
 describe('addReshapePoint: lấy hình tuyến từng điểm bấm', () => {
   it('chưa phóng đủ gần: không lấy, nhắc phóng to', () => {
     const next = addReshapePoint(startReshape('SEG-1', 'Tuyến 1', 300), ROADS, at(0, 0), MIN_ROAD_ZOOM - 0.5)
