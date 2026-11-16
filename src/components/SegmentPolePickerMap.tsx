@@ -10,6 +10,7 @@ import {
   toLngLatBounds,
   getCommuneBboxInfo,
   toBboxPolygonGeoJSON,
+  toBboxMaskGeoJSON,
 } from '../utils/gis-map/mapUtils'
 import { isBend, polesOf, type OrderedPole } from '../utils/gis-map/segmentPoleOrder'
 import { MIN_ROAD_ZOOM } from '../utils/gis-map/segmentReshape'
@@ -45,7 +46,12 @@ interface SegmentPolePickerMapProps {
    * và mức phóng), không chọn / bỏ cột (cột nằm ngay trên đường).
    */
   pickMode?: boolean
-  onPickRoadPoint?: (click: [number, number], roadLines: [number, number][][], zoom: number) => void
+  onPickRoadPoint?: (
+    click: [number, number],
+    roadLines: [number, number][][],
+    zoom: number,
+    communeFrame: [[number, number], [number, number]] | null
+  ) => void
   /** Các điểm đã bấm khi lấy hình (điểm đầu xanh lá). */
   pickedPoints?: [number, number][]
   /** Cột gợi ý (nằm sát hình tuyến, chưa chọn): viền cam. */
@@ -56,7 +62,7 @@ interface SegmentPolePickerMapProps {
    */
   onEditLine?: (line: [number, number][]) => void
   /** Hình nháp nối cột: kéo chấm mờ giữa hai cột để thêm điểm uốn tại chỗ thả. */
-  onInsertBend?: (coord: [number, number]) => void
+  onInsertBend?: (coord: [number, number], edgeIndex: number) => void
   /** Nhấp đúp tay nắm điểm uốn để xoá. */
   onRemoveBend?: (bendId: string) => void
 }
@@ -67,6 +73,9 @@ const PICKED_SRC = 'pick-road-points'
 const COMMUNE_SRC = 'pick-commune-outline'
 /** Viền khung xã (web chỉ có bbox của xã, chưa có ranh giới thật); không có khung thì không vẽ gì. */
 const communeOutline = (bbox: unknown) => toBboxPolygonGeoJSON(bbox) ?? emptyFc
+const COMMUNE_MASK_SRC = 'pick-commune-mask'
+/** Phần ngoài khung xã tô tối như Bản đồ GIS; không có khung thì không phủ gì. */
+const communeMask = (bbox: unknown) => toBboxMaskGeoJSON(bbox) ?? emptyFc
 const emptyFc = { type: 'FeatureCollection' as const, features: [] }
 
 // Nhãn nhỏ ĐẦU / CUỐI trên cột đầu và cột cuối của tuyến
@@ -365,7 +374,7 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
         const at = marker.getLngLat()
         const to: [number, number] = [at.lng, at.lat]
         if (editable) onEditLineRef.current?.(insertVertex(line, i + 1, to))
-        else onInsertBendRef.current?.(to)
+        else onInsertBendRef.current?.(to, i)
       })
       lineHandlesRef.current.push(marker)
     })
@@ -415,6 +424,13 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
 
     map.on('load', () => {
       // Viền khung xã của tuyến: nằm dưới mọi lớp khác, để biết đâu là địa bàn mình
+      map.addSource(COMMUNE_MASK_SRC, { type: 'geojson', data: communeMask(communeBboxRef.current) })
+      map.addLayer({
+        id: 'pick-commune-mask',
+        type: 'fill',
+        source: COMMUNE_MASK_SRC,
+        paint: { 'fill-color': '#0f172a', 'fill-opacity': 0.35 },
+      })
       map.addSource(COMMUNE_SRC, {
         type: 'geojson',
         data: communeOutline(communeBboxRef.current),
@@ -513,7 +529,12 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
       // Chế độ điểm uốn: click chỗ trống (không trúng cột) để đặt điểm uốn
       map.on('click', (e) => {
         if (pickModeRef.current) {
-          onPickRoadPointRef.current?.([e.lngLat.lng, e.lngLat.lat], queryBaseMapRoadLines(map), map.getZoom())
+          onPickRoadPointRef.current?.(
+            [e.lngLat.lng, e.lngLat.lat],
+            queryBaseMapRoadLines(map),
+            map.getZoom(),
+            toLngLatBounds(communeBboxRef.current)
+          )
           return
         }
         if (!bendModeRef.current || !onAddBendRef.current) return
@@ -587,6 +608,7 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
     const map = mapRef.current
     if (!map || !loadedRef.current) return
     ;(map.getSource(COMMUNE_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeOutline(communeBbox))
+    ;(map.getSource(COMMUNE_MASK_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeMask(communeBbox))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(communeBbox)])
 

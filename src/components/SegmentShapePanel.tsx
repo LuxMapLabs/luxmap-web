@@ -18,8 +18,8 @@ interface SegmentShapePanelProps {
   /** Cột chưa thuộc tuyến nằm sát hình: thêm cả một lần. */
   suggestedCount: number
   onAddSuggested: () => void
-  /** Hình nháp nối cột: chuyển thành hình đứng yên để kéo đỉnh, kéo hai đầu ra ngoài cột đầu / cuối. */
-  onEditDraft?: () => void
+  /** Cảnh báo không chặn: hình dài hơn nhiều so với chuỗi cột. */
+  warning?: string | null
   /** Vẽ tay: bấm từng điểm dọc đường trên ảnh vệ tinh, nối thẳng (đường không có trên bản đồ nền). */
   freehand?: boolean
   onFreehandChange?: (freehand: boolean) => void
@@ -46,7 +46,7 @@ export const SegmentShapePanel: React.FC<SegmentShapePanelProps> = ({
   onCancel,
   suggestedCount,
   onAddSuggested,
-  onEditDraft,
+  warning = null,
   freehand = false,
   onFreehandChange,
 }) => (
@@ -148,23 +148,13 @@ export const SegmentShapePanel: React.FC<SegmentShapePanelProps> = ({
         >
           <MapPinned className="w-3.5 h-3.5" />
           {kind === 'road'
-            ? 'Lấy lại hình theo đường trên bản đồ'
-            : 'Lấy hình theo đường trên bản đồ'}
+            ? 'Vẽ lại hình tuyến trên bản đồ'
+            : 'Vẽ hình tuyến trên bản đồ'}
         </button>
-        {kind === 'draft' && onEditDraft && (
-          <button
-            type="button"
-            onClick={onEditDraft}
-            className={`${button} bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1`}
-          >
-            <Route className="w-3.5 h-3.5" />
-            Sửa hình bằng kéo thả
-          </button>
-        )}
-        {kind === 'draft' && onEditDraft && (
+        {kind === 'draft' && (
           <p className="text-[10px] text-slate-500 dark:text-slate-400">
-            Kéo thả: hình thôi chạy theo cột. Kéo chấm trắng để uốn, kéo hai đầu ra tới chỗ con
-            đường thật bắt đầu / kết thúc (kể cả đoạn không có cột).
+            Kéo chấm mờ giữa hai cột để uốn hình: hình thôi chạy theo cột và thành hình kéo thả (cột
+            vẫn phải nằm trong 25 m quanh hình).
           </p>
         )}
         {kind === 'road' && (
@@ -180,6 +170,16 @@ export const SegmentShapePanel: React.FC<SegmentShapePanelProps> = ({
           </p>
         )}
       </div>
+    )}
+
+    {warning && !picking && (
+      <p
+        role="status"
+        className="flex gap-1.5 p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 font-semibold"
+      >
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+        {warning}
+      </p>
     )}
 
     {suggestedCount > 0 && (

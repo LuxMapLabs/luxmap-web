@@ -45,7 +45,7 @@ vi.mock('../../../../../components/SegmentPolePickerMap', () => ({
     onPickRoadPoint?: (click: [number, number], roads: [number, number][][], zoom: number) => void
     suggestedIds?: ReadonlySet<string>
     onEditLine?: (line: [number, number][]) => void
-    onInsertBend?: (coord: [number, number]) => void
+    onInsertBend?: (coord: [number, number], edgeIndex: number) => void
   }) => (
     <div
       data-testid="picker-map"
@@ -67,7 +67,7 @@ vi.mock('../../../../../components/SegmentPolePickerMap', () => ({
         </button>
       )}
       {onInsertBend && (
-        <button type="button" onClick={() => onInsertBend(fake.drop)}>
+        <button type="button" onClick={() => onInsertBend(fake.drop, 0)}>
           kéo chấm giữa hai cột
         </button>
       )}
@@ -107,7 +107,7 @@ const bamDuong = (lng: number, lat: number) => {
 
 /** Lấy hình theo đường: bấm điểm đầu và điểm cuối trên con đường, rồi "Xong". */
 const layHinh = () => {
-  fireEvent.click(screen.getByRole('button', { name: /Lấy (lại )?hình theo đường trên bản đồ/ }))
+  fireEvent.click(screen.getByRole('button', { name: /Vẽ (lại )?hình tuyến trên bản đồ/ }))
   bamDuong(106.7998, 10.8001)
   bamDuong(106.8022, 10.8001)
   fireEvent.click(screen.getByRole('button', { name: 'Xong' }))
@@ -152,7 +152,7 @@ describe('Thêm tuyến: lấy hình bằng cách bấm trên con đường, kh�
 
   it('đang lấy hình: bản đồ ở chế độ bấm đường; bấm "Xong" thì thôi', () => {
     openAdd([NEAR_1])
-    fireEvent.click(screen.getByRole('button', { name: 'Lấy hình theo đường trên bản đồ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vẽ hình tuyến trên bản đồ' }))
     expect(screen.getByTestId('picker-map').dataset.pickMode).toBe('true')
     bamDuong(106.7998, 10.8001)
     bamDuong(106.8022, 10.8001)
@@ -196,6 +196,8 @@ describe('Thêm tuyến: lấy hình bằng cách bấm trên con đường, kh�
 
     expect(screen.queryByRole('button', { name: 'Sắp xếp tự động' })).not.toBeInTheDocument()
     expect(document.querySelector('[title="Kéo để đổi vị trí"]')).toBeNull()
+    expect(screen.getByText('Cột thuộc tuyến')).toBeInTheDocument()
+    expect(screen.queryByText('Đầu tuyến')).not.toBeInTheDocument()
     // Xếp từ đầu tới cuối con đường (tây sang đông)
     const rows = screen.getByRole('list', { name: 'Danh sách cột của tuyến' }).querySelectorAll('[data-pole-id]')
     expect([...rows].map((r) => (r as HTMLElement).dataset.poleId)).toEqual(['POLE-0001', 'POLE-0004'])
@@ -203,7 +205,7 @@ describe('Thêm tuyến: lấy hình bằng cách bấm trên con đường, kh�
 
   it('đường không có trên bản đồ nền: báo lỗi; chọn cột thì máy tự nối thành hình nháp', () => {
     const onAdd = openAdd([NEAR_1, NEAR_2])
-    fireEvent.click(screen.getByRole('button', { name: 'Lấy hình theo đường trên bản đồ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vẽ hình tuyến trên bản đồ' }))
     bamDuong(106.8, 10.81)
     expect(screen.getByRole('alert')).toHaveTextContent(/không nằm trên con đường nào/)
     fireEvent.click(screen.getByRole('button', { name: 'Huỷ lấy hình' }))
@@ -220,7 +222,7 @@ describe('Thêm tuyến: lấy hình bằng cách bấm trên con đường, kh�
 
   it('đường không có trên bản đồ nền: "Vẽ tay" bấm từng điểm, gửi đúng các điểm đã bấm', () => {
     const onAdd = openAdd([])
-    fireEvent.click(screen.getByRole('button', { name: 'Lấy hình theo đường trên bản đồ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vẽ hình tuyến trên bản đồ' }))
     fireEvent.click(screen.getByRole('button', { name: 'Vẽ tay' }))
     expect(screen.getByRole('button', { name: 'Vẽ tay' })).toHaveAttribute('aria-pressed', 'true')
     bamDuong(106.8, 10.81)
@@ -241,10 +243,10 @@ describe('Thêm tuyến: lấy hình bằng cách bấm trên con đường, kh�
 
   it('lần lấy hình mới bắt đầu lại ở "Theo đường bản đồ"', () => {
     openAdd([])
-    fireEvent.click(screen.getByRole('button', { name: 'Lấy hình theo đường trên bản đồ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vẽ hình tuyến trên bản đồ' }))
     fireEvent.click(screen.getByRole('button', { name: 'Vẽ tay' }))
     fireEvent.click(screen.getByRole('button', { name: 'Huỷ lấy hình' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Lấy hình theo đường trên bản đồ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vẽ hình tuyến trên bản đồ' }))
     expect(screen.getByRole('button', { name: 'Theo đường bản đồ' })).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -302,6 +304,21 @@ describe('Sửa tuyến: lấy (lại) hình theo đường ngay trong form', ()
     expect(updated.length_m).toBe(calculateRouteLengthMeters(parseLineStringWkt(updated.geom_wkt)))
   })
 
+  it('hình nháp nối cột: kéo chấm giữa hai cột thì hình thành hình kéo thả, không còn chạy theo cột', () => {
+    const onSave = openEdit([own1, own2], 'LINESTRING(106.8 10.8, 106.802 10.8)')
+    fake.drop = [106.801, 10.8001]
+    fireEvent.click(screen.getByRole('button', { name: 'kéo chấm giữa hai cột' }))
+
+    expect(screen.getByText(/Theo con đường/)).toBeInTheDocument()
+    save()
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(parseLineStringWkt(onSave.mock.calls[0][0].geom_wkt)).toEqual([
+      [106.8, 10.8],
+      [106.801, 10.8001],
+      [106.802, 10.8],
+    ])
+  })
+
   it('hình mới: cột cũ của tuyến nằm xa cũng chặn lưu (cả tuyến phải nằm trong 25 m)', () => {
     const ownFar = pole('POLE-0003', 106.801, 10.8005, 'SEG-009')
     const onSave = openEdit([own1, ownFar], 'LINESTRING(106.8 10.8, 106.801 10.8005)')
@@ -328,7 +345,7 @@ describe('Sửa tuyến: lấy (lại) hình theo đường ngay trong form', ()
   it('huỷ lấy hình giữa chừng: hình đang lưu giữ nguyên', () => {
     const stored = 'LINESTRING(106.7995 10.80009, 106.8005 10.80009, 106.8015 10.80009, 106.8025 10.80009)'
     const onSave = openEdit([own1, own2], stored)
-    fireEvent.click(screen.getByRole('button', { name: 'Lấy lại hình theo đường trên bản đồ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vẽ lại hình tuyến trên bản đồ' }))
     bamDuong(106.7998, 10.8001)
     bamDuong(106.8022, 10.8001)
     fireEvent.click(screen.getByRole('button', { name: 'Huỷ lấy hình' }))
@@ -399,7 +416,7 @@ describe('Uốn hình bằng kéo thả', () => {
     const onSave = openEdit([own1, own2], stored)
     fake.drop = [106.8, 10.8001]
     fireEvent.click(screen.getByRole('button', { name: 'kéo chấm giữa đầu tiên' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Lấy lại hình theo đường trên bản đồ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vẽ lại hình tuyến trên bản đồ' }))
     bamDuong(106.7998, 10.8001)
     fireEvent.click(screen.getByRole('button', { name: 'Huỷ lấy hình' }))
     save()

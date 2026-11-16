@@ -61,6 +61,27 @@ export function toBboxPolygonGeoJSON(bbox?: any | null): GeoJSON.Feature<GeoJSON
   }
 }
 
+/**
+ * Lớp phủ làm tối phần NGOÀI khung xã (cả thế giới trừ khung): đa giác có một lỗ là khung xã.
+ * Cùng kiểu với lớp "managed-area" của trang Bản đồ GIS. Khung không đủ 4 cạnh thì null.
+ */
+export function toBboxMaskGeoJSON(bbox?: any | null): GeoJSON.Feature<GeoJSON.Polygon> | null {
+  const bounds = toLngLatBounds(bbox)
+  if (!bounds) return null
+  const [[minLng, minLat], [maxLng, maxLat]] = bounds
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]],
+        [[minLng, minLat], [minLng, maxLat], [maxLng, maxLat], [maxLng, minLat], [minLng, minLat]],
+      ],
+    },
+  }
+}
+
 export interface ResolvedCommuneBounds {
   bbox: CommuneBbox | null
   center: [number, number] | null
