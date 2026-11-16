@@ -596,8 +596,7 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
 
       {!readOnly && hasBoundary && !isDrawing && (
         <div className="absolute bottom-3 left-3 z-30 max-w-[75%] px-3 py-1.5 rounded-xl bg-white/95 border border-slate-200/90 text-slate-700 text-[10.5px] shadow-md pointer-events-none">
-          <strong className="font-mono">{vertexCount}</strong> đỉnh · kéo chấm để chỉnh · kéo chấm đỏ giữa
-          cạnh để thêm đỉnh · bấm đúp hoặc chuột phải vào đỉnh để xóa
+          <strong className="font-mono">{vertexCount}</strong> đỉnh · kéo chấm đỏ giữa cạnh để thêm · bấm đúp đỉnh để xóa
         </div>
       )}
     </div>
