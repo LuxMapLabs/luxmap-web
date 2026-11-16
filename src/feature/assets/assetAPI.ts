@@ -240,8 +240,8 @@ export const assetAPI = {
    * PUT /api/v1/assets/fixtures/{fixtureId}/removal
    */
   updateFixture: async (fixtureId: string, data: UpdateFixtureRequest): Promise<void> => {
-    // PATCH /api/v1/assets/fixtures/{fixtureId} — chờ backend (xem UpdateFixtureRequest)
-    await apiClient.patch(`/assets/fixtures/${encodeURIComponent(fixtureId)}`, data)
+    // PUT /api/v1/assets/fixtures/{fixtureId} — thay toàn bộ thông số, 204
+    await apiClient.put(`/assets/fixtures/${encodeURIComponent(fixtureId)}`, data)
   },
 
   retireFixture: async (fixtureId: string, data: RetireFixtureRequest): Promise<void> => {

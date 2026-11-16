@@ -342,6 +342,23 @@ describe('Fixture & Pole Lamp Count (Số lượng bóng đèn trên cột) Test
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('8b. Sửa bộ đèn: thiếu ngày lắp thì không gửi (BE bắt buộc)', () => {
+    const onUpdateFixture = vi.fn()
+    renderWithStore(
+      <AddFixtureModal
+        isOpen={true}
+        onClose={vi.fn()}
+        poles={mockPoles}
+        editFixture={EDIT_TARGET}
+        onUpdateFixture={onUpdateFixture}
+      />
+    )
+    fireEvent.change(screen.getByLabelText('Ngày lắp'), { target: { value: '' } })
+    fireEvent.submit(screen.getByRole('button', { name: /Lưu thay đổi/ }).closest('form')!)
+    expect(onUpdateFixture).not.toHaveBeenCalled()
+    expect(screen.getByText('Vui lòng nhập Ngày lắp.')).toBeInTheDocument()
+  })
+
   it('9. FixtureTable hiển thị nút Tháo dỡ khi bộ đèn đang hoạt động và ẩn khi đã tháo dỡ', () => {
     const onRetireMock = vi.fn()
     const retiredFixture: ManagedFixture = {

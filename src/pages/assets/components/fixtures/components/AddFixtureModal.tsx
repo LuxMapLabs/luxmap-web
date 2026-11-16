@@ -143,12 +143,17 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
     e.preventDefault()
 
     if (editFixture) {
+      if (!config.install_date) {
+        setValidationError('Vui lòng nhập Ngày lắp.')
+        return
+      }
+      setValidationError(null)
       onUpdateFixture?.(editFixture.fixture.fixture_id, {
         fixture_type: config.fixture_type,
         power_source: config.power_source,
         lamp_watt: Number(config.lamp_watt) || 100,
         lamp_count: Number(config.lamp_count) || 1,
-        install_date: config.install_date || null,
+        install_date: config.install_date,
         warranty_expiry: config.warranty_expiry || null,
         note: config.note.trim() || null,
       })
@@ -394,6 +399,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                   id="add-fixture-install"
                   type="date"
                   value={config.install_date}
+                  required={isEdit}
                   onChange={(e) => updateConfig('install_date', e.target.value)}
                   className={FIELD_CLASS}
                 />
@@ -414,7 +420,7 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
               <textarea
                 id="add-fixture-note"
                 rows={2}
-                maxLength={500}
+                maxLength={1000}
                 value={config.note}
                 onChange={(e) => updateConfig('note', e.target.value)}
                 placeholder="Trường hợp đặc biệt, ví dụ: thực tế chỉ thay 1 bóng"
