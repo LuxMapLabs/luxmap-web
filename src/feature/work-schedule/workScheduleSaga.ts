@@ -77,17 +77,6 @@ interface ApiResponseErrorShape {
   message?: string
 }
 
-function formatDetailValue(value: unknown): string {
-  if (value == null) return ''
-  if (Array.isArray(value)) {
-    return value.map((item) => formatDetailValue(item)).filter(Boolean).join(', ')
-  }
-  if (typeof value === 'object') {
-    return JSON.stringify(value)
-  }
-  return String(value)
-}
-
 function formatOffSegmentPoles(rawPoles: unknown): string {
   if (!Array.isArray(rawPoles) || rawPoles.length === 0) return ''
   return rawPoles
@@ -139,41 +128,64 @@ function extractApiErrorMessage(err: unknown, fallbackMessage: string): string {
       return 'Sự cố được chọn đang được xử lý trong một phiếu công tác khác.'
     }
 
+    if (code === 'VALIDATION_FAILED') {
+      const field = typeof details?.field === 'string' ? details.field : ''
+      const fieldMessages: Record<string, string> = {
+        pole_ids: 'Danh sách cột được chọn không hợp lệ (từ 1 đến 200 cột thuộc cùng tuyến đường).',
+        segment_id: 'Tuyến đường được chọn không hợp lệ.',
+        segment_ids: 'Danh sách tuyến đường khảo sát không hợp lệ.',
+        title: 'Tiêu đề phiếu công tác không hợp lệ (từ 1 đến 200 ký tự).',
+        scheduled_date: 'Ngày thực hiện không hợp lệ (không được sau hạn hoàn thành).',
+        due_date: 'Hạn hoàn thành không hợp lệ.',
+        pole_locations: 'Dữ liệu tọa độ GPS báo cáo không hợp lệ.',
+        fault_ids: 'Danh sách sự cố được chọn không hợp lệ.',
+        fault_outcomes: 'Kết quả kiểm tra sự cố không hợp lệ.',
+        note: 'Nội dung ghi chú không hợp lệ (từ 1 đến 500 ký tự).',
+      }
+      if (field && fieldMessages[field]) {
+        return fieldMessages[field]
+      }
+      return 'Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.'
+    }
+
     const mappedByCode: Record<string, string> = {
       INVALID_STATE_TRANSITION: 'Trạng thái phiếu công tác hiện tại không cho phép thực hiện thao tác này.',
       CONCURRENT_MODIFICATION: 'Phiếu công tác vừa được cập nhật ở nơi khác. Vui lòng tải lại và thử lại.',
       AFTER_EVIDENCE_REQUIRED: 'Cần có ảnh chụp sau sửa chữa trước khi hoàn tất phiếu.',
       NOTHING_TO_FOLLOW_UP: 'Không có sự cố hoặc hạng mục nào đủ điều kiện để tạo bước tiếp theo.',
       CROSS_COMMUNE_REFERENCE: 'Dữ liệu được chọn không thuộc cùng địa bàn xã/phường.',
-      WORK_ORDER_NOT_FOUND: 'Không tìm thấy phiếu công tác.',
+      WORK_ORDER_NOT_FOUND: 'Không tìm thấy phiếu công tác hoặc bạn không có quyền truy cập.',
       ASSET_NOT_FOUND: 'Không tìm thấy tuyến đường hoặc cột đèn trong hệ thống.',
+      POLE_NOT_FOUND: 'Không tìm thấy cột đèn trong hệ thống.',
+      POLE_NOT_IN_WORK_ORDER: 'Cột đèn không nằm trong danh sách của phiếu công tác này.',
+      WORK_ORDER_NOT_IN_PROGRESS: 'Phiếu công tác chưa ở trạng thái đang thực hiện.',
+      EVIDENCE_KIND_NOT_ALLOWED: 'Loại ảnh bằng chứng không hợp lệ cho loại phiếu công tác này.',
+      ATTACHMENT_NOT_ALLOWED: 'Loại phiếu công tác này không hỗ trợ đính kèm file PDF.',
+      ATTACHMENT_LIMIT_REACHED: 'Đã đạt giới hạn tối đa 10 file PDF đính kèm cho phiếu này.',
+      ATTACHMENT_NOT_FOUND: 'Không tìm thấy file đính kèm.',
+      UPLOAD_TOO_LARGE: 'Dung lượng file tải lên vượt quá giới hạn cho phép.',
+      UNSUPPORTED_MEDIA_TYPE: 'Định dạng file tải lên không hợp lệ (chỉ chấp nhận file PDF chuẩn).',
+      UNSUPPORTED_IMAGE_FORMAT: 'Định dạng ảnh không hợp lệ (chỉ chấp nhận ảnh JPEG).',
       FAULT_NOT_FOUND: 'Không tìm thấy sự cố được chọn.',
       FAULT_STATUS_NOT_ELIGIBLE: 'Trạng thái sự cố hiện tại không hợp lệ để thực hiện thao tác này.',
-      VALIDATION_FAILED: 'Dữ liệu gửi lên không hợp lệ.',
+      SERVER_OWNED_FIELD: 'Yêu cầu chứa trường dữ liệu do máy chủ quản lý không hợp lệ.',
+      COMMUNE_FORBIDDEN: 'Bạn không có quyền thao tác trên địa bàn xã/phường này.',
+      UNAUTHENTICATED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
+      SURVEY_SCHEDULE_NOT_FOUND: 'Không tìm thấy lịch khảo sát định kỳ.',
+      SURVEY_SCHEDULE_EXISTS: 'Tuyến đường này đã có lịch khảo sát định kỳ trùng ngày.',
+      IDEMPOTENCY_CONFLICT: 'Thao tác bị trùng lặp hoặc xung đột dữ liệu. Vui lòng thử lại.',
+      SERVER_BUSY: 'Máy chủ đang bận xử lý. Vui lòng thử lại sau giây lát.',
+      INTERNAL_ERROR: 'Đã xảy ra lỗi hệ thống trên máy chủ. Vui lòng thử lại sau.',
     }
 
     if (code && mappedByCode[code]) {
       return mappedByCode[code]
     }
 
-    if (apiError.message) {
-      if (details) {
-        const detailEntries = Object.entries(details).filter(([k]) => k !== 'correlation_id')
-        if (detailEntries.length > 0) {
-          const detailStr = detailEntries
-            .map(([k, v]) => `${k}: ${formatDetailValue(v)}`)
-            .join('; ')
-          return `${apiError.message} (${detailStr})`
-        }
-      }
-      return apiError.message
-    }
-    if (code) return code
+    return fallbackMessage
   }
 
-  if (errData?.message) return errData.message
-  if (errData?.title) return errData.title
-  if (errObj.message) return errObj.message
   return fallbackMessage
 }
 
@@ -302,6 +314,9 @@ function* handleCreateWorkOrder(
       toast.success('Đã tạo thành công lệnh công tác mới trên máy chủ!')
     }
     yield put(fetchWorkOrdersRequest(undefined))
+    if (requestPayload.task_kind === 'pole_gps_update' && requestPayload.segment_id) {
+      yield put(fetchBusyGpsPolesRequest(requestPayload.segment_id))
+    }
   } catch (error: any) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể tạo lệnh công tác trên máy chủ')
     yield put(createWorkOrderFailure(errorMsg))

@@ -12,6 +12,7 @@ import {
   ChevronUp,
   X,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import type { RootState } from '../../../redux/rootReducer'
 import { fetchAssetsRequest } from '../../../feature/assets/assetSlice'
 import {
@@ -117,16 +118,28 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
     })
   }, [sortedSegmentPoles, searchTerm])
 
+  const MAX_POLES_PER_ORDER = 200
+
   const handleTogglePole = (poleId: string) => {
     if (selectedPoleIds.includes(poleId)) {
       onChange(selectedPoleIds.filter((id) => id !== poleId))
     } else {
+      if (selectedPoleIds.length >= MAX_POLES_PER_ORDER) {
+        toast.warning(`Mỗi phiếu cập nhật vị trí cột chỉ được chọn tối đa ${MAX_POLES_PER_ORDER} cột.`)
+        return
+      }
       onChange([...selectedPoleIds, poleId])
     }
   }
 
   const handleSelectAllNoGps = () => {
-    onChange(Array.from(new Set([...selectedPoleIds, ...noGpsPoleIds])))
+    const merged = Array.from(new Set([...selectedPoleIds, ...noGpsPoleIds]))
+    if (merged.length > MAX_POLES_PER_ORDER) {
+      toast.warning(`Đã chọn tối đa ${MAX_POLES_PER_ORDER} cột cho một phiếu cập nhật vị trí cột.`)
+      onChange(merged.slice(0, MAX_POLES_PER_ORDER))
+      return
+    }
+    onChange(merged)
   }
 
   const isAllFilteredSelected =
@@ -139,7 +152,13 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
       onChange(selectedPoleIds.filter((id) => !filteredSet.has(id)))
     } else {
       const filteredIds = filteredPoles.map((p) => p.pole_id as string)
-      onChange(Array.from(new Set([...selectedPoleIds, ...filteredIds])))
+      const merged = Array.from(new Set([...selectedPoleIds, ...filteredIds]))
+      if (merged.length > MAX_POLES_PER_ORDER) {
+        toast.warning(`Đã chọn tối đa ${MAX_POLES_PER_ORDER} cột cho một phiếu cập nhật vị trí cột.`)
+        onChange(merged.slice(0, MAX_POLES_PER_ORDER))
+        return
+      }
+      onChange(merged)
     }
   }
 
