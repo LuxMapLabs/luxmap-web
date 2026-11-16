@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../../redux/rootReducer'
 import { closeExportModal } from '../../feature/assets/assetSlice'
 import {
-  CheckCircle,
   Boxes,
   Zap,
   Route,
@@ -81,7 +80,6 @@ export const AssetManagementPage: React.FC = () => {
     feeders,
     iotNodes,
     isLoadingAssets,
-    successBanner,
     handleAddPole,
     handleAddPoles,
     handleUpdatePole,
@@ -101,11 +99,6 @@ export const AssetManagementPage: React.FC = () => {
     handleDrawSegment,
     handleAddSegment,
     handleUpdateSegment,
-    handleAddIotNode,
-    handleUpdateIotNode,
-    handleDeleteIotNode,
-    handleSetRelay,
-    handleIssueCredential,
     handleImportSuccess,
   } = useAssetData()
 
@@ -124,16 +117,6 @@ export const AssetManagementPage: React.FC = () => {
     <div className="h-full w-full flex flex-col bg-transparent dark:bg-slate-950 overflow-hidden select-none">
       {/* Scrollable Container */}
       <div className="flex-1 px-1 pb-4 overflow-y-auto space-y-4">
-        {/* Top Notification Banner */}
-        {successBanner && (
-          <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-xl text-xs font-semibold flex items-center animate-in slide-in-from-top-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>{successBanner}</span>
-            </div>
-          </div>
-        )}
-
         <AssetTabs
           groups={[
             [
@@ -243,17 +226,7 @@ export const AssetManagementPage: React.FC = () => {
 
         {/* Tab 4 Content: Thiết bị IoT */}
         {activeCategory === 'iot_nodes' && (
-          <IotNodesTab
-            iotNodes={iotNodes}
-            cabinets={cabinets}
-            feeders={feeders}
-            isLoading={isLoadingAssets}
-            onAddIotNode={handleAddIotNode}
-            onUpdateIotNode={handleUpdateIotNode}
-            onDeleteIotNode={handleDeleteIotNode}
-            onSetRelay={handleSetRelay}
-            onIssueCredential={handleIssueCredential}
-          />
+          <IotNodesTab cabinets={cabinets} feeders={feeders} />
         )}
 
         {/* Tab 5 Content: Cột điện */}
@@ -262,6 +235,7 @@ export const AssetManagementPage: React.FC = () => {
             poles={poles}
             cabinets={cabinets}
             segments={segments}
+            feeders={feeders}
             isLoading={isLoadingAssets}
             activePoleCode={selectedPoleCode}
             onClearActivePole={() => setSelectedPoleCode('')}

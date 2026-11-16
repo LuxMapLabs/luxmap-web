@@ -2,6 +2,19 @@
  * Auto-generated Types for: iot/servers
  * Sinh tự động từ endpoint Backend
  */
+export interface IotGatewayCredential {
+    client_id?: string | null
+    username?: string | null
+    password?: string | null
+    node_ids?: string[]
+}
+
+export interface IotGatewayRoute {
+    gateway_id?: string | null
+    device_ids?: string[]
+    credential_issued?: boolean
+}
+
 export interface IotGatewayRouteRequest {
     device_id?: string | null
 }

@@ -53,7 +53,7 @@ const REPORTS: ReportOption[] = [
 interface SuperiorExportModalProps {
   isOpen: boolean
   onClose: () => void
-  onExport: (types: SuperiorCsvExportType[]) => Promise<void>
+  onExport: (types: SuperiorCsvExportType[]) => void
   segmentLabel: string
   periodLabel: string
 }

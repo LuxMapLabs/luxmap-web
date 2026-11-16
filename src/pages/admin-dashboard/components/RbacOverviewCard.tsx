@@ -18,7 +18,7 @@ export const RbacOverviewCard: React.FC<RbacOverviewCardProps> = ({ users }) => 
   const roles = [
     { key: 'field_engineer', name: 'Kỹ sư', dot: 'bg-cyan-500' },
     { key: 'manager', name: 'Quản lý', dot: 'bg-blue-500' },
-    { key: 'superior', name: 'Lãnh đạo', dot: 'bg-amber-500' },
+    { key: 'superior', name: 'Cấp giám sát', dot: 'bg-amber-500' },
     { key: 'system_admin', name: 'Admin', dot: 'bg-violet-500' },
   ].map((r) => {
     const count = users.filter((u) => u.role === r.key).length

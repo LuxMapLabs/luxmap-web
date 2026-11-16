@@ -70,6 +70,18 @@ export const mapAPI = {
     const response = await apiClient.get<PoleMapDetail>(`/map/poles/${encodeURIComponent(poleId)}`)
     return response.data
   },
+
+  /**
+   * Tải ảnh tài sản theo thumbnail_url / original_url do API trả về.
+   * Đường dẫn là tuyệt đối kèm /api/v1 (apiClient đã có baseURL nên bỏ tiền tố này) và cần Bearer token,
+   * nên phải tải dạng blob, không gắn thẳng vào thẻ img.
+   */
+  fetchPhotoBlob: async (photoUrl: string): Promise<Blob> => {
+    const response = await apiClient.get<Blob>(photoUrl.replace(/^\/api\/v1/, ''), {
+      responseType: 'blob',
+    })
+    return response.data
+  },
 }
 
 export default mapAPI

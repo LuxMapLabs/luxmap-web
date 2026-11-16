@@ -165,13 +165,13 @@ export const getRoleName = (role?: UserRole | string | number | null): string =>
   const normalized = normalizeRole(role)
   switch (normalized) {
     case UserRole.Admin:
-      return 'Quản trị hệ thống (Admin)'
+      return 'Quản trị hệ thống'
     case UserRole.ManagementAgency:
-      return 'Cấp trên / Giám sát (Superior)'
+      return 'Cấp giám sát'
     case UserRole.MaintenanceEngineer:
-      return 'Quản lý (Manager)'
+      return 'Quản lý'
     case UserRole.FieldCrew:
-      return 'Kỹ sư hiện trường (Field Engineer)'
+      return 'Kỹ sư hiện trường'
     default:
       return 'Cán bộ kỹ thuật'
   }

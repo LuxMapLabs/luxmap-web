@@ -1,10 +1,14 @@
+import type { FaultType } from '../../types/common/enums'
+
 export interface PoleItem {
   poleId: string
   segmentId: string
-  fixtureType: string
+  /** Loại sự cố đang mở trên cột (từ API sự cố) */
+  faultType?: FaultType
+  /** Công suất bóng đang dùng (W), null nếu chưa có dữ liệu */
   lampWatt: number | null
+  /** Ghi chú của sự cố hoặc của cột, thiếu thì mã cột kèm tên tuyến */
   atlas: string
-  status: string
 }
 
 /**

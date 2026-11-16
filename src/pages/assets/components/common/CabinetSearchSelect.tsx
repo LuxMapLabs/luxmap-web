@@ -52,12 +52,13 @@ export const CabinetSearchSelect: React.FC<CabinetSearchSelectProps> = ({
   // Tìm tủ đang chọn
   const selectedCabinet = useMemo(() => {
     if (!value) return null
-    return cabinets.find(
-      (c) =>
-        (c.cabinet_id && c.cabinet_id === value) ||
-        (c.external_ref && c.external_ref === value) ||
-        getId(c) === value
-    ) || null
+    // Mã nội bộ trước: mã hiển thị của tủ này có thể trùng mã nội bộ của tủ khác
+    return (
+      cabinets.find((c) => c.cabinet_id === value) ??
+      cabinets.find((c) => getId(c) === value) ??
+      cabinets.find((c) => c.external_ref === value) ??
+      null
+    )
   }, [cabinets, value, getId])
 
   // Lọc danh sách tủ theo từ khóa tìm kiếm (chỉ tìm thông tin tủ: tên, mã/ref, id)

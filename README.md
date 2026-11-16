@@ -33,6 +33,17 @@ Mỗi lần merge vào **`dev`**, workflow [`.github/workflows/deploy-web.yml`](
 - Chạy lại thủ công: Actions → *Deploy web to VPS* → **Run workflow**.
 - Secrets: `VPS_DEPLOY_KEY` (key chỉ được rsync vào thư mục web trên server), `VITE_MAPTILER_KEY`.
 
+## Điều khiển đèn IoT
+
+Manager mở **Tài sản → Thiết bị IoT → Chi tiết** để dùng **Bật / Tắt / Tự động**
+trên node hỗ trợ điều khiển từ xa. Cần xác nhận vì lệnh tác động lên toàn bộ feeder đấu vào rơ-le.
+Tự động dùng lịch hiện có; giao diện này không đặt lịch mới.
+
+Sau khi gửi, giao diện chờ GET xác nhận đúng `command_id`, đọc lại khoảng 2 giây/lần.
+Lệnh khác thay thế sẽ kết thúc chờ; đến `expires_at` hoặc sau 60 giây nếu không có thời hạn,
+giao diện dừng và không tự gửi lại. Đóng modal cũng dừng theo dõi. ACK chỉ xác nhận thiết bị
+đã xử lý lệnh; cần số đo điện mới để kiểm chứng tải thực tế. Không cần thêm cấu hình frontend.
+
 ## 📚 Tài liệu tham khảo
 - Xem hướng dẫn chi tiết tại [GUIDE.md](./GUIDE.md)
 - Xem quy định phát triển tại [RULES.md](./RULES.md)

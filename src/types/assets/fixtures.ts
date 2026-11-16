@@ -12,6 +12,7 @@ export interface ActiveFixture {
     lamp_count: number
     install_date: string | null
     warranty_expiry?: string | null
+    note?: string | null
     warranty_status?: WarrantyStatus
     data_source: DataSource
 }
@@ -26,9 +27,20 @@ export interface CreateFixtureRequest {
     removed_date?: string | null
     warranty_expiry?: string | null
     data_source: DataSource
+    note?: string | null
 }
 
 export interface RetireFixtureRequest {
     removed_date: string | null
+}
+
+export interface UpdateFixtureRequest {
+    fixture_type: FixtureType
+    power_source: PowerSource
+    lamp_watt: number
+    lamp_count: number
+    install_date: string | null
+    warranty_expiry?: string | null
+    note?: any
 }
 

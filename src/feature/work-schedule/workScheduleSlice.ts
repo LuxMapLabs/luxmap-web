@@ -2,7 +2,12 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { WorkOrderItem, WorkOrderDetail, WorkOrderAssignee, WorkOrderItemPagedResult, CreateWorkOrderRequest, PatchWorkOrderRequest, FollowUpWorkOrderRequest, WorkOrderAttachmentItem, WorkOrderPoleLocation } from '../../types/workorders/orders'
 import type { TaskKind } from '../../types/common/enums'
 import type { GetWorkOrdersFilter } from './workScheduleAPI'
-import { mapWorkOrdersToScheduleCases, formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
+import {
+  mapWorkOrdersToScheduleCases,
+  formatSegmentDisplay,
+  segmentLabelFromIds,
+  type SegmentNameMap,
+} from '../../utils/work-schedule/workScheduleUtils'
 
 // ==========================================
 // CẤU TRÚC HỒ SƠ SỰ VỤ & THANH TIẾN TRÌNH (UI STATE)
@@ -72,6 +77,8 @@ export interface WorkScheduleState {
   selectedWorkOrderId: string | null
   workOrderDetail: WorkOrderDetail | null
   assignees: WorkOrderAssignee[]
+  /** segment_id -> tên tuyến (từ API tuyến đường) để hiển thị lịch và chi tiết lệnh */
+  segmentNames: SegmentNameMap
 
   // 2. Loading & Error flags 
   isLoadingWorkOrders: boolean
@@ -107,6 +114,7 @@ const initialState: WorkScheduleState = {
   selectedWorkOrderId: null,
   workOrderDetail: null,
   assignees: [],
+  segmentNames: {},
 
   isLoadingWorkOrders: false,
   workOrdersError: null,
@@ -153,7 +161,7 @@ export const workScheduleSlice = createSlice({
       state.totalWorkOrders = action.payload.total || 0
 
       // Ánh xạ an toàn sang cấu trúc Stepper cho giao diện Lịch
-      state.cases = mapWorkOrdersToScheduleCases(state.workOrders, state.assignees)
+      state.cases = mapWorkOrdersToScheduleCases(state.workOrders, state.assignees, state.segmentNames)
 
       if (state.selectedCaseCode) {
         const found = state.cases.find((c) => c.code === state.selectedCaseCode)
@@ -164,6 +172,9 @@ export const workScheduleSlice = createSlice({
           state.viewingPhaseIndex = 0
         }
       }
+    },
+    fetchSegmentNamesSuccess(state, action: PayloadAction<SegmentNameMap>) {
+      state.segmentNames = action.payload
     },
     fetchWorkOrdersFailure(state, action: PayloadAction<string>) {
       state.isLoadingWorkOrders = false
@@ -190,10 +201,14 @@ export const workScheduleSlice = createSlice({
       const poleIds = Array.from(
         new Set((detail.faults || []).map((f) => f.pole_id).filter(Boolean) as string[])
       )
-      const segId =
-        detail.segment_id ||
-        (detail.segment_ids && detail.segment_ids.length > 0 ? detail.segment_ids[0] : null) ||
-        (detail.faults && detail.faults[0]?.segment_id)
+      const segmentLabel = segmentLabelFromIds(
+        [
+          detail.segment_id,
+          ...(detail.segment_ids ?? []),
+          ...(detail.segment_id || detail.segment_ids?.length ? [] : [detail.faults?.[0]?.segment_id]),
+        ],
+        state.segmentNames
+      )
 
       state.cases.forEach((c) => {
         c.phases.forEach((p) => {
@@ -232,8 +247,8 @@ export const workScheduleSlice = createSlice({
           if (poleIds.length > 0) {
             c.poleIds = poleIds
           }
-          if (segId) {
-            c.segment = formatSegmentDisplay(segId, detail.title)
+          if (segmentLabel) {
+            c.segment = formatSegmentDisplay(segmentLabel, detail.title)
           }
         }
       })
@@ -261,7 +276,7 @@ export const workScheduleSlice = createSlice({
       state.assigneesError = null
       state.assignees = action.payload || []
       if (state.workOrders.length > 0) {
-        state.cases = mapWorkOrdersToScheduleCases(state.workOrders, state.assignees)
+        state.cases = mapWorkOrdersToScheduleCases(state.workOrders, state.assignees, state.segmentNames)
       }
     },
     fetchAssigneesFailure(state, action: PayloadAction<string>) {
@@ -479,6 +494,7 @@ export const workScheduleSlice = createSlice({
 export const {
   fetchWorkOrdersRequest,
   fetchWorkOrdersSuccess,
+  fetchSegmentNamesSuccess,
   fetchWorkOrdersFailure,
   fetchWorkOrderDetailRequest,
   fetchWorkOrderDetailSuccess,

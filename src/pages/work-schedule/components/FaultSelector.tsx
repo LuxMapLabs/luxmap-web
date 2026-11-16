@@ -48,6 +48,10 @@ export const FaultSelector: React.FC<FaultSelectorProps> = ({
 
   // Tải danh sách sự cố đã xác nhận thuộc tuyến từ Backend API
   const fetchFaults = async () => {
+    if (!segmentId) {
+      setFaults([])
+      return
+    }
     setIsLoading(true)
     setError(null)
     try {

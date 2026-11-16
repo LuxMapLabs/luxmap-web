@@ -73,15 +73,15 @@ function buildReportHtmlString(report: SuperiorReportItem): string {
       <table style="width: 100%; border-collapse: collapse; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 2px solid #0f172a;">
         <tr>
           <td style="vertical-align: top; width: 48%;">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">UBND HUYỆN NINH PHƯỚC</div>
-            <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-top: 3px;">PHÒNG KINH TẾ & HẠ TẦNG</div>
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">Đơn vị quản lý</div>
+            <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-top: 3px;">${report.communeName}</div>
             <div style="font-size: 11px; font-family: monospace; color: #64748b; margin-top: 5px;">Số: ${report.workOrderId}/BB-NTCS-2026</div>
           </td>
           <td style="vertical-align: top; width: 52%; text-align: center;">
             <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #0f172a; letter-spacing: 0.5px;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
             <div style="font-size: 12px; font-weight: 700; color: #1e293b; margin-top: 3px;">Độc lập - Tự do - Hạnh phúc</div>
             <div style="width: 120px; height: 1.5px; background: #94a3b8; margin: 6px auto;"></div>
-            <div style="font-size: 11px; color: #64748b; font-style: italic;">Ninh Phước, ngày ${report.verifiedDate}</div>
+            <div style="font-size: 11px; color: #64748b; font-style: italic;">${report.communeName}, ngày ${report.verifiedDate}</div>
           </td>
         </tr>
       </table>
@@ -108,7 +108,7 @@ function buildReportHtmlString(report: SuperiorReportItem): string {
             <td style="padding: 4px 0; color: #64748b;">Tuyến đường xử lý:</td>
             <td style="padding: 4px 0; font-weight: 700; color: #0f172a;">${report.road}</td>
             <td style="padding: 4px 0; color: #64748b;">Địa bàn hành chính:</td>
-            <td style="padding: 4px 0; font-weight: 700; color: #0f172a;">${report.communeName}, Huyện Ninh Phước</td>
+            <td style="padding: 4px 0; font-weight: 700; color: #0f172a;">${report.communeName}</td>
           </tr>
           <tr>
             <td style="padding: 4px 0; color: #64748b;">Kỹ sư hiện trường:</td>

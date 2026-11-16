@@ -3,11 +3,15 @@ import { RowActions } from '../../common/RowActions'
 import { Archive, CheckCircle2, AlertCircle, Boxes, Lightbulb, PackageMinus } from 'lucide-react'
 import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 import type { PoleListItem } from '../../../../../types/assets/poles'
+import type { SegmentListItem } from '../../../../../types/assets/segments'
+import { findByIdOrRef } from '../../../../../utils/assets/findByIdOrRef'
 import { FixtureTableSkeleton } from './FixtureTableSkeleton'
 
 interface FixtureTableProps {
   fixtures: ManagedFixture[]
   poles: PoleListItem[]
+  /** Để ghi tên / mã hiển thị của tuyến; `pole.segment_id` là mã nội bộ, không đưa thẳng ra màn hình. */
+  segments?: SegmentListItem[]
   flashingFixtureCode?: string
   isLoading?: boolean
   onViewDetail?: (fixture: ManagedFixture) => void
@@ -19,6 +23,7 @@ interface FixtureTableProps {
 export const FixtureTable: React.FC<FixtureTableProps> = ({
   fixtures,
   poles,
+  segments = [],
   flashingFixtureCode,
   isLoading = false,
   onViewDetail,
@@ -26,6 +31,11 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
   onRetireFixture,
   onSelectPole,
 }) => {
+  const segmentLabel = (segmentId: string) => {
+    const seg = findByIdOrRef(segments, (s) => s.segment_id, segmentId)
+    return seg?.segment_name || (seg?.external_ref ? `Tuyến ${seg.external_ref}` : 'Tuyến chưa rõ')
+  }
+
   // Pre-build pole map by external_ref for metadata lookup
   const poleMap = React.useMemo(() => {
     const map = new Map<string, PoleListItem>()
@@ -139,7 +149,7 @@ export const FixtureTable: React.FC<FixtureTableProps> = ({
                   <td className="py-2.5 px-3.5">
                     <span className="text-slate-800 font-medium truncate block max-w-[160px]">
                       {pole?.segment_id ? (
-                        <span>Tuyến {pole.segment_id}</span>
+                        <span>{segmentLabel(pole.segment_id)}</span>
                       ) : (
                         <span className="text-slate-400 italic">Theo cột {poleExternal || ''}</span>
                       )}

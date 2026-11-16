@@ -84,8 +84,8 @@ export const CabinetDetailModal: React.FC<CabinetDetailModalProps> = ({
               <div><strong>Mã định danh (ID):</strong> {cabinet.cabinet_id || 'Chưa gán'}</div>
               {showCommune && <div><strong>Địa bàn quản lý:</strong> {formatFriendlyCommuneName(cabinet.commune_name, cabinet.commune_id, 'Chưa gán địa bàn')}</div>}
               <div><strong>Mã tham chiếu ngoài:</strong> {cabinet.external_ref || 'Không có'}</div>
-              {cabinet.iot_node_id && (
-                <div><strong>Mã bộ điều khiển IoT:</strong> {cabinet.iot_node_id}</div>
+              {cabinet.iot_node_ids?.length > 0 && (
+                <div><strong>Mã bộ điều khiển IoT:</strong> {cabinet.iot_node_ids.join(', ')}</div>
               )}
               {cabinet.updated_at && (
                 <div><strong>Cập nhật lần cuối:</strong> {cabinet.updated_at}</div>

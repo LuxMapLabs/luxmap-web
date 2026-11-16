@@ -10,13 +10,13 @@ import {
   Pie,
   Cell,
   CartesianGrid,
+  Text,
 } from 'recharts'
 import { useChartMotion } from './chartMotion'
 
 export interface FixtureBarItem {
   id: string
   name: string
-  shortLabel: string
   normal: number
   dim: number
   out: number
@@ -50,6 +50,36 @@ const segBtn = (active: boolean) =>
 const GREEN = '#7CCBA2'
 const AMBER = '#F2C46B'
 const ROSE = '#EE8B8B'
+
+// Bề rộng tối thiểu mỗi cột trên trục X; nhiều tuyến hơn sức chứa thì biểu đồ cuộn ngang thay vì chồng nhãn
+const MIN_BAND_PX = 64
+
+interface AxisTickProps {
+  x?: number
+  y?: number
+  width?: number
+  visibleTicksCount?: number
+  payload?: { value: string }
+}
+
+// Nhãn trục X xuống dòng theo bề rộng mỗi cột, tối đa 3 dòng (tên đầy đủ xem ở tooltip)
+const WrappedAxisTick = ({ x, y, width = 0, visibleTicksCount = 1, payload }: AxisTickProps) => (
+  <Text
+    x={x}
+    y={y}
+    dy={6}
+    width={Math.max(width / visibleTicksCount - 6, 40)}
+    maxLines={3}
+    lineHeight="1.2em"
+    textAnchor="middle"
+    verticalAnchor="start"
+    fontSize={10.5}
+    fontWeight={600}
+    fill="#475569"
+  >
+    {payload?.value ?? ''}
+  </Text>
+)
 
 export const SuperiorMainCharts: React.FC<SuperiorMainChartsProps> = ({
   segmentChartData,
@@ -136,17 +166,17 @@ export const SuperiorMainCharts: React.FC<SuperiorMainChartsProps> = ({
           </div>
         </div>
 
-        <div className="w-full h-52 mt-3">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="w-full h-56 mt-3 overflow-x-auto">
+          <ResponsiveContainer width="100%" height="100%" minWidth={activeBarData.length * MIN_BAND_PX + 40}>
             <BarChart data={activeBarData} margin={{ top: 10, right: 10, left: -18, bottom: 4 }}>
               <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#E4EFF8" />
               <XAxis
-                dataKey="shortLabel"
-                tick={{ fontSize: 11.5, fontWeight: 600, fill: '#475569' }}
+                dataKey="name"
+                tick={<WrappedAxisTick />}
                 interval={0}
+                height={52}
                 tickLine={false}
                 axisLine={{ stroke: '#DCE8F3' }}
-                dy={6}
               />
               <YAxis
                 tick={{ fontSize: 11, fill: '#94A3B8' }}

@@ -24,6 +24,7 @@ import { AdminManagementPage } from './pages/users/UserManagementPage'
 import { CommunesManagementPage } from './pages/communes/CommunesManagementPage'
 import { SystemSettingsPage } from './pages/settings/SystemSettingsPage'
 import { FirmwareManagementPage } from './pages/firmware/FirmwareManagementPage'
+import { IotBridgeAdminPage } from './pages/iot-bridge/IotBridgeAdminPage'
 import { NotFoundPage } from './pages/not-found/NotFoundPage'
 import { SuperiorReportsPage } from './pages/reports/SuperiorReportsPage'
 import { SuperiorDashboardPage } from './pages/superior-dashboard/SuperiorDashboardPage'
@@ -75,7 +76,7 @@ function App() {
   useEffect(() => {
     // Không chạy checkAuth() nếu đang truy cập trang công khai /r/, /report hoặc /privacy (tránh request thừa và lỗi 401 console)
     const path = window.location.pathname
-    if (path.startsWith('/report') || path.startsWith('/r/') || path.startsWith('/privacy')) {
+    if (path === '/report' || path.startsWith('/r/') || path.startsWith('/privacy')) {
       return
     }
     // /set-password bỏ qua kiểm tra phiên nhưng người dùng sẽ chuyển sang /login ngay sau đó,
@@ -158,6 +159,7 @@ function App() {
             <Route path="/admin/communes" element={<CommunesManagementPage />} />
             <Route path="/admin/firmware" element={<FirmwareManagementPage />} />
             <Route path="/admin/settings" element={<SystemSettingsPage />} />
+            <Route path="/admin/iot-bridge" element={<IotBridgeAdminPage />} />
           </Route>
 
           {/* 404 Not Found Page */}

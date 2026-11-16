@@ -71,6 +71,7 @@ describe('assetCsvExporter', () => {
           data_source: 'field',
           location: { lng: 106.48948, lat: 10.97008 },
           feeder_ids: [],
+          iot_node_ids: [],
           updated_at: null,
         },
       ]
@@ -178,6 +179,7 @@ describe('assetCsvExporter', () => {
           data_source: 'field',
           location: { lng: 106.48, lat: 10.97 },
           feeder_ids: [],
+          iot_node_ids: [],
           updated_at: null,
         },
       ]

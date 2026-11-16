@@ -4,10 +4,16 @@ import { X, AlertTriangle, Check, Calendar } from 'lucide-react'
 import type { RetireFixtureRequest } from '../../../../../types/assets/fixtures'
 import type { ManagedFixture } from '../../../../../hooks/assets/useAssetData'
 
+/** Những gì form đọc: dùng chung cho tab tài sản (ManagedFixture) và Bản đồ GIS (bóng trong chi tiết cột). */
+export type RetirableFixture = Pick<ManagedFixture, 'fixture_id' | 'pole_id' | 'pole_external_ref' | 'install_date'> & {
+  lamp_watt?: number
+  lamp_count?: number
+}
+
 interface RetireFixtureModalProps {
   isOpen: boolean
   onClose: () => void
-  fixture: ManagedFixture | null
+  fixture: RetirableFixture | null
   onConfirm: (fixtureId: string, req: RetireFixtureRequest) => void
 }
 

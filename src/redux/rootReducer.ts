@@ -13,9 +13,10 @@ import dashboardReducer from '../feature/dashboard/dashboardSlice'
 import settingsReducer from '../feature/settings/settingsSlice'
 import adminSystemReducer from '../feature/adminSystem/adminSystemSlice'
 import adminArtifactVersionReducer from '../feature/adminArtifactVersions/artifactVersionSlice'
-import lightingReducer from '../feature/lighting/lightingSlice'
 import passwordReducer from '../feature/password/passwordSlice'
 import avatarReducer from '../feature/avatar/avatarSlice'
+import superiorDashboardReducer from '../feature/dashboard/superiorDashboardSlice'
+import reportsReducer from '../feature/reports/reportsSlice'
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -32,9 +33,10 @@ const rootReducer = combineReducers({
     settings: settingsReducer,
     adminSystem: adminSystemReducer,
     adminArtifactVersions: adminArtifactVersionReducer,
-    lighting: lightingReducer,
     password: passwordReducer,
     avatar: avatarReducer,
+    superiorDashboard: superiorDashboardReducer,
+    reports: reportsReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>

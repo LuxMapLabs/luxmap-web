@@ -1,290 +1,169 @@
-import { useShowCommune } from '../../../../../hooks/useShowCommune'
-import React from 'react'
-import {
-  X,
-  Cpu,
-  Zap,
-  Key,
-  Sliders,
-  Clock,
-  Cable,
-  CheckCircle2,
-  XCircle,
-  MapPin,
-  Calendar,
-} from 'lucide-react'
-import type { IotNodeItem } from '../../../../../types/assets/iot-nodes'
-import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
-import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { AlertTriangle, Loader2, X, Zap } from 'lucide-react'
+import iotAPI from '../../../../../feature/iot/iotAPI'
+import type {
+  IotDiagnosticResult,
+  IotElectricalResult,
+} from '../../../../../types/iot/nodes'
+import { IOT_NODE_STATUS, IOT_TONE_CLASS, iotStatusBadge } from '../../../../../constants/iot'
+import { apiErrorMessage } from '../../../../../utils/iot/apiError'
+import type { FeederPowerState } from '../../../../../types/common/enums'
 
-export interface IotNodeDetailModalProps {
-  isOpen: boolean
-  node: IotNodeItem | null
-  cabinets: CabinetListItem[]
-  onClose: () => void
-  onEdit: (node: IotNodeItem) => void
-  onSetRelay: (node: IotNodeItem) => void
-  onIssueCredential: (node: IotNodeItem) => void
+const POWER_STATE_LABEL: Record<FeederPowerState, string> = { on: 'Mạch đang có tải', off: 'Mạch đã ngắt tải', unknown: 'Chưa rõ' }
+
+const ANOMALY_LABEL: Record<string, string> = {
+  telemetry_stale: 'Node im lặng quá lâu (giây)',
+  current_when_off: 'Còn dòng khi lệnh OFF (mA)',
+  voltage_loss: 'Mất điện áp (V)',
+  voltage_deviation: 'Điện áp lệch danh định (V)',
+  current_deviation: 'Dòng điện lệch danh định (mA)',
+  power_deviation: 'Công suất lệch danh định (mW)',
+  lamp_count_shortfall: 'Thiếu bóng sáng',
 }
 
-export const IotNodeDetailModal: React.FC<IotNodeDetailModalProps> = ({
-  isOpen,
-  node,
-  cabinets,
-  onClose,
-  onEdit,
-  onSetRelay,
-  onIssueCredential,
-}) => {
-  const showCommune = useShowCommune()
-  if (!isOpen || !node) return null
+const formatTime = (value?: string | null) => {
+  if (!value) return '—'
+  const d = new Date(value)
+  return isNaN(d.getTime()) ? value : d.toLocaleString('vi-VN')
+}
 
-  const selectedCabinet = cabinets.find((c) => c.cabinet_id === node.cabinet_id)
+const num = (value?: number | null, digits = 2) => (typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—')
 
-  const formatDateTime = (dateStr?: string | null) => {
-    if (!dateStr) return '—'
-    try {
-      const d = new Date(dateStr)
-      if (isNaN(d.getTime())) return dateStr
-      return d.toLocaleString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
-    } catch {
-      return dateStr
-    }
-  }
+const Section: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode }> = ({ title, icon, children }) => (
+  <section className="space-y-2">
+    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+      {icon}
+      {title}
+    </h4>
+    {children}
+  </section>
+)
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-5 bg-linear-to-r from-teal-700 to-teal-600 text-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center">
-              <Cpu className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs bg-white/25 px-2 py-0.5 rounded-md font-bold">
-                  {node.node_role}
-                </span>
-              </div>
-              <h3 className="font-extrabold text-base mt-0.5 font-mono">
-                {node.node_id}
-              </h3>
-            </div>
+const ErrorLine: React.FC<{ text: string }> = ({ text }) => (
+  <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-300">{text}</p>
+)
+
+/**
+ * Chi tiết CHỈ ĐỌC của một node IoT bridge (docs LUXMAP-IOT-FE.md mục 5): mẫu điện mới nhất và chẩn đoán.
+ * Lịch sử điện (biểu đồ) và lịch sử lệnh xem ở drawer bản đồ GIS, không lặp lại ở đây.
+ */
+export const IotNodeDetailModal: React.FC<{ nodeId: string; onClose: () => void }> = ({ nodeId, onClose }) => {
+  const [electrical, setElectrical] = useState<IotElectricalResult | null>(null)
+  const [electricalError, setElectricalError] = useState<string | null>(null)
+  const [diagnostics, setDiagnostics] = useState<IotDiagnosticResult | null>(null)
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
+
+  useEffect(() => {
+    iotAPI
+      .getElectrical(nodeId)
+      .then(setElectrical)
+      .catch((err) => setElectricalError(apiErrorMessage(err, 'Không đọc được mẫu điện.')))
+    iotAPI
+      .getDiagnostics(nodeId)
+      .then(setDiagnostics)
+      .catch((err) => setDiagnosticsError(apiErrorMessage(err, 'Không đọc được kết quả chẩn đoán.')))
+  }, [nodeId])
+
+  const badge = iotStatusBadge(IOT_NODE_STATUS, electrical?.status)
+  const m = electrical?.measurement
+  const anomalies = diagnostics?.anomalies || []
+  const lamp = diagnostics?.lamp_count
+
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div
+        role="dialog"
+        aria-label={`Chi tiết node ${nodeId}`}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between p-4 px-6 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Chi tiết node {nodeId}</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{electrical?.server_id || ''}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer"
+            title="Đóng"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Content */}
-        <div className="p-6 space-y-6 overflow-y-auto">
-          {/* Grid thông tin chung */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Tủ điện */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
-              <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
-                <Zap className="w-4 h-4 text-amber-500" />
-                <span>Tủ Điện Cấp Nguồn</span>
-              </div>
-              <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                {selectedCabinet?.cabinet_name || node.cabinet_id}
-              </div>
-              <div className="text-[11px] font-mono text-slate-400">
-                Mã tủ: {node.cabinet_id}
-              </div>
-            </div>
-
-            {/* Địa bàn */}
-            {showCommune && (
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
-                <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
-                  <MapPin className="w-4 h-4 text-blue-500" />
-                  <span>Khu Vực Quản Lý</span>
-                </div>
-                <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                  {formatFriendlyCommuneName(selectedCabinet?.commune_name, node.commune_id, 'Chưa gán địa bàn')}
-                </div>
-                {false && (
-                  <div className="text-[11px] font-mono text-slate-400">
-                    Mã địa bàn: {node?.commune_id}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Nguồn dữ liệu & Điều khiển */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-semibold">Nguồn dữ liệu:</span>
-                <span className="font-bold">
-                  {node.data_source === 'simulated' ? (
-                    <span className="text-emerald-600 font-semibold">Mô phỏng (Simulated)</span>
-                  ) : (
-                    <span className="text-purple-600 font-semibold">Kiểm chuẩn (Rig)</span>
-                  )}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-semibold">Điều khiển từ xa:</span>
-                {node.supports_remote_control ? (
-                  <span className="inline-flex items-center gap-1 text-blue-600 font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Bật
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-slate-400 font-semibold">
-                    <XCircle className="w-3.5 h-3.5" /> Tắt (Chỉ đọc)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Secret & Báo cáo */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-semibold">Secret xác thực:</span>
-                {node.has_credential ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
-                    <Key className="w-3.5 h-3.5" /> Đã cấp
-                  </span>
-                ) : (
-                  <span className="text-amber-600 font-semibold">Chưa cấp</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-semibold">Lần cấp secret:</span>
-                <span className="text-slate-700 dark:text-slate-300">
-                  {formatDateTime(node.credential_set_at)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Lần báo cáo và Cập nhật */}
-          <div className="p-3 bg-slate-100/70 dark:bg-slate-800/30 rounded-xl flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-slate-400" />
-              <span>Báo cáo viễn trắc gần nhất:</span>
-              <strong className="text-slate-800 dark:text-slate-100">
-                {formatDateTime(node.last_report_at)}
-              </strong>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span>Cập nhật: {formatDateTime(node.updated_at)}</span>
-            </div>
-          </div>
-
-          {/* Danh Sách Rơ-le Đấu Nối */}
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <Cable className="w-4 h-4 text-indigo-600" />
-                <span>Danh Sách Rơ-le Điều Khiển ({node.relays?.length || 0})</span>
-              </h4>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose()
-                  onSetRelay(node)
-                }}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 flex items-center gap-1 cursor-pointer"
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>Cấu hình rơ-le</span>
-              </button>
-            </div>
-
-            {node.relays && node.relays.length > 0 ? (
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase font-bold text-slate-600 dark:text-slate-300">
-                    <tr>
-                      <th className="py-2.5 px-3">Rơ-le #</th>
-                      <th className="py-2.5 px-3">Mạch xuất tuyến</th>
-                      <th className="py-2.5 px-3 text-center">Chế độ báo cáo</th>
-                      <th className="py-2.5 px-3 text-right">Thời điểm báo cáo</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {node.relays.map((r) => (
-                      <tr key={r.relay_no} className="hover:bg-slate-50/50">
-                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
-                          Rơ-le #{r.relay_no}
-                        </td>
-                        <td className="py-2.5 px-3 font-mono font-bold text-blue-600 dark:text-blue-400">
-                          {r.feeder_id || <span className="text-slate-400 font-normal">Chưa đấu nối</span>}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          {r.control_mode ? (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                              {r.control_mode}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-slate-500">
-                          {formatDateTime(r.mode_reported_at)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        <div className="p-6 space-y-5 overflow-y-auto text-xs text-slate-700 dark:text-slate-200">
+          <Section title="Mẫu điện mới nhất" icon={<Zap className="w-3.5 h-3.5 text-amber-500" />}>
+            {electricalError ? (
+              <ErrorLine text={electricalError} />
+            ) : !electrical ? (
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
             ) : (
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/30 rounded-xl text-center text-xs text-slate-400 italic border border-slate-200 dark:border-slate-800">
-                Thiết bị hiện chưa có rơ-le nào được đấu nối vào mạch xuất tuyến.
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[badge.tone]}`}>{badge.label}</span>
+                  {electrical.power_state && (
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{POWER_STATE_LABEL[electrical.power_state] || electrical.power_state}</span>
+                  )}
+                </div>
+                {m ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <div><span className="block text-[10px] text-slate-400">Nhận lúc</span>{formatTime(m.received_at)}</div>
+                    <div><span className="block text-[10px] text-slate-400">Lệnh đèn</span>{m.lamp_command || '—'}</div>
+                    <div><span className="block text-[10px] text-slate-400">Điện áp</span>{num(m.voltage, 3)} V</div>
+                    <div><span className="block text-[10px] text-slate-400">Dòng</span>{num(m.current_ma)} mA</div>
+                    <div><span className="block text-[10px] text-slate-400">Công suất</span>{num(m.power_mw)} mW</div>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 italic">Chưa có mẫu đo.</p>
+                )}
               </div>
             )}
-          </div>
+          </Section>
 
-          {/* Modal Actions */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onClose()
-                  onIssueCredential(node)
-                }}
-                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>Cấp Secret</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose()
-                  onEdit(node)
-                }}
-                className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <span>Chỉnh sửa</span>
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl text-xs hover:bg-blue-50 transition cursor-pointer"
-            >
-              Đóng
-            </button>
-          </div>
+          <Section title="Chẩn đoán" icon={<AlertTriangle className="w-3.5 h-3.5 text-rose-500" />}>
+            {diagnosticsError ? (
+              <ErrorLine text={diagnosticsError} />
+            ) : !diagnostics ? (
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+            ) : (
+              <div className="space-y-1.5">
+                {anomalies.length === 0 ? (
+                  <p className="text-emerald-700 dark:text-emerald-300 font-semibold">Không có cảnh báo.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {anomalies.map((a, i) => (
+                      <li key={`${a.code}-${i}`} className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200">
+                        <strong>{(a.code && ANOMALY_LABEL[a.code]) || a.code || 'Cảnh báo'}</strong>
+                        {a.observed != null && <> · đo {num(a.observed)}</>}
+                        {a.reference != null && <> · danh định {num(a.reference)}</>}
+                        {a.deviation_percent != null && <> · lệch {num(a.deviation_percent, 1)}%</>}
+                        {a.limit != null && <> · giới hạn {num(a.limit)}</>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {lamp && (
+                  <p>
+                    Ước lượng số bóng:{' '}
+                    {lamp.estimated_lit != null || lamp.estimated_missing != null ? (
+                      <strong>
+                        {lamp.estimated_lit ?? '—'} sáng, {lamp.estimated_missing ?? '—'} thiếu
+                      </strong>
+                    ) : (
+                      <span className="text-slate-500">chưa đủ mẫu ({lamp.samples ?? 0}/{lamp.required_samples ?? '—'})</span>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+          </Section>
+
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
+
+export default IotNodeDetailModal

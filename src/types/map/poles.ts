@@ -2,8 +2,8 @@
  * Auto-generated Types for: map/poles
  * Sinh tự động từ endpoint Backend
  */
+import type { FaultStatus, FaultType, FeederPowerState, FixtureStatus, FixtureType, NodeStatus, PowerSource, Severity, SourceChannel, WarrantyStatus } from '../common/enums'
 import type { PoleAssetPhotoItem } from '../assets/poles'
-import type { FaultStatus, FaultType, FixtureStatus, FixtureType, NodeStatus, PowerSource, Severity, SourceChannel, WarrantyStatus } from '../common/enums'
 import type { Geometry } from '../common/base'
 
 export interface PoleMapBaseline {
@@ -16,6 +16,7 @@ export interface PoleMapBaseline {
 }
 
 export interface PoleMapDetail {
+    power_state?: FeederPowerState
     asset_photos?: PoleAssetPhotoItem[]
     pole_id: string | null
     segment_id: string | null
@@ -36,6 +37,7 @@ export interface PoleMapDetail {
 }
 
 export interface PoleMapFixture {
+    power_state?: FeederPowerState
     fixture_id: string | null
     fixture_type?: FixtureType
     power_source?: PowerSource
@@ -44,6 +46,7 @@ export interface PoleMapFixture {
     install_date?: string | null
     warranty_expiry?: string | null
     warranty_status?: WarrantyStatus
+    note?: string | null
 }
 
 export interface PoleMapFrame {
@@ -101,6 +104,7 @@ export interface PoleMapStatus {
 }
 
 export interface PoleProperties {
+    power_state?: FeederPowerState
     pole_id: string | null
     segment_id: string | null
     fixture_status: FixtureStatus

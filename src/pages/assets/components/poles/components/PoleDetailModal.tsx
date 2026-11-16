@@ -6,14 +6,17 @@ import { StatusBadge } from '../../../../../components/StatusBadge'
 import type { PoleListItem } from '../../../../../types/assets/poles'
 import type { SegmentListItem } from '../../../../../types/assets/segments'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
+import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { FixtureStatus } from '../../../../../types/common/enums'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
+import { findByIdOrRef, cabinetOfPole } from '../../../../../utils/assets/findByIdOrRef'
 
 interface PoleDetailModalProps {
   isOpen: boolean
   pole: PoleListItem | null
   segments?: SegmentListItem[]
   cabinets?: CabinetListItem[]
+  feeders?: FeederListItem[]
   fixtureStatus?: FixtureStatus
   onClose: () => void
   onViewQr?: (pole: PoleListItem) => void
@@ -24,6 +27,7 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
   pole,
   segments = [],
   cabinets = [],
+  feeders = [],
   fixtureStatus,
   onClose,
   onViewQr,
@@ -31,20 +35,12 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
   const showCommune = useShowCommune()
   if (!isOpen || !pole) return null
 
-  const seg = segments.find(
-    (s) => s.segment_id === pole.segment_id || (s.external_ref && s.external_ref.toLowerCase() === pole.segment_id?.toLowerCase())
-  )
+  const seg = findByIdOrRef(segments, (s) => s.segment_id, pole.segment_id)
   const segmentName = seg?.segment_name || (seg?.external_ref ? `Tuyến ${seg.external_ref}` : 'Chưa gắn tuyến')
 
-  const cab = cabinets.find(
-    (c) =>
-      (pole.cabinet_id && (c.cabinet_id === pole.cabinet_id || c.external_ref === pole.cabinet_id)) ||
-      c.cabinet_id === pole.feeder_id ||
-      (c.external_ref && c.external_ref.toLowerCase() === pole.feeder_id?.toLowerCase()) ||
-      (c.feeder_ids && pole.feeder_id && c.feeder_ids.includes(pole.feeder_id))
-  )
+  const cab = cabinetOfPole(cabinets, pole)
   const cabName = cab?.cabinet_name || pole.cabinet_name || cab?.external_ref || 'Chưa gắn tủ'
-  const feederName = pole.feeder_id ? `${cabName} • ${pole.feeder_id}` : cabName
+  const feederCode = findByIdOrRef(feeders, (f) => f.feeder_id, pole.feeder_id)?.external_ref || pole.feeder_id
 
   const watt = pole.active_fixture?.lamp_watt || 100
   const lampCount = pole.active_fixture?.lamp_count || 1
@@ -173,8 +169,8 @@ export const PoleDetailModal: React.FC<PoleDetailModalProps> = ({
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <strong className="text-slate-800 dark:text-slate-200">Tủ điện quản lý:</strong>{' '}
-                <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{pole.feeder_id || 'Chưa gắn'}</span>
-                <span className="text-slate-500">({feederName})</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{feederCode || 'Chưa gắn'}</span>
+                <span className="text-slate-500">({cabName})</span>
               </div>
               {pole.near_sensitive_poi && (
                 <div className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 pt-1">

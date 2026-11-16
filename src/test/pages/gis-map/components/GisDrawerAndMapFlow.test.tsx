@@ -1,8 +1,9 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { store } from '../../../../redux/store'
+import { mapAPI } from '../../../../feature/map/mapAPI'
 import { GisMapLegend } from '../../../../pages/gis-map/components/GisMapLegend'
 import { GisDrawerPanel, type GisDrawerPanelProps } from '../../../../pages/gis-map/components/GisDrawerPanel'
 import type { PoleFeature } from '../../../../pages/gis-map/GisMapPage'
@@ -72,6 +73,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       cabinet_name: 'Tủ điện Tỉnh Lộ 8',
       commune_id: 'commune_tl8',
       feeder_ids: ['F-01', 'F-02'],
+      iot_node_ids: [],
       feeders: [],
     },
   }
@@ -151,7 +153,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
     handleSelectPole: vi.fn(),
     selectedCabinet: null,
     setSelectedCabinet: vi.fn(),
-    onToggleFeeder: vi.fn(),
     cabinets: [],
     effectivePoles: [],
   }
@@ -253,7 +254,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getAllByText('Chưa quét').length).toBeGreaterThan(0)
     })
 
-    it('GisDrawerPanel Zero-Mock: render đúng placeholder khi không có ảnh khảo sát và badge "Bình thường" khi không có lỗi', () => {
+    it('GisDrawerPanel Zero-Mock: render đúng placeholder khi không có ảnh khảo sát và badge "Không có sự cố" khi không có lỗi', () => {
       const normalPole: PoleFeature = {
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [106.4899, 10.9705] },
@@ -290,9 +291,9 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       // 1. Kiểm tra placeholder khi không có ảnh (không còn ảnh Unsplash ngẫu nhiên)
       expect(screen.getByText('Chưa có ảnh cột đèn')).toBeInTheDocument()
 
-      // 2. Kiểm tra badge "Bình thường" trên accordion khi không có lỗi
+      // 2. Kiểm tra badge "Không có sự cố" trên accordion khi không có lỗi
       expect(screen.getByText('Sự cố đang ghi nhận')).toBeInTheDocument()
-      expect(screen.getByText('Bình thường')).toBeInTheDocument()
+      expect(screen.getByText('Không có sự cố')).toBeInTheDocument()
 
       // 3. Không còn bất kỳ dấu vết nào của mock data incidentHistory cũ
       expect(screen.queryByText(/Cháy chấn lưu LED 60W/i)).toBeNull()
@@ -375,6 +376,102 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getByText('Ưu tiên: 60đ')).toBeInTheDocument()
     })
 
+    it('GisDrawerPanel dùng ảnh tài sản (tải qua blob có token) khi cột chưa có khung quét, và mở ảnh gốc ở lightbox', async () => {
+      const photoPole: PoleFeature = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [106.4899, 10.9705] },
+        properties: {
+          pole_id: 'POL-002',
+          segment_id: 'SEG-001',
+          fixture_status: 'normal',
+          open_fault_count: 0,
+        },
+      }
+      store.dispatch(
+        fetchPoleDetailSuccess({
+          ...mockPoleDetail,
+          pole_id: 'POL-002',
+          current_status: { fixture_status: 'normal' },
+          open_faults: [],
+          recent_frames: [],
+          asset_photos: [
+            {
+              photo_id: 'PH-1',
+              thumbnail_url: '/api/v1/assets/poles/POL-002/photos/PH-1/thumbnail',
+              original_url: '/api/v1/assets/poles/POL-002/photos/PH-1/original',
+            },
+          ],
+        })
+      )
+
+      const fetchBlob = vi
+        .spyOn(mapAPI, 'fetchPhotoBlob')
+        .mockImplementation(async (url) => new Blob([url], { type: 'image/jpeg' }))
+      const createUrl = vi.fn((blob: Blob) => `blob:${blob.size}`)
+      const originalCreate = URL.createObjectURL
+      const originalRevoke = URL.revokeObjectURL
+      URL.createObjectURL = createUrl
+      URL.revokeObjectURL = vi.fn()
+
+      try {
+        render(
+          <Provider store={store}>
+            <GisDrawerPanel {...defaultDrawerProps} selectedPole={photoPole} effectivePoles={[photoPole]} />
+          </Provider>
+        )
+
+        const thumb = await screen.findByRole('img', { name: 'POL-002' })
+        expect(thumb).toHaveAttribute('src', expect.stringMatching(/^blob:/))
+        expect(fetchBlob).toHaveBeenCalledWith('/api/v1/assets/poles/POL-002/photos/PH-1/thumbnail')
+        expect(fetchBlob).not.toHaveBeenCalledWith('/api/v1/assets/poles/POL-002/photos/PH-1/original')
+        expect(screen.queryByText('Chưa có ảnh cột đèn')).toBeNull()
+
+        fireEvent.click(thumb)
+        await waitFor(() =>
+          expect(fetchBlob).toHaveBeenCalledWith('/api/v1/assets/poles/POL-002/photos/PH-1/original')
+        )
+      } finally {
+        URL.createObjectURL = originalCreate
+        URL.revokeObjectURL = originalRevoke
+        fetchBlob.mockRestore()
+      }
+    })
+
+    it('GisDrawerPanel hiện ảnh dọc nguyên khung (object-contain), ảnh ngang vẫn phủ kín (object-cover)', () => {
+      const pole: PoleFeature = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [106.4899, 10.9705] },
+        properties: { pole_id: 'POL-002', segment_id: 'SEG-001', fixture_status: 'normal', open_fault_count: 0 },
+      }
+      store.dispatch(
+        fetchPoleDetailSuccess({
+          ...mockPoleDetail,
+          pole_id: 'POL-002',
+          current_status: { fixture_status: 'normal' },
+          open_faults: [],
+          recent_frames: [{ frame_id: 'FRM-9', sweep_id: 'SWP-9', thumbnail_url: 'https://cdn.luxmap.vn/p.jpg' }],
+        })
+      )
+      render(
+        <Provider store={store}>
+          <GisDrawerPanel {...defaultDrawerProps} selectedPole={pole} effectivePoles={[pole]} />
+        </Provider>
+      )
+
+      const img = screen.getByRole('img', { name: 'POL-002' })
+      expect(img.className).toContain('object-cover')
+
+      Object.defineProperty(img, 'naturalWidth', { configurable: true, value: 240 })
+      Object.defineProperty(img, 'naturalHeight', { configurable: true, value: 320 })
+      fireEvent.load(img)
+      expect(screen.getByRole('img', { name: 'POL-002' }).className).toContain('object-contain')
+
+      Object.defineProperty(img, 'naturalWidth', { configurable: true, value: 320 })
+      Object.defineProperty(img, 'naturalHeight', { configurable: true, value: 240 })
+      fireEvent.load(img)
+      expect(screen.getByRole('img', { name: 'POL-002' }).className).toContain('object-cover')
+    })
+
     it('GisDrawerPanel chế độ xem Tuyến đường chỉ hiển thị thông số hạ tầng và KHÔNG CÒN thông số IoT rác', () => {
       render(
         <Provider store={store}>
@@ -415,7 +512,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
             selectedPole={null}
             selectedCabinet={null}
             selectedFeeder={mockFeeder}
-            feederStatusMap={{ 'FDR-009': 'active' }}
           />
         </Provider>
       )
@@ -424,7 +520,9 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getByText(/Điều khiển nguồn Mạch điện/i)).toBeInTheDocument()
       expect(screen.getByText('Thông số Kỹ thuật Mạch điện')).toBeInTheDocument()
       expect(screen.getByText('Tủ A')).toBeInTheDocument()
-      expect(screen.getAllByText(/ĐANG BẬT|TỰ ĐỘNG|ĐANG CẤP ĐIỆN/i).length).toBeGreaterThan(0)
+      // API chưa trả power_state / control_mode: không tự đoán chế độ, trạng thái cấp điện ghi 'Chưa rõ'
+      expect(screen.getByText('Chưa rõ')).toBeInTheDocument()
+      expect(screen.queryByText(/Chế độ: /)).toBeNull()
     })
 
     it('validateImportRow chấp nhận dòng dữ liệu CSV có đủ 100% các cột bắt buộc', () => {
@@ -490,9 +588,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
         landmark_note: 'Gần UBND xã Phú Hòa Đông',
         status: 'active',
         feeder_ids: ['FDR-01', 'FDR-02'],
-        current_load_kw: 12.5,
-        voltage_v: 220,
-        power_factor: 0.95,
       }
 
       const mockConnectedPoles: PoleFeature[] = [
@@ -522,7 +617,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
         },
       ]
 
-      const handleToggleFeeder = vi.fn()
 
       render(
         <Provider store={store}>
@@ -531,8 +625,6 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
             selectedPole={null}
             selectedCabinet={mockCabinet}
             effectivePoles={mockConnectedPoles}
-            onToggleFeeder={handleToggleFeeder}
-            feederStatusMap={{ 'FDR-01': 'active', 'FDR-02': 'fault' }}
           />
         </Provider>
       )

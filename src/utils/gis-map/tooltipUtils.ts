@@ -38,9 +38,9 @@ export function getPoleTooltipHtml({ pole }: PoleTooltipParams): string {
       <div class="pt-1 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
         <div>Tủ cấp nguồn: <strong class="text-emerald-700 dark:text-emerald-400 font-semibold">${displayCabinet}</strong></div>
         <div>Lộ điện (Feeder): <strong class="text-slate-700 dark:text-slate-200 font-mono">${displayFeeder}</strong></div>
-        <div>Công suất tải: <strong class="text-slate-700 dark:text-slate-200 font-mono">${p.lamp_watt || 100}W</strong> (220V AC)</div>
+        ${p.lamp_watt ? `<div>Công suất tải: <strong class="text-slate-700 dark:text-slate-200 font-mono">${p.lamp_watt}W</strong></div>` : ''}
         ${p.atlas || p.atlas_note ? `<div class="text-slate-600 dark:text-slate-400 text-[10.5px]">📍 Vị trí: <strong class="text-slate-800 dark:text-slate-200">${p.atlas || p.atlas_note}</strong></div>` : ''}
-        ${p.power_loss_reason ? `<div class="text-rose-600 dark:text-rose-400 text-[10px] font-medium pt-0.5">⚠️ ${p.power_loss_reason}</div>` : status === 'out' ? `<div class="text-rose-600 dark:text-rose-400 text-[10px] font-medium pt-0.5">⚠️ Cháy bóng LED/Driver (Cáp nguồn trục 220V vẫn thông mạch)</div>` : status === 'dim' ? `<div class="text-amber-600 dark:text-amber-400 text-[10px] font-medium pt-0.5">⚡ Sụt áp cuối nguồn / Giảm quang thông</div>` : ''}
+        ${status === 'out' ? `<div class="text-rose-600 dark:text-rose-400 text-[10px] font-medium pt-0.5">⚠️ Cháy bóng LED/Driver (Cáp nguồn trục 220V vẫn thông mạch)</div>` : status === 'dim' ? `<div class="text-amber-600 dark:text-amber-400 text-[10px] font-medium pt-0.5">⚡ Sụt áp cuối nguồn / Giảm quang thông</div>` : ''}
       </div>
     </div>
   `
