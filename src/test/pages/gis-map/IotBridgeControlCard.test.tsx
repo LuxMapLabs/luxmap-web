@@ -10,17 +10,16 @@ vi.mock('../../../feature/iot/iotAPI', () => ({
     getPoleControl: vi.fn(),
     getCommand: vi.fn(),
     sendCommand: vi.fn(),
-    getElectricalHistoryPage: vi.fn(),
-    getElectricalHistory: vi.fn(),
+    getElectrical: vi.fn(),
   },
 }))
 
 const api = vi.mocked(iotAPI)
 
-const renderCard = (role: string) =>
+const renderCard = (role: string, onOpenElectricalMonitor?: (feederId: string, nodeId?: string | null) => void) =>
   render(
     <Provider store={configureStore({ reducer: { auth: () => ({ user: { role } }) } })}>
-      <IotBridgeControlCard poleId="POLE-0001" />
+      <IotBridgeControlCard poleId="POLE-0001" onOpenElectricalMonitor={onOpenElectricalMonitor} />
     </Provider>
   )
 
@@ -37,6 +36,7 @@ describe('IotBridgeControlCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     api.getCommand.mockResolvedValue({ node_id: 'NODE-001', command_id: 'old', mode: 'AUTO', command: null, command_acknowledged: true })
+    api.getElectrical.mockResolvedValue({ node_id: 'NODE-001', measurement: { power_mw: 512.3, current_ma: 102.5, voltage: 5 } })
   })
 
   it('renders nothing when the pole has no IoT node', async () => {
@@ -67,15 +67,18 @@ describe('IotBridgeControlCard', () => {
     expect(screen.getByRole('button', { name: /Bật mạch FDR-001/ })).toBeInTheDocument()
   })
 
-  it('lets a read-only role open the electrical history chart from the card', async () => {
+  it('shows a one-line feeder summary that opens the electrical monitor for that feeder, for any role', async () => {
     api.getPoleControl.mockResolvedValue(bridgeControl)
-    api.getElectricalHistoryPage.mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] })
-    renderCard('superior')
+    const open = vi.fn()
+    renderCard('superior', open)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Lịch sử điện/ }))
-
-    expect(await screen.findByRole('dialog', { name: 'Lịch sử điện NODE-001' })).toBeInTheDocument()
-    await waitFor(() => expect(api.getElectricalHistoryPage).toHaveBeenCalledWith('NODE-001', { page: 1, page_size: 200 }))
+    const summary = await screen.findByRole('button', { name: /Mạch FDR-001/ })
+    await waitFor(() => expect(summary).toHaveTextContent('512.3 mW · 102.5 mA'))
+    expect(api.getElectrical).toHaveBeenCalledWith('NODE-001')
+    fireEvent.click(summary)
+    expect(open).toHaveBeenCalledWith('FDR-001', 'NODE-001')
+    // Biểu đồ không còn mở ngay trong khung cột
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('explains why a node on the feeder cannot be switched through the bridge', async () => {

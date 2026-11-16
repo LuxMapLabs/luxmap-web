@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   Zap,
   X,
-  Activity,
   Info,
   Radio,
   Wrench,
@@ -33,6 +32,7 @@ import { previewLightingRequest, openHistoryModal } from '../../../feature/light
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
 import { IotBridgeControlCard } from './IotBridgeControlCard'
+import { FeederElectricalSummary } from './FeederElectricalSummary'
 import { segmentDisplayCode } from '../../../utils/gis-map/gisSearchUtils'
 import { formatDate } from '../../../utils/dateUtils'
 import { isManager } from '../../../utils/roleUtils'
@@ -83,6 +83,8 @@ export interface GisDrawerPanelProps {
   /** Quản lý: bật chế độ lấy hình tuyến theo đường trên bản đồ nền cho tuyến đang mở. */
   onStartReshapeSegment?: () => void
   isReshapingSegment?: boolean
+  /** Mở bảng giám sát điện (dưới bản đồ) ở mạch này; `nodeId` khi nơi mở đã biết node của mạch. */
+  onOpenElectricalMonitor?: (feederId: string, nodeId?: string | null) => void
 }
 
 const FAULT_TYPE_LABELS: Record<FaultType, string> = {
@@ -134,6 +136,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   effectivePoles: propsEffectivePoles = [],
   onStartReshapeSegment,
   isReshapingSegment = false,
+  onOpenElectricalMonitor,
 }) => {
   // Khung cột / mạch điện → khung tuyến của nó (nút "Lấy hình theo đường" nằm ở khung tuyến). Bấm đường tuyến trên
   // bản đồ thường trúng dây mạch nằm chồng lên, nên đây là lối mở khung tuyến chắc chắn.
@@ -380,6 +383,11 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       updated_at: null,
     }))
   }, [selectedCabinet, assetFeeders, cabinetConnectedPoles])
+
+  // Node IoT của mạch: mỗi IoT gán đúng một mạch (feeder.control.node_id)
+  const feederNodeId = (feederId: string, feeder?: any): string | null =>
+    (assetFeeders || []).find((af: any) => af.feeder_id === feederId)?.control?.node_id || feeder?.control?.node_id || null
+  const cabinetIotCount = cabinetFeeders.filter((f: any) => feederNodeId(f.feeder_id, f)).length
 
   return (
     <>
@@ -706,49 +714,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   )}
 
                   {/* Điều khiển mạch của trụ qua IoT bridge (chỉ hiện khi mạch có node IoT) */}
-                  <IotBridgeControlCard poleId={poleId} />
-
-                  {/* 3. Luminance Baseline History (Operational Telemetry) */}
-                  <div className="bg-white dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-2xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
-                        <Activity className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                        <span>Độ sáng 3 đêm gần nhất</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Baseline</span>
-                    </div>
-
-                    <div className="space-y-1 pt-0.5">
-                      {poleDetail?.luminance_history && poleDetail.luminance_history.length > 0 ? (
-                        poleDetail.luminance_history.slice(0, 3).map((item: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/70 border border-slate-100 dark:border-slate-800 text-[11px]"
-                          >
-                            <span className="font-mono text-slate-600 dark:text-slate-400">
-                              {item.observed_at ? item.observed_at.split('T')[0] : 'Gần đây'}
-                            </span>
-                            <span className="font-bold text-slate-900 dark:text-white">
-                              {Math.round((item.baseline_ratio || 1) * 100)}%
-                            </span>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
-                                item.classified_as === 'normal'
-                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                                  : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                              }`}
-                            >
-                              {item.classified_as === 'normal' ? 'Sáng' : 'Mờ'}
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="py-2.5 text-center text-slate-400 dark:text-slate-500 text-[11px]">
-                          Chưa có dữ liệu đo quang thông từ các đợt quét gần nhất
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <IotBridgeControlCard poleId={poleId} onOpenElectricalMonitor={onOpenElectricalMonitor} />
 
                   {/* 4. Collapsible Active Faults & Issues (Accordion at the bottom) */}
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden bg-white dark:bg-slate-800/50 shadow-2xs">
@@ -903,7 +869,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <span>Hệ thống IoT Giám sát từ xa</span>
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">
-                    {selectedCabinet.iot_gateway_id || selectedCabinet.iot_node_id || 'Chưa gắn thiết bị'}
+                    {cabinetIotCount > 0 ? `${cabinetIotCount}/${cabinetFeeders.length} mạch có IoT` : 'Chưa gắn thiết bị'}
                   </span>
                 </div>
 
@@ -1048,6 +1014,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           </div>
                           )}
                         </div>
+                        <FeederElectricalSummary
+                          nodeId={feederNodeId(fId, feeder)}
+                          onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(fId, feederNodeId(fId, feeder)) : undefined}
+                        />
                       </div>
                     )
                   })}
@@ -1057,6 +1027,20 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
               </div>
           ) : selectedFeeder ? (
             <div className="space-y-4 text-xs">
+              {/* Số đo điện của mạch (từ node IoT gán cho mạch) */}
+              {(() => {
+                const selId = selectedFeeder.feeder_id || selectedFeeder.external_ref
+                const nodeId = feederNodeId(selId, selectedFeeder)
+                return (
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">Số đo điện của mạch</span>
+                    <FeederElectricalSummary
+                      nodeId={nodeId}
+                      onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(selId, nodeId) : undefined}
+                    />
+                  </div>
+                )
+              })()}
               {/* 1. Feeder Control Card with 3-Mode Tri-State Buttons */}
               <div className="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-3">
                 <div className="font-bold text-slate-800 dark:text-slate-200 text-xs border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 flex items-center justify-between">

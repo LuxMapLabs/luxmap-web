@@ -111,6 +111,8 @@ import {
 import { lineToWkt, type LngLat } from '../../utils/gis-map/roadRouting'
 import { calculateRouteLengthMeters } from '../../utils/gis-map/routeUtils'
 import type { SearchResultItem } from '../../utils/gis-map/gisSearchUtils'
+import { ElectricalMonitorDock, type ElectricalMonitorTarget } from './components/ElectricalMonitorDock'
+import { buildMonitorTarget } from '../../utils/iot/electricalMonitor'
 
 export const GisMapPage: React.FC = () => {
   const isHoveringMarkerRef = useRef<boolean>(false)
@@ -588,6 +590,14 @@ export const GisMapPage: React.FC = () => {
 
   const isPanelOpen = Boolean(selectedPole || selectedSegmentId || selectedCabinet || selectedFeeder)
 
+  // Bảng giám sát điện dưới bản đồ: mở theo một mạch, tab là các mạch cùng tủ
+  const assetFeeders = useSelector((state: RootState) => state.assets.feeders)
+  const [electricalMonitor, setElectricalMonitor] = useState<ElectricalMonitorTarget | null>(null)
+  const openElectricalMonitor = useCallback(
+    (feederId: string, nodeId?: string | null) => setElectricalMonitor(buildMonitorTarget(feederId, assetFeeders || [], nodeId)),
+    [assetFeeders]
+  )
+
   return (
     <div className="flex-1 flex h-full w-full overflow-hidden bg-slate-50 dark:bg-slate-950 relative select-none">
       {/* Map Area */}
@@ -632,6 +642,14 @@ export const GisMapPage: React.FC = () => {
 
         {/* Bottom Left Legend Box */}
         <GisMapLegend />
+
+        {electricalMonitor && (
+          <ElectricalMonitorDock
+            target={electricalMonitor}
+            onSelectFeeder={(feederId) => setElectricalMonitor((m) => (m ? { ...m, activeFeederId: feederId } : m))}
+            onClose={() => setElectricalMonitor(null)}
+          />
+        )}
       </div>
 
       {/* Right Drawer Side Panel */}
@@ -650,6 +668,7 @@ export const GisMapPage: React.FC = () => {
           effectivePoles={effectivePoles}
           onStartReshapeSegment={handleStartReshapeSegment}
           isReshapingSegment={reshape !== null}
+          onOpenElectricalMonitor={openElectricalMonitor}
         />
       )}
 

@@ -319,6 +319,12 @@ describe('Khung cột trên Bản đồ GIS: sửa thông tin cột và gắn b�
     expect(screen.getByRole('button', { name: /Lưu thay đổi/ })).toBeEnabled()
   })
 
+  it('khung cột không còn mục "Độ sáng 3 đêm gần nhất"', () => {
+    setup('manager')
+    expect(screen.queryByText('Độ sáng 3 đêm gần nhất')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Chưa có dữ liệu đo quang thông/)).not.toBeInTheDocument()
+  })
+
   it('Cấp giám sát: không có nút sửa cột hay gắn bộ đèn', () => {
     setup('superior', {}, { ...DETAIL, fixtures: [] })
     expect(screen.queryByRole('button', { name: /Sửa cột/ })).not.toBeInTheDocument()
