@@ -5,6 +5,7 @@ import type {
   CreateCommuneRequest,
   UpdateCommuneRequest,
 } from '../../types/admin/communes'
+import type { Geometry } from '../../types/common/base'
 import type { CommuneQueryParams } from './communeAPI'
 
 export interface AdminCommuneState {
@@ -23,6 +24,10 @@ export interface AdminCommuneState {
   // Selected commune for detail/edit
   selectedCommune: CommuneItem | null
   isLoadingDetail: boolean
+
+  // Ranh giới của địa bàn đang sửa (GET /map/communes)
+  boundary: Geometry | null
+  isLoadingBoundary: boolean
 
   // UI filters
   filters: {
@@ -46,6 +51,9 @@ const initialState: AdminCommuneState = {
   selectedCommune: null,
   isLoadingDetail: false,
 
+  boundary: null,
+  isLoadingBoundary: false,
+
   filters: {
     search: '',
     hasBbox: 'all',
@@ -55,6 +63,13 @@ const initialState: AdminCommuneState = {
 export interface UpdateCommunePayload {
   id: string
   data: UpdateCommuneRequest
+  /** undefined = không đụng tới ranh giới; null = xóa ranh giới */
+  boundary?: Geometry | null
+}
+
+export interface CreateCommunePayload {
+  data: CreateCommuneRequest
+  boundary?: Geometry | null
 }
 
 const adminCommuneSlice = createSlice({
@@ -94,7 +109,25 @@ const adminCommuneSlice = createSlice({
     },
 
     // --- Create Commune ---
-    createCommuneRequest: (state, _action: PayloadAction<CreateCommuneRequest>) => {
+    // --- Fetch Commune Boundary ---
+    fetchCommuneBoundaryRequest: (state, _action: PayloadAction<string>) => {
+      state.isLoadingBoundary = true
+      state.boundary = null
+    },
+    fetchCommuneBoundarySuccess: (state, action: PayloadAction<Geometry | null>) => {
+      state.isLoadingBoundary = false
+      state.boundary = action.payload
+    },
+    fetchCommuneBoundaryFailure: (state) => {
+      state.isLoadingBoundary = false
+      state.boundary = null
+    },
+    clearCommuneBoundary: (state) => {
+      state.isLoadingBoundary = false
+      state.boundary = null
+    },
+
+    createCommuneRequest: (state, _action: PayloadAction<CreateCommunePayload>) => {
       state.isSubmitting = true
       state.actionError = null
       state.actionSuccessMessage = null
@@ -161,6 +194,10 @@ export const {
   fetchCommuneDetailRequest,
   fetchCommuneDetailSuccess,
   fetchCommuneDetailFailure,
+  fetchCommuneBoundaryRequest,
+  fetchCommuneBoundarySuccess,
+  fetchCommuneBoundaryFailure,
+  clearCommuneBoundary,
   createCommuneRequest,
   createCommuneSuccess,
   createCommuneFailure,

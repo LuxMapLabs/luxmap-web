@@ -1,12 +1,17 @@
 import { all, call, put, takeLatest } from 'redux-saga/effects'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
-import { communeAPI as adminCommuneAPI, type CommuneQueryParams } from './communeAPI'
+import {
+  communeAPI as adminCommuneAPI,
+  getCommuneBoundary,
+  updateCommuneBoundary,
+  type CommuneQueryParams,
+} from './communeAPI'
 import type {
   CommuneItemPagedResult,
   CommuneItem,
-  CreateCommuneRequest,
 } from '../../types/admin/communes'
+import type { Geometry } from '../../types/common/base'
 import {
   fetchCommunesRequest,
   fetchCommunesSuccess,
@@ -14,12 +19,16 @@ import {
   fetchCommuneDetailRequest,
   fetchCommuneDetailSuccess,
   fetchCommuneDetailFailure,
+  fetchCommuneBoundaryRequest,
+  fetchCommuneBoundarySuccess,
+  fetchCommuneBoundaryFailure,
   createCommuneRequest,
   createCommuneSuccess,
   createCommuneFailure,
   updateCommuneRequest,
   updateCommuneSuccess,
   updateCommuneFailure,
+  type CreateCommunePayload,
   type UpdateCommunePayload,
 } from './communeSlice'
 
@@ -58,11 +67,28 @@ function* handleFetchCommuneDetail(action: PayloadAction<string>) {
 }
 
 /**
- * Worker saga tạo mới địa bàn
+ * Worker saga tải ranh giới của địa bàn đang sửa
  */
-function* handleCreateCommune(action: PayloadAction<CreateCommuneRequest>) {
+function* handleFetchCommuneBoundary(action: PayloadAction<string>) {
   try {
-    const result: CommuneItem = yield call(adminCommuneAPI.createCommune, action.payload)
+    const boundary: Geometry | null = yield call(getCommuneBoundary, action.payload)
+    yield put(fetchCommuneBoundarySuccess(boundary))
+  } catch {
+    yield put(fetchCommuneBoundaryFailure())
+    toast.error('Không thể tải ranh giới của địa bàn.')
+  }
+}
+
+/**
+ * Worker saga tạo mới địa bàn (ranh giới lưu bằng lệnh riêng sau khi có commune_id)
+ */
+function* handleCreateCommune(action: PayloadAction<CreateCommunePayload>) {
+  try {
+    const { data, boundary } = action.payload
+    let result: CommuneItem = yield call(adminCommuneAPI.createCommune, data)
+    if (boundary && result.commune_id) {
+      result = yield call(updateCommuneBoundary, result.commune_id, { boundary })
+    }
     yield put(createCommuneSuccess(result))
     toast.success(`Đã thêm địa bàn "${result.name || result.commune_id}" thành công!`)
     // Tải lại danh sách
@@ -83,9 +109,12 @@ function* handleCreateCommune(action: PayloadAction<CreateCommuneRequest>) {
  * Worker saga cập nhật địa bàn
  */
 function* handleUpdateCommune(action: PayloadAction<UpdateCommunePayload>) {
-  const { id, data } = action.payload
+  const { id, data, boundary } = action.payload
   try {
-    const result: CommuneItem = yield call(adminCommuneAPI.updateCommune, id, data)
+    let result: CommuneItem = yield call(adminCommuneAPI.updateCommune, id, data)
+    if (boundary !== undefined) {
+      result = yield call(updateCommuneBoundary, id, { boundary })
+    }
     yield put(updateCommuneSuccess(result))
     toast.success(`Cập nhật địa bàn "${result.name || result.commune_id}" thành công!`)
   } catch (error: any) {
@@ -104,6 +133,7 @@ export function* adminCommuneSaga() {
   yield all([
     takeLatest(fetchCommunesRequest.type, handleFetchCommunes),
     takeLatest(fetchCommuneDetailRequest.type, handleFetchCommuneDetail),
+    takeLatest(fetchCommuneBoundaryRequest.type, handleFetchCommuneBoundary),
     takeLatest(createCommuneRequest.type, handleCreateCommune),
     takeLatest(updateCommuneRequest.type, handleUpdateCommune),
   ])

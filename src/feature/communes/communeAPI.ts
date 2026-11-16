@@ -4,7 +4,10 @@ import type {
   CommuneItem,
   CreateCommuneRequest,
   UpdateCommuneRequest,
+  UpdateCommuneBoundaryRequest,
 } from '../../types/admin/communes'
+import type { Geometry } from '../../types/common/base'
+import type { CommunePropertiesFeatureCollection } from '../../types/map/communes'
 
 export interface CommuneQueryParams {
   page?: number
@@ -47,6 +50,29 @@ export const communeAPI = {
     const response = await apiClient.put<CommuneItem>(`/admin/communes/${id}`, payload)
     return response.data
   },
+}
+
+/**
+ * Ranh giới (GeoJSON Polygon/MultiPolygon) của một địa bàn
+ * GET /api/v1/map/communes?commune_id={id}
+ */
+export const getCommuneBoundary = async (id: string): Promise<Geometry | null> => {
+  const response = await apiClient.get<CommunePropertiesFeatureCollection>('/map/communes', {
+    params: { commune_id: id },
+  })
+  return response.data.features?.[0]?.geometry ?? null
+}
+
+/**
+ * Lưu ranh giới địa bàn; boundary = null để xóa
+ * PUT /api/v1/admin/communes/{id}/boundary
+ */
+export const updateCommuneBoundary = async (
+  id: string,
+  payload: UpdateCommuneBoundaryRequest
+): Promise<CommuneItem> => {
+  const response = await apiClient.put<CommuneItem>(`/admin/communes/${id}/boundary`, payload)
+  return response.data
 }
 
 export const adminCommuneAPI = communeAPI
