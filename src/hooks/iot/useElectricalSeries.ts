@@ -38,6 +38,8 @@ const sampleTime = (s: IotArchivedSample) => toElectricalPoint(s)?.time ?? null
 export function useElectricalSeries(nodeId: string | null | undefined, { initial, maxPoints, windowMs }: Options) {
   const [points, setPoints] = useState<ElectricalPoint[]>([])
   const [loading, setLoading] = useState(Boolean(nodeId))
+  // Còn đang tải ngược các trang cũ cho đủ `windowMs` (`loading` đã tắt từ trang đầu): chuỗi còn dài thêm
+  const [backfilling, setBackfilling] = useState(Boolean(nodeId))
   const [error, setError] = useState<string | null>(null)
   const maxCursor = useRef(0)
 
@@ -62,11 +64,13 @@ export function useElectricalSeries(nodeId: string | null | undefined, { initial
     setError(null)
     if (!nodeId) {
       setLoading(false)
+      setBackfilling(false)
       return
     }
     let cancelled = false
     let timer: number | undefined
     setLoading(true)
+    setBackfilling(true)
 
     const schedule = () => {
       if (!cancelled) timer = window.setTimeout(poll, ELECTRICAL_POLL_MS)
@@ -103,10 +107,12 @@ export function useElectricalSeries(nodeId: string | null | undefined, { initial
           if (newest - Math.min(...times) >= windowMs) break
         }
         setError(null)
+        setBackfilling(false)
         schedule()
       } catch (err) {
         if (cancelled) return
         setLoading(false)
+        setBackfilling(false)
         setError(apiErrorMessage(err, 'Không đọc được lịch sử điện.'))
         timer = window.setTimeout(load, ELECTRICAL_POLL_MS)
       }
@@ -119,5 +125,5 @@ export function useElectricalSeries(nodeId: string | null | undefined, { initial
     }
   }, [nodeId, initial, windowMs, absorb])
 
-  return { points, latest: points[points.length - 1] ?? null, loading, error }
+  return { points, latest: points[points.length - 1] ?? null, loading, backfilling, error }
 }

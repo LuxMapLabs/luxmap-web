@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, AlertTriangle, Loader2, X } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useElectricalSeries, ELECTRICAL_POLL_MS } from '../../../hooks/iot/useElectricalSeries'
@@ -14,6 +14,9 @@ import {
 export const INITIAL_SAMPLES = 200
 
 type ElectricalView = 'minute' | 'hour'
+
+/** Thời gian hiệu ứng co giãn ngang của biểu đồ khi đổi chế độ xem (khớp `.electrical-chart-swap` ở index.css). */
+const CHART_ANIMATION_MS = 600
 
 /**
  * Chế độ xem biểu đồ: trung bình các mẫu (10 s / mẫu) trong mỗi phút / giờ, trên khoảng gần nhất;
@@ -74,15 +77,37 @@ const METRIC_TONE: Record<ElectricalMetric, { card: string; dot: string; value: 
 const ElectricalChartPane: React.FC<{ nodeId: string }> = ({ nodeId }) => {
   const [view, setView] = useState<ElectricalView>('minute')
   const v = ELECTRICAL_VIEWS[view]
-  const { points, latest, loading, error } = useElectricalSeries(nodeId, {
+  const { points, latest, loading: firstPage, backfilling, error } = useElectricalSeries(nodeId, {
     initial: INITIAL_SAMPLES,
     maxPoints: v.maxPoints,
     windowMs: v.windowMs,
   })
+  // Chờ tải đủ khoảng đang xem mới vẽ: các trang cũ về dần làm biểu đồ co giãn liên tục nếu vẽ ngay từ trang đầu
+  const loading = firstPage || backfilling
   const [metric, setMetric] = useState<ElectricalMetric>('power')
+  // Đổi theo phút / giờ: giữ biểu đồ cũ trên màn hình trong lúc tải (không quay vòng, không trắng), rồi biểu đồ mới
+  // vào bằng hiệu ứng co giãn ngang: sang "theo phút" (phóng gần) thì rộng ra, sang "theo giờ" (thu xa) thì thu vào.
+  // Các lần cập nhật mẫu 10 giây một lần không có hiệu ứng.
+  const [animating, setAnimating] = useState(false)
+  const changeView = (key: ElectricalView) => {
+    if (key === view) return
+    setView(key)
+    setAnimating(true)
+  }
+  useEffect(() => {
+    if (!animating || loading) return
+    const timer = setTimeout(() => setAnimating(false), CHART_ANIMATION_MS + 100)
+    return () => clearTimeout(timer)
+  }, [animating, loading])
   const m = ELECTRICAL_METRICS[metric]
   const series = useMemo(() => bucketElectricalPoints(points, v.bucketMs), [points, v.bucketMs])
   const hasValues = useMemo(() => series.some((p) => p[metric] !== null), [series, metric])
+  // Biểu đồ cuối cùng đã vẽ được, để giữ nguyên trên màn hình lúc đang tải chế độ mới
+  const lastDrawn = useRef<{ series: typeof series; view: ElectricalView } | null>(null)
+  if (!loading && hasValues) lastDrawn.current = { series, view }
+  const frozen = loading ? lastDrawn.current : null
+  const shownSeries = frozen ? frozen.series : series
+  const shownView = frozen ? frozen.view : view
   // Dữ liệu chưa phủ hết khoảng đang xem (server IoT chỉ còn chừng đó mẫu)
   const shortOfWindow =
     points.length > 1 && !loading ? points[points.length - 1].time - points[0].time < v.windowMs * 0.95 : false
@@ -156,7 +181,7 @@ const ElectricalChartPane: React.FC<{ nodeId: string }> = ({ nodeId }) => {
                 key={key}
                 type="button"
                 aria-pressed={view === key}
-                onClick={() => setView(key)}
+                onClick={() => changeView(key)}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
                   view === key
                     ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
@@ -175,7 +200,7 @@ const ElectricalChartPane: React.FC<{ nodeId: string }> = ({ nodeId }) => {
           </p>
         )}
         <div className="flex-1 min-h-0 px-1 pb-1">
-          {loading ? (
+          {loading && !frozen ? (
             <div className="h-full flex items-center justify-center">
               <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
             </div>
@@ -194,8 +219,13 @@ const ElectricalChartPane: React.FC<{ nodeId: string }> = ({ nodeId }) => {
               </p>
             </div>
           ) : (
+            <div
+              key={shownView}
+              className={`h-full overflow-hidden ${animating && !loading ? 'electrical-chart-swap' : ''}`}
+              style={{ ['--swap-from' as string]: view === 'minute' ? 0.5 : 1.6 }}
+            >
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={series} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+              <LineChart data={shownSeries} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" />
                 <XAxis
                   dataKey="time"
@@ -219,12 +249,13 @@ const ElectricalChartPane: React.FC<{ nodeId: string }> = ({ nodeId }) => {
                   dataKey={metric}
                   stroke={m.color}
                   strokeWidth={2}
-                  dot={view === 'hour' ? { r: 2.5 } : false}
+                  dot={shownView === 'hour' ? { r: 2.5 } : false}
                   connectNulls
                   isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
+            </div>
           )}
         </div>
       </div>
@@ -247,7 +278,7 @@ export const ElectricalMonitorDock: React.FC<{
     <section
       role="region"
       aria-label="Giám sát điện"
-      className="absolute left-3 right-14 bottom-8 z-30 h-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col p-3 gap-2 text-xs"
+      className="absolute left-3 right-3 bottom-3 z-[10000] h-[min(30rem,65%)] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col p-3 gap-2 text-xs"
     >
       <div className="flex items-center gap-2">
         <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
