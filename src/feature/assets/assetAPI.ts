@@ -22,6 +22,8 @@ import type {
   PoleListItemPagedResult,
   CreatePoleRequest,
   UpdatePoleRequest,
+  SetPoleLocationRequest,
+  PoleLocationResponse,
 } from '../../types/assets/poles'
 import type {
   CreateFixtureRequest,
@@ -146,6 +148,21 @@ export const assetAPI = {
    */
   updatePole: async (poleId: string, data: UpdatePoleRequest): Promise<void> => {
     await apiClient.put(`/assets/poles/${encodeURIComponent(poleId)}`, data)
+  },
+
+  /**
+   * Chỉ cập nhật vị trí GPS của Cột điện (kiểm tra hành lang tuyến <= 25m)
+   * PUT /api/v1/assets/poles/{poleId}/location
+   */
+  updatePoleLocation: async (
+    poleId: string,
+    data: SetPoleLocationRequest
+  ): Promise<PoleLocationResponse> => {
+    const response = await apiClient.put<PoleLocationResponse>(
+      `/assets/poles/${encodeURIComponent(poleId)}/location`,
+      data
+    )
+    return response.data
   },
 
   /**

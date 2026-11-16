@@ -6,6 +6,7 @@ import {
   fetchAssetsRequest,
   createPolesBulkRequest,
   updatePoleRequest,
+  updatePoleLocationRequest,
   deletePoleRequest,
   createCabinetsBulkRequest,
   updateCabinetRequest,
@@ -173,6 +174,39 @@ export function useAssetData() {
   const handleUpdatePole = async (updated: PoleListItem) => {
     if (!updated.pole_id) {
       toast.error('Thiếu mã định danh cột để cập nhật!')
+      return
+    }
+
+    const existingPole = backendPoles.find((p) => p.pole_id === updated.pole_id)
+    const hasValidCoords =
+      updated.location != null &&
+      typeof updated.location.lat === 'number' &&
+      typeof updated.location.lng === 'number' &&
+      Number.isFinite(updated.location.lat) &&
+      Number.isFinite(updated.location.lng)
+
+    const isOnlyLocationChange =
+      Boolean(existingPole) &&
+      hasValidCoords &&
+      (updated.external_ref || updated.pole_id) ===
+        (existingPole!.external_ref || existingPole!.pole_id) &&
+      (updated.segment_id || null) === (existingPole!.segment_id || null) &&
+      (updated.feeder_id || null) === (existingPole!.feeder_id || null) &&
+      Boolean(updated.near_sensitive_poi) === Boolean(existingPole!.near_sensitive_poi) &&
+      (updated.data_source || 'field') === (existingPole!.data_source || 'field') &&
+      (updated.note ?? null) === (existingPole!.note ?? null)
+
+    if (isOnlyLocationChange && updated.location) {
+      dispatch(
+        updatePoleLocationRequest({
+          poleId: updated.pole_id,
+          data: {
+            lat: updated.location.lat,
+            lng: updated.location.lng,
+          },
+          externalRef: updated.external_ref || updated.pole_id,
+        })
+      )
       return
     }
 

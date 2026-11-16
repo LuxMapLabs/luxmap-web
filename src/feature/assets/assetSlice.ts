@@ -1,7 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import type { ImportResult } from '../../types/assets/import'
 import type { ImportAssetCategory } from './assetAPI'
-import type { PoleListItem, CreatePoleRequest, UpdatePoleRequest } from '../../types/assets/poles'
+import type {
+  PoleListItem,
+  CreatePoleRequest,
+  UpdatePoleRequest,
+  SetPoleLocationRequest,
+} from '../../types/assets/poles'
 import type { CabinetListItem, CreateCabinetRequest, UpdateCabinetRequest } from '../../types/assets/cabinets'
 import type { SegmentListItem, CreateSegmentRequest, UpdateSegmentRequest } from '../../types/assets/segments'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../types/assets/feeders'
@@ -92,6 +97,12 @@ export interface UpdatePolePayload {
   data: UpdatePoleRequest
 }
 
+export interface UpdatePoleLocationPayload {
+  poleId: string
+  data: SetPoleLocationRequest
+  externalRef?: string | null
+}
+
 export interface UpdateCabinetPayload {
   cabinetId: string
   data: UpdateCabinetRequest
@@ -163,6 +174,11 @@ const assetSlice = createSlice({
       state.mutationError = null
     },
     updatePoleRequest: (state, action: PayloadAction<UpdatePolePayload>) => {
+      void action
+      state.isMutating = true
+      state.mutationError = null
+    },
+    updatePoleLocationRequest: (state, action: PayloadAction<UpdatePoleLocationPayload>) => {
       void action
       state.isMutating = true
       state.mutationError = null
@@ -339,6 +355,7 @@ export const {
   createPoleRequest,
   createPolesBulkRequest,
   updatePoleRequest,
+  updatePoleLocationRequest,
   deletePoleRequest,
   createCabinetRequest,
   createCabinetsBulkRequest,

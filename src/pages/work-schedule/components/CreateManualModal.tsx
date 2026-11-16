@@ -119,28 +119,18 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
     }
   }, [assignees, assigneeId])
 
-  // Đồng bộ ngày và dữ liệu prefill khi mở modal
+  // Đồng bộ ngày và dữ liệu prefill (hoặc reset form sạch) khi mở modal
   useEffect(() => {
     if (isOpen) {
       const todayStr = getTodayStr()
       const effectiveDate = defaultDate && defaultDate >= todayStr ? defaultDate : todayStr
       setDate(effectiveDate)
-
-      if (initialPhase) {
-        setInitPhase(initialPhase)
-      }
-      if (initialTitle) {
-        setTitle(initialTitle)
-      }
-      if (initialNotes) {
-        setNotes(initialNotes)
-      }
-      if (initialPoleIds && initialPoleIds.length > 0) {
-        setSelectedPoleIds(initialPoleIds)
-      }
-      if (initialFaultIds && initialFaultIds.length > 0) {
-        setSelectedFaultIds(initialFaultIds)
-      }
+      setInitPhase(initialPhase || 'survey')
+      setTitle(initialTitle || '')
+      setNotes(initialNotes || '')
+      setSelectedPoleIds(initialPoleIds && initialPoleIds.length > 0 ? initialPoleIds : [])
+      setSelectedFaultIds(initialFaultIds && initialFaultIds.length > 0 ? initialFaultIds : [])
+      setQrPdfFiles([])
       if (initialSegmentId && segmentsList.length > 0) {
         const found = segmentsList.find((s) => s.includes(initialSegmentId))
         if (found) {
@@ -201,9 +191,9 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       toast.warning('Chỉ hỗ trợ đính kèm file định dạng PDF (.pdf).')
     }
 
-    const sizeValidPdfs = validPdfs.filter((f) => f.size <= MAX_BYTES)
+    const sizeValidPdfs = validPdfs.filter((f) => f.size > 0 && f.size <= MAX_BYTES)
     if (sizeValidPdfs.length < validPdfs.length) {
-      toast.warning('Mỗi file PDF không được vượt quá 20 MiB.')
+      toast.warning('File PDF không được rỗng (0 byte) và mỗi file không vượt quá 20 MiB.')
     }
 
     const remainingSlots = Math.max(0, MAX_FILES - qrPdfFiles.length)

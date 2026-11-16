@@ -37,6 +37,7 @@ import {
   createPoleRequest,
   createPolesBulkRequest,
   updatePoleRequest,
+  updatePoleLocationRequest,
   deletePoleRequest,
   createCabinetRequest,
   createCabinetsBulkRequest,
@@ -66,6 +67,7 @@ import {
   type ImportAssetPayload,
   type CreatePolePayload,
   type UpdatePolePayload,
+  type UpdatePoleLocationPayload,
   type UpdateCabinetPayload,
   type UpdateFeederPayload,
   type UpdateSegmentPayload,
@@ -121,11 +123,63 @@ function translateErrorMessage(msg: string): string {
 
 function getErrorMessage(error: unknown, fallback: string): string {
   const err = error as {
-    response?: { data?: { error?: { message?: string }; message?: string } }
+    response?: {
+      data?: {
+        error?: {
+          code?: string
+          message?: string
+          details?: Record<string, unknown>
+        }
+        message?: string
+      }
+    }
     message?: string
   }
-  const rawMsg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || fallback
-  return translateErrorMessage(rawMsg)
+  const apiError = err?.response?.data?.error
+  const code = apiError?.code
+  const details = apiError?.details
+
+  if (code === 'POLE_OFF_SEGMENT') {
+    const distanceM = typeof details?.distance_m === 'number' ? details.distance_m : undefined
+    const corridorM = typeof details?.corridor_m === 'number' ? details.corridor_m : 25
+    const segmentId = typeof details?.segment_id === 'string' ? details.segment_id : ''
+    if (distanceM !== undefined) {
+      return `Vị trí mới cách tuyến hiện tại${segmentId ? ` (${segmentId})` : ''} ${distanceM}m, vượt quá hành lang cho phép ${corridorM}m. Để chuyển cột sang tuyến khác, vui lòng chọn lại tuyến đường.`
+    }
+    return `Vị trí mới của cột nằm ngoài hành lang tuyến hiện tại (tối đa ${corridorM}m).`
+  }
+
+  if (code === 'VALIDATION_FAILED' && details?.field === 'location') {
+    return 'Tọa độ vĩ độ (lat trong ±90) và kinh độ (lng trong ±180) bắt buộc phải là số hợp lệ.'
+  }
+
+  const codeTranslations: Record<string, string> = {
+    VALIDATION_FAILED: 'Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.',
+    ASSET_NOT_FOUND: 'Không tìm thấy tài sản hoặc tài sản nằm ngoài phạm vi xã/phường được phân quyền.',
+    POLE_NOT_FOUND: 'Không tìm thấy cột đèn trong hệ thống.',
+    EXTERNAL_REF_TAKEN: 'Mã hiệu tài sản đã tồn tại trong địa bàn xã/phường này.',
+    ASSET_IN_USE: 'Tài sản này đang còn dữ liệu liên kết nên không thể xóa hoặc thay đổi.',
+    CROSS_COMMUNE_REFERENCE: 'Tài sản liên kết không thuộc cùng địa bàn xã/phường.',
+    COMMUNE_FORBIDDEN: 'Bạn không có quyền thao tác trên địa bàn xã/phường này.',
+    NOTE_CHANGED: 'Ghi chú của cột vừa được người khác cập nhật. Vui lòng tải lại trước khi sửa.',
+    UNSUPPORTED_MEDIA_TYPE: 'Định dạng tệp tải lên không được hỗ trợ.',
+    UNSUPPORTED_IMAGE_FORMAT: 'Định dạng ảnh không hợp lệ (chỉ hỗ trợ ảnh JPEG).',
+    UPLOAD_TOO_LARGE: 'Dung lượng tệp tải lên vượt quá giới hạn cho phép.',
+    UNAUTHENTICATED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+    FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
+    SERVER_BUSY: 'Máy chủ đang bận xử lý. Vui lòng thử lại sau giây lát.',
+    INTERNAL_ERROR: 'Đã xảy ra lỗi hệ thống trên máy chủ. Vui lòng thử lại sau.',
+  }
+
+  const rawMsg = apiError?.message || err?.response?.data?.message || err?.message || ''
+  const translated = translateErrorMessage(rawMsg)
+  if (translated && translated !== rawMsg) {
+    return translated
+  }
+  if (code && codeTranslations[code]) {
+    return codeTranslations[code]
+  }
+  return fallback
 }
 
 /**
@@ -346,6 +400,28 @@ function* handleUpdatePole(action: PayloadAction<UpdatePolePayload>) {
     const errorMsg = getErrorMessage(error, 'Không thể cập nhật cột đèn')
     yield put(mutationFailure(errorMsg))
     toast.error(`Lỗi khi cập nhật cột: ${errorMsg}`)
+  }
+}
+
+function* handleUpdatePoleLocation(action: PayloadAction<UpdatePoleLocationPayload>) {
+  try {
+    const { poleId, data, externalRef } = action.payload
+    const before: PoleListItem[] = yield select((state: RootState) => state.assets.poles)
+    const old = before.find((p) => p.pole_id === poleId)
+    yield call(assetAPI.updatePoleLocation, poleId, data)
+
+    if (old?.segment_id) {
+      const failed: boolean = yield* syncSegmentGeometries([old.segment_id], before)
+      if (failed) warnSegmentNotSynced()
+    }
+
+    yield put(mutationSuccess())
+    toast.success(`Đã cập nhật vị trí cột đèn "${externalRef || old?.external_ref || poleId}"!`)
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể cập nhật vị trí cột đèn')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi khi cập nhật vị trí cột: ${errorMsg}`)
   }
 }
 
@@ -721,6 +797,7 @@ export default function* assetSaga() {
   yield takeLatest(createPoleRequest.type, handleCreatePole)
   yield takeLatest(createPolesBulkRequest.type, handleCreatePolesBulk)
   yield takeLatest(updatePoleRequest.type, handleUpdatePole)
+  yield takeLatest(updatePoleLocationRequest.type, handleUpdatePoleLocation)
   yield takeLatest(deletePoleRequest.type, handleDeletePole)
   yield takeLatest(createCabinetRequest.type, handleCreateCabinet)
   yield takeLatest(createCabinetsBulkRequest.type, handleCreateCabinetsBulk)
