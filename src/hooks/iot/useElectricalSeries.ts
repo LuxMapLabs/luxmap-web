@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import iotAPI from '../../feature/iot/iotAPI'
 import type { IotArchivedSample } from '../../types/iot/nodes'
 import { apiErrorMessage } from '../../utils/iot/apiError'
-import { mergeElectricalPoints, type ElectricalPoint } from '../../utils/iot/electricalSeries'
+import { mergeElectricalPoints, toElectricalPoint, type ElectricalPoint } from '../../utils/iot/electricalSeries'
 
 /**
  * Chu kỳ lấy mẫu mới bằng `after = cursor lớn nhất` (spec IoT mục 5). Node chỉ ghi một mẫu điện mỗi 10 s
@@ -10,20 +10,32 @@ import { mergeElectricalPoints, type ElectricalPoint } from '../../utils/iot/ele
  */
 export const ELECTRICAL_POLL_MS = 10_000
 
+/** Trần số trang tải ngược khi xem theo khoảng thời gian (mỗi trang một request BE → server IoT). */
+export const ELECTRICAL_MAX_PAGES = 50
+
 interface Options {
-  /** Lần tải đầu: số mẫu mới nhất (tối đa 200 theo `page_size` của API). */
+  /** Số mẫu mỗi trang khi tải đầu (tối đa 200 theo `page_size` của API). */
   initial: number
   /** Giữ tối đa chừng này điểm; mẫu cũ hơn bị bỏ. */
   maxPoints: number
+  /**
+   * Xem theo khoảng thời gian: tải ngược thêm trang tới khi phủ `windowMs` tính từ mẫu mới nhất
+   * (hoặc hết dữ liệu / chạm `ELECTRICAL_MAX_PAGES`), và chỉ giữ mẫu trong khoảng đó.
+   * Không đặt: chỉ tải một trang `initial` mẫu.
+   */
+  windowMs?: number
 }
 
+const sampleTime = (s: IotArchivedSample) => toElectricalPoint(s)?.time ?? null
+
 /**
- * Chuỗi mẫu điện của một node IoT: tải `initial` mẫu mới nhất, rồi cứ `ELECTRICAL_POLL_MS` lấy mẫu mới
- * bằng `after` = cursor lớn nhất đang có. Chỉ hỏi khi component đang hiện; `nodeId` rỗng thì không gọi gì.
- * Hỏi ngầm: không bật lại `loading`. Lần sau chỉ hẹn sau khi lần trước đã về (BE chậm cũng không chồng request),
- * và kết quả về sau khi đã đổi node / đóng bảng thì bỏ.
+ * Chuỗi mẫu điện của một node IoT: tải mẫu mới nhất (một trang, hoặc đủ `windowMs`), rồi cứ `ELECTRICAL_POLL_MS`
+ * lấy mẫu mới bằng `after` = cursor lớn nhất đang có. Chỉ hỏi khi component đang hiện; `nodeId` rỗng thì không gọi gì.
+ * Hỏi ngầm: không bật lại `loading` (tắt ngay sau trang đầu; trang cũ hơn về thì biểu đồ dài thêm).
+ * Lần sau chỉ hẹn sau khi lần trước đã về (BE chậm cũng không chồng request), và kết quả về sau khi đã đổi node /
+ * chế độ / đóng bảng thì bỏ.
  */
-export function useElectricalSeries(nodeId: string | null | undefined, { initial, maxPoints }: Options) {
+export function useElectricalSeries(nodeId: string | null | undefined, { initial, maxPoints, windowMs }: Options) {
   const [points, setPoints] = useState<ElectricalPoint[]>([])
   const [loading, setLoading] = useState(Boolean(nodeId))
   const [error, setError] = useState<string | null>(null)
@@ -34,9 +46,14 @@ export function useElectricalSeries(nodeId: string | null | undefined, { initial
       // Không có mẫu mới thì không đổi state: biểu đồ không vẽ lại
       if (samples.length === 0) return
       for (const s of samples) if (typeof s.cursor === 'number' && s.cursor > maxCursor.current) maxCursor.current = s.cursor
-      setPoints((prev) => mergeElectricalPoints(prev, samples, maxPoints))
+      setPoints((prev) => {
+        const merged = mergeElectricalPoints(prev, samples, maxPoints)
+        if (!windowMs || merged.length === 0) return merged
+        const from = merged[merged.length - 1].time - windowMs
+        return merged.filter((p) => p.time >= from)
+      })
     },
-    [maxPoints]
+    [maxPoints, windowMs]
   )
 
   useEffect(() => {
@@ -68,28 +85,39 @@ export function useElectricalSeries(nodeId: string | null | undefined, { initial
 
     // Lần tải đầu lỗi (vd. 503 node chưa cấu hình nguồn đo) thì thử lại sau một chu kỳ, không dừng hẳn:
     // nguồn được cấu hình rồi thì biểu đồ tự chạy, không cần mở lại bảng.
-    const load = () =>
-      iotAPI
-        .getElectricalHistoryPage(nodeId, { page: 1, page_size: initial })
-        .then((result) => {
+    const load = async () => {
+      let newest: number | null = null
+      try {
+        for (let page = 1; ; page++) {
+          const result = await iotAPI.getElectricalHistoryPage(nodeId, { page, page_size: initial })
           if (cancelled) return
-          absorb(result.items || [])
-          setError(null)
-          schedule()
-        })
-        .catch((err) => {
-          if (cancelled) return
-          setError(apiErrorMessage(err, 'Không đọc được lịch sử điện.'))
-          timer = window.setTimeout(load, ELECTRICAL_POLL_MS)
-        })
-        .finally(() => !cancelled && setLoading(false))
+          const items = result.items || []
+          absorb(items)
+          if (page === 1) setLoading(false)
+          if (!windowMs || items.length < initial || page >= ELECTRICAL_MAX_PAGES) break
+          if (typeof result.total === 'number' && page * initial >= result.total) break
+          // Trang mới nhất trước: mẫu cũ nhất của trang này đã ra ngoài khoảng thì đủ
+          const times = items.map(sampleTime).filter((t): t is number => t !== null)
+          if (times.length === 0) break
+          newest ??= Math.max(...times)
+          if (newest - Math.min(...times) >= windowMs) break
+        }
+        setError(null)
+        schedule()
+      } catch (err) {
+        if (cancelled) return
+        setLoading(false)
+        setError(apiErrorMessage(err, 'Không đọc được lịch sử điện.'))
+        timer = window.setTimeout(load, ELECTRICAL_POLL_MS)
+      }
+    }
     load()
 
     return () => {
       cancelled = true
       if (timer) window.clearTimeout(timer)
     }
-  }, [nodeId, initial, absorb])
+  }, [nodeId, initial, windowMs, absorb])
 
   return { points, latest: points[points.length - 1] ?? null, loading, error }
 }

@@ -46,5 +46,41 @@ export function mergeElectricalPoints(prev: ElectricalPoint[], samples: IotArchi
   return [...byCursor.values()].sort((a, b) => a.time - b.time || a.cursor - b.cursor).slice(-maxPoints)
 }
 
-export const formatMetric = (value: number | null, metric: ElectricalMetric) =>
+/** Một điểm sau khi gộp: `count` = số mẫu thô trong khoảng. */
+export interface ElectricalBucketPoint extends ElectricalPoint {
+  count: number
+}
+
+const average = (values: (number | null)[]) => {
+  const nums = values.filter((v): v is number => v !== null)
+  return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null
+}
+
+/**
+ * Gộp mẫu thô thành trung bình theo khoảng `bucketMs` (phút / giờ), mốc là đầu khoảng.
+ * Giá trị null không tính vào trung bình; khoảng toàn null thì null. `bucketMs <= 0` trả nguyên mẫu (count = 1).
+ */
+export function bucketElectricalPoints(points: ElectricalPoint[], bucketMs: number): ElectricalBucketPoint[] {
+  if (bucketMs <= 0) return points.map((p) => ({ ...p, count: 1 }))
+  const groups = new Map<number, ElectricalPoint[]>()
+  for (const p of points) {
+    const start = Math.floor(p.time / bucketMs) * bucketMs
+    const group = groups.get(start)
+    if (group) group.push(p)
+    else groups.set(start, [p])
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([start, group]) => ({
+      cursor: Math.max(...group.map((p) => p.cursor)),
+      time: start,
+      current: average(group.map((p) => p.current)),
+      voltage: average(group.map((p) => p.voltage)),
+      power: average(group.map((p) => p.power)),
+      lamp: group[group.length - 1].lamp,
+      count: group.length,
+    }))
+}
+
+export const formatMetric =(value: number | null, metric: ElectricalMetric) =>
   value !== null ? `${value.toFixed(ELECTRICAL_METRICS[metric].digits)} ${ELECTRICAL_METRICS[metric].unit}` : '—'
