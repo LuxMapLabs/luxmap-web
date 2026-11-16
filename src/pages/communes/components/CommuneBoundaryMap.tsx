@@ -131,7 +131,7 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
     set('cb-area', areas)
     set(
       'cb-mask',
-      readOnlyRef.current && polys.length > 0
+      polys.length > 0
         ? [
             {
               type: 'Feature',
@@ -228,7 +228,7 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
         id: 'cb-fill',
         type: 'fill',
         source: 'cb-area',
-        paint: { 'fill-color': BOUNDARY_COLOR, 'fill-opacity': readOnlyRef.current ? 0 : 0.08 },
+        paint: { 'fill-color': BOUNDARY_COLOR, 'fill-opacity': 0 },
       })
       map.addLayer({
         id: 'cb-line',
