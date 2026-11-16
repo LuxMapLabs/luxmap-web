@@ -241,11 +241,11 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
         type: 'circle',
         source: 'cb-mids',
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 15, 6.5],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 15, 4.5],
           'circle-color': BOUNDARY_COLOR,
-          'circle-opacity': 0.85,
+          'circle-opacity': 0.4,
           'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1.5,
+          'circle-stroke-width': 1,
         },
       })
       map.addLayer({
@@ -253,10 +253,10 @@ export const CommuneBoundaryMap: React.FC<CommuneBoundaryMapProps> = ({
         type: 'circle',
         source: 'cb-vertices',
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 15, 5],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4.5, 15, 8],
           'circle-color': '#ffffff',
           'circle-stroke-color': BOUNDARY_COLOR,
-          'circle-stroke-width': 1.5,
+          'circle-stroke-width': 2,
         },
       })
       map.addLayer({
