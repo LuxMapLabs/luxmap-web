@@ -1,4 +1,6 @@
 import apiClient from '../../config/apiClient'
+import type { IotCommandRequest, IotCommandStatus } from '../../types/iot/nodes'
+import type { IotPoleControl } from '../../types/iot/poles'
 import type { ImportResult } from '../../types/assets/import'
 import type {
   SegmentListItemPagedResult,
@@ -28,6 +30,7 @@ import type {
 import type {
   CreateFixtureRequest,
   RetireFixtureRequest,
+  UpdateFixtureRequest,
 } from '../../types/assets/fixtures'
 import type {
   IotNodeItemPagedResult,
@@ -151,13 +154,10 @@ export const assetAPI = {
   },
 
   /**
-   * Chỉ cập nhật vị trí GPS của Cột điện (kiểm tra hành lang tuyến <= 25m)
+   * Dời cột tới vị trí mới (chỉ vị trí; backend đo hành lang tuyến của cột và ghi audit)
    * PUT /api/v1/assets/poles/{poleId}/location
    */
-  updatePoleLocation: async (
-    poleId: string,
-    data: SetPoleLocationRequest
-  ): Promise<PoleLocationResponse> => {
+  setPoleLocation: async (poleId: string, data: SetPoleLocationRequest): Promise<PoleLocationResponse> => {
     const response = await apiClient.put<PoleLocationResponse>(
       `/assets/poles/${encodeURIComponent(poleId)}/location`,
       data
@@ -239,6 +239,11 @@ export const assetAPI = {
    * Tháo gỡ bóng đèn (Retire fixture)
    * PUT /api/v1/assets/fixtures/{fixtureId}/removal
    */
+  updateFixture: async (fixtureId: string, data: UpdateFixtureRequest): Promise<void> => {
+    // PUT /api/v1/assets/fixtures/{fixtureId} — thay toàn bộ thông số, 204
+    await apiClient.put(`/assets/fixtures/${encodeURIComponent(fixtureId)}`, data)
+  },
+
   retireFixture: async (fixtureId: string, data: RetireFixtureRequest): Promise<void> => {
     await apiClient.put(`/assets/fixtures/${encodeURIComponent(fixtureId)}/removal`, data)
   },
@@ -362,6 +367,21 @@ export const assetAPI = {
    */
   setIotNodeRelay: async (nodeId: string, relayNo: number, data: SetRelayRequest): Promise<void> => {
     await apiClient.put(`/assets/iot-nodes/${encodeURIComponent(nodeId)}/relays/${relayNo}`, data)
+  },
+
+  sendIotNodeCommand: async (nodeId: string, data: IotCommandRequest, signal?: AbortSignal): Promise<IotCommandStatus> => {
+    const response = await apiClient.post<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`, data, { signal })
+    return response.data
+  },
+
+  getIotNodeCommand: async (nodeId: string, signal?: AbortSignal): Promise<IotCommandStatus> => {
+    const response = await apiClient.get<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`, { signal })
+    return response.data
+  },
+
+  getIotPoleControl: async (poleId: string): Promise<IotPoleControl> => {
+    const response = await apiClient.get<IotPoleControl>(`/iot/poles/${encodeURIComponent(poleId)}/control`)
+    return response.data
   },
 
   /**

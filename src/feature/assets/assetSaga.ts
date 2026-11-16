@@ -8,19 +8,22 @@ import type {
   CreateSegmentRequest,
   SegmentDetail,
 } from '../../types/assets/segments'
-import type {
-  CabinetListItemPagedResult,
-  CreateCabinetRequest,
-} from '../../types/assets/cabinets'
+import type { CabinetListItemPagedResult, CreateCabinetRequest } from '../../types/assets/cabinets'
 import type { FeederListItemPagedResult, CreateFeederRequest } from '../../types/assets/feeders'
-import type { PoleListItem, PoleListItemPagedResult } from '../../types/assets/poles'
+import type {
+  PoleListItem,
+  PoleListItemPagedResult,
+} from '../../types/assets/poles'
 import type { RootState } from '../../redux/rootReducer'
+import { fetchMapLayersRequest, fetchPoleDetailRequest } from '../map/mapSlice'
 import {
   buildSegmentGeometry,
   isSameLine,
   orderedPolesOfSegment,
   reconcileRoute,
 } from '../../utils/gis-map/segmentPoleOrder'
+import { isRoadShape } from '../../utils/gis-map/segmentRoadShape'
+import { calculateDistanceMeters } from '../../utils/gis-map/routeUtils'
 import type { CreateFixtureRequest } from '../../types/assets/fixtures'
 import type {
   IotNodeItemPagedResult,
@@ -37,7 +40,6 @@ import {
   createPoleRequest,
   createPolesBulkRequest,
   updatePoleRequest,
-  updatePoleLocationRequest,
   deletePoleRequest,
   createCabinetRequest,
   createCabinetsBulkRequest,
@@ -57,21 +59,25 @@ import {
   createFixtureRequest,
   createFixturesBulkRequest,
   retireFixtureRequest,
+  updateFixtureRequest,
   createIotNodeRequest,
   updateIotNodeRequest,
   deleteIotNodeRequest,
   setIotNodeRelayRequest,
   issueIotNodeCredentialRequest,
+  reshapeSegmentRequest,
   mutationSuccess,
   mutationFailure,
   type ImportAssetPayload,
   type CreatePolePayload,
   type UpdatePolePayload,
-  type UpdatePoleLocationPayload,
+  type ReshapeSegmentPayload,
   type UpdateCabinetPayload,
   type UpdateFeederPayload,
   type UpdateSegmentPayload,
   type RetireFixturePayload,
+  type UpdateFixturePayload,
+  type CreateFixturePayload,
   type UpdateIotNodePayload,
   type SetIotNodeRelayPayload,
   type IssueIotNodeCredentialPayload,
@@ -123,63 +129,12 @@ function translateErrorMessage(msg: string): string {
 
 function getErrorMessage(error: unknown, fallback: string): string {
   const err = error as {
-    response?: {
-      data?: {
-        error?: {
-          code?: string
-          message?: string
-          details?: Record<string, unknown>
-        }
-        message?: string
-      }
-    }
+    response?: { data?: { error?: { message?: string }; message?: string } }
     message?: string
   }
-  const apiError = err?.response?.data?.error
-  const code = apiError?.code
-  const details = apiError?.details
-
-  if (code === 'POLE_OFF_SEGMENT') {
-    const distanceM = typeof details?.distance_m === 'number' ? details.distance_m : undefined
-    const corridorM = typeof details?.corridor_m === 'number' ? details.corridor_m : 25
-    const segmentId = typeof details?.segment_id === 'string' ? details.segment_id : ''
-    if (distanceM !== undefined) {
-      return `Vị trí mới cách tuyến hiện tại${segmentId ? ` (${segmentId})` : ''} ${distanceM}m, vượt quá hành lang cho phép ${corridorM}m. Để chuyển cột sang tuyến khác, vui lòng chọn lại tuyến đường.`
-    }
-    return `Vị trí mới của cột nằm ngoài hành lang tuyến hiện tại (tối đa ${corridorM}m).`
-  }
-
-  if (code === 'VALIDATION_FAILED' && details?.field === 'location') {
-    return 'Tọa độ vĩ độ (lat trong ±90) và kinh độ (lng trong ±180) bắt buộc phải là số hợp lệ.'
-  }
-
-  const codeTranslations: Record<string, string> = {
-    VALIDATION_FAILED: 'Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.',
-    ASSET_NOT_FOUND: 'Không tìm thấy tài sản hoặc tài sản nằm ngoài phạm vi xã/phường được phân quyền.',
-    POLE_NOT_FOUND: 'Không tìm thấy cột đèn trong hệ thống.',
-    EXTERNAL_REF_TAKEN: 'Mã hiệu tài sản đã tồn tại trong địa bàn xã/phường này.',
-    ASSET_IN_USE: 'Tài sản này đang còn dữ liệu liên kết nên không thể xóa hoặc thay đổi.',
-    CROSS_COMMUNE_REFERENCE: 'Tài sản liên kết không thuộc cùng địa bàn xã/phường.',
-    COMMUNE_FORBIDDEN: 'Bạn không có quyền thao tác trên địa bàn xã/phường này.',
-    NOTE_CHANGED: 'Ghi chú của cột vừa được người khác cập nhật. Vui lòng tải lại trước khi sửa.',
-    UNSUPPORTED_MEDIA_TYPE: 'Định dạng tệp tải lên không được hỗ trợ.',
-    UNSUPPORTED_IMAGE_FORMAT: 'Định dạng ảnh không hợp lệ (chỉ hỗ trợ ảnh JPEG).',
-    UPLOAD_TOO_LARGE: 'Dung lượng tệp tải lên vượt quá giới hạn cho phép.',
-    UNAUTHENTICATED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-    FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
-    SERVER_BUSY: 'Máy chủ đang bận xử lý. Vui lòng thử lại sau giây lát.',
-    INTERNAL_ERROR: 'Đã xảy ra lỗi hệ thống trên máy chủ. Vui lòng thử lại sau.',
-  }
-
-  const rawMsg = apiError?.message || err?.response?.data?.message || err?.message || ''
-  const translated = translateErrorMessage(rawMsg)
-  if (translated && translated !== rawMsg) {
-    return translated
-  }
-  if (code && codeTranslations[code]) {
-    return codeTranslations[code]
-  }
-  return fallback
+  const rawMsg =
+    err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || fallback
+  return translateErrorMessage(rawMsg)
 }
 
 /**
@@ -192,7 +147,7 @@ function* handleFetchAssets() {
       CabinetListItemPagedResult,
       FeederListItemPagedResult,
       PoleListItemPagedResult,
-      IotNodeItemPagedResult
+      IotNodeItemPagedResult,
     ] = yield all([
       call(assetAPI.getSegments, { page_size: 1000 }),
       call(assetAPI.getCabinets, { page_size: 1000 }),
@@ -259,10 +214,7 @@ function* handleImportAsset(action: PayloadAction<ImportAssetPayload>) {
       yield put(fetchAssetsRequest())
     }
   } catch (error: unknown) {
-    const errorMsg = getErrorMessage(
-      error,
-      'Không thể kết nối đến máy chủ Backend để nạp dữ liệu.'
-    )
+    const errorMsg = getErrorMessage(error, 'Không thể kết nối đến máy chủ Backend để nạp dữ liệu.')
     yield put(importAssetFailure(errorMsg))
     toast.error(`Lỗi nạp dữ liệu: ${errorMsg}`)
   }
@@ -272,9 +224,27 @@ function* handleImportAsset(action: PayloadAction<ImportAssetPayload>) {
 // MUTATION WORKER SAGAS (REDUX-SAGA FIRST ARCHITECTURE)
 // ====================================================
 
+/** Backend giới hạn page_size ở 200 (lặng lẽ, không báo lỗi): đọc lần lượt từng trang tới hết. */
+const POLE_PAGE_SIZE = 200
+
+function* fetchAllPoles() {
+  const all: PoleListItem[] = []
+  for (let page = 1; ; page++) {
+    const res = (yield call(assetAPI.getPoles, {
+      page,
+      page_size: POLE_PAGE_SIZE,
+    })) as PoleListItemPagedResult
+    const items = res.items ?? []
+    all.push(...items)
+    const total = typeof res.total === 'number' ? res.total : all.length
+    if (items.length === 0 || all.length >= total) return all
+  }
+}
+
 /**
- * Cột không còn bị ép nằm trên đường, nên sau khi cột được tạo / dời / đổi tuyến, hình tuyến phải dựng lại
- * từ các cột của nó (giữ điểm uốn đã có). Backend không tự vẽ lại. Cột đã lưu rồi thì lỗi ở đây không hoàn tác được,
+ * Sau khi cột được tạo / dời / đổi tuyến, tuyến chưa có hình hoặc đang là đường nối cột (bản nháp) được dựng lại
+ * từ các cột của nó (giữ điểm uốn đã có). Tuyến có hình thật (theo con đường) thì giữ nguyên: không bao giờ
+ * ghi đè bằng đường nối cột (`isRoadShape`). Backend không tự vẽ lại. Cột đã lưu rồi thì lỗi ở đây không hoàn tác được,
  * chỉ báo để người dùng mở "Sửa tuyến" lưu lại. Trả về true nếu có tuyến không cập nhật được.
  *
  * `before`: danh sách cột trước khi lưu (vị trí cũ, để nhận ra đỉnh nào của đường cũ là cột nào).
@@ -286,8 +256,7 @@ function* syncSegmentGeometries(segmentIds: string[], before: PoleListItem[]) {
 
   let after: PoleListItem[] = []
   try {
-    const res = (yield call(assetAPI.getPoles, { page_size: 1000 })) as PoleListItemPagedResult
-    after = res.items ?? []
+    after = yield* fetchAllPoles()
   } catch {
     return true
   }
@@ -295,8 +264,10 @@ function* syncSegmentGeometries(segmentIds: string[], before: PoleListItem[]) {
   for (const segmentId of ids) {
     try {
       const detail = (yield call(assetAPI.getSegmentDetail, segmentId)) as SegmentDetail
+      const previous = orderedPolesOfSegment(before, segmentId)
+      if (isRoadShape(previous, detail.geom_wkt)) continue
       const route = reconcileRoute(
-        orderedPolesOfSegment(before, segmentId),
+        previous,
         detail.geom_wkt,
         orderedPolesOfSegment(after, segmentId)
       )
@@ -321,8 +292,19 @@ function* syncSegmentGeometries(segmentIds: string[], before: PoleListItem[]) {
   return failed
 }
 
+/** `POINT(lng lat)` của form cột; null nếu không đọc được. */
+const pointOfWkt = (wkt: string | null | undefined): [number, number] | null => {
+  const m = typeof wkt === 'string' ? /^\s*POINT\s*\(\s*(\S+)\s+(\S+)\s*\)\s*$/i.exec(wkt) : null
+  if (!m) return null
+  const lng = Number(m[1])
+  const lat = Number(m[2])
+  return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
+}
+
 const warnSegmentNotSynced = () =>
-  toast.warning('Cột đã lưu nhưng hình tuyến chưa cập nhật. Mở "Sửa tuyến" và lưu lại để vẽ lại đường.')
+  toast.warning(
+    'Cột đã lưu nhưng hình tuyến chưa cập nhật. Mở "Sửa tuyến" và lưu lại để vẽ lại đường.'
+  )
 
 function* handleCreatePole(action: PayloadAction<CreatePolePayload>) {
   try {
@@ -363,7 +345,9 @@ function* handleCreatePolesBulk(action: PayloadAction<CreatePolePayload[]>) {
 
     // Mỗi tuyến chỉ cập nhật hình một lần sau khi đã thêm xong cả loạt cột
     const failed: boolean = yield* syncSegmentGeometries(
-      list.flatMap((item) => (item.pole.segment_id && item.pole.geom_wkt ? [item.pole.segment_id] : [])),
+      list.flatMap((item) =>
+        item.pole.segment_id && item.pole.geom_wkt ? [item.pole.segment_id] : []
+      ),
       before
     )
     if (failed) warnSegmentNotSynced()
@@ -378,11 +362,23 @@ function* handleCreatePolesBulk(action: PayloadAction<CreatePolePayload[]>) {
   }
 }
 
-function* handleUpdatePole(action: PayloadAction<UpdatePolePayload>) {
+export function* handleUpdatePole(action: PayloadAction<UpdatePolePayload>) {
   try {
     const { poleId, data } = action.payload
     const before: PoleListItem[] = yield select((state: RootState) => state.assets.poles)
     const old = before.find((p) => p.pole_id === poleId)
+    // Dời cột trên cùng tuyến: đổi vị trí qua /location như Bản đồ GIS, để backend đo hành lang và ghi audit.
+    // Đổi tuyến thì không: /location đo theo tuyến cũ của cột.
+    const to = pointOfWkt(data.geom_wkt)
+    const from: [number, number] | null = old?.location
+      ? [old.location.lng, old.location.lat]
+      : null
+    const moved =
+      to !== null &&
+      from !== null &&
+      (old?.segment_id ?? null) === (data.segment_id ?? null) &&
+      calculateDistanceMeters(from, to) >= 0.01
+    if (moved && to) yield call(assetAPI.setPoleLocation, poleId, { lat: to[1], lng: to[0] })
     yield call(assetAPI.updatePole, poleId, data)
 
     // Tuyến cũ (nếu cột đã có GPS) mất / dời cột, tuyến mới (nếu cột có GPS) nhận cột
@@ -396,32 +392,15 @@ function* handleUpdatePole(action: PayloadAction<UpdatePolePayload>) {
     yield put(mutationSuccess())
     toast.success(`Đã cập nhật thông số cột đèn "${data.external_ref || poleId}"!`)
     yield put(fetchAssetsRequest())
+    if (action.payload.refreshMap) {
+      yield put(fetchPoleDetailRequest(poleId))
+      yield put(fetchMapLayersRequest())
+    }
   } catch (error: unknown) {
-    const errorMsg = getErrorMessage(error, 'Không thể cập nhật cột đèn')
+    const errorMsg =
+      poleOffSegmentMessage(error) ?? getErrorMessage(error, 'Không thể cập nhật cột đèn')
     yield put(mutationFailure(errorMsg))
     toast.error(`Lỗi khi cập nhật cột: ${errorMsg}`)
-  }
-}
-
-function* handleUpdatePoleLocation(action: PayloadAction<UpdatePoleLocationPayload>) {
-  try {
-    const { poleId, data, externalRef } = action.payload
-    const before: PoleListItem[] = yield select((state: RootState) => state.assets.poles)
-    const old = before.find((p) => p.pole_id === poleId)
-    yield call(assetAPI.updatePoleLocation, poleId, data)
-
-    if (old?.segment_id) {
-      const failed: boolean = yield* syncSegmentGeometries([old.segment_id], before)
-      if (failed) warnSegmentNotSynced()
-    }
-
-    yield put(mutationSuccess())
-    toast.success(`Đã cập nhật vị trí cột đèn "${externalRef || old?.external_ref || poleId}"!`)
-    yield put(fetchAssetsRequest())
-  } catch (error: unknown) {
-    const errorMsg = getErrorMessage(error, 'Không thể cập nhật vị trí cột đèn')
-    yield put(mutationFailure(errorMsg))
-    toast.error(`Lỗi khi cập nhật vị trí cột: ${errorMsg}`)
   }
 }
 
@@ -661,18 +640,22 @@ function* handleUpdateSegment(action: PayloadAction<UpdateSegmentPayload>) {
   }
 }
 
-function* handleCreateFixture(action: PayloadAction<CreateFixtureRequest>) {
+export function* handleCreateFixture(action: PayloadAction<CreateFixturePayload>) {
   try {
-    const data = action.payload
+    const { data, poleId } = action.payload
     yield call(assetAPI.createFixture, data)
 
     yield put(mutationSuccess())
-    toast.success('Đã thêm bóng đèn mới thành công!')
+    toast.success('Đã gắn bộ đèn mới!')
     yield put(fetchAssetsRequest())
+    if (poleId) {
+      yield put(fetchPoleDetailRequest(poleId))
+      yield put(fetchMapLayersRequest())
+    }
   } catch (error: unknown) {
-    const errorMsg = getErrorMessage(error, 'Không thể thêm bóng đèn')
+    const errorMsg = getErrorMessage(error, 'Không thể gắn bộ đèn')
     yield put(mutationFailure(errorMsg))
-    toast.error(`Lỗi khi thêm bóng đèn: ${errorMsg}`)
+    toast.error(`Lỗi khi gắn bộ đèn: ${errorMsg}`)
   }
 }
 
@@ -693,9 +676,28 @@ function* handleCreateFixturesBulk(action: PayloadAction<CreateFixtureRequest[]>
   }
 }
 
-function* handleRetireFixture(action: PayloadAction<RetireFixturePayload>) {
+export function* handleUpdateFixture(action: PayloadAction<UpdateFixturePayload>) {
   try {
-    const { fixtureId, data } = action.payload
+    const { fixtureId, data, poleId } = action.payload
+    yield call(assetAPI.updateFixture, fixtureId, data)
+
+    yield put(mutationSuccess())
+    toast.success(`Đã lưu thông tin bộ đèn "${fixtureId}"!`)
+    yield put(fetchAssetsRequest())
+    if (poleId) {
+      yield put(fetchPoleDetailRequest(poleId))
+      yield put(fetchMapLayersRequest())
+    }
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Không thể sửa bộ đèn')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi khi sửa bộ đèn: ${errorMsg}`)
+  }
+}
+
+export function* handleRetireFixture(action: PayloadAction<RetireFixturePayload>) {
+  try {
+    const { fixtureId, data, poleId } = action.payload
     yield call(assetAPI.retireFixture, fixtureId, data)
 
     yield put(mutationSuccess())
@@ -705,10 +707,85 @@ function* handleRetireFixture(action: PayloadAction<RetireFixturePayload>) {
         : `Đã kích hoạt lại bóng đèn "${fixtureId}"!`
     )
     yield put(fetchAssetsRequest())
+    // Tháo từ Bản đồ GIS: cột đang mở và lớp bản đồ hiện ngay bóng đã tháo
+    if (poleId) {
+      yield put(fetchPoleDetailRequest(poleId))
+      yield put(fetchMapLayersRequest())
+    }
   } catch (error: unknown) {
     const errorMsg = getErrorMessage(error, 'Không thể thao tác bóng đèn')
     yield put(mutationFailure(errorMsg))
     toast.error(`Lỗi thao tác bóng đèn: ${errorMsg}`)
+  }
+}
+
+const formatMeters = (m: number) => `${m.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} m`
+
+/** 409 `POLE_OFF_SEGMENT`: vị trí mới ra ngoài hành lang khảo sát quanh tuyến của cột. Backend gửi kèm số đo thật. */
+function poleOffSegmentMessage(error: unknown): string | null {
+  const body = (
+    error as {
+      response?: {
+        data?: { error?: { code?: string; details?: { distance_m?: number; corridor_m?: number } } }
+      }
+    }
+  )?.response?.data?.error
+  if (body?.code !== 'POLE_OFF_SEGMENT') return null
+  const { distance_m: distance, corridor_m: corridor } = body.details ?? {}
+  const far = typeof distance === 'number' ? `cách tuyến ${formatMeters(distance)}, ` : ''
+  const limit = typeof corridor === 'number' ? ` ${formatMeters(corridor)}` : ''
+  return `Vị trí mới ${far}nằm ngoài hành lang${limit} quanh tuyến của cột nên không lưu. Muốn đưa cột sang tuyến khác thì sửa cột ở Quản lý tài sản.`
+}
+
+/** 409 `POLE_OFF_SEGMENT` khi đổi hình tuyến: hình mới để cột của tuyến nằm xa đường quá hành lang khảo sát. */
+function segmentOffCorridorMessage(error: unknown): string | null {
+  const body = (
+    error as {
+      response?: {
+        data?: {
+          error?: {
+            code?: string
+            details?: { pole_ids?: string[]; pole_count?: number; corridor_m?: number }
+          }
+        }
+      }
+    }
+  )?.response?.data?.error
+  if (body?.code !== 'POLE_OFF_SEGMENT') return null
+  const { pole_ids: ids, pole_count: count, corridor_m: corridor } = body.details ?? {}
+  const howMany = typeof count === 'number' ? `${count} cột` : 'Có cột'
+  const which = ids?.length ? ` (${ids.slice(0, 5).join(', ')}${ids.length > 5 ? '…' : ''})` : ''
+  const limit = typeof corridor === 'number' ? ` ${formatMeters(corridor)}` : ''
+  return `${howMany} của tuyến${which} nằm xa hình mới quá${limit} nên không lưu. Chọn đường đi qua gần các cột đó, hoặc dời cột trước.`
+}
+
+/**
+ * Lấy hình tuyến theo đường trên bản đồ nền (Bản đồ GIS): ghi hình mới qua PUT /assets/segments/{id}, giữ nguyên các
+ * thông tin khác của tuyến và danh sách cột. Chiều dài lấy theo hình mới, như mọi chỗ khác web ghi hình tuyến.
+ */
+export function* handleReshapeSegment(action: PayloadAction<ReshapeSegmentPayload>) {
+  const { segmentId, label, geomWkt, lengthM } = action.payload
+  try {
+    const detail: SegmentDetail = yield call(assetAPI.getSegmentDetail, segmentId)
+    const seg = detail.segment
+    yield call(assetAPI.updateSegment, segmentId, {
+      external_ref: seg.external_ref,
+      segment_name: seg.segment_name,
+      road_class: seg.road_class,
+      length_m: lengthM,
+      geom_wkt: geomWkt,
+      data_source: seg.data_source,
+    })
+
+    yield put(mutationSuccess())
+    toast.success(`Đã cập nhật hình tuyến "${label}" (dài ${formatMeters(lengthM)})`)
+    yield put(fetchMapLayersRequest())
+    yield put(fetchAssetsRequest())
+  } catch (error: unknown) {
+    const errorMsg =
+      segmentOffCorridorMessage(error) ?? getErrorMessage(error, 'Không thể cập nhật hình tuyến')
+    yield put(mutationFailure(errorMsg))
+    toast.error(`Lỗi khi lưu hình tuyến: ${errorMsg}`)
   }
 }
 
@@ -788,6 +865,7 @@ function* handleIssueIotNodeCredential(action: PayloadAction<IssueIotNodeCredent
     const errorMsg = getErrorMessage(error, 'Không thể cấp secret thiết bị IoT')
     yield put(mutationFailure(errorMsg))
     toast.error(`Lỗi cấp secret: ${errorMsg}`)
+    action.payload.onError?.()
   }
 }
 
@@ -797,7 +875,6 @@ export default function* assetSaga() {
   yield takeLatest(createPoleRequest.type, handleCreatePole)
   yield takeLatest(createPolesBulkRequest.type, handleCreatePolesBulk)
   yield takeLatest(updatePoleRequest.type, handleUpdatePole)
-  yield takeLatest(updatePoleLocationRequest.type, handleUpdatePoleLocation)
   yield takeLatest(deletePoleRequest.type, handleDeletePole)
   yield takeLatest(createCabinetRequest.type, handleCreateCabinet)
   yield takeLatest(createCabinetsBulkRequest.type, handleCreateCabinetsBulk)
@@ -812,8 +889,10 @@ export default function* assetSaga() {
   yield takeLatest(updateSegmentRequest.type, handleUpdateSegment)
   yield takeLatest(deleteSegmentRequest.type, handleDeleteSegment)
   yield takeLatest(drawSegmentRequest.type, handleDrawSegment)
+  yield takeLatest(reshapeSegmentRequest.type, handleReshapeSegment)
   yield takeLatest(createFixtureRequest.type, handleCreateFixture)
   yield takeLatest(createFixturesBulkRequest.type, handleCreateFixturesBulk)
+  yield takeLatest(updateFixtureRequest.type, handleUpdateFixture)
   yield takeLatest(retireFixtureRequest.type, handleRetireFixture)
   yield takeLatest(createIotNodeRequest.type, handleCreateIotNode)
   yield takeLatest(updateIotNodeRequest.type, handleUpdateIotNode)
