@@ -1,174 +1,84 @@
-import React, { useState, useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Compass, AlertCircle, RotateCcw, Trash2, CheckCircle2 } from 'lucide-react'
+import { X, Compass, RotateCcw, CheckCircle2, Loader2 } from 'lucide-react'
 import type { CommuneItem, CommuneBbox } from '../../../types/admin/communes'
-import { CommuneBboxMap } from './CommuneBboxMap'
+import type { Geometry } from '../../../types/common/base'
+import { CommuneBoundaryMap } from './CommuneBoundaryMap'
+import { countVertices, geometryToPolygons, polygonsToBbox } from '../../../utils/communeBoundary'
 
 export interface CommuneFormModalProps {
   isOpen: boolean
   isSubmitting?: boolean
   commune?: CommuneItem | null
+  /** Ranh giới đang lưu của địa bàn (chỉ khi sửa) */
+  initialBoundary?: Geometry | null
+  isLoadingBoundary?: boolean
   onClose: () => void
-  onSubmit: (payload: { name: string; bbox?: CommuneBbox | null }) => void
+  /** boundary: undefined = giữ nguyên, null = xóa, Geometry = ranh giới mới */
+  onSubmit: (payload: { name: string; bbox?: CommuneBbox | null; boundary?: Geometry | null }) => void
 }
-
-// Ô nhập có thể đang giữ chuỗi dở dang ("106.50"); chuyển về số trước khi kiểm tra/gửi (rỗng/sai -> NaN)
-const toNumericBbox = (b: CommuneBbox): CommuneBbox => ({
-  min_lng: parseFloat(String(b.min_lng)),
-  min_lat: parseFloat(String(b.min_lat)),
-  max_lng: parseFloat(String(b.max_lng)),
-  max_lat: parseFloat(String(b.max_lat)),
-})
 
 export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
   isOpen,
   isSubmitting = false,
   commune = null,
+  initialBoundary = null,
+  isLoadingBoundary = false,
   onClose,
   onSubmit,
 }) => {
   const isEdit = Boolean(commune)
 
   const [name, setName] = useState('')
-  const [bbox, setBbox] = useState<CommuneBbox | null>(null)
-  const [hasBbox, setHasBbox] = useState(false)
-  const [resetBboxKey, setResetBboxKey] = useState(0)
+  const [boundary, setBoundary] = useState<Geometry | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Đồng bộ state ngay trong pha render khi mở modal hoặc đổi địa bàn để bản đồ nhận ngay BBox ở frame đầu tiên (0ms)
-  const [prevSyncTrigger, setPrevSyncTrigger] = useState<{
+  // Đồng bộ state ngay trong pha render khi mở modal, đổi địa bàn hoặc ranh giới tải xong từ API
+  const [prevSync, setPrevSync] = useState<{
     isOpen: boolean
-    communeId: string | number | null
-  }>({ isOpen: false, communeId: null })
+    communeId: string | null
+    initialBoundary: Geometry | null
+  }>({ isOpen: false, communeId: null, initialBoundary: null })
 
   const currentCommuneId = commune?.commune_id ?? null
-  if (prevSyncTrigger.isOpen !== isOpen || prevSyncTrigger.communeId !== currentCommuneId) {
-    setPrevSyncTrigger({ isOpen, communeId: currentCommuneId })
+  if (
+    prevSync.isOpen !== isOpen ||
+    prevSync.communeId !== currentCommuneId ||
+    prevSync.initialBoundary !== initialBoundary
+  ) {
+    setPrevSync({ isOpen, communeId: currentCommuneId, initialBoundary })
     if (isOpen) {
-      if (commune) {
-        setName(commune.name || '')
-        if (commune.bbox) {
-          setBbox({ ...commune.bbox })
-          setHasBbox(true)
-        } else {
-          setBbox(null)
-          setHasBbox(false)
-        }
-      } else {
-        setName('')
-        setBbox(null)
-        setHasBbox(false)
+      if (prevSync.isOpen !== isOpen || prevSync.communeId !== currentCommuneId) {
+        setName(commune?.name || '')
+        setErrors({})
       }
-      setResetBboxKey(0)
-      setErrors({})
+      setBoundary(initialBoundary)
     }
   }
 
-  // Tính kích thước X × Y (km) của khung BBox
-  const bboxDimensionText = useMemo(() => {
-    if (!hasBbox || !bbox) return ''
-    const n = toNumericBbox(bbox)
-    const minLng = n.min_lng ?? NaN
-    const maxLng = n.max_lng ?? NaN
-    const minLat = n.min_lat ?? NaN
-    const maxLat = n.max_lat ?? NaN
-    if (
-      !Number.isFinite(minLng) ||
-      !Number.isFinite(maxLng) ||
-      !Number.isFinite(minLat) ||
-      !Number.isFinite(maxLat)
-    ) {
-      return ''
-    }
-    const widthKm = (Math.abs(maxLng - minLng) * 109.2).toFixed(2)
-    const heightKm = (Math.abs(maxLat - minLat) * 111.32).toFixed(2)
-    return `${widthKm} km × ${heightKm} km`
-  }, [bbox, hasBbox])
+  const vertexCount = useMemo(() => countVertices(geometryToPolygons(boundary)), [boundary])
 
   if (!isOpen) return null
 
-  // Validate form
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {}
-    if (!name.trim()) {
-      newErrors.name = 'Tên địa bàn không được để trống'
-    } else if (name.trim().length > 200) {
-      newErrors.name = 'Tên địa bàn tối đa 200 ký tự'
-    }
-
-    if (hasBbox && bbox) {
-      const { min_lng, min_lat, max_lng, max_lat } = toNumericBbox(bbox)
-      if (
-        typeof min_lng !== 'number' ||
-        typeof min_lat !== 'number' ||
-        typeof max_lng !== 'number' ||
-        typeof max_lat !== 'number' ||
-        !Number.isFinite(min_lng) ||
-        !Number.isFinite(min_lat) ||
-        !Number.isFinite(max_lng) ||
-        !Number.isFinite(max_lat)
-      ) {
-        newErrors.bbox = 'Tọa độ 4 cạnh của khung BBox phải là số hợp lệ'
-      } else {
-        if (min_lng >= max_lng) {
-          newErrors.bbox = 'Kinh độ Tây (min_lng) phải nhỏ hơn Kinh độ Đông (max_lng)'
-        }
-        if (min_lat >= max_lat) {
-          newErrors.bbox = 'Vĩ độ Nam (min_lat) phải nhỏ hơn Vĩ độ Bắc (max_lat)'
-        }
-        if (min_lng < -180 || max_lng > 180 || min_lat < -90 || max_lat > 90) {
-          newErrors.bbox = 'Tọa độ nằm ngoài phạm vi địa lý toàn cầu (EPSG:4326)'
-        }
-      }
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validate()) return
+    const trimmed = name.trim()
+    const newErrors: Record<string, string> = {}
+    if (!trimmed) newErrors.name = 'Tên địa bàn không được để trống'
+    else if (trimmed.length > 200) newErrors.name = 'Tên địa bàn tối đa 200 ký tự'
+    setErrors(newErrors)
+    if (Object.keys(newErrors).length > 0) return
 
+    // Khung bản đồ lấy từ hộp bao của ranh giới; chưa có ranh giới thì giữ khung cũ
+    const bbox = boundary
+      ? polygonsToBbox(geometryToPolygons(boundary))
+      : (commune?.bbox ?? null)
+    const changed = boundary !== initialBoundary
     onSubmit({
-      name: name.trim(),
-      bbox: hasBbox && bbox ? toNumericBbox(bbox) : null,
+      name: trimmed,
+      bbox,
+      boundary: changed ? boundary : isEdit ? undefined : null,
     })
-  }
-
-  // Cập nhật từng cạnh BBox từ ô input hỗ trợ cả dấu phẩy lẫn dấu chấm, chuẩn hóa 100% về dấu chấm
-  const handleCoordInputChange = (key: keyof CommuneBbox, val: string) => {
-    const normalized = val.trim().replace(',', '.')
-    if (normalized !== '' && !/^-?\d*\.?\d*$/.test(normalized)) return
-
-    const num = parseFloat(normalized)
-    setBbox((prev) => {
-      // Chưa có khung: bắt đầu từ 4 ô trống, chỉ khi đủ 4 ô hợp lệ bản đồ mới hiện khung
-      const current = prev || ({ min_lng: '', min_lat: '', max_lng: '', max_lat: '' } as unknown as CommuneBbox)
-      return {
-        ...current,
-        // Giữ nguyên chuỗi đang gõ khi chưa khớp dạng số chuẩn (vd "11.0", "106.50") để không nuốt ký tự
-        [key]: isNaN(num) || String(num) !== normalized ? (normalized as any) : num,
-      }
-    })
-    setHasBbox(true)
-  }
-
-  // Đặt lại khung BBox về giá trị gốc ban đầu của địa bàn
-  const handleResetBbox = () => {
-    if (commune?.bbox) {
-      setBbox({ ...commune.bbox })
-      setHasBbox(true)
-    } else {
-      setBbox(null)
-      setHasBbox(false)
-    }
-    setErrors((prev) => {
-      const next = { ...prev }
-      delete next.bbox
-      return next
-    })
-    setResetBboxKey((prev) => prev + 1)
   }
 
   return createPortal(
@@ -186,8 +96,8 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isEdit
-                  ? 'Chỉnh sửa tên và thiết lập khung bao bản đồ (BBox)'
-                  : 'Khai báo tên xã/thị trấn và vẽ khung bản đồ định vị'}
+                  ? 'Chỉnh sửa tên và ranh giới hành chính'
+                  : 'Khai báo tên xã/thị trấn và vẽ ranh giới trên bản đồ'}
               </p>
             </div>
           </div>
@@ -220,139 +130,47 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
               {errors.name && <p className="text-rose-500 text-[11px] mt-1 font-medium">{errors.name}</p>}
             </div>
 
-            {/* Toggle Khung BBox */}
+            {/* Ranh giới hành chính */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                    Khung bao bản đồ (BBox)
-                  </h4>
-                  <p className="text-[11px] text-slate-500">Giới hạn vùng camera khi người dùng mở bản đồ địa bàn này</p>
+                  <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs">Ranh giới hành chính</h4>
+                  <p className="text-[11px] text-slate-500">Viền đứt đỏ trên bản đồ là phạm vi quản lý của địa bàn này</p>
                 </div>
-                {isEdit
-                  ? commune?.bbox && (
-                      <button
-                        type="button"
-                        onClick={handleResetBbox}
-                        className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/50 transition cursor-pointer"
-                        title="Khôi phục tọa độ khung BBox về giá trị gốc ban đầu"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Đặt lại</span>
-                      </button>
-                    )
-                  : hasBbox && (
-                      <button
-                        type="button"
-                        onClick={handleResetBbox}
-                        className="text-[11px] text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 font-semibold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition cursor-pointer"
-                        title="Xóa bỏ khung BBox vừa vẽ để vẽ lại từ đầu"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Xóa bỏ</span>
-                      </button>
-                    )}
+                {isEdit && boundary !== initialBoundary && (
+                  <button
+                    type="button"
+                    onClick={() => setBoundary(initialBoundary)}
+                    className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/50 transition cursor-pointer"
+                    title="Khôi phục ranh giới về bản đang lưu"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Đặt lại</span>
+                  </button>
+                )}
               </div>
 
-              {errors.bbox && (
-                <div className="p-2.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl mb-3 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{errors.bbox}</span>
-                </div>
-              )}
-
-              {/* 4 Ô Nhập Số Tọa Độ: Chuẩn La bàn GIS (Bắc ở trên, Nam ở dưới) */}
-              <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2.5">
-                <div className="space-y-2">
-                  {/* Bắc (Top) */}
-                  <div className="flex justify-center">
-                    <div className="w-full sm:w-56">
-                      <label className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5 text-center">
-                        Vĩ độ Bắc (max_lat)
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={bbox?.max_lat !== undefined && bbox?.max_lat !== null ? String(bbox.max_lat) : ''}
-                        onChange={(e) => handleCoordInputChange('max_lat', e.target.value)}
-                        placeholder="11.02..."
-                        className="w-full px-2.5 py-1.5 bg-white/60 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tây (Left) & Đông (Right) */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
-                        Kinh độ Tây (min_lng)
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={bbox?.min_lng !== undefined && bbox?.min_lng !== null ? String(bbox.min_lng) : ''}
-                        onChange={(e) => handleCoordInputChange('min_lng', e.target.value)}
-                        placeholder="106.45..."
-                        className="w-full px-2.5 py-1.5 bg-white/60 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5 text-right">
-                        Kinh độ Đông (max_lng)
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={bbox?.max_lng !== undefined && bbox?.max_lng !== null ? String(bbox.max_lng) : ''}
-                        onChange={(e) => handleCoordInputChange('max_lng', e.target.value)}
-                        placeholder="106.52..."
-                        className="w-full px-2.5 py-1.5 bg-white/60 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Nam (Bottom) */}
-                  <div className="flex justify-center">
-                    <div className="w-full sm:w-56">
-                      <label className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5 text-center">
-                        Vĩ độ Nam (min_lat)
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={bbox?.min_lat !== undefined && bbox?.min_lat !== null ? String(bbox.min_lat) : ''}
-                        onChange={(e) => handleCoordInputChange('min_lat', e.target.value)}
-                        placeholder="10.95..."
-                        className="w-full px-2.5 py-1.5 bg-white/60 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-[10.5px] text-slate-500 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-2">
-                  <span>
-                    Kích thước:{' '}
-                    <strong className="text-blue-600 dark:text-blue-400 font-mono font-medium">
-                      {bboxDimensionText || '—'}
-                    </strong>
+              <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700 text-[11px]">
+                {isLoadingBoundary ? (
+                  <span className="flex items-center gap-2 text-slate-500">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Đang tải ranh giới...
                   </span>
-                  {bboxDimensionText ? (
-                    <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Đã gắn khung BBox</span>
-                    </span>
-                  ) : (
-                    <span className="text-amber-700 dark:text-amber-400 font-medium">Chưa có khung BBox</span>
-                  )}
-                </div>
+                ) : vertexCount > 0 ? (
+                  <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Đã có ranh giới ({vertexCount} đỉnh)</span>
+                  </span>
+                ) : (
+                  <span className="text-amber-700 dark:text-amber-400 font-medium">Chưa có ranh giới</span>
+                )}
               </div>
             </div>
 
-            {/* Hướng dẫn thao tác nhanh tinh gọn (Inline Alert Banner) */}
             <div className="p-2.5 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl text-[11px] text-blue-900 dark:text-blue-300 flex items-start gap-2 shadow-2xs">
               <span className="text-sm shrink-0">💡</span>
               <p className="leading-snug">
-                Nắm kéo <strong>4 chốt góc vuông</strong> hoặc <strong>4 nhãn hướng (Bắc, Nam, Tây, Đông)</strong> để co giãn khung; tick <strong>&quot;Di chuyển khung&quot;</strong> trên bản đồ để dời toàn bộ vị trí BBox.
+                Gõ tên xã/phường rồi <strong>chọn gợi ý</strong> để bản đồ vẽ sẵn ranh giới, sau đó <strong>kéo các chấm</strong> cho khớp. Không có sẵn ranh giới thì bấm <strong>&quot;Vẽ tay ranh giới&quot;</strong>.
               </p>
             </div>
           </div>
@@ -360,21 +178,16 @@ export const CommuneFormModal: React.FC<CommuneFormModalProps> = ({
           {/* Cột Phải: Bản đồ 2 lớp gán nhãn BBox */}
           <div className="lg:col-span-7 flex flex-col min-h-[420px]">
             <label className="text-xs font-bold text-slate-700 dark:text-slate-300 h-6 flex items-center mb-1.5 shrink-0">
-              Vẽ và tinh chỉnh khung BBox trên bản đồ
+              Vẽ và tinh chỉnh ranh giới trên bản đồ
             </label>
             <div className="w-full flex-1 rounded-2xl overflow-hidden min-h-[400px]">
-              <CommuneBboxMap
+              <CommuneBoundaryMap
                 key={commune?.commune_id || 'new-commune-modal'}
-                bbox={bbox}
-                communeName={name}
-                onChangeBbox={(newBbox) => {
-                  setBbox(newBbox)
-                  setHasBbox(Boolean(newBbox))
-                }}
-                readOnly={false}
-                isCreateMode={!isEdit}
+                boundary={boundary}
+                onChange={setBoundary}
+                fallbackBbox={commune?.bbox ?? null}
+                onPickName={(picked) => setName((current) => current.trim() ? current : picked)}
                 height="400px"
-                resetKey={resetBboxKey}
               />
             </div>
           </div>
