@@ -35,11 +35,8 @@ import { apiErrorMessage } from '../../../utils/iot/apiError'
 import { toast } from 'sonner'
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
-import type { IotAutoSchedule } from '../../../types/iot/nodes'
-import { AutoScheduleForm } from './AutoScheduleForm'
+import { FeederCommandDialog, type FeederCommandTarget } from './FeederCommandDialog'
 import { useFeederCommandModes } from '../../../hooks/iot/useFeederCommandModes'
-import { createPortal } from 'react-dom'
-import { IotBridgeControlCard } from './IotBridgeControlCard'
 import { FeederElectricalSummary } from './FeederElectricalSummary'
 import { segmentDisplayCode } from '../../../utils/gis-map/gisSearchUtils'
 import { formatDate } from '../../../utils/dateUtils'
@@ -203,7 +200,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
   // Bật / Tắt / AUTO qua POST /iot/nodes/{nodeId}/command (docs/LUXMAP-IOT-FE.md mục 4), không qua /lighting/commands.
   // AUTO luôn kèm lịch: bấm Auto mở form lịch (điền sẵn lịch đang có trên node), gửi từ form.
-  const [autoTarget, setAutoTarget] = useState<{ feederId: string; nodeId: string; initial: IotAutoSchedule | null } | null>(null)
+  // Hộp xác nhận lệnh: Bật / Tắt hỏi lại trước khi gửi, AUTO mở form lịch
+  const [commandTarget, setCommandTarget] = useState<FeederCommandTarget | null>(null)
   const [sendingCommand, setSendingCommand] = useState(false)
   // Đổi giá trị để đọc lại chế độ mạch (lịch sử lệnh) ngay sau khi gửi lệnh
   const [modeRefresh, setModeRefresh] = useState(0)
@@ -224,7 +222,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     try {
       await iotAPI.sendCommand(nodeId, schedule ? { ...commandBody('auto'), auto_schedule: schedule } : commandBody(mode))
       toast.success(`Đã gửi lệnh ${mode === 'on' ? 'Bật' : mode === 'off' ? 'Tắt' : 'AUTO'} tới ${nodeId}, chờ node xác nhận.`)
-      setAutoTarget(null)
+      setCommandTarget(null)
       setModeRefresh((n) => n + 1)
       if (selectedCabinet?.cabinet_id) dispatch(fetchCabinetTopologyRequest(selectedCabinet.cabinet_id))
     } catch (err) {
@@ -234,7 +232,11 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     }
   }
 
-  const handleControlFeederMode = async (feederId: string, mode: FeederControlMode) => {
+  const handleControlFeederMode = async (
+    feederId: string,
+    mode: FeederControlMode,
+    info: Pick<FeederCommandTarget, 'feederName' | 'feederCode' | 'poleCount'> = {}
+  ) => {
     // Node gán cho mạch (feederNodeId bên dưới, mỗi node IoT gán đúng một mạch)
     const nodeId = feederNodeId(feederId, selectedFeeder?.feeder_id === feederId ? selectedFeeder : undefined)
     if (!nodeId) {
@@ -242,11 +244,11 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       return
     }
     if (mode !== 'auto') {
-      await sendFeederCommand(feederId, nodeId, mode)
+      setCommandTarget({ feederId, nodeId, mode, initial: null, ...info })
       return
     }
     const current = await iotAPI.getCommand(nodeId).catch(() => null)
-    setAutoTarget({ feederId, nodeId, initial: current?.auto_schedule ?? null })
+    setCommandTarget({ feederId, nodeId, mode, initial: current?.auto_schedule ?? null, ...info })
   }
 
   const effectiveFixtureStatus =
@@ -438,6 +440,20 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   const selectedFeederNodeId = selectedFeeder
     ? feederNodeId(selectedFeeder.feeder_id || selectedFeeder.external_ref, selectedFeeder)
     : null
+  // Tên / mã / số cột của mạch đang mở, hiện trong hộp lệnh (cùng số với khung mạch)
+  const selectedFeederInfo = selectedFeeder
+    ? {
+        feederName: selectedFeeder.feeder_name || undefined,
+        feederCode: selectedFeeder.external_ref || selectedFeeder.feeder_id,
+        poleCount:
+          (propsEffectivePoles ?? []).filter(
+            (p) =>
+              p.properties.feeder_id === selectedFeeder.feeder_id || p.properties.feeder_id === selectedFeeder.external_ref
+          ).length ||
+          selectedFeeder.pole_count ||
+          undefined,
+      }
+    : {}
   // Chế độ đang chạy của từng mạch = lệnh success mới nhất trong lịch sử lệnh của node
   const commandModes = useFeederCommandModes(
     [...cabinetFeeders.map((f: any) => feederNodeId(f.feeder_id, f)), selectedFeederNodeId].filter(
@@ -457,31 +473,14 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
           onClose={() => setHistoryTarget(null)}
         />
       )}
-      {autoTarget &&
-        createPortal(
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div
-              role="dialog"
-              aria-label={`Lịch AUTO mạch ${autoTarget.feederId}`}
-              className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 text-xs"
-            >
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Chạy AUTO theo lịch</h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Mạch <span className="font-mono">{autoTarget.feederId}</span> · node{' '}
-                  <span className="font-mono">{autoTarget.nodeId}</span>
-                </p>
-              </div>
-              <AutoScheduleForm
-                initial={autoTarget.initial}
-                sending={sendingCommand}
-                onSubmit={(schedule) => sendFeederCommand(autoTarget.feederId, autoTarget.nodeId, 'auto', schedule)}
-                onCancel={() => setAutoTarget(null)}
-              />
-            </div>
-          </div>,
-          document.body
-        )}
+      {commandTarget && (
+        <FeederCommandDialog
+          target={commandTarget}
+          sending={sendingCommand}
+          onSend={(schedule) => sendFeederCommand(commandTarget.feederId, commandTarget.nodeId, commandTarget.mode, schedule)}
+          onClose={() => setCommandTarget(null)}
+        />
+      )}
       <aside className="w-97.5 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-40 shrink-0 font-sans">
         
         {/* Panel Header */}
@@ -804,9 +803,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     </div>
                   )}
 
-                  {/* Điều khiển mạch của trụ qua IoT bridge (chỉ hiện khi mạch có node IoT) */}
-                  <IotBridgeControlCard poleId={poleId} onOpenElectricalMonitor={onOpenElectricalMonitor} />
-
                   {/* 4. Collapsible Active Faults & Issues (Accordion at the bottom) */}
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden bg-white dark:bg-slate-800/50 shadow-2xs">
                     <button
@@ -1059,7 +1055,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
                             <button
                               type="button"
-                              onClick={() => handleControlFeederMode(fId, 'on')}
+                              onClick={() => handleControlFeederMode(fId, 'on', { feederName: fName, feederCode: fCode, poleCount })}
                               aria-pressed={currentMode === 'on'}
                               className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                                 currentMode === 'on'
@@ -1074,7 +1070,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
                             <button
                               type="button"
-                              onClick={() => handleControlFeederMode(fId, 'off')}
+                              onClick={() => handleControlFeederMode(fId, 'off', { feederName: fName, feederCode: fCode, poleCount })}
                               aria-pressed={currentMode === 'off'}
                               className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                                 currentMode === 'off'
@@ -1089,7 +1085,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
                             <button
                               type="button"
-                              onClick={() => handleControlFeederMode(fId, 'auto')}
+                              onClick={() => handleControlFeederMode(fId, 'auto', { feederName: fName, feederCode: fCode, poleCount })}
                               aria-pressed={currentMode === 'auto'}
                               className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                                 currentMode === 'auto'
@@ -1201,7 +1197,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
                         <button
                           type="button"
-                          onClick={() => handleControlFeederMode(selId, 'on')}
+                          onClick={() => handleControlFeederMode(selId, 'on', selectedFeederInfo)}
                           aria-pressed={currentMode === 'on'}
                           className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                             currentMode === 'on'
@@ -1216,7 +1212,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => handleControlFeederMode(selId, 'off')}
+                          onClick={() => handleControlFeederMode(selId, 'off', selectedFeederInfo)}
                           aria-pressed={currentMode === 'off'}
                           className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                             currentMode === 'off'
@@ -1231,7 +1227,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => handleControlFeederMode(selId, 'auto')}
+                          onClick={() => handleControlFeederMode(selId, 'auto', selectedFeederInfo)}
                           aria-pressed={currentMode === 'auto'}
                           className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                             currentMode === 'auto'

@@ -78,18 +78,33 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
     await waitFor(() => expect(api.getCommandHistory).toHaveBeenLastCalledWith('NODE-005', { page: 1, page_size: HISTORY_PAGE_SIZE }))
   })
 
-  it('loads older pages on demand', async () => {
+  it('pages with numbered buttons and Trước / Sau', async () => {
     api.getCommandHistory
-      .mockResolvedValueOnce({ page: 1, page_size: HISTORY_PAGE_SIZE, total: 2, items: [item('c2', 'MANUAL', 'OFF', 'success')] })
-      .mockResolvedValueOnce({ page: 2, page_size: HISTORY_PAGE_SIZE, total: 2, items: [item('c1', 'MANUAL', 'ON', 'success')] })
+      .mockResolvedValueOnce({ page: 1, page_size: HISTORY_PAGE_SIZE, total: 25, items: [item('c25', 'MANUAL', 'OFF', 'success')] })
+      .mockResolvedValueOnce({ page: 3, page_size: HISTORY_PAGE_SIZE, total: 25, items: [item('c5', 'MANUAL', 'ON', 'success')] })
     render(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
     await screen.findAllByTestId('iot-command-row')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tải thêm lệnh cũ hơn' }))
+    const nav = screen.getByRole('navigation', { name: 'Phân trang' })
+    expect(nav).toHaveTextContent('Trang 1 / 3 · 25 lệnh')
+    expect(within(nav).getByRole('button', { name: 'Trước' })).toBeDisabled()
+    fireEvent.click(within(nav).getByRole('button', { name: '3' }))
 
-    await waitFor(() => expect(screen.getAllByTestId('iot-command-row')).toHaveLength(2))
-    expect(api.getCommandHistory).toHaveBeenLastCalledWith('NODE-004', { page: 2, page_size: HISTORY_PAGE_SIZE })
-    expect(screen.queryByRole('button', { name: 'Tải thêm lệnh cũ hơn' })).not.toBeInTheDocument()
+    await waitFor(() => expect(api.getCommandHistory).toHaveBeenLastCalledWith('NODE-004', { page: 3, page_size: HISTORY_PAGE_SIZE }))
+    expect(await screen.findByText('Trang 3 / 3 · 25 lệnh')).toBeInTheDocument()
+    expect(screen.getAllByTestId('iot-command-row')).toHaveLength(1)
+    expect(within(nav).getByRole('button', { name: 'Sau' })).toBeDisabled()
+  })
+
+  it('a backend without status still shows a status badge ("Chưa rõ trạng thái")', async () => {
+    api.getCommandHistory.mockResolvedValueOnce({
+      page: 1,
+      page_size: HISTORY_PAGE_SIZE,
+      total: 1,
+      items: [{ ...item('c1', 'MANUAL', 'ON', 'success'), status: undefined }],
+    })
+    render(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    expect(await screen.findByText('Chưa rõ trạng thái')).toBeInTheDocument()
   })
 
   it('a feeder without a node calls nothing and says so', () => {
