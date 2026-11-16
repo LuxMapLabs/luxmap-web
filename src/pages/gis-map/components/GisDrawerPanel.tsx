@@ -30,7 +30,7 @@ import type { RootState, AppDispatch } from '../../../redux/store'
 import { fetchPoleDetailRequest, clearPoleDetail, fetchCabinetTopologyRequest } from '../../../feature/map/mapSlice'
 import { IotCommandHistoryModal, type CommandHistoryFeeder } from './IotCommandHistoryModal'
 import iotAPI from '../../../feature/iot/iotAPI'
-import { commandBody } from '../../../utils/iot/iotCommand'
+import { commandBody, latestSuccessAutoSchedule } from '../../../utils/iot/iotCommand'
 import { apiErrorMessage } from '../../../utils/iot/apiError'
 import { toast } from 'sonner'
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
@@ -247,8 +247,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       setCommandTarget({ feederId, nodeId, mode, initial: null, ...info })
       return
     }
-    const current = await iotAPI.getCommand(nodeId).catch(() => null)
-    setCommandTarget({ feederId, nodeId, mode, initial: current?.auto_schedule ?? null, ...info })
+    // Điền sẵn lịch AUTO node đã thực sự chạy (lệnh AUTO success mới nhất), không lấy lệnh pending / expired
+    const history = await iotAPI.getCommandHistory(nodeId, { page: 1, page_size: 20 }).catch(() => null)
+    setCommandTarget({ feederId, nodeId, mode, initial: latestSuccessAutoSchedule(history?.items), ...info })
   }
 
   const effectiveFixtureStatus =

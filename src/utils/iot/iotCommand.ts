@@ -1,4 +1,4 @@
-import type { IotCommandHistoryItem, IotCommandStatus } from '../../types/iot/nodes'
+import type { IotAutoSchedule, IotCommandHistoryItem, IotCommandStatus } from '../../types/iot/nodes'
 
 /** Lịch AUTO mặc định khi node chưa có lịch nào. */
 export const DEFAULT_AUTO_SCHEDULE = { day_start: '06:00', night_start: '18:00' }
@@ -12,7 +12,7 @@ export function commandBody(choice: IotCommandChoice) {
     : { mode: 'MANUAL', command: choice === 'on' ? 'ON' : 'OFF' }
 }
 
-/** Lệnh đang hiệu lực trên node, đọc từ GET command: `AUTO` hoặc `MANUAL` + `ON`/`OFF`. */
+/** Nút tương ứng một lệnh: `AUTO` hoặc `MANUAL` + `ON`/`OFF`. */
 export function currentChoice(status?: Pick<IotCommandStatus, 'mode' | 'command'> | null): IotCommandChoice | null {
   if (!status?.mode) return null
   if (status.mode.toUpperCase() === 'AUTO') return 'auto'
@@ -29,23 +29,19 @@ export function latestSuccessChoice(items?: IotCommandHistoryItem[] | null): Iot
   return latest ? currentChoice(latest) : null
 }
 
-export type IotCommandProgress = 'pending' | 'acknowledged' | 'superseded' | 'expired'
-
 /**
- * Tiến trình của lệnh FE vừa gửi (docs/LUXMAP-IOT-FE.md mục 4):
- * GET trả mã khác ⇒ lệnh mới đã thay; cùng mã và `command_acknowledged` ⇒ node đã xác nhận;
- * quá `expires_at` mà chưa ACK ⇒ hết hạn chờ xác nhận.
+ * Lịch điền sẵn cho form AUTO: lịch của lệnh AUTO `success` mới nhất trong lịch sử lệnh (lịch node đã thực sự chạy).
+ * Lệnh AUTO pending / expired không tính. Không có → null (form dùng 06:00 / 18:00).
  */
-export function commandProgress(
-  tracked: { command_id?: string | null; expires_at?: string | null },
-  current: IotCommandStatus | null,
-  now: number
-): IotCommandProgress {
-  if (current?.command_id && tracked.command_id && current.command_id !== tracked.command_id) return 'superseded'
-  if (current?.command_id === tracked.command_id && current?.command_acknowledged) return 'acknowledged'
-  const expiresAt = tracked.expires_at ? Date.parse(tracked.expires_at) : NaN
-  if (Number.isFinite(expiresAt) && now >= expiresAt) return 'expired'
-  return 'pending'
+export function latestSuccessAutoSchedule(items?: IotCommandHistoryItem[] | null): IotAutoSchedule | null {
+  const latest = (items || []).find(
+    (item) =>
+      item.status === 'success' &&
+      item.mode?.toUpperCase() === 'AUTO' &&
+      item.auto_schedule?.day_start &&
+      item.auto_schedule.night_start
+  )
+  return latest?.auto_schedule ?? null
 }
 
 /** "HH:mm" 24 giờ — cùng luật với backend (TimeOnly.TryParseExact "HH:mm"). */

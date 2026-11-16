@@ -7,7 +7,6 @@ import { configureStore } from '@reduxjs/toolkit'
 vi.mock('../../../../feature/iot/iotAPI', () => ({
   default: {
     getPoleControl: vi.fn(() => Promise.resolve(null)),
-    getCommand: vi.fn(() => Promise.resolve(null)),
     sendCommand: vi.fn(),
   },
 }))

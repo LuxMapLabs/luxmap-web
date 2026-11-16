@@ -20,7 +20,6 @@ import type {
   RegisterNodeRequest,
   RegisteredNode,
 } from '../../types/iot/nodes'
-import type { IotPoleControl } from '../../types/iot/poles'
 
 /**
  * IoT bridge (docs/LUXMAP-IOT-FE.md của backend): gateway ESP32 + node LoRa. Lệnh Bật / Tắt / AUTO và nhật ký lệnh
@@ -39,21 +38,9 @@ export const iotAPI = {
     return response.data
   },
 
-  /** GET /api/v1/iot/poles/{poleId}/control — mạch, node, rơ-le của trụ và có điều khiển qua bridge được không. */
-  getPoleControl: async (poleId: string): Promise<IotPoleControl> => {
-    const response = await apiClient.get<IotPoleControl>(`/iot/poles/${encodeURIComponent(poleId)}/control`)
-    return response.data
-  },
-
   /** POST /api/v1/iot/nodes/{nodeId}/command — 202: bridge đã nhận lệnh, node CHƯA xác nhận. */
   sendCommand: async (nodeId: string, body: IotCommandRequest): Promise<IotCommandStatus> => {
     const response = await apiClient.post<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`, body)
-    return response.data
-  },
-
-  /** GET /api/v1/iot/nodes/{nodeId}/command — lệnh hiện tại, lịch AUTO và cờ ACK của node. */
-  getCommand: async (nodeId: string): Promise<IotCommandStatus> => {
-    const response = await apiClient.get<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`)
     return response.data
   },
 
