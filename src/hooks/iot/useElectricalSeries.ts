@@ -66,15 +66,24 @@ export function useElectricalSeries(nodeId: string | null | undefined, { initial
       schedule()
     }
 
-    iotAPI
-      .getElectricalHistoryPage(nodeId, { page: 1, page_size: initial })
-      .then((result) => {
-        if (cancelled) return
-        absorb(result.items || [])
-        schedule()
-      })
-      .catch((err) => !cancelled && setError(apiErrorMessage(err, 'Không đọc được lịch sử điện.')))
-      .finally(() => !cancelled && setLoading(false))
+    // Lần tải đầu lỗi (vd. 503 node chưa cấu hình nguồn đo) thì thử lại sau một chu kỳ, không dừng hẳn:
+    // nguồn được cấu hình rồi thì biểu đồ tự chạy, không cần mở lại bảng.
+    const load = () =>
+      iotAPI
+        .getElectricalHistoryPage(nodeId, { page: 1, page_size: initial })
+        .then((result) => {
+          if (cancelled) return
+          absorb(result.items || [])
+          setError(null)
+          schedule()
+        })
+        .catch((err) => {
+          if (cancelled) return
+          setError(apiErrorMessage(err, 'Không đọc được lịch sử điện.'))
+          timer = window.setTimeout(load, ELECTRICAL_POLL_MS)
+        })
+        .finally(() => !cancelled && setLoading(false))
+    load()
 
     return () => {
       cancelled = true

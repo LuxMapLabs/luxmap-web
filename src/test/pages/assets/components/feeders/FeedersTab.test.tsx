@@ -26,6 +26,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
       data_source: 'field',
       location: { lat: 10.9701, lng: 106.4896 },
       feeder_ids: ['FDR-001'],
+      iot_node_ids: [],
       updated_at: '2026-10-20T10:00:00Z',
     },
     {
@@ -37,6 +38,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
       data_source: 'field',
       location: { lat: 10.973, lng: 106.495 },
       feeder_ids: ['FDR-002'],
+      iot_node_ids: [],
       updated_at: '2026-10-20T10:00:00Z',
     },
   ]

@@ -5,13 +5,12 @@ import iotAPI from '../../../../../feature/iot/iotAPI'
 import type {
   IotDiagnosticResult,
   IotElectricalResult,
-  IotPowerState,
 } from '../../../../../types/iot/nodes'
 import { IOT_NODE_STATUS, IOT_TONE_CLASS, iotStatusBadge } from '../../../../../constants/iot'
 import { apiErrorMessage } from '../../../../../utils/iot/apiError'
+import type { FeederPowerState } from '../../../../../types/common/enums'
 
-
-const POWER_STATE_LABEL: Record<IotPowerState, string> = { on: 'Mạch đang có tải', off: 'Mạch đã ngắt tải', unknown: 'Chưa rõ' }
+const POWER_STATE_LABEL: Record<FeederPowerState, string> = { on: 'Mạch đang có tải', off: 'Mạch đã ngắt tải', unknown: 'Chưa rõ' }
 
 const ANOMALY_LABEL: Record<string, string> = {
   telemetry_stale: 'Node im lặng quá lâu (giây)',

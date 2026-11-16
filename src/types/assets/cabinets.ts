@@ -49,6 +49,7 @@ export interface CabinetListItem {
     data_source: DataSource
     location: AssetLocation
     feeder_ids: string[]
+    iot_node_ids: string[]
     iot_node_id?: string | null
     updated_at: string | null
     updated_by?: string | null

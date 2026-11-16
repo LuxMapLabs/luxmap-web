@@ -37,7 +37,7 @@ const SectionTitle: React.FC<{ icon: React.ReactNode; children: React.ReactNode 
 /**
  * Admin đăng ký một bộ IoT bridge (`POST /iot/nodes/register`, `ManageSettings`): tạo node ở tủ điện, đấu mạch vào
  * rơ-le #1, lưu nguồn đo (chỉ số danh định) và tuyến MQTT trong một lần.
- * Thứ tự chọn: xã → tủ trống của xã → mạch của tủ; server chỉ lấy trong cùng xã (backend từ chối server khác xã).
+ * Thứ tự chọn: xã → tủ của xã → mạch chưa gắn node của tủ; server chỉ lấy trong cùng xã (backend từ chối server khác xã).
  * Nguồn dữ liệu cố định `calibration_rig` (phần cứng nhóm tự dựng); web không cho chọn `simulated`.
  */
 export const RegisterNodeModal: React.FC<{
@@ -73,12 +73,13 @@ export const RegisterNodeModal: React.FC<{
       .finally(() => setAssetsLoaded(true))
   }, [])
 
-  // Mỗi tủ gắn tối đa một node: chỉ tủ trống của xã đã chọn.
+  // Một tủ gắn được nhiều node, mỗi node đúng một mạch (backend: `iot_node_ids` của tủ, `control.node_id` của mạch).
   const communeCabinets = useMemo(
-    () => cabinets.filter((c) => c.cabinet_id && !c.iot_node_id && c.commune_id === communeId),
+    () => cabinets.filter((c) => c.cabinet_id && c.commune_id === communeId),
     [cabinets, communeId]
   )
-  const cabinetFeeders = feeders.filter((f) => f.feeder_id && f.cabinet?.cabinet_id === cabinetId)
+  // Chỉ mạch chưa gắn node của tủ đã chọn.
+  const cabinetFeeders = feeders.filter((f) => f.feeder_id && f.cabinet?.cabinet_id === cabinetId && !f.control?.node_id)
   const communeServers = servers.filter((s) => s.server_id && s.commune_id === communeId)
 
   const selectCommune = (id: string) => {
@@ -127,8 +128,8 @@ export const RegisterNodeModal: React.FC<{
   const cabinetHint = !communeId
     ? 'Chọn xã / phường trước.'
     : assetsLoaded && communeCabinets.length === 0
-      ? 'Xã này không còn tủ điện trống (mỗi tủ gắn tối đa một node).'
-      : 'Chỉ tủ chưa gắn node.'
+      ? 'Xã này chưa có tủ điện.'
+      : undefined
   const serverHint = !communeId
     ? 'Chọn xã / phường trước.'
     : communeServers.length === 0
@@ -186,7 +187,7 @@ export const RegisterNodeModal: React.FC<{
                 ))}
               </select>
             </Field>
-            <Field label="Mạch (rơ-le #1)" hint={cabinetId && cabinetFeeders.length === 0 ? 'Tủ này chưa có mạch.' : undefined}>
+            <Field label="Mạch (rơ-le #1)" hint={cabinetId && cabinetFeeders.length === 0 ? 'Mọi mạch của tủ này đã gắn node (mỗi mạch một node).' : 'Chỉ mạch chưa gắn node.'}>
               <select
                 aria-label="Mạch (rơ-le #1)"
                 className={`${inputClass} cursor-pointer`}

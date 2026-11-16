@@ -231,6 +231,7 @@ describe('Segment modals & asset forms - Field Test Cases Suite', () => {
     data_source: 'field',
     location: { lat: 10.9701, lng: 106.4896 },
     feeder_ids: ['F1'],
+    iot_node_ids: [],
     updated_at: '2026-10-15T00:00:00Z',
   }
 
@@ -243,6 +244,7 @@ describe('Segment modals & asset forms - Field Test Cases Suite', () => {
     data_source: 'field',
     location: { lat: 10.9801, lng: 106.5 },
     feeder_ids: ['F2'],
+    iot_node_ids: [],
     updated_at: '2026-10-15T00:00:00Z',
   }
 

@@ -147,6 +147,21 @@ describe('ElectricalMonitorDock (bảng giám sát điện dưới bản đồ G
     expect(await screen.findByText('Chưa cấu hình nguồn điều khiển cho thiết bị IoT.')).toBeInTheDocument()
     expect(screen.getByText('Chưa có mẫu điện nào.')).toBeInTheDocument()
   })
+
+  it('keeps retrying after a failed first load, so the chart starts once the source is configured', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    api.getElectricalHistoryPage.mockRejectedValueOnce({ response: { data: { error: { message: 'Chưa cấu hình nguồn điều khiển cho thiết bị IoT.' } } } })
+    renderDock()
+    expect(await screen.findByText('Chưa cấu hình nguồn điều khiển cho thiết bị IoT.')).toBeInTheDocument()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ELECTRICAL_POLL_MS)
+    })
+
+    expect(api.getElectricalHistoryPage).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText(/2 mẫu/)).toBeInTheDocument()
+    expect(screen.queryByText('Chưa cấu hình nguồn điều khiển cho thiết bị IoT.')).not.toBeInTheDocument()
+  })
 })
 
 describe('FeederElectricalSummary (dòng số đo trong mạch của khung tủ)', () => {

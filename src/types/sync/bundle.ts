@@ -5,7 +5,7 @@
 import type { FaultItem } from '../faults/faults'
 import type { SegmentPropertiesFeatureCollection } from '../map/segments'
 import type { WorkOrderDetail } from '../workorders/orders'
-import type { FixtureStatus, FixtureType, PowerSource, WarrantyStatus } from '../common/enums'
+import type { FeederPowerState, FixtureStatus, FixtureType, PowerSource, WarrantyStatus } from '../common/enums'
 import type { Geometry } from '../common/base'
 
 export interface SyncBundle {
@@ -18,6 +18,7 @@ export interface SyncBundle {
 }
 
 export interface SyncPoleProperties {
+    power_state?: FeederPowerState
     pole_id: string | null
     segment_id: string | null
     fixture_status: FixtureStatus

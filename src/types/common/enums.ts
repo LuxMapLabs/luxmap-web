@@ -33,6 +33,8 @@ export type FixtureType = 'led_road_lamp'
 
 export type InspectionOutcome = 'fault_present' | 'fault_absent' | 'inconclusive'
 
+export type IotCommandHistoryStatus = 'success' | 'pending' | 'expired'
+
 export type JobState = 'ok' | 'failing' | 'stalled' | 'running'
 
 export type LightingAckResult = 'applied' | 'failed'

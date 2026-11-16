@@ -36,6 +36,7 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
     data_source: 'field',
     location: { lat: 10.9701, lng: 106.4896 },
     feeder_ids: [],
+    iot_node_ids: [],
     updated_at: '2026-10-12T00:00:00Z',
   }
 

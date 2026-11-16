@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Activity, Power, PowerOff, Sun, Clock, Loader2, Radio } from 'lucide-react'
+import { Activity, Power, PowerOff, Sun, Loader2, Radio } from 'lucide-react'
 import type { RootState } from '../../../redux/store'
 import iotAPI from '../../../feature/iot/iotAPI'
 import type { IotPoleControl } from '../../../types/iot/poles'
@@ -9,13 +9,13 @@ import { isManager } from '../../../utils/roleUtils'
 import {
   commandBody,
   commandProgress,
-  currentChoice,
-  isClock,
   type IotCommandChoice,
   type IotCommandProgress,
 } from '../../../utils/iot/iotCommand'
 import { apiErrorMessage } from '../../../utils/iot/apiError'
 import { formatMetric } from '../../../utils/iot/electricalSeries'
+import { AutoScheduleForm } from './AutoScheduleForm'
+import { useFeederCommandModes } from '../../../hooks/iot/useFeederCommandModes'
 
 const POLL_MS = 3_000
 
@@ -46,8 +46,6 @@ export const IotBridgeControlCard: React.FC<{
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  const [dayStart, setDayStart] = useState('')
-  const [nightStart, setNightStart] = useState('')
   const [electrical, setElectrical] = useState<IotElectricalResult | null>(null)
 
   const nodeId = control?.node_id || null
@@ -99,6 +97,14 @@ export const IotBridgeControlCard: React.FC<{
 
   const progress = tracked ? commandProgress(tracked, current, now) : null
 
+  // Chế độ đang chạy = lệnh success mới nhất trong lịch sử lệnh (lệnh pending / expired không tính).
+  // Đọc lại ngay khi lệnh vừa gửi được node xác nhận.
+  const [modeRefresh, setModeRefresh] = useState(0)
+  useEffect(() => {
+    if (progress === 'acknowledged') setModeRefresh((n) => n + 1)
+  }, [progress])
+  const commandModes = useFeederCommandModes(nodeId && viaBridge ? [nodeId] : [], modeRefresh)
+
   // Theo dõi ACK: đọc lại GET command tới khi xác nhận, bị thay, hoặc hết hạn.
   useEffect(() => {
     if (!nodeId || progress !== 'pending') return
@@ -110,36 +116,25 @@ export const IotBridgeControlCard: React.FC<{
 
   const feederLabel = control.feeder_id || 'mạch'
   const canPress = isManager(role) && viaBridge
-  const active = currentChoice(current)
+  const active = nodeId ? commandModes[nodeId] ?? null : null
 
-  const send = async (choice: IotCommandChoice, withSchedule = false) => {
+  // AUTO luôn đi kèm lịch (form AutoScheduleForm); BẬT / TẮT không có lịch
+  const send = async (choice: IotCommandChoice, schedule?: { day_start: string; night_start: string }) => {
     if (!nodeId) return
     setError(null)
-    if (withSchedule && (!isClock(dayStart) || !isClock(nightStart) || dayStart === nightStart)) {
-      setError('Lịch AUTO cần hai giờ khác nhau theo định dạng HH:mm.')
-      return
-    }
     setSending(true)
     try {
-      const body = withSchedule
-        ? { ...commandBody('auto'), auto_schedule: { day_start: dayStart, night_start: nightStart } }
-        : commandBody(choice)
+      const body = schedule ? { ...commandBody('auto'), auto_schedule: schedule } : commandBody(choice)
       const accepted = await iotAPI.sendCommand(nodeId, body)
       setTracked(accepted)
       setCurrent(accepted)
       setNow(Date.now())
-      if (withSchedule) setScheduleOpen(false)
+      if (schedule) setScheduleOpen(false)
     } catch (err) {
       setError(apiErrorMessage(err, 'Không gửi được lệnh tới IoT bridge.'))
     } finally {
       setSending(false)
     }
-  }
-
-  const openSchedule = () => {
-    setDayStart(current?.auto_schedule?.day_start || '')
-    setNightStart(current?.auto_schedule?.night_start || '')
-    setScheduleOpen((open) => !open)
   }
 
   const buttonClass = (choice: IotCommandChoice) =>
@@ -184,53 +179,24 @@ export const IotBridgeControlCard: React.FC<{
                 <button type="button" disabled={sending} onClick={() => send('off')} className={buttonClass('off')}>
                   <PowerOff className="w-3.5 h-3.5" /> Tắt mạch {control.feeder_id}
                 </button>
-                <button type="button" disabled={sending} onClick={() => send('auto')} className={buttonClass('auto')}>
+                <button
+                  type="button"
+                  disabled={sending}
+                  aria-expanded={scheduleOpen}
+                  onClick={() => setScheduleOpen((open) => !open)}
+                  className={buttonClass('auto')}
+                >
                   <Sun className="w-3.5 h-3.5" /> AUTO
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={openSchedule}
-                className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1 cursor-pointer"
-              >
-                <Clock className="w-3.5 h-3.5" /> Đặt lịch AUTO
-              </button>
-
               {scheduleOpen && (
-                <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/50 space-y-1.5">
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="text-[10.5px] text-slate-500 dark:text-slate-400">
-                      Bắt đầu ban ngày
-                      <input
-                        type="time"
-                        value={dayStart}
-                        onChange={(e) => setDayStart(e.target.value)}
-                        className="mt-0.5 w-full px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-mono"
-                      />
-                    </label>
-                    <label className="text-[10.5px] text-slate-500 dark:text-slate-400">
-                      Bắt đầu ban đêm
-                      <input
-                        type="time"
-                        value={nightStart}
-                        onChange={(e) => setNightStart(e.target.value)}
-                        className="mt-0.5 w-full px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-mono"
-                      />
-                    </label>
-                  </div>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                    Ban ngày: AUTO theo cảm biến ánh sáng. Ban đêm: AUTO luôn bật. Giờ địa phương của node.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={sending}
-                    onClick={() => send('auto', true)}
-                    className="w-full px-2 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-bold cursor-pointer"
-                  >
-                    Gửi AUTO với lịch mới
-                  </button>
-                </div>
+                <AutoScheduleForm
+                  initial={current?.auto_schedule}
+                  sending={sending}
+                  onSubmit={(schedule) => send('auto', schedule)}
+                  onCancel={() => setScheduleOpen(false)}
+                />
               )}
             </>
           )}

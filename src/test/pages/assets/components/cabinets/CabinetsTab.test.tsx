@@ -110,6 +110,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     data_source: 'field',
     location: { lat: 10.9701, lng: 106.4896 },
     feeder_ids: ['feeder_01', 'feeder_02'],
+    iot_node_ids: [],
     updated_at: '2026-10-08T10:00:00Z',
     updated_by: 'usr_admin',
     updated_by_name: 'Quản trị viên',
@@ -124,6 +125,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     data_source: 'field',
     location: { lat: 0, lng: 0 },
     feeder_ids: [],
+    iot_node_ids: [],
     updated_at: '2026-10-08T11:00:00Z',
   }
 
@@ -413,6 +415,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
         data_source: 'field',
         location: { lat: 10.97, lng: 106.48 },
         feeder_ids: [],
+        iot_node_ids: [],
         updated_at: null,
       }
 

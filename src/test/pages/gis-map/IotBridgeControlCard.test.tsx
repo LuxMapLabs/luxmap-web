@@ -11,6 +11,7 @@ vi.mock('../../../feature/iot/iotAPI', () => ({
     getCommand: vi.fn(),
     sendCommand: vi.fn(),
     getElectrical: vi.fn(),
+    getCommandHistory: vi.fn(),
   },
 }))
 
@@ -37,6 +38,24 @@ describe('IotBridgeControlCard', () => {
     vi.clearAllMocks()
     api.getCommand.mockResolvedValue({ node_id: 'NODE-001', command_id: 'old', mode: 'AUTO', command: null, command_acknowledged: true })
     api.getElectrical.mockResolvedValue({ node_id: 'NODE-001', measurement: { power_mw: 512.3, current_ma: 102.5, voltage: 5 } })
+    api.getCommandHistory.mockResolvedValue({ items: [{ command_id: 'old', mode: 'AUTO', command: null, status: 'success' }] })
+  })
+
+  it('shows the mode of the latest success command; a newer pending one does not count', async () => {
+    api.getPoleControl.mockResolvedValue(bridgeControl)
+    // GET command đã báo lệnh mới (OFF) nhưng node chưa thực hiện: chế độ vẫn là AUTO thành công trước đó
+    api.getCommand.mockResolvedValue({ node_id: 'NODE-001', command_id: 'new', mode: 'MANUAL', command: 'OFF', command_acknowledged: false })
+    api.getCommandHistory.mockResolvedValue({
+      items: [
+        { command_id: 'new', mode: 'MANUAL', command: 'OFF', status: 'pending' },
+        { command_id: 'old', mode: 'AUTO', command: null, status: 'success' },
+      ],
+    })
+    renderCard('superior')
+
+    expect(await screen.findByText('AUTO')).toBeInTheDocument()
+    expect(api.getCommandHistory).toHaveBeenCalledWith('NODE-001', { page: 1, page_size: 20 })
+    expect(screen.queryByText('Tắt')).not.toBeInTheDocument()
   })
 
   it('renders nothing when the pole has no IoT node', async () => {
@@ -57,7 +76,7 @@ describe('IotBridgeControlCard', () => {
     api.getPoleControl.mockResolvedValue(bridgeControl)
     renderCard('system_admin')
     expect(await screen.findByText('AUTO')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Bật mạch|Tắt mạch|Đặt lịch AUTO/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Bật mạch|Tắt mạch|^AUTO$/ })).not.toBeInTheDocument()
   })
 
   it('labels the buttons with the feeder they switch, for the manager', async () => {
@@ -106,15 +125,42 @@ describe('IotBridgeControlCard', () => {
     expect(await screen.findByText('Đang chờ node xác nhận…')).toBeInTheDocument()
   })
 
+  it('AUTO always goes with a schedule: the button opens the form prefilled from the node, and sends it', async () => {
+    api.getPoleControl.mockResolvedValue(bridgeControl)
+    api.getCommand.mockResolvedValue({
+      node_id: 'NODE-001',
+      command_id: 'old',
+      mode: 'AUTO',
+      command: null,
+      command_acknowledged: true,
+      auto_schedule: { day_start: '05:30', night_start: '18:15' },
+    })
+    api.sendCommand.mockResolvedValue({ node_id: 'NODE-001', command_id: 'new', mode: 'AUTO', command: null })
+    renderCard('manager')
+
+    fireEvent.click(await screen.findByRole('button', { name: /^AUTO$/ }))
+    expect(api.sendCommand).not.toHaveBeenCalled()
+    expect(screen.getByDisplayValue('05:30')).toBeInTheDocument()
+    fireEvent.change(screen.getByDisplayValue('18:15'), { target: { value: '19:00' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi AUTO' }))
+
+    await waitFor(() =>
+      expect(api.sendCommand).toHaveBeenCalledWith('NODE-001', {
+        mode: 'AUTO',
+        command: null,
+        auto_schedule: { day_start: '05:30', night_start: '19:00' },
+      })
+    )
+  })
+
   it('refuses an AUTO schedule whose two times are equal, without calling the API', async () => {
     api.getPoleControl.mockResolvedValue(bridgeControl)
     renderCard('manager')
 
-    fireEvent.click(await screen.findByText('Đặt lịch AUTO'))
-    const [day, night] = screen.getAllByDisplayValue('') as HTMLInputElement[]
-    fireEvent.change(day, { target: { value: '07:00' } })
-    fireEvent.change(night, { target: { value: '07:00' } })
-    fireEvent.click(screen.getByText('Gửi AUTO với lịch mới'))
+    fireEvent.click(await screen.findByRole('button', { name: /^AUTO$/ }))
+    // Node chưa có lịch: điền sẵn 06:00 / 18:00
+    fireEvent.change(screen.getByDisplayValue('18:00'), { target: { value: '06:00' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi AUTO' }))
 
     expect(await screen.findByText('Lịch AUTO cần hai giờ khác nhau theo định dạng HH:mm.')).toBeInTheDocument()
     expect(api.sendCommand).not.toHaveBeenCalled()

@@ -9,6 +9,7 @@ import type {
   ServerLocationRequest,
 } from '../../types/iot/servers'
 import type {
+  IotCommandHistoryItemPagedResult,
   IotCommandRequest,
   IotCommandStatus,
   IotDiagnosticResult,
@@ -22,8 +23,8 @@ import type {
 import type { IotPoleControl } from '../../types/iot/poles'
 
 /**
- * IoT bridge (docs/LUXMAP-IOT-FE.md của backend): gateway ESP32 + node LoRa, điều khiển qua `/iot/...`.
- * Khác kênh `/lighting/...` (MQTT EMQX): trụ nào dùng kênh nào do `GET /iot/poles/{id}/control` quyết.
+ * IoT bridge (docs/LUXMAP-IOT-FE.md của backend): gateway ESP32 + node LoRa. Lệnh Bật / Tắt / AUTO và nhật ký lệnh
+ * đều qua `/iot/nodes/{nodeId}/command...`; web không còn gọi kênh cũ `/lighting/...`.
  */
 export const iotAPI = {
   /** GET /api/v1/iot/servers — gateway trong phạm vi xã, kèm `status` và `location` (có thể null). */
@@ -53,6 +54,18 @@ export const iotAPI = {
   /** GET /api/v1/iot/nodes/{nodeId}/command — lệnh hiện tại, lịch AUTO và cờ ACK của node. */
   getCommand: async (nodeId: string): Promise<IotCommandStatus> => {
     const response = await apiClient.get<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`)
+    return response.data
+  },
+
+  /** GET /api/v1/iot/nodes/{nodeId}/command/history — lệnh đã ghi audit, mới nhất trước, kèm `status` success | pending | expired. */
+  getCommandHistory: async (
+    nodeId: string,
+    params: { page?: number; page_size?: number } = {}
+  ): Promise<IotCommandHistoryItemPagedResult> => {
+    const response = await apiClient.get<IotCommandHistoryItemPagedResult>(
+      `/iot/nodes/${encodeURIComponent(nodeId)}/command/history`,
+      { params }
+    )
     return response.data
   },
 

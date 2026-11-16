@@ -73,6 +73,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       cabinet_name: 'Tủ điện Tỉnh Lộ 8',
       commune_id: 'commune_tl8',
       feeder_ids: ['F-01', 'F-02'],
+      iot_node_ids: [],
       feeders: [],
     },
   }
