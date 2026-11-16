@@ -116,3 +116,29 @@ export const simplifyRing = (ring: BoundaryRing, tolerance: number): BoundaryRin
 
 export const simplifyPolygons = (polygons: BoundaryPolygon[], tolerance: number): BoundaryPolygon[] =>
   polygons.map((polygon) => polygon.map((ring) => simplifyRing(ring, tolerance)))
+
+/** Khung chữ nhật cũ (bbox) coi như một polygon 4 đỉnh, để xã chưa có ranh giới vẫn có viền. */
+export const bboxToGeometry = (bbox: CommuneBbox | null | undefined): Geometry | null => {
+  if (!bbox) return null
+  const { min_lng, min_lat, max_lng, max_lat } = bbox
+  if (
+    typeof min_lng !== 'number' ||
+    typeof min_lat !== 'number' ||
+    typeof max_lng !== 'number' ||
+    typeof max_lat !== 'number' ||
+    min_lng >= max_lng ||
+    min_lat >= max_lat
+  ) {
+    return null
+  }
+  return polygonsToGeometry([
+    [
+      [
+        [min_lng, max_lat],
+        [max_lng, max_lat],
+        [max_lng, min_lat],
+        [min_lng, min_lat],
+      ],
+    ],
+  ])
+}

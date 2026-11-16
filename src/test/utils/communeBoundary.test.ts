@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  bboxToGeometry,
   countVertices,
   geometryToPolygons,
   polygonsToBbox,
@@ -51,6 +52,21 @@ describe('communeBoundary', () => {
     const simplified = simplifyRing(ring, 0.0001)
     expect(simplified.length).toBeLessThan(ring.length)
     expect(simplified.length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('bboxToGeometry', () => {
+  it('khung chữ nhật thành polygon 4 đỉnh', () => {
+    const g = bboxToGeometry({ min_lng: 106, min_lat: 11, max_lng: 107, max_lat: 12 })
+    const polys = geometryToPolygons(g)
+    expect(polys).toHaveLength(1)
+    expect(polys[0][0]).toHaveLength(4)
+    expect(polygonsToBbox(polys)).toEqual({ min_lng: 106, min_lat: 11, max_lng: 107, max_lat: 12 })
+  })
+
+  it('khung thiếu hoặc ngược thì không có polygon', () => {
+    expect(bboxToGeometry(null)).toBeNull()
+    expect(bboxToGeometry({ min_lng: 107, min_lat: 11, max_lng: 106, max_lat: 12 })).toBeNull()
   })
 })
 
