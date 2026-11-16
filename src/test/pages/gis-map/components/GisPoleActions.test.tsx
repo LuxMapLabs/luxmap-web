@@ -8,7 +8,6 @@ import { configureStore, type Action, type Middleware } from '@reduxjs/toolkit'
 vi.mock('../../../../feature/iot/iotAPI', () => ({
   default: {
     getPoleControl: vi.fn(() => Promise.resolve(null)),
-    getCommand: vi.fn(() => Promise.resolve(null)),
     sendCommand: vi.fn(),
     getElectricalHistory: vi.fn(() => new Promise(() => {})),
     getElectricalHistoryPage: vi.fn(() => new Promise(() => {})),
@@ -323,11 +322,11 @@ describe('Khung cột trên Bản đồ GIS: sửa thông tin cột và gắn b�
     expect(screen.getByRole('button', { name: /Lưu thay đổi/ })).toBeEnabled()
   })
 
-  it('khung cột không có thẻ IoT: không đọc mạch IoT của cột, IoT chỉ xem ở tủ điện', async () => {
-    vi.mocked(iotAPI.getPoleControl).mockClear()
+  it('khung cột không có thẻ IoT: không gọi API IoT nào, IoT chỉ xem ở tủ điện', async () => {
+    vi.mocked(iotAPI.getCommandHistory).mockClear()
     setup('manager')
     await act(async () => {})
-    expect(iotAPI.getPoleControl).not.toHaveBeenCalled()
+    expect(iotAPI.getCommandHistory).not.toHaveBeenCalled()
     expect(screen.queryByText(/qua IoT/)).not.toBeInTheDocument()
   })
 
@@ -366,12 +365,20 @@ describe('Khung mạch điện: Bật / Tắt / AUTO gửi POST /iot/nodes/{node
     fireEvent.click(within(confirm).getByRole('button', { name: 'Xác nhận Bật' }))
     await waitFor(() => expect(iotAPI.sendCommand).toHaveBeenCalledWith('NODE-004', { mode: 'MANUAL', command: 'ON' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Xác nhận bật mạch FDR-010' })).not.toBeInTheDocument())
-    // AUTO luôn kèm lịch: bấm Auto mở form (điền lịch đang có trên node), chưa gửi gì
-    vi.mocked(iotAPI.getCommand).mockResolvedValueOnce({ node_id: 'NODE-004', auto_schedule: { day_start: '05:45', night_start: '17:50' } })
+    // AUTO luôn kèm lịch: bấm Auto mở form, điền lịch của lệnh AUTO success mới nhất trong lịch sử lệnh
+    // (lệnh AUTO pending mới hơn chưa chạy nên không lấy), chưa gửi gì
+    vi.mocked(iotAPI.getCommandHistory).mockResolvedValue({
+      items: [
+        { command_id: 'c3', mode: 'AUTO', command: null, status: 'pending', auto_schedule: { day_start: '07:00', night_start: '19:00' } },
+        { command_id: 'c2', mode: 'AUTO', command: null, status: 'success', auto_schedule: { day_start: '05:45', night_start: '17:50' } },
+      ],
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Auto' }))
     const dialog = await screen.findByRole('dialog', { name: 'Lịch AUTO mạch FDR-010' })
     expect(iotAPI.sendCommand).toHaveBeenCalledTimes(1)
+    expect(iotAPI.getCommandHistory).toHaveBeenCalledWith('NODE-004', { page: 1, page_size: 20 })
     expect(screen.getByDisplayValue('05:45')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('07:00')).not.toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Gửi AUTO' }))
     await waitFor(() =>
       expect(iotAPI.sendCommand).toHaveBeenLastCalledWith('NODE-004', {

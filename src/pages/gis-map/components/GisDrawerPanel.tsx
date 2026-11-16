@@ -30,7 +30,7 @@ import type { RootState, AppDispatch } from '../../../redux/store'
 import { fetchPoleDetailRequest, clearPoleDetail, fetchCabinetTopologyRequest } from '../../../feature/map/mapSlice'
 import { IotCommandHistoryModal, type CommandHistoryFeeder } from './IotCommandHistoryModal'
 import iotAPI from '../../../feature/iot/iotAPI'
-import { commandBody } from '../../../utils/iot/iotCommand'
+import { commandBody, latestSuccessAutoSchedule } from '../../../utils/iot/iotCommand'
 import { apiErrorMessage } from '../../../utils/iot/apiError'
 import { toast } from 'sonner'
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
@@ -55,20 +55,23 @@ import {
   type RetirableFixture,
 } from '../../assets/components/fixtures/components/RetireFixtureModal'
 import { useAuthImage } from '../../../hooks/useAuthImage'
+import { POLE_LAMP_UI, poleFeatureLampState, poleLampState } from '../../../utils/gis-map/poleLampState'
 
-// Nhãn trạng thái cột theo fixture_status do API trả về
-const poleStatusBadge = (status?: string | null) =>
-  status === 'out'
-    ? { label: 'Đèn tắt', className: 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' }
-    : status === 'dim'
-    ? { label: 'Đèn mờ', className: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' }
-    : status === 'normal'
-    ? { label: 'Đạt chuẩn', className: 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300' }
-    : { label: 'Chưa quét', className: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300' }
+// Nhãn trạng thái cột: fixture_status + power_state của mạch (poleLampState)
+const poleStatusBadge = (p?: { fixture_status?: string | null; power_state?: string | null } | null) => {
+  const ui = POLE_LAMP_UI[poleFeatureLampState(p)]
+  return { label: ui.label, short: ui.short, className: `border ${ui.badge}` }
+}
 
 // Trạng thái cấp điện của mạch theo power_state do API trả về
 const feederPowerLabel = (state?: string | null) =>
-  state === 'on' ? 'Đang cấp điện' : state === 'off' ? 'Đã ngắt điện' : 'Chưa rõ'
+  state === 'on' ? 'Đang cấp điện' : state === 'off' ? 'Mạch đang tắt' : 'Chưa rõ'
+const feederPowerBadge = (state?: string | null) =>
+  state === 'on'
+    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+    : state === 'off'
+    ? 'bg-white text-slate-700 border-slate-300 dark:bg-slate-900 dark:text-slate-200 dark:border-slate-600'
+    : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
 
 const fixtureTypeLabel = (type?: string | null) => (type === 'led_road_lamp' ? 'Đèn LED đường phố' : type || '-')
 
@@ -247,12 +250,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       setCommandTarget({ feederId, nodeId, mode, initial: null, ...info })
       return
     }
-    const current = await iotAPI.getCommand(nodeId).catch(() => null)
-    setCommandTarget({ feederId, nodeId, mode, initial: current?.auto_schedule ?? null, ...info })
+    // Điền sẵn lịch AUTO node đã thực sự chạy (lệnh AUTO success mới nhất), không lấy lệnh pending / expired
+    const history = await iotAPI.getCommandHistory(nodeId, { page: 1, page_size: 20 }).catch(() => null)
+    setCommandTarget({ feederId, nodeId, mode, initial: latestSuccessAutoSchedule(history?.items), ...info })
   }
 
   const effectiveFixtureStatus =
     poleDetail?.current_status?.fixture_status || selectedPole?.properties?.fixture_status || 'unknown'
+  // Màu / nhãn như marker: power_state lấy cùng nguồn với marker trước, rồi từ chi tiết cột
+  const selectedPoleLamp = poleLampState(
+    effectiveFixtureStatus,
+    selectedPole?.properties?.power_state ?? poleDetail?.power_state
+  )
   const openFaultCount =
     poleDetail?.open_faults?.length !== undefined
       ? poleDetail.open_faults.length
@@ -538,24 +547,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     : activeSegmentDetail.name}
                 </span>
                 {selectedPole && (
-                  <span
-                    className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${
-                      effectiveFixtureStatus === 'out'
-                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                        : effectiveFixtureStatus === 'dim'
-                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                        : effectiveFixtureStatus === 'unknown'
-                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                        : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                    }`}
-                  >
-                    {effectiveFixtureStatus === 'out'
-                      ? 'Đèn tắt'
-                      : effectiveFixtureStatus === 'dim'
-                      ? 'Đèn mờ'
-                      : effectiveFixtureStatus === 'unknown'
-                      ? 'Chưa quét'
-                      : 'Đạt chuẩn'}
+                  <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${POLE_LAMP_UI[selectedPoleLamp].badge}`}>
+                    {POLE_LAMP_UI[selectedPoleLamp].label}
                   </span>
                 )}
               </div>
@@ -1017,7 +1010,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         key={fId}
                         className={`p-2.5 rounded-xl border transition-all ${
                           currentMode === 'off'
-                            ? 'bg-rose-50/50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60'
+                            ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600'
                             : currentMode === 'on'
                             ? 'bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60'
                             : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-700/60 shadow-2xs'
@@ -1031,7 +1024,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                   currentMode === 'on'
                                     ? 'bg-emerald-500 animate-pulse'
                                     : currentMode === 'off'
-                                    ? 'bg-rose-500'
+                                    ? 'bg-white ring-1 ring-slate-400'
                                     : 'bg-indigo-500'
                                 }`}
                               />
@@ -1039,14 +1032,18 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                 {fName}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-[10.5px] text-slate-500 dark:text-slate-400">
-                              <span className="font-mono font-medium text-slate-600 dark:text-slate-300">
-                                {fCode}
+                            <div className="mt-0.5 font-mono font-medium text-[10.5px] text-slate-600 dark:text-slate-300 truncate">
+                              {fCode}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10.5px] text-slate-500 dark:text-slate-400">
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${feederPowerBadge(
+                                  cabFeeder?.power_state ?? feeder.power_state
+                                )}`}
+                              >
+                                {feederPowerLabel(cabFeeder?.power_state ?? feeder.power_state)}
                               </span>
-                              <span>•</span>
-                              <span>{poleCount} cột đèn</span>
-                              <span>•</span>
-                              <span>{feederPowerLabel(cabFeeder?.power_state ?? feeder.power_state)}</span>
+                              <span className="whitespace-nowrap">{poleCount} cột đèn</span>
                             </div>
                           </div>
 
@@ -1317,7 +1314,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         p.properties.feeder_id === selectedFeeder.external_ref
                     )
                     .map((f: PoleFeature, index: number) => {
-                      const statusBadge = poleStatusBadge(f.properties.fixture_status)
+                      const statusBadge = poleStatusBadge(f.properties)
                       const lampLabel = f.properties.lamp_code || `Đèn số ${index + 1}`
 
                       return (
@@ -1444,24 +1441,8 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                             </span>
                           )}
                         </div>
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded font-medium ${
-                            f.properties.fixture_status === 'normal'
-                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                              : f.properties.fixture_status === 'dim'
-                              ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                              : f.properties.fixture_status === 'out'
-                              ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                          }`}
-                        >
-                          {f.properties.fixture_status === 'normal'
-                            ? 'Sáng'
-                            : f.properties.fixture_status === 'dim'
-                            ? 'Mờ'
-                            : f.properties.fixture_status === 'out'
-                            ? 'Tắt'
-                            : 'Chưa quét'}
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${poleStatusBadge(f.properties).className}`}>
+                          {poleStatusBadge(f.properties).short}
                         </span>
                       </div>
                     ))}

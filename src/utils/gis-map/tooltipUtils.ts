@@ -1,4 +1,5 @@
 import type { PoleFeature, SegmentInfo } from '../../pages/gis-map/GisMapPage'
+import { POLE_LAMP_UI, poleFeatureLampState } from './poleLampState'
 
 interface PoleTooltipParams {
   pole: PoleFeature
@@ -6,23 +7,10 @@ interface PoleTooltipParams {
 
 export function getPoleTooltipHtml({ pole }: PoleTooltipParams): string {
   const p = pole.properties || {}
-  const status = p.fixture_status || 'unknown'
-  const statusText =
-    status === 'normal'
-      ? 'Đạt chuẩn'
-      : status === 'dim'
-      ? 'Đèn mờ (Sụt áp)'
-      : status === 'out'
-      ? 'Hỏng / Tắt'
-      : 'Chưa quét'
-  const statusCol =
-    status === 'normal'
-      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-      : status === 'dim'
-      ? 'text-amber-800 bg-amber-50 border-amber-200'
-      : status === 'out'
-      ? 'text-rose-700 bg-rose-50 border-rose-200'
-      : 'text-slate-700 bg-slate-50 border-slate-200'
+  const lamp = poleFeatureLampState(p)
+  const statusText = POLE_LAMP_UI[lamp].label
+  const statusCol = POLE_LAMP_UI[lamp].badge
+  const powerText = p.power_state === 'on' ? 'Đang bật' : p.power_state === 'off' ? 'Đang tắt' : 'Chưa rõ'
 
   // Ưu tiên hiển thị external_ref theo đúng chỉ đạo người dùng
   const displayPoleCode = p.external_ref || p.pole_code || p.pole_id
@@ -40,7 +28,8 @@ export function getPoleTooltipHtml({ pole }: PoleTooltipParams): string {
         <div>Lộ điện (Feeder): <strong class="text-slate-700 dark:text-slate-200 font-mono">${displayFeeder}</strong></div>
         ${p.lamp_watt ? `<div>Công suất tải: <strong class="text-slate-700 dark:text-slate-200 font-mono">${p.lamp_watt}W</strong></div>` : ''}
         ${p.atlas || p.atlas_note ? `<div class="text-slate-600 dark:text-slate-400 text-[10.5px]">📍 Vị trí: <strong class="text-slate-800 dark:text-slate-200">${p.atlas || p.atlas_note}</strong></div>` : ''}
-        ${status === 'out' ? `<div class="text-rose-600 dark:text-rose-400 text-[10px] font-medium pt-0.5">⚠️ Cháy bóng LED/Driver (Cáp nguồn trục 220V vẫn thông mạch)</div>` : status === 'dim' ? `<div class="text-amber-600 dark:text-amber-400 text-[10px] font-medium pt-0.5">⚡ Sụt áp cuối nguồn / Giảm quang thông</div>` : ''}
+        <div>Mạch: <strong class="text-slate-700 dark:text-slate-200">${powerText}</strong></div>
+        ${lamp === 'off' ? `<div class="text-slate-500 dark:text-slate-400 text-[10px] pt-0.5">Mạch đang tắt nên đèn tắt; lần quan sát gần nhất đèn bình thường.</div>` : ''}
       </div>
     </div>
   `
@@ -84,19 +73,26 @@ interface FeederTooltipParams {
 }
 
 export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): string {
-  const isLineFault = p.status === 'fault' || p.power_state === 'off'
-  const isLineActive = !isLineFault && (p.status === 'active' || p.power_state === 'on')
+  // Cùng luật với màu đường (useFeederLinesLayer): sự cố trước, rồi mạch tắt, rồi đang cấp điện
+  const isLineFault = p.status === 'fault'
+  const isLineOff = !isLineFault && (p.status === 'off' || p.power_state === 'off')
+  const isLineActive = !isLineFault && !isLineOff && (p.status === 'active' || p.power_state === 'on')
 
   let statusBg = 'bg-slate-400'
-  let statusText = 'Chưa xác định nguồn'
+  let statusText = 'Chưa rõ trạng thái'
   let headerTitleColor = 'text-slate-700 dark:text-slate-300'
   let badgeClasses = 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
 
   if (isLineFault) {
     statusBg = 'bg-rose-500'
-    statusText = 'Đã ngắt nguồn'
+    statusText = 'Sự cố'
     headerTitleColor = 'text-rose-700 dark:text-rose-400'
     badgeClasses = 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800'
+  } else if (isLineOff) {
+    statusBg = 'bg-white ring-1 ring-slate-400'
+    statusText = 'Mạch đang tắt'
+    headerTitleColor = 'text-slate-800 dark:text-slate-200'
+    badgeClasses = 'text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600'
   } else if (isLineActive) {
     statusBg = 'bg-emerald-500'
     statusText = 'Đang cấp điện'

@@ -8,6 +8,7 @@ import {
 import { FeederElectricalSummary, SPARKLINE_SAMPLES } from '../../../pages/gis-map/components/FeederElectricalSummary'
 import { ELECTRICAL_POLL_MS } from '../../../hooks/iot/useElectricalSeries'
 import { buildMonitorTarget } from '../../../utils/iot/electricalMonitor'
+import { bucketElectricalPoints } from '../../../utils/iot/electricalSeries'
 import iotAPI from '../../../feature/iot/iotAPI'
 import type { FeederListItem } from '../../../types/assets/feeders'
 
@@ -161,6 +162,99 @@ describe('ElectricalMonitorDock (bảng giám sát điện dưới bản đồ G
     expect(api.getElectricalHistoryPage).toHaveBeenCalledTimes(2)
     expect(await screen.findByText(/2 mẫu/)).toBeInTheDocument()
     expect(screen.queryByText('Chưa cấu hình nguồn điều khiển cho thiết bị IoT.')).not.toBeInTheDocument()
+  })
+})
+
+describe('ElectricalMonitorDock: chế độ xem từng mẫu / theo phút / theo giờ', () => {
+  // Mẫu k = 0 là mới nhất; cách nhau 3 phút, nên mỗi trang 200 mẫu phủ 10 giờ
+  const NEWEST = Date.parse('2026-11-16T12:00:00Z')
+  const spaced = (k: number) => ({
+    cursor: 100_000 - k,
+    reading: { received_at: new Date(NEWEST - k * 180_000).toISOString(), data: { voltage: 5, current: 100, power: 500, lamp_command: 'ON' } },
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    api.getElectricalHistoryPage.mockImplementation(async (_node, { page, page_size }) => ({
+      page,
+      page_size,
+      total: 10_000,
+      items: Array.from({ length: page_size }, (_, i) => spaced((page - 1) * page_size + i)),
+    }))
+    api.getElectricalHistory.mockResolvedValue({ items: [], next_cursor: 0, has_more: false })
+  })
+
+  it('opens on "Theo phút" (3 hours): one page of 10 hours is enough; there is no single-sample mode', async () => {
+    renderDock()
+    // 3 giờ / 3 phút + mẫu đầu = 61 mẫu, gộp theo phút còn 61 điểm
+    expect(await screen.findByText(/61 mẫu · 61 điểm/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Theo phút' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: 'Từng mẫu' })).not.toBeInTheDocument()
+    expect(api.getElectricalHistoryPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('"Theo giờ" loads older pages until 24 hours are covered, keeps only that window and averages per hour', async () => {
+    renderDock()
+    await screen.findByText(/61 mẫu/)
+    fireEvent.click(screen.getByRole('button', { name: 'Theo giờ' }))
+
+    // Trang 1–3 phủ 30 giờ ≥ 24 giờ: dừng, không hỏi trang 4
+    await waitFor(() => expect(api.getElectricalHistoryPage).toHaveBeenCalledWith('NODE-001', { page: 3, page_size: INITIAL_SAMPLES }))
+    expect(api.getElectricalHistoryPage).not.toHaveBeenCalledWith('NODE-001', { page: 4, page_size: INITIAL_SAMPLES })
+    // 24 giờ / 3 phút + mẫu đầu = 481 mẫu, gộp còn 24–25 điểm giờ
+    expect(await screen.findByText(/481 mẫu · 2[45] điểm/)).toBeInTheDocument()
+    expect(screen.getByText(/Trung bình mỗi giờ · 24 giờ gần nhất/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Theo giờ' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('says when the server holds less than the window, and stops paging on a short page', async () => {
+    api.getElectricalHistoryPage.mockImplementation(async (_node, { page, page_size }) => ({
+      page,
+      page_size,
+      total: 20,
+      items: page === 1 ? Array.from({ length: 20 }, (_, i) => spaced(i)) : [],
+    }))
+    renderDock()
+    await screen.findByText(/20 mẫu/)
+    fireEvent.click(screen.getByRole('button', { name: 'Theo phút' }))
+
+    // Trang đầu ngắn hơn page_size: hết dữ liệu, không hỏi trang 2
+    await waitFor(() => expect(screen.getByText(/dữ liệu chỉ có từ/)).toBeInTheDocument())
+    expect(api.getElectricalHistoryPage).not.toHaveBeenCalledWith('NODE-001', { page: 2, page_size: INITIAL_SAMPLES })
+    expect(screen.getByText(/20 mẫu · 20 điểm/)).toBeInTheDocument()
+  })
+})
+
+describe('bucketElectricalPoints', () => {
+  const point = (time: string, power: number | null, cursor: number) => ({
+    cursor,
+    time: Date.parse(time),
+    current: null,
+    voltage: 5,
+    power,
+    lamp: 'ON',
+  })
+
+  it('averages each metric per bucket, ignoring nulls, and counts the raw samples', () => {
+    const out = bucketElectricalPoints(
+      [
+        point('2026-11-16T01:00:10Z', 100, 1),
+        point('2026-11-16T01:00:50Z', 200, 2),
+        point('2026-11-16T01:00:55Z', null, 3),
+        point('2026-11-16T01:01:05Z', 50, 4),
+      ],
+      60_000
+    )
+    expect(out.map((p) => [new Date(p.time).toISOString(), p.power, p.count, p.cursor, p.current])).toEqual([
+      ['2026-11-16T01:00:00.000Z', 150, 3, 3, null],
+      ['2026-11-16T01:01:00.000Z', 50, 1, 4, null],
+    ])
+  })
+
+  it('bucket 0 keeps every sample as its own point', () => {
+    expect(bucketElectricalPoints([point('2026-11-16T01:00:10Z', 100, 1)], 0)).toEqual([
+      { ...point('2026-11-16T01:00:10Z', 100, 1), count: 1 },
+    ])
   })
 })
 

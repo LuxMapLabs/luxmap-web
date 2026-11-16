@@ -26,7 +26,7 @@ describe('Feeder Lines Two-Color State & Tooltip Test Suite (Task 12)', () => {
     expect(html).not.toContain('bg-rose-500')
   })
 
-  it('TC-02: Đường dây điện chuyển sang trạng thái Đã ngắt nguồn (Màu đỏ) khi Tủ điện hoặc Feeder bị sự cố (fault)', () => {
+  it('TC-02: Đường dây điện chuyển sang trạng thái Sự cố (Màu đỏ) khi Tủ điện hoặc Feeder bị sự cố (fault)', () => {
     const featureProps = {
       feeder_id: 'FDR-002',
       external_ref: 'LỘ 2 - TỦ ĐIỆN 02',
@@ -43,7 +43,7 @@ describe('Feeder Lines Two-Color State & Tooltip Test Suite (Task 12)', () => {
     const html = getFeederTooltipHtml({ featureProps })
 
     // Kiểm tra class và text phản ánh màu đỏ cảnh báo sự cố
-    expect(html).toContain('Đã ngắt nguồn')
+    expect(html).toContain('Sự cố')
     expect(html).toContain('bg-rose-500')
     expect(html).toContain('text-rose-700')
     expect(html).toContain('animate-pulse')
@@ -88,11 +88,19 @@ describe('Feeder Lines Two-Color State & Tooltip Test Suite (Task 12)', () => {
 
     const html = getFeederTooltipHtml({ featureProps })
 
-    expect(html).toContain('Chưa xác định nguồn')
+    expect(html).toContain('Chưa rõ trạng thái')
     expect(html).toContain('bg-slate-400')
     expect(html).not.toContain('Đang cấp điện')
     expect(html).not.toContain('bg-emerald-500')
     expect(html).not.toContain('Tủ cấp nguồn: <strong class="text-slate-900 dark:text-white font-semibold">POLE-0026')
     expect(html).toContain('Tủ cấp nguồn: <strong class="text-slate-900 dark:text-white font-semibold">Chưa liên kết tủ')
+  })
+
+  it('TC-05: mạch power_state off là "Mạch đang tắt", không phải sự cố đỏ', () => {
+    const html = getFeederTooltipHtml({ featureProps: { feeder_id: 'FDR-005', status: 'off', power_state: 'off', from_id: 'CAB-005' } })
+    expect(html).toContain('Mạch đang tắt')
+    expect(html).not.toContain('Sự cố')
+    expect(html).not.toContain('bg-rose-500')
+    expect(html).not.toContain('Đang cấp điện')
   })
 })
