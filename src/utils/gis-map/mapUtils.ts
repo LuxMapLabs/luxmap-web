@@ -3,6 +3,7 @@ import type { Geometry } from '../../types/common/base'
 import { bboxToGeometry, geometryToPolygons, pointInGeometry } from '../communeBoundary'
 import type { MapBounds } from '../../types/auth/me'
 import type { Map as MapLibreMap, StyleSpecification } from 'maplibre-gl'
+import type { FeatureCollection, Point } from 'geojson'
 
 /** Fallback only — the map opens on the account's `map_bounds` (GET /auth/me). Centre of the surveyed communes. */
 export const DEFAULT_MAP_CENTER: [number, number] = [106.4975, 10.9715]
@@ -275,6 +276,23 @@ export const FIT_BOUNDS_GIS_SEGMENT = {
 
 export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY || ''
 
+// Toạ độ gần đúng, cần đối chiếu nguồn chính thức.
+export const VN_ARCHIPELAGO_LABELS: FeatureCollection<Point, { label: string }> = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: { label: 'QUẦN ĐẢO HOÀNG SA\n(TP. Đà Nẵng - Việt Nam)' },
+      geometry: { type: 'Point', coordinates: [112.0, 17.35] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'QUẦN ĐẢO TRƯỜNG SA\n(Tỉnh Khánh Hòa - Việt Nam)' },
+      geometry: { type: 'Point', coordinates: [114.2, 12.2] },
+    },
+  ],
+}
+
 export const SATELLITE_RASTER_PAINT = {
   'raster-opacity': 0.8,
   'raster-brightness-min': 0.04,
@@ -288,7 +306,7 @@ export const SATELLITE_RASTER_PAINT = {
 export const SATELLITE_WHITE_BALANCE_COLOR = '#a9c3e8'
 
 /**
- * Bản đồ vệ tinh MapTiler Hybrid có lớp cân bằng trắng khử vàng.
+ * Bản đồ vệ tinh MapTiler Hybrid có lớp cân bằng trắng khử vàng và nhãn quần đảo Hoàng Sa - Trường Sa (Việt Nam).
  */
 export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
   version: 8,
@@ -312,6 +330,10 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       maxzoom: 22,
       attribution:
         '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+    },
+    'vn-islands-labels': {
+      type: 'geojson',
+      data: VN_ARCHIPELAGO_LABELS,
     },
   },
   layers: [
@@ -387,7 +409,12 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', '$type', 'Point'], ['!in', 'class', 'city', 'country', 'province', 'state', 'place']],
+      filter: [
+        'all',
+        ['==', '$type', 'Point'],
+        ['!in', 'class', 'city', 'country', 'province', 'state', 'place'],
+        ['any', ['!in', 'class', 'island', 'islet', 'archipelago'], ['has', 'name:vi']],
+      ],
     },
     {
       id: 'City labels',
@@ -650,6 +677,24 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       },
       metadata: {},
       filter: ['all', ['==', '$type', 'Point'], ['==', 'class', 'hospital'], ['has', 'name']],
+    },
+    {
+      id: 'VN archipelago labels',
+      type: 'symbol',
+      source: 'vn-islands-labels',
+      maxzoom: 9,
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-font': ['Noto Sans Bold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 3, 9, 5, 11, 8, 14],
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(0,0,0,0.8)',
+        'text-halo-width': 1.5,
+      },
     },
   ],
 }) as unknown as StyleSpecification
