@@ -13,13 +13,15 @@ import type {
   IotCommandRequest,
   IotCommandStatus,
   IotDiagnosticResult,
-  IotArchivedSamplePagedResult,
   IotElectricalResult,
   IotNodeStatusPagedResult,
-  IotTelemetryPage,
   RegisterNodeRequest,
   RegisteredNode,
 } from '../../types/iot/nodes'
+import type {
+  IotFeederArchivedSamplePagedResult,
+  IotFeederElectricalResult,
+} from '../../types/iot/feeders'
 
 /**
  * IoT bridge (docs/LUXMAP-IOT-FE.md của backend): gateway ESP32 + node LoRa. Lệnh Bật / Tắt / AUTO và nhật ký lệnh
@@ -93,33 +95,29 @@ export const iotAPI = {
 
   // ---- Dữ liệu điện và chẩn đoán (mục 5) ----
 
+  /** GET /api/v1/iot/feeders/{feederId}/electrical — trạng thái điện và mẫu đo gần nhất của mạch. */
+  getFeederElectrical: async (feederId: string): Promise<IotFeederElectricalResult> => {
+    const response = await apiClient.get<IotFeederElectricalResult>(
+      `/iot/feeders/${encodeURIComponent(feederId)}/electrical`
+    )
+    return response.data
+  },
+
+  /** GET /api/v1/iot/feeders/{feederId}/electrical/history?page=&page_size=&sort_by= — lịch sử điện của mạch, mới nhất trước. */
+  getFeederElectricalHistory: async (
+    feederId: string,
+    params: { page: number; page_size: number; sort_by?: 'received_at' | 'measured_at' }
+  ): Promise<IotFeederArchivedSamplePagedResult> => {
+    const response = await apiClient.get<IotFeederArchivedSamplePagedResult>(
+      `/iot/feeders/${encodeURIComponent(feederId)}/electrical/history`,
+      { params: { sort_by: 'received_at', ...params } }
+    )
+    return response.data
+  },
+
   /** GET /api/v1/iot/nodes/{nodeId}/electrical — mẫu mới nhất; `status` + `received_at` phân biệt mẫu mới / cũ. */
   getElectrical: async (nodeId: string): Promise<IotElectricalResult> => {
     const response = await apiClient.get<IotElectricalResult>(`/iot/nodes/${encodeURIComponent(nodeId)}/electrical`)
-    return response.data
-  },
-
-  /**
-   * GET /api/v1/iot/nodes/{nodeId}/electrical/history?page=&page_size= — mới nhất trước (theo `received_at`).
-   * Dùng cho lần tải đầu của biểu đồ; sau đó lấy mẫu mới bằng `getElectricalHistory(after = cursor lớn nhất)`.
-   */
-  getElectricalHistoryPage: async (
-    nodeId: string,
-    params: { page: number; page_size: number }
-  ): Promise<IotArchivedSamplePagedResult> => {
-    const response = await apiClient.get<IotArchivedSamplePagedResult>(
-      `/iot/nodes/${encodeURIComponent(nodeId)}/electrical/history`,
-      { params: { ...params, sort_by: 'received_at' } }
-    )
-    return response.data
-  },
-
-  /** GET /api/v1/iot/nodes/{nodeId}/electrical/history?after=&limit= — dùng `next_cursor` làm `after` cho trang sau. */
-  getElectricalHistory: async (nodeId: string, after = 0, limit = 100): Promise<IotTelemetryPage> => {
-    const response = await apiClient.get<IotTelemetryPage>(
-      `/iot/nodes/${encodeURIComponent(nodeId)}/electrical/history`,
-      { params: { after, limit } }
-    )
     return response.data
   },
 

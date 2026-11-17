@@ -1057,3 +1057,9 @@ button:focus-visible {
   transform-origin: center;
   animation: electrical-chart-swap 600ms cubic-bezier(0.45, 0, 0.2, 1);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .electrical-chart-swap {
+    animation: none;
+  }
+}

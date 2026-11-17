@@ -1,5 +1,5 @@
 import type { FeederListItem } from '../../types/assets/feeders'
-import type { ElectricalMonitorTarget, MonitorFeeder } from '../../pages/gis-map/components/ElectricalMonitorDock'
+import type { ElectricalMonitorTarget, MonitorFeeder } from '../../pages/gis-map/components/ElectricalMonitorModal'
 import { findByIdOrRef } from '../assets/findByIdOrRef'
 
 const toMonitorFeeder = (f: FeederListItem): MonitorFeeder => ({
