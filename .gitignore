@@ -42,3 +42,4 @@ docs
 .agent/
 pipeline
 skills-lock.json
+.agy/
