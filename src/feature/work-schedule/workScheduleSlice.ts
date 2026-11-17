@@ -103,7 +103,14 @@ export interface WorkScheduleState {
   viewingPhaseIndex: number
   currentMonth: number // 0-indexed
   currentYear: number
-  filterPhase: 'all' | TaskKind | 'ended' | 'has_report' | 'has_cancel'
+  filterPhase:
+    | 'all'
+    | TaskKind
+    | 'ended'
+    | 'has_report'
+    | 'has_cancel'
+    | 'overdue_not_started'
+    | 'overdue_no_report'
 }
 
 const now = new Date()
@@ -221,6 +228,21 @@ export const workScheduleSlice = createSlice({
             }
             if (detail.materials_note) {
               p.materialsNote = detail.materials_note
+            }
+            if (detail.scheduled_date) {
+              p.date = detail.scheduled_date.substring(0, 10)
+            }
+            if (detail.due_date) {
+              p.dueDate = detail.due_date.substring(0, 10)
+            }
+            if (detail.assigned_to !== undefined) {
+              p.assigneeId = detail.assigned_to || ''
+              const matchedAssignee = state.assignees.find((a) => a.user_id === detail.assigned_to)
+              if (matchedAssignee?.full_name) {
+                p.assigneeName = matchedAssignee.full_name
+              } else if (!detail.assigned_to) {
+                p.assigneeName = 'Chưa phân công'
+              }
             }
             if (detail.wo_status) {
               p.rawStatus = detail.wo_status
