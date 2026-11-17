@@ -318,6 +318,68 @@ export const VN_ARCHIPELAGO_MASK: Polygon | MultiPolygon = {
   ],
 }
 
+// Nhãn 11 đặc khu đảo, toạ độ đảo chính lấy từ OpenStreetMap
+export const VN_SPECIAL_ZONE_LABELS: FeatureCollection<Point, { label: string }> = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU VÂN ĐỒN\n(Tỉnh Quảng Ninh)' },
+      geometry: { type: 'Point', coordinates: [107.4953, 21.1567] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU CÔ TÔ\n(Tỉnh Quảng Ninh)' },
+      geometry: { type: 'Point', coordinates: [107.7588, 20.9834] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU CÁT HẢI\n(TP. Hải Phòng)' },
+      geometry: { type: 'Point', coordinates: [107.0091, 20.7952] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU BẠCH LONG VĨ\n(TP. Hải Phòng)' },
+      geometry: { type: 'Point', coordinates: [107.7285, 20.1351] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU CỒN CỎ\n(Tỉnh Quảng Trị)' },
+      geometry: { type: 'Point', coordinates: [107.3398, 17.1584] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU LÝ SƠN\n(Tỉnh Quảng Ngãi)' },
+      geometry: { type: 'Point', coordinates: [109.1188, 15.3806] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU PHÚ QUÝ\n(Tỉnh Lâm Đồng)' },
+      geometry: { type: 'Point', coordinates: [108.9452, 10.5259] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU CÔN ĐẢO\n(TP. Hồ Chí Minh)' },
+      geometry: { type: 'Point', coordinates: [106.615, 8.7004] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU KIÊN HẢI\n(Tỉnh An Giang)' },
+      geometry: { type: 'Point', coordinates: [104.8427, 9.9633] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU PHÚ QUỐC\n(Tỉnh An Giang)' },
+      geometry: { type: 'Point', coordinates: [103.9574, 10.2288] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU THỔ CHÂU\n(Tỉnh An Giang)' },
+      geometry: { type: 'Point', coordinates: [103.4847, 9.3035] },
+    },
+  ],
+}
+
 export const SATELLITE_RASTER_PAINT = {
   'raster-opacity': 0.8,
   'raster-brightness-min': 0.04,
@@ -359,6 +421,10 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
     'vn-islands-labels': {
       type: 'geojson',
       data: VN_ARCHIPELAGO_LABELS,
+    },
+    'vn-special-zone-labels': {
+      type: 'geojson',
+      data: VN_SPECIAL_ZONE_LABELS,
     },
   },
   layers: [
@@ -741,6 +807,24 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       },
       metadata: {},
       filter: ['all', ['==', '$type', 'Point'], ['==', 'class', 'hospital'], ['has', 'name']],
+    },
+    {
+      id: 'VN special zone labels',
+      type: 'symbol',
+      source: 'vn-special-zone-labels',
+      minzoom: 6,
+      maxzoom: 9.5,
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-font': ['Noto Sans Bold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 6, 10, 9, 12],
+        'text-anchor': 'center',
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(0,0,0,0.8)',
+        'text-halo-width': 1.5,
+      },
     },
     {
       id: 'VN archipelago labels',
