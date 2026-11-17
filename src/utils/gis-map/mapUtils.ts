@@ -195,8 +195,8 @@ export const DEFAULT_MAP_ZOOM = 14.8
 // ==========================================
 // 1. GIỚI HẠN CAMERA TOÀN CỤC (GLOBAL MAP LIMITS)
 // ==========================================
-/** Mức zoom tối đa cho phép của bản đồ nền (tránh bể hạt ngói vệ tinh) */
-export const MAP_MAX_ZOOM = 20
+/** Mức zoom tối đa cho phép của bản đồ nền (ảnh vệ tinh MapTiler chỉ nét đến khoảng 17.5, sâu hơn bị nhòe) */
+export const MAP_MAX_ZOOM = 17.5
 
 /** Mức zoom tối thiểu mặc định toàn cục */
 export const MAP_DEFAULT_MIN_ZOOM = 6
@@ -275,8 +275,20 @@ export const FIT_BOUNDS_GIS_SEGMENT = {
 
 export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY || ''
 
+export const SATELLITE_RASTER_PAINT = {
+  'raster-opacity': 0.8,
+  'raster-brightness-min': 0.04,
+  'raster-brightness-max': 1,
+  'raster-contrast': 0.3,
+  'raster-saturation': 0.15,
+  'raster-hue-rotate': 0,
+} as const
+
+// Nền xanh nhạt đặt dưới ảnh vệ tinh (ảnh trong 80%) để bù sắc vàng của ảnh MapTiler.
+export const SATELLITE_WHITE_BALANCE_COLOR = '#a9c3e8'
+
 /**
- * Bản đồ Vệ Tinh Google Hybrid Sạch (Google Satellite + Tự Động Nạp Hoàng Sa & Trường Sa từ Google + MapTiler Vector Sạch trong đất liền - 0% Rác Quán Xá)
+ * Bản đồ vệ tinh MapTiler Hybrid có lớp cân bằng trắng khử vàng.
  */
 export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
   version: 8,
@@ -295,30 +307,19 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
     },
     satellite: {
       type: 'raster',
-      tiles: [
-        'https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-      ],
-      tileSize: 256,
+      tiles: [`https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}?key=${MAPTILER_KEY}`],
+      tileSize: 512,
       maxzoom: 22,
-      attribution: '&copy; Google Maps',
-    },
-    'google-vn-hybrid': {
-      type: 'raster',
-      tiles: [
-        'https://mt0.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}',
-        'https://mt1.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}',
-        'https://mt2.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}',
-        'https://mt3.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}',
-      ],
-      tileSize: 256,
-      maxzoom: 22,
-      attribution: '&copy; Google Maps',
+      attribution:
+        '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
     },
   },
   layers: [
+    {
+      id: 'Satellite white balance',
+      type: 'background',
+      paint: { 'background-color': SATELLITE_WHITE_BALANCE_COLOR },
+    },
     {
       id: 'Satellite',
       type: 'raster',
@@ -326,16 +327,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       minzoom: 0,
       maxzoom: 22,
       layout: { visibility: 'visible' },
-      paint: { 'raster-opacity': 1.0 },
-    },
-    {
-      id: 'google-vn-regional-hybrid',
-      type: 'raster',
-      source: 'google-vn-hybrid',
-      minzoom: 0,
-      maxzoom: 9.5,
-      layout: { visibility: 'visible' },
-      paint: { 'raster-opacity': 1.0 },
+      paint: { ...SATELLITE_RASTER_PAINT },
     },
     {
       id: 'Country border',
@@ -348,7 +340,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 3, 0.5, 9, 1.5, 22, 32],
       },
       filter: ['all', ['==', 'admin_level', 2], ['==', 'maritime', 0], ['==', 'disputed', 0]],
-      minzoom: 9.5,
+      minzoom: 0,
     },
     {
       id: 'Road labels',
@@ -402,7 +394,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       type: 'symbol',
       source: 'maptiler_planet',
       'source-layer': 'place',
-      minzoom: 9.5,
+      minzoom: 6,
       maxzoom: 16,
       layout: {
         'symbol-sort-key': ['to-number', ['get', 'rank']],
@@ -461,7 +453,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       type: 'symbol',
       source: 'maptiler_planet',
       'source-layer': 'place',
-      minzoom: 9.5,
+      minzoom: 4,
       maxzoom: 16,
       layout: {
         'symbol-sort-key': ['to-number', ['get', 'rank']],
@@ -486,7 +478,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       type: 'symbol',
       source: 'maptiler_planet',
       'source-layer': 'place',
-      minzoom: 9.5,
+      minzoom: 2,
       maxzoom: 12,
       layout: {
         'symbol-sort-key': ['to-number', ['get', 'rank']],
