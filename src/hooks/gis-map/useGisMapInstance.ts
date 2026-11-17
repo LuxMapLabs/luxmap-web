@@ -36,6 +36,8 @@ export function useGisMapInstance() {
       zoom: DEFAULT_MAP_ZOOM,
       minZoom: MAP_DEFAULT_MIN_ZOOM,
       maxZoom: MAP_MAX_ZOOM,
+      // Giữ nhiều ô bản đồ trong bộ nhớ: kéo/zoom quay lại chỗ vừa xem thì hiện ngay, không tải và giải mã lại
+      maxTileCacheSize: 200,
       attributionControl: false,
     })
 

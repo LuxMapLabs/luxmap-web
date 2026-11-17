@@ -196,8 +196,8 @@ export const DEFAULT_MAP_ZOOM = 14.8
 // ==========================================
 // 1. GIỚI HẠN CAMERA TOÀN CỤC (GLOBAL MAP LIMITS)
 // ==========================================
-/** Mức zoom tối đa cho phép của bản đồ nền (ảnh vệ tinh MapTiler chỉ nét đến khoảng 17.5, sâu hơn bị nhòe) */
-export const MAP_MAX_ZOOM = 17.5
+/** Mức zoom tối đa cho phép của bản đồ nền (ảnh vệ tinh MapTiler ở Việt Nam chỉ có chi tiết thật đến zoom 17, sâu hơn bị nhòe) */
+export const MAP_MAX_ZOOM = 17
 
 /** Mức zoom tối thiểu mặc định toàn cục */
 export const MAP_DEFAULT_MIN_ZOOM = 6
