@@ -8,6 +8,7 @@ import type {
   PoleMapDetail,
 } from '../../types/map/poles'
 import type { SegmentPropertiesFeatureCollection } from '../../types/map/segments'
+import type { CommunePropertiesFeatureCollection } from '../../types/map/communes'
 
 export interface MapPolesQueryParams {
   bbox: string
@@ -22,6 +23,15 @@ export interface MapCommonQueryParams {
 }
 
 export const mapAPI = {
+  /**
+   * Ranh giới (Polygon/MultiPolygon) các địa bàn của tài khoản
+   * GET /api/v1/map/communes
+   */
+  getCommuneBoundaries: async (): Promise<CommunePropertiesFeatureCollection> => {
+    const response = await apiClient.get<CommunePropertiesFeatureCollection>('/map/communes')
+    return response.data
+  },
+
   /**
    * Lấy FeatureCollection các cột điện trong bounding box
    * GET /api/v1/map/poles

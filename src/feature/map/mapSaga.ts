@@ -11,7 +11,11 @@ import type {
 } from '../../types/map/cabinets'
 import type { PolePropertiesFeatureCollection, PoleMapDetail } from '../../types/map/poles'
 import type { SegmentPropertiesFeatureCollection } from '../../types/map/segments'
+import type { CommunePropertiesFeatureCollection } from '../../types/map/communes'
 import {
+  fetchCommuneBoundariesRequest,
+  fetchCommuneBoundariesSuccess,
+  fetchCommuneBoundariesFailure,
   fetchMapLayersRequest,
   fetchMapLayersSuccess,
   fetchMapLayersFailure,
@@ -145,7 +149,20 @@ function* handleFetchPoleDetail(action: PayloadAction<string>) {
   }
 }
 
+/**
+ * Worker saga tải ranh giới các địa bàn của tài khoản; lỗi thì coi như chưa có ranh giới (dùng khung bbox)
+ */
+function* handleFetchCommuneBoundaries() {
+  try {
+    const res: CommunePropertiesFeatureCollection = yield call(mapAPI.getCommuneBoundaries)
+    yield put(fetchCommuneBoundariesSuccess(res.features || []))
+  } catch {
+    yield put(fetchCommuneBoundariesFailure())
+  }
+}
+
 export default function* mapSaga() {
+  yield takeLatest(fetchCommuneBoundariesRequest.type, handleFetchCommuneBoundaries)
   yield takeLatest(fetchMapLayersRequest.type, handleFetchMapLayers)
   yield takeLatest(fetchCabinetTopologyRequest.type, handleFetchCabinetTopology)
   yield takeLatest(fetchPoleDetailRequest.type, handleFetchPoleDetail)
