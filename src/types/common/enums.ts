@@ -41,10 +41,6 @@ export type LightingAckResult = 'applied' | 'failed'
 
 export type LightingCommandStatus = 'pending' | 'delivered' | 'applied' | 'failed' | 'expired' | 'superseded'
 
-export type LightingExclusionReason = 'not_wired' | 'remote_control_unsupported' | 'no_credential'
-
-export type LightingTargetKind = 'feeder' | 'segment'
-
 export type NodeRole = 'segment_controller'
 
 export type NodeStatus = 'online' | 'offline' | 'never_reported'

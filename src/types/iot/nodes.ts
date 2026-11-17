@@ -94,6 +94,7 @@ export interface IotDiagnosticResult {
     measurement?: IotMeasurement
     anomalies?: IotAnomaly[]
     lamp_count?: LampCountEstimate
+    sensor_health?: IotSensorHealth
 }
 
 export interface IotElectricalResult {
@@ -129,6 +130,11 @@ export interface IotNodeStatusPagedResult {
     items?: IotNodeStatus[]
 }
 
+export interface IotSensorHealth {
+    status?: string | null
+    received_at?: string | null
+}
+
 export interface IotTelemetryPage {
     items?: IotArchivedSample[]
     next_cursor?: number
@@ -145,6 +151,15 @@ export interface LampCountEstimate {
     votes?: Record<string, number>
     ambiguous_samples?: number
     outside_range_samples?: number
+    median_current_ma?: number
+    threshold_counts?: LampCountThresholdCounts
+}
+
+export interface LampCountThresholdCounts {
+    above_65_ma?: number
+    at_or_below_52_5_ma?: number
+    at_or_above_50_ma?: number
+    at_or_above_45_ma?: number
 }
 
 export interface NodeProfile {
@@ -160,6 +175,7 @@ export interface NodeProfile {
     off_current_limit_ma?: number
     max_silence_seconds?: number
     use_ten_lamp_calibration?: boolean
+    lamp_count_calibration?: string | null
 }
 
 export interface RegisterNodeRequest {
@@ -173,6 +189,7 @@ export interface RegisterNodeRequest {
     nominal_current_ma: number
     nominal_power_mw: number
     gateway_id?: string | null
+    lamp_count_calibration?: string | null
 }
 
 export interface RegisteredNode {
@@ -181,11 +198,5 @@ export interface RegisteredNode {
     device_id?: string | null
     feeder_id?: string | null
     gateway_id?: string | null
-}
-
-export interface RegisteredSource {
-    node_id?: string | null
-    server_id?: string | null
-    device_id?: string | null
 }
 
