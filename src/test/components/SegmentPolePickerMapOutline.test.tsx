@@ -114,11 +114,11 @@ describe('Bản đồ trong form tuyến: viền khung xã', () => {
 
     const data = map.sources['pick-commune-outline'].data as GeoJSON.Feature<GeoJSON.Polygon>
     expect(data.geometry.coordinates[0]).toEqual([
-      [106.45, 10.95],
-      [106.55, 10.95],
-      [106.55, 11.05],
       [106.45, 11.05],
+      [106.55, 11.05],
+      [106.55, 10.95],
       [106.45, 10.95],
+      [106.45, 11.05],
     ])
     expect(map.layers['pick-commune-outline']).toMatchObject({ type: 'line', source: 'pick-commune-outline' })
     // Lớp viền thêm trước lớp đường tuyến nên nằm dưới
