@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import {
   ElectricalMonitorModal,
   HISTORY_PAGE_SAMPLES,
@@ -12,7 +12,12 @@ import iotAPI from '../../feature/iot/iotAPI'
 import type { FeederListItem } from '../../types/assets/feeders'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
-  default: { getFeederElectricalHistory: vi.fn(), getFeederElectrical: vi.fn() },
+  default: {
+    getFeederElectricalHistory: vi.fn(),
+    getFeederElectrical: vi.fn(),
+    getNodes: vi.fn(),
+    getServers: vi.fn(),
+  },
 }))
 
 const api = vi.mocked(iotAPI)
@@ -35,10 +40,11 @@ const sample = (
 
 const target: ElectricalMonitorTarget = {
   title: 'Tủ A - Tỉnh Lộ 8',
+  cabinetId: 'CAB-TL8',
   feeders: [
-    { feeder_id: 'FDR-009', label: 'FDR-CAB-TL8-A', node_id: 'NODE-001' },
-    { feeder_id: 'FDR-010', label: 'FDR-CAB-TL8-B', node_id: 'NODE-002' },
-    { feeder_id: 'FDR-011', label: 'FDR-CAB-TL8-C', node_id: null },
+    { feeder_id: 'FDR-009', label: 'FDR-CAB-TL8-A', name: 'Mạch A - Tỉnh Lộ 8', node_id: 'NODE-001' },
+    { feeder_id: 'FDR-010', label: 'FDR-CAB-TL8-B', name: 'Mạch B - Tỉnh Lộ 8', node_id: 'NODE-002' },
+    { feeder_id: 'FDR-011', label: 'FDR-CAB-TL8-C', name: 'Mạch C - Tỉnh Lộ 8', node_id: null },
   ],
   activeFeederId: 'FDR-009',
 }
@@ -50,6 +56,8 @@ describe('ElectricalMonitorModal (popup giám sát điện tủ GIS)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     api.getFeederElectrical.mockResolvedValue({ status: 'online', power_state: 'on' })
+    api.getNodes.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 100 })
+    api.getServers.mockResolvedValue([])
     // Trang đầu: mới nhất trước.
     api.getFeederElectricalHistory.mockResolvedValue({
       page: 1,
@@ -145,17 +153,86 @@ describe('ElectricalMonitorModal (popup giám sát điện tủ GIS)', () => {
     expect(screen.queryByText('Mạch chưa có mẫu điện nào.')).not.toBeInTheDocument()
   })
 
-  it('shows one tab per feeder of the cabinet and switching tab reads that feeder node', async () => {
-    const onSelect = vi.fn()
-    const { rerender } = renderModal(target, onSelect)
-    expect(within(screen.getByRole('tablist', { name: 'Mạch' })).getAllByRole('tab').map((t) => t.textContent)).toEqual(['FDR-CAB-TL8-A', 'FDR-CAB-TL8-B', 'FDR-CAB-TL8-C'])
-    fireEvent.click(screen.getByRole('tab', { name: 'FDR-CAB-TL8-B' }))
-    expect(onSelect).toHaveBeenCalledWith('FDR-010')
+  it('displays the active feeder name in the feeder picker button with 3 feeders', () => {
+    renderModal(target)
+    const pickerBtn = screen.getByRole('button', { name: /Mạch A - Tỉnh Lộ 8/ })
+    expect(pickerBtn).toBeInTheDocument()
+    expect(pickerBtn).toHaveAttribute('aria-haspopup', 'listbox')
+    expect(pickerBtn).toHaveAttribute('aria-expanded', 'false')
+  })
 
-    rerender(<ElectricalMonitorModal target={{ ...target, activeFeederId: 'FDR-010' }} onSelectFeeder={onSelect} onClose={vi.fn()} />)
-    await waitFor(() =>
-      expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-010', { page: 1, page_size: HISTORY_PAGE_SAMPLES })
-    )
+  it('clicking › calls onSelectFeeder with the next feeder, and ‹ is disabled on the first feeder', () => {
+    const onSelect = vi.fn()
+    renderModal(target, onSelect)
+    const prevBtn = screen.getByRole('button', { name: 'Mạch trước' })
+    const nextBtn = screen.getByRole('button', { name: 'Mạch sau' })
+    expect(prevBtn).toBeDisabled()
+    expect(nextBtn).not.toBeDisabled()
+
+    fireEvent.click(nextBtn)
+    expect(onSelect).toHaveBeenCalledWith('FDR-010')
+  })
+
+  it('opens popover, filters with search input down to 1 item', () => {
+    renderModal(target)
+    const pickerBtn = screen.getByRole('button', { name: /Mạch A - Tỉnh Lộ 8/ })
+    fireEvent.click(pickerBtn)
+    expect(pickerBtn).toHaveAttribute('aria-expanded', 'true')
+
+    const searchInput = screen.getByRole('combobox')
+    expect(searchInput).toBeInTheDocument()
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(3)
+
+    fireEvent.change(searchInput, { target: { value: 'Mạch B' } })
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.getByRole('option')).toHaveTextContent('Mạch B - Tỉnh Lộ 8')
+  })
+
+  it('navigates with ArrowDown + Enter in search input to call onSelectFeeder', () => {
+    const onSelect = vi.fn()
+    renderModal(target, onSelect)
+    const pickerBtn = screen.getByRole('button', { name: /Mạch A - Tỉnh Lộ 8/ })
+    fireEvent.click(pickerBtn)
+
+    const searchInput = screen.getByRole('combobox')
+    fireEvent.keyDown(searchInput, { key: 'ArrowDown' })
+    fireEvent.keyDown(searchInput, { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledWith('FDR-010')
+  })
+
+  it('Escape closes popover without calling onClose, second Escape calls onClose', () => {
+    const onClose = vi.fn()
+    renderModal(target, vi.fn(), onClose)
+    const pickerBtn = screen.getByRole('button', { name: /Mạch A - Tỉnh Lộ 8/ })
+    fireEvent.click(pickerBtn)
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+
+    const searchInput = screen.getByRole('combobox')
+    fireEvent.keyDown(searchInput, { key: 'Escape' })
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders static text and no aria-haspopup="listbox" button when cabinet has only 1 feeder', () => {
+    const singleTarget: ElectricalMonitorTarget = {
+      title: 'Tủ 1 mạch',
+      cabinetId: 'CAB-1',
+      feeders: [
+        { feeder_id: 'FDR-001', label: 'FDR-CAB-1-L1', name: 'Mạch 1', node_id: 'NODE-001' },
+      ],
+      activeFeederId: 'FDR-001',
+    }
+    renderModal(singleTarget)
+    expect(screen.queryByRole('button', { name: 'Mạch trước' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mạch sau' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Mạch 1/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Mạch 1')).toBeInTheDocument()
+    expect(document.querySelector('[aria-haspopup="listbox"]')).toBeNull()
   })
 
   it('a feeder without an IoT node (FDR-011) calls API and does not poll', async () => {
@@ -378,9 +455,10 @@ describe('buildMonitorTarget', () => {
   it('lists every feeder of the same cabinet as tabs and opens on the asked feeder', () => {
     const t = buildMonitorTarget('FDR-010', feeders)
     expect(t.title).toBe('Tủ CAB-1')
+    expect(t.cabinetId).toBe('CAB-1')
     expect(t.feeders).toEqual([
-      { feeder_id: 'FDR-009', label: 'FDR-CAB-A1', node_id: 'NODE-001' },
-      { feeder_id: 'FDR-010', label: 'FDR-CAB-A2', node_id: null },
+      { feeder_id: 'FDR-009', label: 'FDR-CAB-A1', name: '', node_id: 'NODE-001' },
+      { feeder_id: 'FDR-010', label: 'FDR-CAB-A2', name: '', node_id: null },
     ])
     expect(t.activeFeederId).toBe('FDR-010')
   })
@@ -393,7 +471,8 @@ describe('buildMonitorTarget', () => {
     expect(buildMonitorTarget('FDR-010', feeders, 'NODE-X').feeders[1].node_id).toBe('NODE-X')
     expect(buildMonitorTarget('FDR-404', feeders, 'NODE-Y')).toEqual({
       title: 'Mạch FDR-404',
-      feeders: [{ feeder_id: 'FDR-404', label: 'FDR-404', node_id: 'NODE-Y' }],
+      cabinetId: null,
+      feeders: [{ feeder_id: 'FDR-404', label: 'FDR-404', name: '', node_id: 'NODE-Y' }],
       activeFeederId: 'FDR-404',
     })
   })
