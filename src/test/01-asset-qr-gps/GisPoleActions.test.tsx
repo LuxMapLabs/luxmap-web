@@ -9,8 +9,7 @@ vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
     getPoleControl: vi.fn(() => Promise.resolve(null)),
     sendCommand: vi.fn(),
-    getElectricalHistory: vi.fn(() => new Promise(() => {})),
-    getElectricalHistoryPage: vi.fn(() => new Promise(() => {})),
+    getFeederElectricalHistory: vi.fn(() => new Promise(() => {})),
     getCommandHistory: vi.fn(() => Promise.resolve({ items: [] })),
   },
 }))

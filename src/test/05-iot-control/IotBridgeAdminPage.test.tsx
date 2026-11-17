@@ -16,7 +16,7 @@ vi.mock('../../feature/iot/iotAPI', () => ({
     registerNode: vi.fn(),
     getGatewayRoutes: vi.fn(),
     getElectrical: vi.fn(),
-    getElectricalHistory: vi.fn(),
+    getFeederElectricalHistory: vi.fn(),
     getDiagnostics: vi.fn(),
   },
 }))
@@ -226,7 +226,7 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
     expect(await screen.findByText('Còn dòng khi lệnh OFF (mA)')).toBeInTheDocument()
     expect(screen.queryByText('Lịch sử điện')).not.toBeInTheDocument()
     expect(screen.queryByText('Lịch sử lệnh')).not.toBeInTheDocument()
-    expect(api.getElectricalHistory).not.toHaveBeenCalled()
+    expect(api.getFeederElectricalHistory).not.toHaveBeenCalled()
   })
 
   it('shows the backend error message when the source is not configured (503)', async () => {
