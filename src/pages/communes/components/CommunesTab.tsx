@@ -6,7 +6,6 @@ import {
   X,
   MapPin,
   Compass,
-  Maximize2,
   Globe,
   Calendar,
   Edit2,
@@ -17,7 +16,9 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import type { RootState } from '../../../redux/rootReducer'
+import type { Geometry } from '../../../types/common/base'
 import type {
+  CommuneBbox,
   CommuneItem,
   CreateCommuneRequest,
   UpdateCommuneRequest,
@@ -26,10 +27,13 @@ import {
   fetchCommunesRequest,
   createCommuneRequest,
   updateCommuneRequest,
+  fetchCommuneBoundaryRequest,
+  clearCommuneBoundary,
   setCommuneFilters,
   setCommunePage,
 } from '../../../feature/communes/communeSlice'
-import { CommuneBboxMap } from './CommuneBboxMap'
+import { CommuneBoundaryMap } from './CommuneBoundaryMap'
+import { bboxToGeometry } from '../../../utils/communeBoundary'
 import { CommuneFormModal } from './CommuneFormModal'
 import { CommuneDetailModal } from './CommuneDetailModal'
 
@@ -43,6 +47,8 @@ export const CommunesTab: React.FC = () => {
     isLoading,
     isSubmitting,
     filters,
+    boundary,
+    isLoadingBoundary,
   } = useSelector((state: RootState) => state.adminCommunes)
 
   // Local state modals & Selected commune for live map preview
@@ -120,6 +126,20 @@ export const CommunesTab: React.FC = () => {
     return filteredCommunes[0] || null
   }, [filteredCommunes, selectedCommuneId])
 
+  // Bản đồ xem trước vẽ ranh giới của địa bàn đang chọn; tải lại sau khi đóng form hoặc khi địa bàn vừa được lưu
+  const previewCommuneId = activeCommune?.commune_id
+  const previewUpdatedAt = activeCommune?.updated_at
+  useEffect(() => {
+    if (previewCommuneId && !isFormModalOpen) dispatch(fetchCommuneBoundaryRequest(previewCommuneId))
+  }, [dispatch, previewCommuneId, previewUpdatedAt, isFormModalOpen])
+
+  // Xã chưa có ranh giới thì vẽ khung cũ như một polygon; giữ nguyên tham chiếu để bản đồ không nạp lại mỗi lần render
+  const previewBbox = activeCommune?.bbox
+  const previewBoundary = useMemo(
+    () => (isLoadingBoundary ? null : (boundary ?? bboxToGeometry(previewBbox))),
+    [isLoadingBoundary, boundary, previewBbox]
+  )
+
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '—'
     try {
@@ -134,17 +154,40 @@ export const CommunesTab: React.FC = () => {
     }
   }
 
-  const handleCreateSubmit = (payload: { name: string; bbox?: any }) => {
-    dispatch(createCommuneRequest(payload as CreateCommuneRequest))
+  const openCreateForm = () => {
+    dispatch(clearCommuneBoundary())
+    setEditingCommune(null)
+    setIsFormModalOpen(true)
+  }
+
+  // Mở form sửa: tải ranh giới đang lưu của địa bàn để vẽ lên bản đồ
+  const openEditForm = (commune: CommuneItem) => {
+    if (commune.commune_id) dispatch(fetchCommuneBoundaryRequest(commune.commune_id))
+    setEditingCommune(commune)
+    setIsFormModalOpen(true)
+  }
+
+  const handleCreateSubmit = (payload: {
+    name: string
+    bbox?: CommuneBbox | null
+    boundary?: Geometry | null
+  }) => {
+    const { boundary, ...data } = payload
+    dispatch(createCommuneRequest({ data: data as CreateCommuneRequest, boundary }))
     setIsFormModalOpen(false)
   }
 
-  const handleEditSubmit = (payload: { name: string; bbox?: any }) => {
+  const handleEditSubmit = (payload: {
+    name: string
+    bbox?: CommuneBbox | null
+    boundary?: Geometry | null
+  }) => {
     if (!editingCommune?.commune_id) return
     dispatch(
       updateCommuneRequest({
         id: editingCommune.commune_id,
-        data: payload as UpdateCommuneRequest,
+        data: { name: payload.name, bbox: payload.bbox } as UpdateCommuneRequest,
+        boundary: payload.boundary,
       })
     )
     setIsFormModalOpen(false)
@@ -203,7 +246,7 @@ export const CommunesTab: React.FC = () => {
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              Có BBox ({hasBboxCount})
+              Có ranh giới ({hasBboxCount})
             </button>
             <button
               type="button"
@@ -222,8 +265,7 @@ export const CommunesTab: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              setEditingCommune(null)
-              setIsFormModalOpen(true)
+              openCreateForm()
             }}
             className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 active:scale-95 text-white font-semibold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
           >
@@ -269,14 +311,13 @@ export const CommunesTab: React.FC = () => {
                 <Compass className="w-8 h-8 text-slate-300 mx-auto" />
                 <p className="font-bold text-slate-600">Không tìm thấy địa bàn phù hợp</p>
                 <p className="text-[11px] text-slate-400">
-                  Thử thay đổi từ khóa tìm kiếm hoặc thiết lập lại bộ lọc trạng thái BBox.
+                  Thử thay đổi từ khóa tìm kiếm hoặc thiết lập lại bộ lọc trạng thái ranh giới.
                 </p>
               </div>
             ) : (
               filteredCommunes.map((item) => {
                 const isSelected = item.commune_id === activeCommune?.commune_id
                 const hasBbox = Boolean(item.bbox)
-                const bbox = item.bbox
 
                 return (
                   <div
@@ -297,12 +338,12 @@ export const CommunesTab: React.FC = () => {
                       {hasBbox ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
                           <CheckCircle2 className="w-3 h-3 text-emerald-700 shrink-0" />
-                          <span>Đã có BBox</span>
+                          <span>Đã có ranh giới</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
                           <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
-                          <span>Chưa có BBox</span>
+                          <span>Chưa có ranh giới</span>
                         </span>
                       )}
                     </div>
@@ -325,11 +366,9 @@ export const CommunesTab: React.FC = () => {
                     {/* Tọa độ tóm tắt */}
                     <div className="p-2 rounded-lg bg-slate-50/80 border border-slate-200/70 text-[10.5px] font-mono text-slate-600 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400 font-sans">BBox:</span>
-                        {hasBbox && bbox && typeof bbox.min_lng === 'number' ? (
-                          <span className="font-medium text-emerald-800">
-                            [{bbox.min_lng.toFixed(2)}, {bbox.min_lat?.toFixed(2)}] → [{bbox.max_lng?.toFixed(2)}, {bbox.max_lat?.toFixed(2)}]
-                          </span>
+                        <span className="text-slate-400 font-sans">Ranh giới:</span>
+                        {hasBbox ? (
+                          <span className="font-medium text-emerald-800">Đã thiết lập</span>
                         ) : (
                           <span className="text-amber-700">Chưa thiết lập</span>
                         )}
@@ -362,14 +401,13 @@ export const CommunesTab: React.FC = () => {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setEditingCommune(item)
-                          setIsFormModalOpen(true)
+                          openEditForm(item)
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 text-[11px] font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs active:scale-95"
-                        title="Chỉnh sửa và vẽ lại khung BBox"
+                        title="Chỉnh sửa và vẽ lại ranh giới"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
-                        <span>Sửa BBox</span>
+                        <span>Sửa ranh giới</span>
                       </button>
                     </div>
                   </div>
@@ -440,12 +478,12 @@ export const CommunesTab: React.FC = () => {
                       {activeCommune.bbox ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs shrink-0">
                           <CheckCircle2 className="w-3 h-3 text-emerald-700 shrink-0" />
-                          <span>Đã có BBox</span>
+                          <span>Đã có ranh giới</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs shrink-0">
                           <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
-                          <span>Chưa có BBox</span>
+                          <span>Chưa có ranh giới</span>
                         </span>
                       )}
                     </div>
@@ -464,28 +502,18 @@ export const CommunesTab: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        setEditingCommune(activeCommune)
-                        setIsFormModalOpen(true)
+                        openEditForm(activeCommune)
                       }}
                       className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 active:scale-95 text-white font-semibold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
-                      <span>Sửa BBox</span>
+                      <span>Sửa ranh giới</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Tầng 2: Thông số GIS phụ thoáng đãng, chống dồn ép */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono text-slate-500 pt-1 border-t border-slate-200/60">
-                  {activeCommune.bbox && (
-                    <span className="flex items-center gap-1.5">
-                      <Maximize2 className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-slate-400 font-sans">BBox:</span>
-                      <strong className="font-medium text-slate-700">
-                        [{activeCommune.bbox.min_lng?.toFixed(2)}, {activeCommune.bbox.min_lat?.toFixed(2)}] → [{activeCommune.bbox.max_lng?.toFixed(2)}, {activeCommune.bbox.max_lat?.toFixed(2)}]
-                      </strong>
-                    </span>
-                  )}
                   {activeCommune.center?.lat && (
                     <span className="flex items-center gap-1.5">
                       <Globe className="w-3.5 h-3.5 text-slate-400" />
@@ -504,17 +532,11 @@ export const CommunesTab: React.FC = () => {
 
               {/* Khung bản đồ vệ tinh MapLibre trực tiếp */}
               <div className="w-full flex-1 relative bg-slate-900">
-                <CommuneBboxMap
+                <CommuneBoundaryMap
                   key={activeCommune.commune_id || 'none'}
-                  bbox={activeCommune.bbox}
-                  communeName={activeCommune.name || ''}
-                  readOnly={true}
+                  boundary={previewBoundary}
+                  readOnly
                   height="100%"
-                  initialCenter={
-                    activeCommune.center?.lat && activeCommune.center?.lng
-                      ? [activeCommune.center.lng, activeCommune.center.lat]
-                      : undefined
-                  }
                 />
               </div>
             </>
@@ -535,6 +557,8 @@ export const CommunesTab: React.FC = () => {
         isOpen={isFormModalOpen}
         isSubmitting={isSubmitting}
         commune={editingCommune}
+        initialBoundary={boundary}
+        isLoadingBoundary={isLoadingBoundary}
         onClose={() => {
           setIsFormModalOpen(false)
           setEditingCommune(null)
@@ -548,8 +572,7 @@ export const CommunesTab: React.FC = () => {
         onClose={() => setViewingCommune(null)}
         onEdit={(commune) => {
           setViewingCommune(null)
-          setEditingCommune(commune)
-          setIsFormModalOpen(true)
+          openEditForm(commune)
         }}
       />
     </div>
