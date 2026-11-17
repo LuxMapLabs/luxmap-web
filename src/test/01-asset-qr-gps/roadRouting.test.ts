@@ -40,6 +40,21 @@ describe('roadLinesFromFeatures: chỉ lấy đường xe chạy được', () =
     ])
     expect(lines).toHaveLength(3)
   })
+
+  it('bỏ đường đang xây (construction: true), giữ đường bình thường', () => {
+    const lines = roadLinesFromFeatures([
+      {
+        geometry: { type: 'LineString', coordinates: [at(0, 0), at(10, 0)] },
+        properties: { class: 'primary', construction: true },
+      },
+      {
+        geometry: { type: 'LineString', coordinates: [at(0, 5), at(10, 5)] },
+        properties: { class: 'primary' },
+      },
+    ])
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toEqual([at(0, 5), at(10, 5)])
+  })
 })
 
 describe('routeAlongRoads: tìm đoạn dọc theo đường giữa hai điểm bấm', () => {

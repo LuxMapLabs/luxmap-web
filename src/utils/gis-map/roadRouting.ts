@@ -1,7 +1,7 @@
 import { calculateRouteLengthMeters } from './routeUtils'
 
 /**
- * Lấy hình tuyến theo đường có sẵn trên bản đồ nền (lớp `transportation` của MapTiler / OpenMapTiles, dữ liệu
+ * Lấy hình tuyến theo đường có sẵn trên bản đồ nền (lớp `road` của MapTiler Planet v4, dữ liệu
  * © OpenStreetMap). Bản đồ nền tới trình duyệt dưới dạng từng ô: một con đường bị cắt ở mép ô thành nhiều mẩu,
  * mẩu của ô này lấn sang ô kia một chút. Ở đây ghép các mẩu lại thành mạng đường rồi tìm đoạn ngắn nhất dọc
  * theo đường giữa hai điểm người dùng bấm.
@@ -40,10 +40,11 @@ interface RoadFeatureLike {
   properties?: Record<string, unknown> | null
 }
 
-/** Nét đường xe chạy được trong các feature của lớp `transportation`; MultiLineString tách thành từng nét. */
+/** Nét đường xe chạy được trong các feature của lớp `road`; MultiLineString tách thành từng nét. */
 export const roadLinesFromFeatures = (features: ReadonlyArray<RoadFeatureLike>): LngLat[][] => {
   const lines: LngLat[][] = []
   for (const f of features) {
+    if (f.properties?.construction === true) continue
     if (!ROAD_CLASSES.has(String(f.properties?.class ?? ''))) continue
     const g = f.geometry
     if (g.type === 'LineString') lines.push(g.coordinates as LngLat[])

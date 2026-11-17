@@ -3,9 +3,9 @@ import { ROAD_CLASS_LIST, roadLinesFromFeatures, type LngLat } from '../../utils
 import { MIN_ROAD_ZOOM } from '../../utils/gis-map/segmentReshape'
 import { GOOGLE_HYBRID_STYLE } from '../../utils/gis-map/mapUtils'
 
-/** Nguồn và lớp đường của bản đồ nền (`GOOGLE_HYBRID_STYLE`, lược đồ OpenMapTiles). */
+/** Nguồn và lớp đường của bản đồ nền (`GOOGLE_HYBRID_STYLE`, MapTiler Planet v4). */
 const BASE_MAP_SOURCE = 'maptiler_planet'
-const ROAD_SOURCE_LAYER = 'transportation'
+const ROAD_SOURCE_LAYER = 'road'
 /**
  * Nguồn riêng cho nét đường (cùng URL ô với bản đồ nền, ép `maxzoom` 14). Đọc thẳng nguồn nền thì ở zoom 16 - 16.9 ô phóng to
  * trả về rỗng: lớp vàng và cú bấm theo đường mất đúng mức đó (đo trên Chrome); nguồn riêng thì đủ ở mọi mức.
@@ -37,7 +37,7 @@ export const showRoadHint = (map: maplibregl.Map) => {
         source: ROAD_SOURCE,
         'source-layer': ROAD_SOURCE_LAYER,
         minzoom: MIN_ROAD_ZOOM,
-        filter: ['in', ['get', 'class'], ['literal', ROAD_CLASS_LIST]],
+        filter: ['all', ['in', ['get', 'class'], ['literal', ROAD_CLASS_LIST]], ['!=', ['get', 'construction'], true]],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#facc15',
