@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { X, Edit3, Calendar, User, MapPin, FileText, Wrench, Loader2 } from 'lucide-react'
+import { X, Edit3, Calendar, User, MapPin, FileText, Wrench, Loader2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ScheduleCase, SchedulePhase } from '../../../feature/work-schedule/workScheduleSlice'
 import type { WorkOrderAssignee } from '../../../types/workorders/orders'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
+import { getPhaseOverdueInfo, getLocalTodayYmd } from '../../../utils/work-schedule/scheduleRules'
 
 interface EditScheduleModalProps {
   isOpen: boolean
@@ -35,12 +36,18 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const [materialsNote, setMaterialsNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const todayYmd = getLocalTodayYmd()
+  const overdueInfo = getPhaseOverdueInfo(currentPhase, caseItem?.isTerminated, undefined, todayYmd)
+  const isScheduledDateLocked = overdueInfo.isOverdue
+
   useEffect(() => {
     if (isOpen && currentPhase && caseItem) {
+      const todayStr = getLocalTodayYmd()
       setTitle(caseItem.title || 'Lệnh công tác')
-      const initialDate = currentPhase.date || new Date().toISOString().substring(0, 10)
+      const initialDate = currentPhase.date || todayStr
       setScheduledDate(initialDate)
-      setDueDate(currentPhase.dueDate || initialDate)
+      const currentDue = currentPhase.dueDate || initialDate
+      setDueDate(currentDue < todayStr ? todayStr : currentDue)
       setAssigneeId(currentPhase.assigneeId || assignees[0]?.user_id || '')
       setMaterialsNote(currentPhase.materialsNote || '')
     }
@@ -63,6 +70,11 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
     if (dueDate && dueDate < scheduledDate) {
       toast.warning('Hạn chót hoàn thành không được trước ngày thực hiện!')
+      return
+    }
+
+    if (isScheduledDateLocked && dueDate < todayYmd) {
+      toast.warning('Vui lòng chọn hạn chót hoàn thành từ ngày hôm nay trở đi để gia hạn phiếu quá hạn!')
       return
     }
 
@@ -148,19 +160,36 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             />
           </div>
 
+          {/* Thông báo khóa Ngày thực hiện khi phiếu đã quá hạn */}
+          {isScheduledDateLocked && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <strong>Phiếu đã quá hạn ({overdueInfo.overdueDays} ngày):</strong> Ô{' '}
+                <strong>Ngày thực hiện</strong> được khóa cố định để giữ nguyên lịch sử giao ca trên bảng lịch. Quản lý chỉ cần cập nhật{' '}
+                <strong>Hạn chót hoàn thành mới</strong> (và đổi Kỹ sư phụ trách nếu cần).
+              </div>
+            </div>
+          )}
+
           {/* Ngày thực hiện & Hạn chót */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                Ngày thực hiện (*)
+                {isScheduledDateLocked ? 'Ngày thực hiện (Đã khóa)' : 'Ngày thực hiện (*)'}
               </label>
               <input
                 type="date"
                 required
+                disabled={isScheduledDateLocked}
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition cursor-pointer"
+                className={`w-full px-3.5 py-2.5 border rounded-xl text-xs font-semibold outline-none transition ${
+                  isScheduledDateLocked
+                    ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed select-none'
+                    : 'bg-slate-50 border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer'
+                }`}
               />
             </div>
 
@@ -172,7 +201,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               <input
                 type="date"
                 required
-                min={scheduledDate}
+                min={isScheduledDateLocked ? todayYmd : scheduledDate}
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition cursor-pointer"

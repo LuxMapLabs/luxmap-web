@@ -71,6 +71,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   const { segments: storeSegments, isLoadingAssets, loadAssetsError } = useSelector(
     (state: RootState) => state.assets
   )
+  const segmentNames = useSelector((state: RootState) => state.workSchedule.segmentNames)
 
   const [initPhase, setInitPhase] = useState<TaskKind>(initialPhase || 'survey')
   const [title, setTitle] = useState(initialTitle || '')
@@ -87,17 +88,24 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   const prevPhaseRef = React.useRef(initPhase)
 
   const segmentsList = useMemo(() => {
-    return storeSegments
-      .filter((s) => Boolean(s.segment_id))
-      .map((s) => `${s.segment_name || s.segment_id} (${s.segment_id})`)
-  }, [storeSegments])
+    if (storeSegments.length > 0) {
+      return storeSegments
+        .filter((s) => Boolean(s.segment_id))
+        .map((s) => `${s.segment_name || s.segment_id} (${s.segment_id})`)
+    }
+    const entries = Object.entries(segmentNames || {})
+    if (entries.length > 0) {
+      return entries.map(([id, name]) => `${name || id} (${id})`)
+    }
+    return []
+  }, [storeSegments, segmentNames])
 
   // Tải danh sách tuyến đường & cột từ Redux Saga khi mở modal
   useEffect(() => {
-    if (isOpen && storeSegments.length === 0 && !isLoadingAssets && !loadAssetsError) {
+    if (isOpen && storeSegments.length === 0 && !isLoadingAssets) {
       dispatch(fetchAssetsRequest())
     }
-  }, [isOpen, storeSegments.length, isLoadingAssets, loadAssetsError, dispatch])
+  }, [isOpen, storeSegments.length, isLoadingAssets, dispatch])
 
   // Đồng bộ tuyến đường mặc định khi danh sách tuyến đã tải xong
   useEffect(() => {
@@ -418,7 +426,16 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 showTriggerBadge={false}
                 options={
                   segmentsList.length === 0
-                    ? [{ value: '', label: 'Đang tải danh sách tuyến...' }]
+                    ? [
+                        {
+                          value: '',
+                          label: isLoadingAssets
+                            ? 'Đang tải danh sách tuyến...'
+                            : loadAssetsError
+                              ? 'Không tải được danh sách tuyến'
+                              : 'Chưa có tuyến đường trong địa bàn',
+                        },
+                      ]
                     : segmentsList.map((s) => ({
                         value: s,
                         label: s,
