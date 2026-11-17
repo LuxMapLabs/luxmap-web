@@ -11,6 +11,8 @@ vi.mock('../../feature/iot/iotAPI', () => ({
     sendCommand: vi.fn(),
     getFeederElectricalHistory: vi.fn(() => new Promise(() => {})),
     getCommandHistory: vi.fn(() => Promise.resolve({ items: [] })),
+    getNodes: vi.fn(() => Promise.resolve({ total: 0, items: [] })),
+    getServers: vi.fn(() => Promise.resolve([])),
   },
 }))
 
@@ -83,7 +85,12 @@ const POLE_ITEM: PoleListItem = {
   updated_at: null,
 }
 
-const setup = (role: string, overrides: Partial<GisDrawerPanelProps> = {}, detail: PoleMapDetail = DETAIL) => {
+const setup = (
+  role: string,
+  overrides: Partial<GisDrawerPanelProps> = {},
+  detail: PoleMapDetail = DETAIL,
+  assetsOverrides: Record<string, unknown> = {}
+) => {
   const dispatched: Action[] = []
   const recorder: Middleware = () => (next) => (action) => {
     dispatched.push(action as Action)
@@ -95,7 +102,15 @@ const setup = (role: string, overrides: Partial<GisDrawerPanelProps> = {}, detai
   })
   store.dispatch(loginSuccess({ user: { user_id: 'U-1', username: 'u', role } as unknown as CurrentUserResponse }))
   store.dispatch(fetchPoleDetailSuccess(detail))
-  store.dispatch(fetchAssetsSuccess({ poles: [POLE_ITEM], cabinets: [], segments: [], feeders: [] } as never))
+  store.dispatch(
+    fetchAssetsSuccess({
+      poles: [POLE_ITEM],
+      cabinets: [],
+      segments: [],
+      feeders: [],
+      ...assetsOverrides,
+    } as never)
+  )
 
   const props: GisDrawerPanelProps = {
     selectedPole: POLE,
@@ -432,6 +447,100 @@ describe('Khung mạch điện: Bật / Tắt / AUTO gửi POST /iot/nodes/{node
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(iotAPI.sendCommand).not.toHaveBeenCalled()
+  })
+})
+
+describe('Khung tủ điện: danh sách mạch thu gọn, bấm mới mở chi tiết và gọi lịch sử điện', () => {
+  it('tủ 3 mạch có node: mã node hiện đủ, không gọi điện trước khi bấm, bấm mở mạch và nút Biểu đồ, bấm mạch khác thì mạch trước đóng', async () => {
+    vi.mocked(iotAPI.getNodes).mockResolvedValue({
+      total: 3,
+      items: [
+        { node_id: 'IOT-NODE-001', cabinet_id: 'CAB-001', server_id: 'iot-server-01', status: 'online' },
+        { node_id: 'IOT-NODE-002', cabinet_id: 'CAB-001', server_id: 'iot-server-01', status: 'online' },
+        { node_id: 'IOT-NODE-003', cabinet_id: 'CAB-001', server_id: 'iot-server-01', status: 'offline' },
+      ],
+    })
+    vi.mocked(iotAPI.getServers).mockResolvedValue([
+      { server_id: 'iot-server-01', status: 'online' },
+      { server_id: 'iot-server-99', status: 'offline' },
+    ])
+    vi.mocked(iotAPI.getFeederElectricalHistory).mockClear()
+
+    setup(
+      'manager',
+      {
+        selectedPole: null,
+        selectedCabinet: {
+          cabinet_id: 'CAB-001',
+          cabinet_name: 'Tủ A',
+          external_ref: 'CAB-001',
+          segment_name: 'Tuyến 1',
+          feeders: [
+            { feeder_id: 'FDR-001', power_state: 'on' },
+            { feeder_id: 'FDR-002', power_state: 'on' },
+            { feeder_id: 'FDR-003', power_state: 'off' },
+          ],
+        },
+        onOpenElectricalMonitor: vi.fn(),
+      },
+      DETAIL,
+      {
+        feeders: [
+          {
+            feeder_id: 'FDR-001',
+            external_ref: 'FDR-001',
+            feeder_name: 'Mạch 1 - Lộ 1',
+            control: { node_id: 'IOT-NODE-001', relay_no: 1, control_mode: 'auto' },
+          },
+          {
+            feeder_id: 'FDR-002',
+            external_ref: 'FDR-002',
+            feeder_name: 'Mạch 2 - Lộ 2',
+            control: { node_id: 'IOT-NODE-002', relay_no: 1, control_mode: 'auto' },
+          },
+          {
+            feeder_id: 'FDR-003',
+            external_ref: 'FDR-003',
+            feeder_name: 'Mạch 3 - Lộ 3',
+            control: { node_id: 'IOT-NODE-003', relay_no: 1, control_mode: 'auto' },
+          },
+        ],
+      }
+    )
+
+    // Dòng Gateway hiện iot-server-01 (không hiện iot-server-99 vì không thuộc node nào của tủ)
+    expect(await screen.findByText('iot-server-01')).toBeInTheDocument()
+    expect(screen.queryByText('iot-server-99')).not.toBeInTheDocument()
+
+    // Mã node hiện đủ cả 3 node không bị cắt và nhãn ngắn hiển thị
+    expect(screen.getByText('IOT-NODE-001')).toBeInTheDocument()
+    expect(screen.getByText('IOT-NODE-002')).toBeInTheDocument()
+    expect(screen.getByText('IOT-NODE-003')).toBeInTheDocument()
+    expect(screen.getAllByText('online').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('mất tín hiệu')).toBeInTheDocument()
+
+    // Trước khi bấm, getFeederElectricalHistory KHÔNG được gọi và không thấy nút Biểu đồ
+    expect(iotAPI.getFeederElectricalHistory).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /Biểu đồ/ })).not.toBeInTheDocument()
+
+    // Bấm dòng mạch 1 -> aria-expanded="true" và thấy nút "Biểu đồ" cùng mã mạch FDR-001
+    const btn1 = screen.getByRole('button', { name: /Mạch 1 - Lộ 1/ })
+    expect(btn1).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(btn1)
+
+    expect(btn1).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /Biểu đồ/ })).toBeInTheDocument()
+    expect(within(document.getElementById('feeder-detail-FDR-001')!).getByText('FDR-001')).toBeInTheDocument()
+
+    // Bấm mạch 2 -> mạch 1 đóng, mạch 2 mở
+    const btn2 = screen.getByRole('button', { name: /Mạch 2 - Lộ 2/ })
+    expect(btn2).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(btn2)
+
+    expect(btn1).toHaveAttribute('aria-expanded', 'false')
+    expect(btn2).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById('feeder-detail-FDR-001')).toBeNull()
+    expect(document.getElementById('feeder-detail-FDR-002')).not.toBeNull()
   })
 })
 

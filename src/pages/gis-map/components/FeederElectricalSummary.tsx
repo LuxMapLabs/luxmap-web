@@ -39,7 +39,7 @@ export const FeederElectricalSummary: React.FC<{
           <Radio className="w-3 h-3 text-indigo-500 shrink-0" />
           {nodeId ? (
             <>
-              <span className="font-mono truncate">{nodeId}</span>
+              <span className="font-mono whitespace-nowrap shrink-0">{nodeId}</span>
               {latest && <span className="shrink-0">· {new Date(latest.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>}
             </>
           ) : (
