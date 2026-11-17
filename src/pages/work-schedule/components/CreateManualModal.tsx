@@ -11,6 +11,7 @@ import { FaultSelector } from './FaultSelector'
 import { GpsPoleSelector } from './GpsPoleSelector'
 import { extractSegmentId } from '../../../utils/work-schedule/poleUtils'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
+import { LateNightScheduleWarning } from './LateNightScheduleWarning'
 
 interface CreateManualModalProps {
   isOpen: boolean
@@ -523,6 +524,10 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="p-2.5 rounded-xl text-xs font-bold outline-none transition-all bg-slate-50 border border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              />
+              <LateNightScheduleWarning
+                selectedDate={date}
+                onSwitchToTomorrow={(tomorrow) => setDate(tomorrow)}
               />
             </div>
 

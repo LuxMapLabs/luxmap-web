@@ -376,7 +376,6 @@ export const WorkSchedulePage: React.FC = () => {
         ? poleIds
         : selectedCase?.poleIds ||
           currentPhase?.poleIds ||
-          currentPhase?.report?.aiDetections?.map((d) => d.poleId) ||
           []
 
     setNextPhaseContext({

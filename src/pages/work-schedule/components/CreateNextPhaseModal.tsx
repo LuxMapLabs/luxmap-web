@@ -4,6 +4,7 @@ import type { TaskKind } from '../../../types/common/enums'
 import type { WorkOrderAssignee } from '../../../types/workorders/orders'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
+import { LateNightScheduleWarning } from './LateNightScheduleWarning'
 
 interface CreateNextPhaseModalProps {
   isOpen: boolean
@@ -226,6 +227,10 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
                 onChange={(e) => setDate(e.target.value)}
                 required
                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <LateNightScheduleWarning
+                selectedDate={date}
+                onSwitchToTomorrow={(tomorrow) => setDate(tomorrow)}
               />
             </div>
 

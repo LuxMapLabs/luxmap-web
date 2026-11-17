@@ -3,7 +3,6 @@ import {
   X,
   Video,
   Camera,
-  Cpu,
   Gauge,
   Wrench,
   Maximize2,
@@ -70,6 +69,46 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const [backendEvidence, setBackendEvidence] = useState<EvidenceItem[]>([])
   const [poles, setPoles] = useState<WorkOrderPole[]>([])
   const [polePhotos, setPolePhotos] = useState<PolePhotoItem[]>([])
+  const [decidingPhotoId, setDecidingPhotoId] = useState<string | null>(null)
+
+  const handleDecidePolePhoto = async (
+    photoId: string | null | undefined,
+    decision: 'confirm' | 'reject'
+  ) => {
+    if (!targetWorkOrderId || !photoId || decidingPhotoId) return
+    setDecidingPhotoId(photoId)
+    try {
+      const updated = await workScheduleAPI.decidePolePhoto(targetWorkOrderId, photoId, {
+        decision,
+        note:
+          decision === 'confirm'
+            ? 'Quản lý xác nhận báo cáo khảo sát cột đèn.'
+            : 'Quản lý từ chối ảnh/video khảo sát không hợp lệ.',
+      })
+      setPolePhotos((prev) =>
+        prev.map((item) => (item.photo_id === photoId ? updated : item))
+      )
+      toast.success(
+        decision === 'confirm'
+          ? `Đã xác nhận báo cáo cột ${updated.pole_id || ''}!`
+          : `Đã từ chối báo cáo ảnh/video cột ${updated.pole_id || ''}.`
+      )
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { error?: { code?: string } } } }
+      const code = errObj?.response?.data?.error?.code
+      if (code === 'POLE_VIDEO_NOT_VIEWED') {
+        toast.error('Vui lòng phát xem clip video của cột này trước khi bấm Xác nhận.')
+      } else if (code === 'POLE_PHOTO_INCONCLUSIVE') {
+        toast.error(
+          'Ảnh chưa được Kỹ sư chốt trạng thái (Sáng/Tắt). Vui lòng Yêu cầu làm lại hoặc bấm Từ chối nếu ảnh không dùng.'
+        )
+      } else {
+        toast.error('Không thể cập nhật quyết định cho báo cáo cột đèn này.')
+      }
+    } finally {
+      setDecidingPhotoId(null)
+    }
+  }
 
   // Chi tiết lệnh công tác từ Redux store
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
@@ -108,19 +147,23 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
       workScheduleAPI
         .getWorkOrderPolePhotos(targetWorkOrderId)
         .then((res) => {
-          if (res.items && res.items.length > 0) {
-            setPolePhotos(res.items)
-          } else {
-            setPolePhotos([])
+          if (cancelled) return
+          const items = res.items || []
+          setPolePhotos(items)
+          if (phase?.phaseType === 'survey') {
+            const hasClip = items.some((p) => Boolean(p.video && p.photo_id))
+            setActiveTab(hasClip ? 'video' : items.length > 0 ? 'photos' : 'video')
           }
         })
-        .catch(() => setPolePhotos([]))
+        .catch(() => {
+          if (!cancelled) setPolePhotos([])
+        })
 
       return () => {
         cancelled = true
       }
     }
-  }, [isOpen, targetWorkOrderId])
+  }, [isOpen, targetWorkOrderId, phase?.phaseType])
 
   // Mỗi lần mở một giai đoạn mới thì quay về tab ảnh bằng chứng
   useEffect(() => {
@@ -191,11 +234,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 
   // Tổng số ảnh thực tế hiển thị trong Tab 2 theo đúng giai đoạn
   const photoCount = phase.phaseType === 'survey' ? polePhotos.length : displayPhotos.length
-
-  // Phiên bản mô hình AI thực tế từ dữ liệu backend (nếu có)
-  const modelVersionSource = polePhotos.find((p) => p.model_version || p.artifact_version)
-  const modelVersionLabel =
-    modelVersionSource?.model_version || modelVersionSource?.artifact_version || null
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -294,10 +332,10 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Cpu className="w-4 h-4" />
+                <FileText className="w-4 h-4" />
                 <span>
                   {phase.phaseType === 'survey'
-                    ? 'Phân Tích AI & Tuyến Khảo Sát'
+                    ? 'Kết Quả Khảo Sát & Đánh Giá Kỹ Thuật'
                     : phase.phaseType === 'inspection'
                     ? 'Chẩn Đoán Lỗi & Đề Xuất Vật Tư'
                     : 'Nghiệm Thu Kỹ Thuật & Vật Tư'}
@@ -449,7 +487,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     />
                   </div>
 
-                  {/* Thông số kỹ thuật thực tế của clip đang phát */}
+                  {/* Thông số thực tế và báo cáo của kỹ sư trên clip đang phát */}
                   <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-slate-900 text-white">
@@ -462,36 +500,71 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                       <span className="text-slate-600 font-medium">
                         Dung lượng: <strong>{formatByteCount(selectedVideoPhoto.video?.byte_count)}</strong>
                       </span>
-                      {selectedVideoPhoto.video?.sampled_frames != null && (
-                        <>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-slate-600 font-medium">
-                            Frames: <strong>{selectedVideoPhoto.video.sampled_frames}</strong>
-                            {selectedVideoPhoto.video.on_frames != null &&
-                              selectedVideoPhoto.video.off_frames != null &&
-                              ` (Sáng: ${selectedVideoPhoto.video.on_frames}, Tắt: ${selectedVideoPhoto.video.off_frames})`}
-                          </span>
-                        </>
-                      )}
-                      {selectedVideoPhoto.video?.confidence_median != null && (
-                        <>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-slate-600 font-medium">
-                            Độ tin cậy AI: <strong>{Math.round(selectedVideoPhoto.video.confidence_median * 100)}%</strong>
-                          </span>
-                        </>
-                      )}
+                      {(() => {
+                        const effectiveState = selectedVideoPhoto.final_cv_state || selectedVideoPhoto.cv_state
+                        const isOut = effectiveState === 'off'
+                        const isNormal = effectiveState === 'on'
+                        return (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-600 font-medium">
+                              Báo cáo kỹ sư:{' '}
+                              <strong
+                                className={
+                                  isOut
+                                    ? 'text-rose-700'
+                                    : isNormal
+                                    ? 'text-emerald-700'
+                                    : 'text-amber-700'
+                                }
+                              >
+                                {isOut ? 'Mất sáng (Cần kiểm tra)' : isNormal ? 'Đèn sáng bình thường' : 'Chưa chốt trạng thái'}
+                              </strong>
+                            </span>
+                          </>
+                        )
+                      })()}
                       {selectedVideoPhoto.video?.hdr && (
                         <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">
                           HDR
                         </span>
                       )}
                     </div>
-                    {selectedVideoPhoto.captured_at && (
-                      <span className="text-[11px] text-slate-500">
-                        Quay lúc: {new Date(selectedVideoPhoto.captured_at).toLocaleString('vi-VN')}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {selectedVideoPhoto.captured_at && (
+                        <span className="text-[11px] text-slate-500">
+                          Quay lúc: {new Date(selectedVideoPhoto.captured_at).toLocaleString('vi-VN')}
+                        </span>
+                      )}
+                      {selectedVideoPhoto.decision === 'confirm' ? (
+                        <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                          ✓ Đã xác nhận
+                        </span>
+                      ) : selectedVideoPhoto.decision === 'reject' ? (
+                        <span className="text-[10.5px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                          ✕ Đã từ chối
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={decidingPhotoId === selectedVideoPhoto.photo_id}
+                            onClick={() => handleDecidePolePhoto(selectedVideoPhoto.photo_id, 'confirm')}
+                            className="py-1 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                          >
+                            ✓ Xác nhận clip
+                          </button>
+                          <button
+                            type="button"
+                            disabled={decidingPhotoId === selectedVideoPhoto.photo_id}
+                            onClick={() => handleDecidePolePhoto(selectedVideoPhoto.photo_id, 'reject')}
+                            className="py-1 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                          >
+                            Từ chối
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Danh sách chọn video theo cột đèn (nếu có nhiều hơn 1 clip) */}
@@ -578,7 +651,8 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                       const effectiveState = photo.final_cv_state || photo.cv_state
                       const isOut = effectiveState === 'off'
                       const isNormal = effectiveState === 'on'
-                      const isDecided = photo.decision === 'confirm'
+                      const isConfirmed = photo.decision === 'confirm'
+                      const isRejected = photo.decision === 'reject'
 
                       return (
                         <div
@@ -616,7 +690,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 
                             {/* Mã cột & nhãn có video */}
                             <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/80 backdrop-blur-md text-white border border-white/20">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/80 backdrop-blur-md text-white border border-blue-400/20">
                                 {photo.pole_id || `Cột #${idx + 1}`}
                               </span>
                               {photo.video && (
@@ -639,9 +713,13 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                 <span className="font-extrabold text-slate-900 text-sm">
                                   Cột {photo.pole_id || 'Chưa định danh'}
                                 </span>
-                                {isDecided ? (
+                                {isConfirmed ? (
                                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                    ✓ Đã duyệt
+                                    ✓ Đã xác nhận
+                                  </span>
+                                ) : isRejected ? (
+                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                    ✕ Đã từ chối
                                   </span>
                                 ) : (
                                   <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
@@ -657,13 +735,40 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                   <strong>Ghi chú:</strong> {photo.review_note}
                                 </p>
                               )}
+                              {!photo.decision && (
+                                <div
+                                  className="flex items-center gap-1.5 mt-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    disabled={decidingPhotoId === photo.photo_id}
+                                    onClick={() => handleDecidePolePhoto(photo.photo_id, 'confirm')}
+                                    className="flex-1 py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10.5px] transition cursor-pointer disabled:opacity-50"
+                                  >
+                                    ✓ Xác nhận
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={decidingPhotoId === photo.photo_id}
+                                    onClick={() => handleDecidePolePhoto(photo.photo_id, 'reject')}
+                                    className="py-1 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[10.5px] transition cursor-pointer disabled:opacity-50"
+                                  >
+                                    Từ chối
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10.5px] text-slate-500 font-medium">
                               <span>
-                                Độ tin cậy:{' '}
+                                Đánh giá:{' '}
                                 <strong className="text-slate-700">
-                                  {photo.confidence != null ? `${Math.round(photo.confidence * 100)}%` : 'Chưa có'}
+                                  {isOut
+                                    ? 'Mất sáng'
+                                    : isNormal
+                                    ? 'Đèn sáng'
+                                    : 'Chưa chốt kết luận'}
                                 </strong>
                               </span>
                               {photo.lat && photo.lng && (
@@ -736,25 +841,81 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: KẾT QUẢ AI & ĐO ĐẠC CỘT ĐÈN */}
+          {/* TAB 3: KẾT QUẢ KHẢO SÁT & ĐÁNH GIÁ KỸ THUẬT */}
           {activeTab === 'ai' && (
             <div className="flex flex-col gap-4 animate-in fade-in duration-150">
-              {/* Thẻ chẩn đoán AI & danh sách cột đèn trên tuyến */}
+              {/* Thẻ danh sách cột đèn kỹ sư hiện trường ghi nhận */}
               <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-3">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <Cpu className="w-4 h-4 text-amber-500" />
-                    Chẩn Đoán Tự Động Từ Mô Hình Computer Vision
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    Danh Sách Cột Đèn Ghi Nhận Từ Kỹ Sư Hiện Trường
                   </h4>
-                  {modelVersionLabel && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                      Mô hình {modelVersionLabel}
-                    </span>
-                  )}
                 </div>
 
-                {/* Danh sách cột đèn được chẩn đoán */}
-                {abnormalPoles.length > 0 ? (
+                {/* Danh sách cột đèn được kỹ sư báo cáo (hoặc có sự cố trên tuyến) */}
+                {phase.phaseType === 'survey' && polePhotos.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {polePhotos.map((photo, idx) => {
+                      const effectiveState = photo.final_cv_state || photo.cv_state
+                      const isOut = effectiveState === 'off'
+                      const isNormal = effectiveState === 'on'
+
+                      return (
+                        <div
+                          key={photo.photo_id || idx}
+                          className={`p-3 rounded-xl border flex items-start gap-3 ${
+                            isOut
+                              ? 'bg-rose-50/70 border-rose-200'
+                              : isNormal
+                              ? 'bg-emerald-50/70 border-emerald-200'
+                              : 'bg-amber-50/70 border-amber-200'
+                          }`}
+                        >
+                          <AlertTriangle
+                            className={`w-4 h-4 shrink-0 mt-0.5 ${
+                              isOut
+                                ? 'text-rose-600'
+                                : isNormal
+                                ? 'text-emerald-600'
+                                : 'text-amber-600'
+                            }`}
+                          />
+                          <div className="flex flex-col gap-1 text-xs text-slate-900 flex-1">
+                            <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-blue-700 font-bold">
+                                {photo.pole_id || '-'}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  isOut
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : isNormal
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {isOut
+                                  ? 'Báo mất sáng (Cần kiểm tra)'
+                                  : isNormal
+                                  ? 'Đèn sáng bình thường'
+                                  : 'Chưa chốt trạng thái (Cần yêu cầu làm lại)'}
+                              </span>
+                              {photo.decision === 'confirm' && (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                  ✓ Đã duyệt nghiệm thu
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-700 leading-relaxed">
+                              {photo.review_note || 'Kỹ sư không đính kèm ghi chú riêng cho cột này.'}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : abnormalPoles.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {abnormalPoles.map((p, idx) => (
                       <div
@@ -763,13 +924,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                       >
                         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                         <div className="flex flex-col gap-1 text-xs text-amber-950 flex-1">
-                          <div className="font-extrabold text-sm flex items-center gap-2">
+                          <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-blue-700 font-bold">{p.pole_id}</span>
                             <span>Trạng thái: {p.fixture_status || 'Cần kiểm tra'}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 text-[10px] font-mono font-bold">
-                              Độ tin cậy:{' '}
-                              {p.status_confidence != null ? `${Math.round(p.status_confidence * 100)}%` : 'Chưa có'}
-                            </span>
                             {p.open_fault_count && p.open_fault_count > 0 ? (
                               <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
                                 {p.open_fault_count} sự cố mở
@@ -787,7 +944,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>
-                      Đã khảo sát {poles.length} cột dọc tuyến <strong>{formatSegmentDisplay(caseItem.segment)}</strong>. Không có cột nào bị đánh dấu bất thường hoặc đang có sự cố mở.
+                      Tuyến <strong>{formatSegmentDisplay(caseItem.segment)}</strong> ({poles.length} cột): Không có cột đèn nào bị đánh dấu bất thường hoặc đang có sự cố mở.
                     </span>
                   </div>
                 ) : (
