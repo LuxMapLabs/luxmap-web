@@ -4,6 +4,8 @@ import type { RootState } from '../../redux/store'
 import {
   toLngLatBounds,
   toBboxParam,
+  toBoundaryGeoJSON,
+  toBoundaryMaskGeoJSON,
   FIT_BOUNDS_GIS_PANORAMA,
   FIT_BOUNDS_GIS_SEGMENT,
 } from '../../utils/gis-map/mapUtils'
@@ -92,6 +94,7 @@ import { GisDrawerPanel } from './components/GisDrawerPanel'
 import { useElectricalCascade } from '../../hooks/gis-map/useElectricalCascade'
 import { useGisMapInstance } from '../../hooks/gis-map/useGisMapInstance'
 import { useFeederLinesLayer } from '../../hooks/gis-map/useFeederLinesLayer'
+import { useCommuneBoundary } from '../../hooks/gis-map/useCommuneBoundary'
 import { useGisMarkers } from '../../hooks/gis-map/useGisMarkers'
 import { useIotBridgeMarkers } from '../../hooks/gis-map/useIotBridgeMarkers'
 import type { SearchResultItem } from '../../utils/gis-map/gisSearchUtils'
@@ -108,6 +111,7 @@ export const GisMapPage: React.FC = () => {
   // Open on the account's commune center (GET /auth/me map_bounds.center) taken 100% directly from backend.
   // Không khóa kéo/zoom: khu vực quản lý được khoanh bằng viền + vùng ngoài tô mờ, có nút quay về.
   const mapBounds = useSelector((state: RootState) => state.auth.user?.map_bounds)
+  const communeBoundary = useCommuneBoundary()
   const lastFramedBboxRef = useRef<string | null>(null)
   useEffect(() => {
     const bounds = toLngLatBounds(mapBounds?.bbox)
@@ -149,41 +153,13 @@ export const GisMapPage: React.FC = () => {
   // Khoanh vùng khu vực quản lý: viền nét đứt + tô mờ phần bên ngoài bbox của xã
   useEffect(() => {
     const map = mapRef.current
-    const bounds = toLngLatBounds(mapBounds?.bbox)
     if (!isMapLoaded || !map) return
 
     const sourceId = 'managed-area'
     const emptyData: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
-    let maskData: GeoJSON.Feature<GeoJSON.Polygon> | null = null
-    let lineData: GeoJSON.Feature<GeoJSON.Polygon> | null = null
-    if (bounds) {
-      const [[minLng, minLat], [maxLng, maxLat]] = bounds
-      const inner: [number, number][] = [
-        [minLng, minLat],
-        [minLng, maxLat],
-        [maxLng, maxLat],
-        [maxLng, minLat],
-        [minLng, minLat],
-      ]
-      const outer: [number, number][] = [
-        [-180, -85],
-        [180, -85],
-        [180, 85],
-        [-180, 85],
-        [-180, -85],
-      ]
-      maskData = {
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'Polygon', coordinates: [outer, inner] },
-      }
-      lineData = {
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'Polygon', coordinates: [inner] },
-      }
-    }
+    const maskData = toBoundaryMaskGeoJSON(communeBoundary, mapBounds?.bbox)
+    const lineData = toBoundaryGeoJSON(communeBoundary, mapBounds?.bbox)
 
     const maskId = `${sourceId}-mask`
     const lineId = `${sourceId}-line`
@@ -219,7 +195,7 @@ export const GisMapPage: React.FC = () => {
     } catch {
       // Style chưa sẵn sàng (vd. khi hot-reload) - bỏ qua, effect sẽ chạy lại khi bbox đổi
     }
-  }, [isMapLoaded, mapBounds, mapRef])
+  }, [isMapLoaded, mapBounds, communeBoundary, mapRef])
 
   // Nút "Về khu vực quản lý": xếp ngay trên cụm zoom, cùng kiểu với nút điều khiển gốc của bản đồ
   useEffect(() => {
