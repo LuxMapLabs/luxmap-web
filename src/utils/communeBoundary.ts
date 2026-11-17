@@ -162,3 +162,23 @@ export const ringSelfIntersects = (ring: BoundaryRing): boolean => {
   }
   return false
 }
+
+const inRing = (ring: BoundaryRing, lng: number, lat: number): boolean => {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    if (yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+/** Điểm (lng, lat) có nằm trong ranh giới (tính cả lỗ) hay không. */
+export const pointInGeometry = (geometry: Geometry | null | undefined, lng: number, lat: number): boolean =>
+  geometryToPolygons(geometry).some(
+    ([outer, ...holes]) => inRing(outer, lng, lat) && !holes.some((hole) => inRing(hole, lng, lat))
+  )
+
+/** Gộp nhiều ranh giới thành một (MultiPolygon); không có thì null. */
+export const mergeGeometries = (geometries: (Geometry | null | undefined)[]): Geometry | null =>
+  polygonsToGeometry(geometries.flatMap((g) => geometryToPolygons(g)))
