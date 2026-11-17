@@ -32,7 +32,10 @@ import { EditScheduleModal } from './EditScheduleModal'
 import { CancelScheduleModal } from './CancelScheduleModal'
 import { ApproveCancellationModal } from './ApproveCancellationModal'
 import { RejectCancellationModal } from './RejectCancellationModal'
-import { checkScheduleModificationAllowed } from '../../../utils/work-schedule/scheduleRules'
+import {
+  checkScheduleModificationAllowed,
+  getPhaseOverdueInfo,
+} from '../../../utils/work-schedule/scheduleRules'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import type { EvidenceItem } from '../../../types/workorders/orders'
@@ -266,6 +269,21 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   // Kiểm tra bước hiện tại đã được duyệt hay chưa
   const isCurrentlyApproved = isInspectionApprovedLocal && currentPhase?.phaseType === 'inspection'
 
+  // Kiểm tra cảnh báo quá hạn (chưa ấn bắt đầu vs đã bắt đầu nhưng chưa có báo cáo)
+  const overdueInfo = getPhaseOverdueInfo(
+    currentPhase,
+    caseItem.isTerminated,
+    effectiveRawStatus
+  )
+  const isOverdueNotStarted =
+    overdueInfo.kind === 'overdue_not_started' &&
+    currentPhase?.cancellationRequest?.status !== 'pending' &&
+    !isCurrentlyApproved
+  const isOverdueNoReport =
+    overdueInfo.kind === 'overdue_no_report' &&
+    currentPhase?.cancellationRequest?.status !== 'pending' &&
+    !isCurrentlyApproved
+
   // Kiểm tra trạng thái đã nghiệm thu để hiển thị nút tạo bước tiếp theo
   const isSurveyEnded =
     currentPhase?.phaseType === 'survey' &&
@@ -364,12 +382,19 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 const isActive =
                   !isSuperiorStep && Boolean(phaseForStep && !isStepEnded && !isStepCancelled)
                 const isViewing = actualPhaseIndex >= 0 && actualPhaseIndex === viewingPhaseIndex
+                const stepOverdue = isActive
+                  ? getPhaseOverdueInfo(phaseForStep, caseItem.isTerminated)
+                  : null
 
                 let circleClass = 'bg-slate-200 text-slate-500 border-slate-300'
                 if (isStepCancelled) {
                   circleClass = 'bg-rose-500 text-white border-rose-500 shadow-xs'
                 } else if (isCompleted) {
                   circleClass = 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                } else if (isActive && stepOverdue?.kind === 'overdue_not_started') {
+                  circleClass = 'bg-orange-600 text-white border-orange-600 ring-4 ring-orange-100 shadow-xs'
+                } else if (isActive && stepOverdue?.kind === 'overdue_no_report') {
+                  circleClass = 'bg-amber-600 text-white border-amber-600 ring-4 ring-amber-100 shadow-xs'
                 } else if (isActive) {
                   circleClass = 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100 shadow-xs'
                 }
@@ -514,6 +539,100 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
           )}
 
+          {/* ======================================================== */}
+          {/* BANNER CẢNH BÁO QUÁ HẠN: CHƯA BẮT ĐẦU HOẶC CHƯA BÁO CÁO */}
+          {/* ======================================================== */}
+          {isOverdueNotStarted && currentPhase && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50 via-amber-50/70 to-orange-50 border-2 border-orange-300 shadow-sm flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-start gap-2.5">
+                <div className="p-2 rounded-xl bg-orange-600 text-white shadow-xs shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 border border-orange-300">
+                      Quá hạn {overdueInfo.overdueDays} ngày • Chưa bắt đầu
+                    </span>
+                    <h4 className="font-extrabold text-sm text-orange-950">
+                      Kỹ sư hiện trường chưa ấn bắt đầu ca làm việc
+                    </h4>
+                  </div>
+                  <p className="text-xs text-orange-900/90 mt-1 leading-relaxed">
+                    Kỹ sư <strong className="text-orange-950">{currentPhase.assigneeName}</strong> vẫn{' '}
+                    <strong>chưa bấm bắt đầu</strong> nhiệm vụ dù đã qua hạn hoàn thành (
+                    <strong>{overdueInfo.deadlineFormatted}</strong>). Quản lý có thể gia hạn hoàn thành, đổi kỹ sư thay thế hoặc hủy ca này.
+                  </p>
+                </div>
+              </div>
+
+              {canModify && (
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-orange-200/70">
+                  <button
+                    type="button"
+                    onClick={() => setIsCancelModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-rose-300 bg-white text-rose-700 hover:bg-rose-50 font-bold text-xs shadow-2xs transition active:scale-95 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hủy lịch</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Gia hạn / Đổi kỹ sư</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isOverdueNoReport && currentPhase && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-yellow-50/70 to-amber-50 border-2 border-amber-300 shadow-sm flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-start gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-600 text-white shadow-xs shrink-0 mt-0.5">
+                  <Clock className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                      Quá hạn {overdueInfo.overdueDays} ngày • Chưa báo cáo
+                    </span>
+                    <h4 className="font-extrabold text-sm text-amber-950">
+                      Kỹ sư đã bắt đầu thực hiện nhưng chưa nộp báo cáo
+                    </h4>
+                  </div>
+                  <p className="text-xs text-amber-900/90 mt-1 leading-relaxed">
+                    Kỹ sư <strong className="text-amber-950">{currentPhase.assigneeName}</strong> đã bấm bắt đầu tại hiện trường nhưng đã quá hạn hoàn thành (
+                    <strong>{overdueInfo.deadlineFormatted}</strong>) mà <strong>chưa gửi báo cáo nghiệm thu</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {canModify && (
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-amber-200/70">
+                  <button
+                    type="button"
+                    onClick={() => setIsCancelModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-rose-300 bg-white text-rose-700 hover:bg-rose-50 font-bold text-xs shadow-2xs transition active:scale-95 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hủy lịch</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Gia hạn / Đổi kỹ sư</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Thông báo sự vụ nếu đã kết thúc (Terminated / END / CANCELLED) */}
           {caseItem.isTerminated && (
             <div
@@ -558,18 +677,34 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         {modificationCheck.reason}
                       </div>
                     </div>
-                  ) : (
-                    <div className="p-3 bg-emerald-50/70 border border-emerald-200/90 rounded-2xl flex items-center justify-between text-xs text-emerald-950 shadow-2xs">
-                      <span className="flex items-center gap-2 font-bold">
-                        <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
-                        Đủ điều kiện chỉnh sửa / hủy lịch (Ngày thực hiện:{' '}
-                        {modificationCheck.scheduledDateFormatted})
-                      </span>
-                      <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                        Lịch sau ngày hôm nay
-                      </span>
-                    </div>
-                  )}
+                  ) : !overdueInfo.isOverdue ? (
+                    overdueInfo.isExtended ? (
+                      <div className="p-3 bg-indigo-50/70 border border-indigo-200/90 rounded-2xl flex items-center justify-between gap-2 flex-wrap text-xs text-indigo-950 shadow-2xs">
+                        <span className="flex items-center gap-2 font-bold">
+                          <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+                          <span>
+                            Đã gia hạn hoàn thành đến ngày{' '}
+                            <strong className="text-indigo-800">{overdueInfo.deadlineFormatted}</strong>{' '}
+                            (Ngày giao ban đầu: {modificationCheck.scheduledDateFormatted})
+                          </span>
+                        </span>
+                        <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-full shrink-0">
+                          Đang trong hạn gia hạn
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-emerald-50/70 border border-emerald-200/90 rounded-2xl flex items-center justify-between text-xs text-emerald-950 shadow-2xs">
+                        <span className="flex items-center gap-2 font-bold">
+                          <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
+                          Đủ điều kiện chỉnh sửa / hủy lịch (Ngày thực hiện:{' '}
+                          {modificationCheck.scheduledDateFormatted})
+                        </span>
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                          {modificationCheck.isFutureDate ? 'Lịch sau ngày hôm nay' : 'Lịch trong ngày'}
+                        </span>
+                      </div>
+                    )
+                  ) : null}
                 </>
               )}
 
@@ -590,7 +725,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     <Calendar className="w-3 h-3 text-slate-400" />
                     Ngày thực hiện
                   </div>
-                  <div className="text-xs font-bold text-slate-800 mt-1">{currentPhase.date}</div>
+                  <div className="text-xs font-bold text-slate-800 mt-1 flex flex-wrap items-center gap-1.5">
+                    <span>{currentPhase.date}</span>
+                    {currentPhase.dueDate && currentPhase.dueDate !== currentPhase.date && (
+                      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-md">
+                        Hạn chót: {currentPhase.dueDate}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
@@ -625,15 +767,29 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         Đã có báo cáo (Chờ Quản lý duyệt)
                       </span>
                     ) : effectiveRawStatus === 'in_progress' ? (
-                      <span className="text-amber-600 font-bold flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-amber-600" />
-                        Đang thực hiện
-                      </span>
+                      overdueInfo.kind === 'overdue_no_report' ? (
+                        <span className="text-amber-700 font-extrabold flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Đang thực hiện • Quá hạn {overdueInfo.overdueDays} ngày (Chưa báo cáo)</span>
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 font-bold flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          Đang thực hiện
+                        </span>
+                      )
                     ) : effectiveRawStatus === 'assigned' || Boolean(currentPhase.assigneeId) ? (
-                      <span className="text-sky-600 font-bold flex items-center gap-1">
-                        <UserCheck className="w-3.5 h-3.5 text-sky-600" />
-                        Đã giao việc (Chờ tiếp nhận)
-                      </span>
+                      overdueInfo.kind === 'overdue_not_started' ? (
+                        <span className="text-orange-700 font-extrabold flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                          <span>Chưa bắt đầu • Quá hạn {overdueInfo.overdueDays} ngày</span>
+                        </span>
+                      ) : (
+                        <span className="text-sky-600 font-bold flex items-center gap-1">
+                          <UserCheck className="w-3.5 h-3.5 text-sky-600" />
+                          Đã giao việc (Chờ tiếp nhận)
+                        </span>
+                      )
                     ) : (
                       <span className="text-slate-500 font-bold flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
@@ -844,6 +1000,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         </div>
                       )}
                     </div>
+                  ) : overdueInfo.kind === 'overdue_not_started' ? (
+                    <div className="p-4 rounded-xl bg-orange-50/90 border border-orange-200 text-center text-xs text-orange-800 font-semibold">
+                      ⚠️ Đã quá hạn {overdueInfo.overdueDays} ngày nhưng Kỹ sư hiện trường vẫn chưa ấn Bắt đầu thực hiện nhiệm vụ cập nhật tọa độ GPS.
+                    </div>
+                  ) : overdueInfo.kind === 'overdue_no_report' ? (
+                    <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-center text-xs text-amber-800 font-semibold">
+                      ⏳ Kỹ sư hiện trường đã bắt đầu thực hiện nhưng đã quá hạn {overdueInfo.overdueDays} ngày vẫn chưa gửi báo cáo tọa độ GPS.
+                    </div>
                   ) : (
                     <div className="py-6 text-center text-xs text-slate-500">
                       ⏳ Kỹ sư hiện trường đang thực hiện nhiệm vụ, chưa gửi báo cáo tọa độ GPS.
@@ -980,6 +1144,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </div>
                     )}
                   </div>
+                ) : overdueInfo.kind === 'overdue_not_started' ? (
+                  <div className="p-4 rounded-xl bg-orange-50/90 border border-orange-200 text-center text-xs text-orange-800 font-semibold">
+                    ⚠️ Đã quá hạn {overdueInfo.overdueDays} ngày nhưng Kỹ sư hiện trường vẫn chưa ấn Bắt đầu thực hiện nhiệm vụ.
+                  </div>
+                ) : overdueInfo.kind === 'overdue_no_report' ? (
+                  <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-center text-xs text-amber-800 font-semibold">
+                    ⏳ Kỹ sư hiện trường đã bắt đầu thực hiện nhưng đã quá hạn {overdueInfo.overdueDays} ngày vẫn chưa nộp báo cáo nghiệm thu.
+                  </div>
                 ) : (
                   <div className="py-6 text-center text-xs text-slate-500">
                     ⏳ Kỹ sư hiện trường đang xử lý nhiệm vụ, chưa nộp báo cáo.
@@ -1005,8 +1177,13 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               Đóng
             </button>
 
-            {/* Nút Chỉnh sửa & Hủy lịch (Đồng bộ với Backend C#) */}
-            {!caseItem.isTerminated && currentPhase && currentPhase.status !== 'ended' && currentPhase.rawStatus !== 'cancelled' && currentPhase.rawStatus !== 'verified' && (
+            {/* Nút Chỉnh sửa & Hủy lịch (Ẩn ở Footer khi lịch đã quá hạn vì đã có nút xử lý trên Banner Cảnh Báo) */}
+            {!caseItem.isTerminated &&
+              !overdueInfo.isOverdue &&
+              currentPhase &&
+              currentPhase.status !== 'ended' &&
+              currentPhase.rawStatus !== 'cancelled' &&
+              currentPhase.rawStatus !== 'verified' && (
               <>
                 <button
                   type="button"
