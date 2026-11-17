@@ -23,22 +23,24 @@ import {
   Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../../../redux/rootReducer'
-import type { ScheduleCase } from '../../../feature/work-schedule/workScheduleSlice'
-import type { WorkOrderAssignee, WorkOrderPoleLocation } from '../../../types/workorders/orders'
+import { fetchWorkOrdersRequest, type ScheduleCase } from '../../../feature/work-schedule/workScheduleSlice'
+import { fetchDashboardDataRequest } from '../../../feature/dashboard/dashboardSlice'
+import type { WorkOrderAssignee, WorkOrderPoleLocation, EvidenceItem, PolePhotoItem } from '../../../types/workorders/orders'
 import { FieldReportDetailModal } from './FieldReportDetailModal'
 import { EditScheduleModal } from './EditScheduleModal'
 import { CancelScheduleModal } from './CancelScheduleModal'
 import { ApproveCancellationModal } from './ApproveCancellationModal'
 import { RejectCancellationModal } from './RejectCancellationModal'
+import { SurveyConflictModal, type SurveyPoleConflict } from './SurveyConflictModal'
 import {
   checkScheduleModificationAllowed,
   getPhaseOverdueInfo,
 } from '../../../utils/work-schedule/scheduleRules'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
-import type { EvidenceItem } from '../../../types/workorders/orders'
+import { faultAPI } from '../../../feature/faults/faultAPI'
 import { EvidenceImage } from './EvidenceImage'
 
 interface CaseDetailModalProps {
@@ -107,6 +109,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   onApproveGpsUpdate,
   onPreviewGis,
 }) => {
+  const dispatch = useDispatch()
   // Dữ liệu chi tiết lệnh công tác từ máy chủ
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
 
@@ -135,8 +138,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const [isApproveCancellationOpen, setIsApproveCancellationOpen] = useState(false)
   const [isRejectCancellationOpen, setIsRejectCancellationOpen] = useState(false)
 
-  // Danh sách cột đèn thực tế của lệnh (đặc biệt cho bước Khảo sát trên tuyến)
+  // Danh sách cột đèn ghi nhận sự cố thực tế của lệnh (đặc biệt cho bước Khảo sát chuyển sang Kiểm tra)
   const [surveyPoles, setSurveyPoles] = useState<string[]>([])
+  const [surveyPolePhotos, setSurveyPolePhotos] = useState<PolePhotoItem[]>([])
+  const [surveyConflicts, setSurveyConflicts] = useState<SurveyPoleConflict[]>([])
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false)
+  const [conflictToCancel, setConflictToCancel] = useState<{ workOrderId: string; poleId: string } | null>(null)
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false)
+  const [surveyRefreshTick, setSurveyRefreshTick] = useState(0)
   const [previewEvidence, setPreviewEvidence] = useState<EvidenceItem[]>([])
 
   useEffect(() => {
@@ -150,11 +159,34 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
       setEditedMaterialsNote(matNote)
 
       if (currentP?.workOrderId) {
-        workScheduleAPI
-          .getWorkOrderPoles(currentP.workOrderId)
-          .then((res) => {
-            if (res.items && res.items.length > 0) {
-              const abnormal = res.items
+        if (currentP.phaseType === 'survey') {
+          let cancelled = false
+          Promise.all([
+            workScheduleAPI.getWorkOrderPoles(currentP.workOrderId),
+            workScheduleAPI.getWorkOrderPolePhotos(currentP.workOrderId),
+          ])
+            .then(async ([polesRes, photosRes]) => {
+              if (cancelled) return
+              const photoItems = photosRes.items || []
+              setSurveyPolePhotos(photoItems)
+
+              // Lấy bản ghi báo cáo mới nhất chưa bị từ chối theo từng cột đèn từ kỹ sư hiện trường
+              const latestByPole = new Map<string, PolePhotoItem>()
+              for (const item of photoItems) {
+                if (item.pole_id && item.decision !== 'reject') {
+                  latestByPole.set(item.pole_id, item)
+                }
+              }
+
+              const photoFaultPoles: string[] = []
+              latestByPole.forEach((photo, poleId) => {
+                const effectiveState = photo.final_cv_state || photo.cv_state
+                if (effectiveState === 'off') {
+                  photoFaultPoles.push(poleId)
+                }
+              })
+
+              const abnormalFromPoles = (polesRes.items || [])
                 .filter(
                   (p) =>
                     (p.fixture_status && p.fixture_status !== 'normal' && p.fixture_status !== 'unknown') ||
@@ -162,28 +194,123 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 )
                 .map((p) => p.pole_id)
                 .filter(Boolean) as string[]
-              const all = res.items.map((p) => p.pole_id).filter(Boolean) as string[]
-              setSurveyPoles(abnormal.length > 0 ? abnormal : all)
-            } else {
-              setSurveyPoles([])
-            }
-          })
-          .catch(() => setSurveyPoles([]))
 
-        if (currentP.phaseType !== 'survey') {
+              // Nếu khảo sát bằng ảnh/video từng cột: chỉ lấy cột thuộc báo cáo đó để khớp 100% với FollowUp ở BE
+              const combinedFaultPoles =
+                photoItems.length > 0
+                  ? Array.from(new Set(photoFaultPoles))
+                  : Array.from(new Set(abnormalFromPoles))
+              setSurveyPoles(combinedFaultPoles)
+
+              // Kiểm tra các cột ghi nhận sự cố có đang nằm trong phiếu công tác khác chưa đóng không
+              if (combinedFaultPoles.length > 0) {
+                const segIds = Array.from(
+                  new Set(
+                    [
+                      ...(polesRes.items || []).map((p) => p.segment_id),
+                      workOrderDetail?.segment_id,
+                      ...(workOrderDetail?.segment_ids || []),
+                    ].filter(Boolean) as string[]
+                  )
+                )
+                if (segIds.length > 0) {
+                  try {
+                    const faultResults = await Promise.all(
+                      segIds.map((segId) => faultAPI.getFaults({ segment_id: segId, page_size: 200 }))
+                    )
+                    if (cancelled) return
+                    const targetSet = new Set(combinedFaultPoles)
+                    const undecidedPhotoByPole = new Map<string, string>()
+                    for (const ph of photoItems) {
+                      if (ph.pole_id && ph.photo_id && !ph.decision) {
+                        undecidedPhotoByPole.set(ph.pole_id, ph.photo_id)
+                      }
+                    }
+                    const conflictList: SurveyPoleConflict[] = []
+                    const seenPairs = new Set<string>()
+                    for (const res of faultResults) {
+                      for (const f of res.items || []) {
+                        if (
+                          f.pole_id &&
+                          targetSet.has(f.pole_id) &&
+                          f.work_order_id &&
+                          f.work_order_id !== currentP.workOrderId &&
+                          (f.fault_status === 'detected' ||
+                            f.fault_status === 'confirmed' ||
+                            f.fault_status === 'in_progress')
+                        ) {
+                          const pairKey = `${f.pole_id}__${f.work_order_id}`
+                          if (!seenPairs.has(pairKey)) {
+                            seenPairs.add(pairKey)
+                            const undecidedPhotoId = undecidedPhotoByPole.get(f.pole_id) || null
+                            conflictList.push({
+                              poleId: f.pole_id,
+                              workOrderId: f.work_order_id,
+                              faultId: f.fault_id || '',
+                              photoId: undecidedPhotoId,
+                              canRejectPhoto: Boolean(undecidedPhotoId),
+                            })
+                          }
+                        }
+                      }
+                    }
+                    setSurveyConflicts(conflictList)
+                  } catch {
+                    if (!cancelled) setSurveyConflicts([])
+                  }
+                } else {
+                  setSurveyConflicts([])
+                }
+              } else {
+                setSurveyConflicts([])
+              }
+            })
+            .catch(() => {
+              if (!cancelled) {
+                setSurveyPolePhotos([])
+                setSurveyPoles([])
+                setSurveyConflicts([])
+              }
+            })
+          setPreviewEvidence([])
+          return () => {
+            cancelled = true
+          }
+        } else {
+          setSurveyPolePhotos([])
+          setSurveyConflicts([])
+          workScheduleAPI
+            .getWorkOrderPoles(currentP.workOrderId)
+            .then((res) => {
+              if (res.items && res.items.length > 0) {
+                const abnormal = res.items
+                  .filter(
+                    (p) =>
+                      (p.fixture_status && p.fixture_status !== 'normal' && p.fixture_status !== 'unknown') ||
+                      (p.open_fault_count && p.open_fault_count > 0)
+                  )
+                  .map((p) => p.pole_id)
+                  .filter(Boolean) as string[]
+                setSurveyPoles(abnormal)
+              } else {
+                setSurveyPoles([])
+              }
+            })
+            .catch(() => setSurveyPoles([]))
+
           workScheduleAPI
             .getWorkOrderEvidence(currentP.workOrderId)
             .then((res) => setPreviewEvidence(res.items || []))
             .catch(() => setPreviewEvidence([]))
-        } else {
-          setPreviewEvidence([])
         }
       } else {
         setSurveyPoles([])
+        setSurveyPolePhotos([])
+        setSurveyConflicts([])
         setPreviewEvidence([])
       }
     }
-  }, [caseItem, viewingPhaseIndex, isOpen, workOrderDetail])
+  }, [caseItem, viewingPhaseIndex, isOpen, workOrderDetail, isFieldReportModalOpen, surveyRefreshTick])
 
   if (!isOpen || !caseItem) return null
 
@@ -296,6 +423,58 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
     (currentPhase.status === 'ended' || currentPhase.rawStatus === 'verified')
   const hasRepairPhase = caseItem.phases.some((p) => p.phaseType === 'repair')
   const canSpawnRepairFromInspection = isInspectionEnded && !hasRepairPhase && !caseItem.isTerminated
+
+  const conflictPoleSet = new Set(surveyConflicts.map((c) => c.poleId))
+  const surveyPolesForNext =
+    (currentPhase?.poleIds && currentPhase.poleIds.length > 0 && currentPhase.poleIds) ||
+    (surveyPoles && surveyPoles.length > 0 && surveyPoles) ||
+    []
+  const freeSurveyPolesForNext = surveyPolesForNext.filter((pid) => !conflictPoleSet.has(pid))
+
+  const handleRejectConflictPhoto = async (conflict: SurveyPoleConflict) => {
+    const workOrderId = currentPhase?.workOrderId
+    if (!workOrderId || !conflict.photoId || isResolvingConflict) return
+    setIsResolvingConflict(true)
+    try {
+      await workScheduleAPI.decidePolePhoto(workOrderId, conflict.photoId, {
+        decision: 'reject',
+        note: `Từ chối vì cột ${conflict.poleId} đang nằm trong phiếu công tác ${conflict.workOrderId}.`,
+      })
+      toast.success(`Đã loại cột ${conflict.poleId} khỏi báo cáo khảo sát.`)
+      setSurveyRefreshTick((t) => t + 1)
+    } catch {
+      toast.error(`Không thể từ chối báo cáo của cột ${conflict.poleId}.`)
+    } finally {
+      setIsResolvingConflict(false)
+    }
+  }
+
+  const handleConfirmCancelConflictOrder = async (reason: string) => {
+    if (!conflictToCancel) return
+    setIsResolvingConflict(true)
+    try {
+      await workScheduleAPI.cancelWorkOrder(conflictToCancel.workOrderId, { note: reason })
+      toast.success(
+        `Đã hủy phiếu ${conflictToCancel.workOrderId} và giải phóng cột ${conflictToCancel.poleId}!`
+      )
+      setConflictToCancel(null)
+      dispatch(fetchWorkOrdersRequest(undefined))
+      dispatch(fetchDashboardDataRequest())
+      setSurveyRefreshTick((t) => t + 1)
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { error?: { code?: string } } } }
+      const code = errObj?.response?.data?.error?.code
+      if (code === 'INVALID_STATE_TRANSITION') {
+        toast.error(
+          `Phiếu ${conflictToCancel.workOrderId} đã có báo cáo hoàn thành hoặc đã đóng, không thể hủy.`
+        )
+      } else {
+        toast.error(`Không thể hủy phiếu ${conflictToCancel.workOrderId}.`)
+      }
+    } finally {
+      setIsResolvingConflict(false)
+    }
+  }
 
   // Đóng modal chi tiết sự vụ
   const handleCloseModal = () => {
@@ -1039,16 +1218,143 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
 
                     {/* Bằng chứng / Thông tin hiện trường */}
                     {currentPhase.phaseType === 'survey' ? (
-                      <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
-                          <span className="font-bold text-blue-950">
-                            Khảo sát thực địa trên tuyến:
-                          </span>
-                          <span className="font-extrabold text-blue-800 font-mono">
-                            {surveyPoles.length > 0 ? `${surveyPoles.length} cột ghi nhận` : 'Toàn tuyến'}
-                          </span>
+                      <div className="flex flex-col gap-2">
+                        <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+                            <span className="font-bold text-blue-950">
+                              Khảo sát thực địa trên tuyến:
+                            </span>
+                            <span className="font-extrabold text-blue-800 font-mono">
+                              {surveyPoles.length > 0
+                                ? `${surveyPoles.length} cột ghi nhận sự cố`
+                                : surveyPolePhotos.length > 0
+                                ? 'Không phát hiện cột mất sáng'
+                                : 'Toàn tuyến'}
+                            </span>
+                          </div>
                         </div>
+
+                        {/* Danh sách cột đèn do Kỹ sư hiện trường gửi báo cáo */}
+                        {surveyPolePhotos.length > 0 && (
+                          <div className="flex flex-col gap-1.5 mt-0.5">
+                            <span className="text-[11px] font-bold text-slate-600">
+                              Cột đèn Kỹ sư hiện trường đã gửi báo cáo ({surveyPolePhotos.length}):
+                            </span>
+                            <div className="flex flex-col gap-1.5">
+                              {surveyPolePhotos.map((photo, i) => {
+                                const effectiveState = photo.final_cv_state || photo.cv_state
+                                const isOut = effectiveState === 'off'
+                                const isNormal = effectiveState === 'on'
+                                const needsVideoView = Boolean(
+                                  photo.video && !photo.video.viewed_by && photo.decision !== 'confirm'
+                                )
+
+                                return (
+                                  <div
+                                    key={photo.photo_id || i}
+                                    className={`p-2.5 rounded-xl border text-xs flex flex-col gap-1 ${
+                                      isOut
+                                        ? 'bg-rose-50/70 border-rose-200/90'
+                                        : isNormal
+                                        ? 'bg-emerald-50/70 border-emerald-200/90'
+                                        : 'bg-amber-50/70 border-amber-200/90'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <span className="font-bold text-slate-900">
+                                        Cột <strong className="font-mono text-blue-700">{photo.pole_id || '-'}</strong>
+                                      </span>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        {photo.pole_id && conflictPoleSet.has(photo.pole_id) && (
+                                          <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px] rounded-md">
+                                            Đang ở phiếu{' '}
+                                            {surveyConflicts.find((c) => c.poleId === photo.pole_id)?.workOrderId}
+                                          </span>
+                                        )}
+                                        {needsVideoView && (
+                                          <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 font-bold text-[10px] rounded-md">
+                                            Cần mở xem video
+                                          </span>
+                                        )}
+                                        <span
+                                          className={`px-2 py-0.5 font-extrabold text-[10px] rounded-md ${
+                                            isOut
+                                              ? 'bg-rose-200/80 text-rose-900'
+                                              : isNormal
+                                              ? 'bg-emerald-200/80 text-emerald-900'
+                                              : 'bg-amber-200/80 text-amber-900'
+                                          }`}
+                                        >
+                                          {isOut
+                                            ? 'Báo mất sáng (Cần kiểm tra)'
+                                            : isNormal
+                                            ? 'Đèn sáng bình thường'
+                                            : 'Chưa chốt trạng thái (Cần yêu cầu làm lại)'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {photo.review_note && (
+                                      <p className="text-[11px] text-slate-700">
+                                        <strong>Ghi chú kỹ sư:</strong> {photo.review_note}
+                                      </p>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {/* Cảnh báo xung đột khi có cột đang nằm trong phiếu công tác khác chưa đóng */}
+                        {surveyConflicts.length > 0 && (
+                          <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 flex flex-col gap-2 text-xs text-amber-950">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                              <div>
+                                <strong>Phát hiện {surveyConflicts.length} cột đang nằm trong phiếu khác chưa đóng:</strong>{' '}
+                                Cần hủy phiếu đang giữ cột hoặc từ chối cột khỏi báo cáo khảo sát (nếu chưa duyệt) để đưa vào lịch kiểm tra mới.
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              {surveyConflicts.map((c) => (
+                                <div
+                                  key={`${c.poleId}-${c.workOrderId}`}
+                                  className="px-2.5 py-2 rounded-lg bg-white border border-amber-200 flex items-center justify-between gap-2 flex-wrap"
+                                >
+                                  <span>
+                                    Cột <strong className="font-mono text-slate-900">{c.poleId}</strong> đang thuộc phiếu{' '}
+                                    <strong className="font-mono text-rose-700">{c.workOrderId}</strong>
+                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {c.canRejectPhoto && (
+                                      <button
+                                        type="button"
+                                        disabled={isResolvingConflict}
+                                        onClick={() => handleRejectConflictPhoto(c)}
+                                        className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold text-[10.5px] transition cursor-pointer disabled:opacity-50"
+                                      >
+                                        Từ chối cột này
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      disabled={isResolvingConflict}
+                                      onClick={() =>
+                                        setConflictToCancel({
+                                          workOrderId: c.workOrderId,
+                                          poleId: c.poleId,
+                                        })
+                                      }
+                                      className="px-2 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10.5px] transition cursor-pointer disabled:opacity-50"
+                                    >
+                                      Hủy phiếu {c.workOrderId}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : previewEvidence.length > 0 ? (
                       <div className="grid grid-cols-3 gap-2 select-none">
@@ -1078,31 +1384,6 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         Chưa có ảnh bằng chứng đính kèm — bấm nút trên để xem chi tiết báo cáo.
                       </div>
                     )}
-
-                    {/* Detections AI phát hiện sự cố (nếu là Khảo sát) */}
-                    {currentPhase.report?.aiDetections &&
-                      currentPhase.report.aiDetections.length > 0 && (
-                        <div className="flex flex-col gap-1.5 mt-1">
-                          <span className="text-[11px] font-bold text-slate-600">
-                            Phát hiện từ mô hình Computer Vision:
-                          </span>
-                          <div className="flex flex-col gap-1.5">
-                            {currentPhase.report.aiDetections.map((ai, i) => (
-                              <div
-                                key={i}
-                                className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/90 text-xs flex items-center justify-between"
-                              >
-                                <span className="font-bold text-slate-900">
-                                  <strong className="font-mono text-blue-700">{ai.poleId}</strong>: {ai.issue}
-                                </span>
-                                <span className="px-2 py-0.5 bg-amber-200/80 text-amber-900 font-extrabold text-[10px] rounded-md font-mono">
-                                  AI: {Math.round(ai.confidence * 100)}%
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
 
                     {/* Đo độ rọi Luxmeter (nếu có) */}
                     {currentPhase.report?.luxMeasured && (
@@ -1292,33 +1573,59 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     </>
                   )}
 
-                  {canSpawnInspectionFromSurvey && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
-                        ✓ Đã nghiệm thu khảo sát
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const polesForNext =
-                            (currentPhase.poleIds && currentPhase.poleIds.length > 0 && currentPhase.poleIds) ||
-                            (surveyPoles && surveyPoles.length > 0 && surveyPoles) ||
-                            currentPhase.report?.aiDetections?.map((d) => d.poleId) ||
-                            []
-                          onOpenCreateNextPhaseModal(
-                            caseItem.code,
-                            'inspection',
-                            currentPhase.workOrderId,
-                            polesForNext
-                          )
-                        }}
-                        className="flex items-center gap-1 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
-                        title="Tạo lịch kiểm tra tiếp nối (kế thừa mã sự vụ)"
-                      >
-                        <span>➕ Tạo lịch kiểm tra</span>
-                      </button>
-                    </div>
-                  )}
+                  {canSpawnInspectionFromSurvey && (() => {
+                    const hasAnyFaultPoles = surveyPolesForNext.length > 0
+                    const allFaultPolesBusy = hasAnyFaultPoles && freeSurveyPolesForNext.length === 0
+
+                    return (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                          ✓ Đã nghiệm thu khảo sát
+                        </span>
+                        {allFaultPolesBusy ? (
+                          <button
+                            type="button"
+                            onClick={() => setIsConflictModalOpen(true)}
+                            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
+                            title="Các cột lỗi đều đang nằm trong phiếu công tác khác. Bấm để xem và xử lý."
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Đang trùng phiếu ({surveyConflicts.length} cột)</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!hasAnyFaultPoles}
+                            onClick={() => {
+                              if (!hasAnyFaultPoles) return
+                              if (surveyConflicts.length > 0) {
+                                setIsConflictModalOpen(true)
+                                return
+                              }
+                              onOpenCreateNextPhaseModal(
+                                caseItem.code,
+                                'inspection',
+                                currentPhase.workOrderId,
+                                freeSurveyPolesForNext
+                              )
+                            }}
+                            className={`flex items-center gap-1 px-4 py-2 text-xs font-bold rounded-xl shadow-xs transition ${
+                              hasAnyFaultPoles
+                                ? 'text-white bg-blue-600 hover:bg-blue-700 cursor-pointer active:scale-95'
+                                : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-70'
+                            }`}
+                            title={
+                              hasAnyFaultPoles
+                                ? 'Tạo lịch kiểm tra tiếp nối (kế thừa mã sự vụ)'
+                                : 'Ca khảo sát này không ghi nhận cột đèn nào bị sự cố cần kiểm tra'
+                            }
+                          >
+                            <span>➕ Tạo lịch kiểm tra</span>
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </>
               )}
 
@@ -1614,6 +1921,38 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           }}
         />
       )}
+      {/* Popup Cảnh Báo & Xử Lý Cột Trùng Phiếu Khác Khi Tạo Lịch Kiểm Tra */}
+      <SurveyConflictModal
+        isOpen={isConflictModalOpen}
+        conflicts={surveyConflicts}
+        freePoleIds={freeSurveyPolesForNext}
+        isProcessing={isResolvingConflict}
+        onClose={() => setIsConflictModalOpen(false)}
+        onRequestCancelOtherOrder={(workOrderId, poleId) =>
+          setConflictToCancel({ workOrderId, poleId })
+        }
+        onRejectPolePhoto={handleRejectConflictPhoto}
+        onProceedWithFreePoles={() => {
+          setIsConflictModalOpen(false)
+          if (freeSurveyPolesForNext.length > 0) {
+            onOpenCreateNextPhaseModal(
+              caseItem.code,
+              'inspection',
+              currentPhase?.workOrderId,
+              freeSurveyPolesForNext
+            )
+          }
+        }}
+      />
+
+      {/* Modal Hủy Phiếu Công Tác Khác Đang Giữ Cột */}
+      <CancelScheduleModal
+        isOpen={Boolean(conflictToCancel)}
+        onClose={() => setConflictToCancel(null)}
+        caseCode={conflictToCancel?.poleId || ''}
+        workOrderId={conflictToCancel?.workOrderId || ''}
+        onSubmit={handleConfirmCancelConflictOrder}
+      />
     </div>
   )
 }

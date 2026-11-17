@@ -148,11 +148,29 @@ function extractApiErrorMessage(err: unknown, fallbackMessage: string): string {
       return 'Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường thông tin.'
     }
 
+    if (code === 'POLE_VIDEO_NOT_VIEWED') {
+      return 'Còn video báo cáo hiện trường chưa được mở xem. Vui lòng bấm "Xem Báo Cáo Hiện Trường Thực Địa" và phát video trước khi duyệt nghiệm thu.'
+    }
+    if (code === 'POLE_PHOTO_INCONCLUSIVE') {
+      return 'Còn báo cáo cột đèn chưa được Kỹ sư hiện trường chốt trạng thái (Đèn sáng / Đèn tắt). Vui lòng bấm "Yêu cầu làm lại" để Kỹ sư cập nhật kết luận.'
+    }
+    if (
+      code === 'POLE_PHOTOS_UNDECIDED' ||
+      code === 'UNDECIDED_POLE_PHOTOS' ||
+      code === 'POLE_PHOTO_UNDECIDED' ||
+      Array.isArray(details?.photo_ids)
+    ) {
+      return 'Còn báo cáo ảnh/video cột đèn trong phiếu khảo sát chưa được xác nhận. Vui lòng kiểm tra báo cáo hiện trường hoặc yêu cầu kỹ sư cập nhật trước khi nghiệm thu.'
+    }
+
     const mappedByCode: Record<string, string> = {
       INVALID_STATE_TRANSITION: 'Trạng thái phiếu công tác hiện tại không cho phép thực hiện thao tác này.',
       CONCURRENT_MODIFICATION: 'Phiếu công tác vừa được cập nhật ở nơi khác. Vui lòng tải lại và thử lại.',
       AFTER_EVIDENCE_REQUIRED: 'Cần có ảnh chụp sau sửa chữa trước khi hoàn tất phiếu.',
-      NOTHING_TO_FOLLOW_UP: 'Không có sự cố hoặc hạng mục nào đủ điều kiện để tạo bước tiếp theo.',
+      NOTHING_TO_FOLLOW_UP: 'Không có cột đèn nào ghi nhận sự cố hợp lệ từ bước trước để tạo lịch tiếp theo.',
+      POLE_PHOTO_ALREADY_DECIDED: 'Báo cáo cột đèn này đã được phê duyệt trước đó.',
+      POLE_PHOTO_NOT_FOUND: 'Không tìm thấy dữ liệu ảnh/video báo cáo cột đèn.',
+      POLE_PHOTO_TARGET_CHANGED: 'Thông tin cột đèn của báo cáo đã thay đổi trên hệ thống.',
       CROSS_COMMUNE_REFERENCE: 'Dữ liệu được chọn không thuộc cùng địa bàn xã/phường.',
       WORK_ORDER_NOT_FOUND: 'Không tìm thấy phiếu công tác hoặc bạn không có quyền truy cập.',
       ASSET_NOT_FOUND: 'Không tìm thấy tuyến đường hoặc cột đèn trong hệ thống.',

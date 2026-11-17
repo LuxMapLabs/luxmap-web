@@ -36,6 +36,22 @@ export function getLocalTodayYmd(now: Date = new Date()): string {
   return `${year}-${month}-${day}`
 }
 
+export function getLocalTomorrowYmd(now: Date = new Date()): string {
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  return getLocalTodayYmd(tomorrow)
+}
+
+/**
+ * Cảnh báo khi Quản lý tạo phiếu cho ngày hôm nay nhưng thời điểm hiện tại đã từ 22:00 trở đi.
+ */
+export function isLateNightSameDayWarning(
+  selectedYmd?: string,
+  now: Date = new Date()
+): boolean {
+  if (!selectedYmd) return false
+  return now.getHours() >= 22 && selectedYmd.substring(0, 10) === getLocalTodayYmd(now)
+}
+
 export function formatYmdToVi(ymdStr?: string): string {
   if (!ymdStr) return '-'
   const datePart = ymdStr.substring(0, 10)

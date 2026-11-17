@@ -411,27 +411,23 @@ export const workScheduleAPI = {
 
   /**
    * Tự động xác nhận toàn bộ các ảnh cột đèn chưa duyệt trong ca khảo sát
-   * Gọi khi Quản lý bấm Duyệt báo cáo khảo sát hoặc Tạo lịch tiếp theo
+   * Gọi khi Quản lý bấm Duyệt báo cáo khảo sát hoặc Tạo lịch tiếp theo.
+   * Không dùng Promise.allSettled nuốt lỗi: nếu có video chưa xem (POLE_VIDEO_NOT_VIEWED)
+   * hoặc ảnh kỹ sư chưa chốt kết luận (POLE_PHOTO_INCONCLUSIVE), ném lỗi để Saga dừng lại và báo rõ cho Quản lý.
    */
   async confirmAllPendingPolePhotos(workOrderId: string): Promise<void> {
-    try {
-      const photosRes = await this.getWorkOrderPolePhotos(workOrderId)
-      const items = photosRes.items || []
-      // Lọc các ảnh chưa có quyết định decision
-      const pendingItems = items.filter((p) => p.photo_id && !p.decision && p.decision !== 'confirm')
-      if (pendingItems.length === 0) return
+    const photosRes = await this.getWorkOrderPolePhotos(workOrderId)
+    const items = photosRes.items || []
+    // Lọc các ảnh/video chưa có quyết định decision
+    const pendingItems = items.filter((p) => p.photo_id && !p.decision)
+    if (pendingItems.length === 0) return
 
-      // Xác nhận song song các ảnh để Backend chuyển cột thành out và tạo fault detected
-      await Promise.allSettled(
-        pendingItems.map((p) =>
-          this.decidePolePhoto(workOrderId, p.photo_id!, {
-            decision: 'confirm',
-            note: 'Quản lý duyệt báo cáo khảo sát hiện trường.',
-          })
-        )
-      )
-    } catch (err) {
-      console.warn(`[WorkScheduleAPI] confirmAllPendingPolePhotos error for ${workOrderId}:`, err)
+    // Xác nhận tuần tự từng báo cáo cột đèn (tránh tranh chấp khóa FOR UPDATE trên cùng work_order)
+    for (const p of pendingItems) {
+      await this.decidePolePhoto(workOrderId, p.photo_id!, {
+        decision: 'confirm',
+        note: 'Quản lý duyệt báo cáo khảo sát hiện trường.',
+      })
     }
   },
 
