@@ -387,6 +387,7 @@ export const SATELLITE_RASTER_PAINT = {
   'raster-contrast': 0.3,
   'raster-saturation': 0.15,
   'raster-hue-rotate': 0,
+  'raster-fade-duration': 100,
 } as const
 
 // Nền xanh nhạt đặt dưới ảnh vệ tinh (ảnh trong 80%) để bù sắc vàng của ảnh MapTiler.
