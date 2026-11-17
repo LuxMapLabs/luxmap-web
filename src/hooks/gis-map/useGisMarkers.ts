@@ -28,6 +28,9 @@ interface UseGisMarkersProps {
 export const ZOOM_OUT_CLASS = 'gis-zoom-out'
 export const SELECTED_FULL_SIZE_ZOOM = 15
 
+/** Tủ điện (và chấm IoT node gắn ở tủ) chỉ hiện từ mức zoom này. */
+export const CABINET_MIN_ZOOM = 9.5
+
 export function useGisMarkers({
   map,
   isMapLoaded,
@@ -50,7 +53,7 @@ export function useGisMarkers({
     if (!map) return
     const zoom = map.getZoom()
     const showPolesAndLines = zoom >= 13.0
-    const showCabinets = zoom >= 9.5
+    const showCabinets = zoom >= CABINET_MIN_ZOOM
     map.getContainer().classList.toggle(ZOOM_OUT_CLASS, zoom < SELECTED_FULL_SIZE_ZOOM)
 
     // 1. Pole Markers

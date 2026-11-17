@@ -5,7 +5,6 @@ import {
   toLngLatBounds,
   toBboxParam,
   toBoundaryGeoJSON,
-  toBoundaryMaskGeoJSON,
   FIT_BOUNDS_GIS_PANORAMA,
   FIT_BOUNDS_GIS_SEGMENT,
 } from '../../utils/gis-map/mapUtils'
@@ -150,7 +149,7 @@ export const GisMapPage: React.FC = () => {
     lastFramedBboxRef.current = bboxKey
   }, [isMapLoaded, mapBounds, mapRef])
 
-  // Khoanh vùng khu vực quản lý: viền nét đứt + tô mờ phần bên ngoài bbox của xã
+  // Khoanh vùng khu vực quản lý: viền nét đứt quanh khu vực xã
   useEffect(() => {
     const map = mapRef.current
     if (!isMapLoaded || !map) return
@@ -158,29 +157,18 @@ export const GisMapPage: React.FC = () => {
     const sourceId = 'managed-area'
     const emptyData: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
-    const maskData = toBoundaryMaskGeoJSON(communeBoundary, mapBounds?.bbox)
     const lineData = toBoundaryGeoJSON(communeBoundary, mapBounds?.bbox)
 
-    const maskId = `${sourceId}-mask`
     const lineId = `${sourceId}-line`
     try {
-      const maskSrc = map.getSource(maskId) as maplibregl.GeoJSONSource | undefined
       const lineSrc = map.getSource(lineId) as maplibregl.GeoJSONSource | undefined
 
-      if (maskSrc && lineSrc) {
-        maskSrc.setData(maskData || emptyData)
+      if (lineSrc) {
         lineSrc.setData(lineData || emptyData)
         return
       }
 
-      map.addSource(maskId, { type: 'geojson', data: maskData || emptyData })
       map.addSource(lineId, { type: 'geojson', data: lineData || emptyData })
-      map.addLayer({
-        id: `${sourceId}-mask-fill`,
-        type: 'fill',
-        source: maskId,
-        paint: { 'fill-color': '#0f172a', 'fill-opacity': 0.35 },
-      })
       map.addLayer({
         id: `${sourceId}-line-stroke`,
         type: 'line',

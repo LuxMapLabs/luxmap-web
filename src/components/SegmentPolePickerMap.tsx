@@ -12,7 +12,6 @@ import {
   toLngLatBounds,
   getCommuneBboxInfo,
   toBoundaryGeoJSON,
-  toBoundaryMaskGeoJSON,
 } from '../utils/gis-map/mapUtils'
 import { isBend, polesOf, type OrderedPole } from '../utils/gis-map/segmentPoleOrder'
 import { MIN_ROAD_ZOOM } from '../utils/gis-map/segmentReshape'
@@ -75,9 +74,6 @@ const PICKED_SRC = 'pick-road-points'
 const COMMUNE_SRC = 'pick-commune-outline'
 /** Viền ranh giới xã (chưa có ranh giới thì dùng khung bbox); không có gì thì không vẽ. */
 const communeOutline = (boundary: Geometry | null, bbox: unknown) => toBoundaryGeoJSON(boundary, bbox) ?? emptyFc
-const COMMUNE_MASK_SRC = 'pick-commune-mask'
-/** Phần ngoài ranh giới xã tô tối như Bản đồ GIS; không có gì thì không phủ. */
-const communeMask = (boundary: Geometry | null, bbox: unknown) => toBoundaryMaskGeoJSON(boundary, bbox) ?? emptyFc
 const emptyFc = { type: 'FeatureCollection' as const, features: [] }
 
 // Nhãn nhỏ ĐẦU / CUỐI trên cột đầu và cột cuối của tuyến
@@ -429,13 +425,6 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
 
     map.on('load', () => {
       // Viền khung xã của tuyến: nằm dưới mọi lớp khác, để biết đâu là địa bàn mình
-      map.addSource(COMMUNE_MASK_SRC, { type: 'geojson', data: communeMask(boundaryRef.current, communeBboxRef.current) })
-      map.addLayer({
-        id: 'pick-commune-mask',
-        type: 'fill',
-        source: COMMUNE_MASK_SRC,
-        paint: { 'fill-color': '#0f172a', 'fill-opacity': 0.35 },
-      })
       map.addSource(COMMUNE_SRC, {
         type: 'geojson',
         data: communeOutline(boundaryRef.current, communeBboxRef.current),
@@ -613,7 +602,6 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
     const map = mapRef.current
     if (!map || !loadedRef.current) return
     ;(map.getSource(COMMUNE_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeOutline(communeBoundary, communeBbox))
-    ;(map.getSource(COMMUNE_MASK_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeMask(communeBoundary, communeBbox))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(communeBbox), communeBoundary])
 

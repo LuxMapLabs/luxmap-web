@@ -10,6 +10,7 @@ import {
   iotStatusBadge,
   type IotStatusBadge,
 } from '../../constants/iot'
+import { CABINET_MIN_ZOOM } from './useGisMarkers'
 
 /** Trạng thái gateway/node đổi theo heartbeat và mẫu điện; backend chưa có realtime nên đọc lại định kỳ. */
 const REFRESH_MS = 30_000
@@ -51,7 +52,7 @@ function markerElement(text: string, badge: IotStatusBadge, title: string): HTML
 
 /**
  * Marker IoT bridge trên bản đồ GIS: gateway theo `location` của server (null = chưa có toạ độ, không vẽ),
- * node theo toạ độ tủ điện — một chấm trạng thái ở góc trên phải marker tủ, không kèm chữ.
+ * node theo toạ độ tủ điện — một chấm trạng thái ở góc trên phải marker tủ, không kèm chữ; chấm node ẩn khi zoom < `CABINET_MIN_ZOOM`, cùng tủ điện.
  */
 export function useIotBridgeMarkers(map: maplibregl.Map | null, isMapLoaded: boolean) {
   const [servers, setServers] = useState<IotServerStatus[]>([])
@@ -78,6 +79,7 @@ export function useIotBridgeMarkers(map: maplibregl.Map | null, isMapLoaded: boo
   useEffect(() => {
     if (!map || !isMapLoaded) return
     const markers: maplibregl.Marker[] = []
+    const nodeDotElements: HTMLDivElement[] = []
 
     servers.forEach((server) => {
       if (!server.location) return
@@ -90,6 +92,7 @@ export function useIotBridgeMarkers(map: maplibregl.Map | null, isMapLoaded: boo
       if (!node.location) return
       const badge = iotStatusBadge(IOT_NODE_STATUS, node.status)
       const el = dotElement(badge, `${node.node_id} (tủ ${node.cabinet_id}): ${badge.label}`)
+      nodeDotElements.push(el)
       markers.push(
         new maplibregl.Marker({ element: el, anchor: 'center', offset: [12, -12] })
           .setLngLat([node.location.lng, node.location.lat])
@@ -97,6 +100,18 @@ export function useIotBridgeMarkers(map: maplibregl.Map | null, isMapLoaded: boo
       )
     })
 
-    return () => markers.forEach((marker) => marker.remove())
+    const syncNodeDots = () => {
+      nodeDotElements.forEach((el) => {
+        el.style.visibility = map.getZoom() >= CABINET_MIN_ZOOM ? 'visible' : 'hidden'
+      })
+    }
+
+    syncNodeDots()
+    map.on('zoom', syncNodeDots)
+
+    return () => {
+      map.off('zoom', syncNodeDots)
+      markers.forEach((marker) => marker.remove())
+    }
   }, [map, isMapLoaded, servers, nodes])
 }

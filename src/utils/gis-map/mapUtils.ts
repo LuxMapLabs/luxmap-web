@@ -3,6 +3,7 @@ import type { Geometry } from '../../types/common/base'
 import { bboxToGeometry, geometryToPolygons, pointInGeometry } from '../communeBoundary'
 import type { MapBounds } from '../../types/auth/me'
 import type { Map as MapLibreMap, StyleSpecification } from 'maplibre-gl'
+import type { FeatureCollection, MultiPolygon, Point, Polygon } from 'geojson'
 
 /** Fallback only — the map opens on the account's `map_bounds` (GET /auth/me). Centre of the surveyed communes. */
 export const DEFAULT_MAP_CENTER: [number, number] = [106.4975, 10.9715]
@@ -195,8 +196,8 @@ export const DEFAULT_MAP_ZOOM = 14.8
 // ==========================================
 // 1. GIỚI HẠN CAMERA TOÀN CỤC (GLOBAL MAP LIMITS)
 // ==========================================
-/** Mức zoom tối đa cho phép của bản đồ nền (tránh bể hạt ngói vệ tinh) */
-export const MAP_MAX_ZOOM = 20
+/** Mức zoom tối đa cho phép của bản đồ nền (ảnh vệ tinh MapTiler ở Việt Nam chỉ có chi tiết thật đến zoom 17, sâu hơn bị nhòe) */
+export const MAP_MAX_ZOOM = 17
 
 /** Mức zoom tối thiểu mặc định toàn cục */
 export const MAP_DEFAULT_MIN_ZOOM = 6
@@ -275,8 +276,125 @@ export const FIT_BOUNDS_GIS_SEGMENT = {
 
 export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY || ''
 
+// Tâm quần đảo theo OpenStreetMap (Quần đảo Hoàng Sa, Đặc khu Trường Sa).
+export const VN_ARCHIPELAGO_LABELS: FeatureCollection<Point, { label: string }> = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: { label: 'QUẦN ĐẢO HOÀNG SA\n(TP. Đà Nẵng - Việt Nam)' },
+      geometry: { type: 'Point', coordinates: [112.03, 16.41] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'QUẦN ĐẢO TRƯỜNG SA\n(Tỉnh Khánh Hòa - Việt Nam)' },
+      geometry: { type: 'Point', coordinates: [113.16, 9.67] },
+    },
+  ],
+}
+
+// Vùng khoanh Hoàng Sa, Trường Sa: ẩn nhãn địa danh MapTiler bên trong (tránh tên nước ngoài).
+export const VN_ARCHIPELAGO_MASK: Polygon | MultiPolygon = {
+  type: 'MultiPolygon',
+  coordinates: [
+    [
+      [
+        [110.8, 15.4],
+        [113.2, 15.4],
+        [113.2, 17.6],
+        [110.8, 17.6],
+        [110.8, 15.4],
+      ],
+    ],
+    [
+      [
+        [111.2, 6.8],
+        [116.5, 6.8],
+        [116.5, 12.1],
+        [111.2, 12.1],
+        [111.2, 6.8],
+      ],
+    ],
+  ],
+}
+
+// Nhãn 11 đặc khu đảo, toạ độ đảo chính lấy từ OpenStreetMap
+export const VN_SPECIAL_ZONE_LABELS: FeatureCollection<Point, { label: string }> = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU VÂN ĐỒN\n(Tỉnh Quảng Ninh)' },
+      geometry: { type: 'Point', coordinates: [107.4953, 21.1567] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU CÔ TÔ\n(Tỉnh Quảng Ninh)' },
+      geometry: { type: 'Point', coordinates: [107.7588, 20.9834] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU CÁT HẢI\n(TP. Hải Phòng)' },
+      geometry: { type: 'Point', coordinates: [107.0091, 20.7952] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU BẠCH LONG VĨ\n(TP. Hải Phòng)' },
+      geometry: { type: 'Point', coordinates: [107.7285, 20.1351] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU CỒN CỎ\n(Tỉnh Quảng Trị)' },
+      geometry: { type: 'Point', coordinates: [107.3398, 17.1584] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU LÝ SƠN\n(Tỉnh Quảng Ngãi)' },
+      geometry: { type: 'Point', coordinates: [109.1188, 15.3806] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU PHÚ QUÝ\n(Tỉnh Lâm Đồng)' },
+      geometry: { type: 'Point', coordinates: [108.9452, 10.5259] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU CÔN ĐẢO\n(TP. Hồ Chí Minh)' },
+      geometry: { type: 'Point', coordinates: [106.615, 8.7004] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU KIÊN HẢI\n(Tỉnh An Giang)' },
+      geometry: { type: 'Point', coordinates: [104.8427, 9.9633] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU PHÚ QUỐC\n(Tỉnh An Giang)' },
+      geometry: { type: 'Point', coordinates: [103.9574, 10.2288] },
+    },
+    {
+      type: 'Feature',
+      properties: { label: 'ĐẶC KHU THỔ CHÂU\n(Tỉnh An Giang)' },
+      geometry: { type: 'Point', coordinates: [103.4847, 9.3035] },
+    },
+  ],
+}
+
+export const SATELLITE_RASTER_PAINT = {
+  'raster-opacity': 0.8,
+  'raster-brightness-min': 0.04,
+  'raster-brightness-max': 1,
+  'raster-contrast': 0.3,
+  'raster-saturation': 0.15,
+  'raster-hue-rotate': 0,
+  'raster-fade-duration': 100,
+} as const
+
+// Nền xanh nhạt đặt dưới ảnh vệ tinh (ảnh trong 80%) để bù sắc vàng của ảnh MapTiler.
+export const SATELLITE_WHITE_BALANCE_COLOR = '#a9c3e8'
+
 /**
- * Bản đồ Vệ Tinh Google Hybrid Sạch (Google Satellite + Tự Động Nạp Hoàng Sa & Trường Sa từ Google + MapTiler Vector Sạch trong đất liền - 0% Rác Quán Xá)
+ * Bản đồ vệ tinh MapTiler Hybrid có lớp cân bằng trắng khử vàng và nhãn quần đảo Hoàng Sa - Trường Sa (Việt Nam).
  */
 export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
   version: 8,
@@ -290,35 +408,32 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
   zoom: 1,
   sources: {
     maptiler_planet: {
-      url: `https://api.maptiler.com/tiles/v3/tiles.json?key=${MAPTILER_KEY}`,
+      url: `https://api.maptiler.com/tiles/v4/tiles.json?key=${MAPTILER_KEY}`,
       type: 'vector',
     },
     satellite: {
       type: 'raster',
-      tiles: [
-        'https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        'https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-      ],
-      tileSize: 256,
+      tiles: [`https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}?key=${MAPTILER_KEY}`],
+      tileSize: 512,
       maxzoom: 22,
-      attribution: '&copy; Google Maps',
+      attribution:
+        '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
     },
-    'google-vn-hybrid': {
-      type: 'raster',
-      tiles: [
-        'https://mt0.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}',
-        'https://mt1.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}',
-        'https://mt2.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}',
-        'https://mt3.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}',
-      ],
-      tileSize: 256,
-      maxzoom: 22,
-      attribution: '&copy; Google Maps',
+    'vn-islands-labels': {
+      type: 'geojson',
+      data: VN_ARCHIPELAGO_LABELS,
+    },
+    'vn-special-zone-labels': {
+      type: 'geojson',
+      data: VN_SPECIAL_ZONE_LABELS,
     },
   },
   layers: [
+    {
+      id: 'Satellite white balance',
+      type: 'background',
+      paint: { 'background-color': SATELLITE_WHITE_BALANCE_COLOR },
+    },
     {
       id: 'Satellite',
       type: 'raster',
@@ -326,35 +441,26 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       minzoom: 0,
       maxzoom: 22,
       layout: { visibility: 'visible' },
-      paint: { 'raster-opacity': 1.0 },
-    },
-    {
-      id: 'google-vn-regional-hybrid',
-      type: 'raster',
-      source: 'google-vn-hybrid',
-      minzoom: 0,
-      maxzoom: 9.5,
-      layout: { visibility: 'visible' },
-      paint: { 'raster-opacity': 1.0 },
+      paint: { ...SATELLITE_RASTER_PAINT },
     },
     {
       id: 'Country border',
       type: 'line',
       source: 'maptiler_planet',
-      'source-layer': 'boundary',
+      'source-layer': 'country_border',
       layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'visible' },
       paint: {
         'line-color': 'hsl(0, 0%, 94%)',
         'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 3, 0.5, 9, 1.5, 22, 32],
       },
-      filter: ['all', ['==', 'admin_level', 2], ['==', 'maritime', 0], ['==', 'disputed', 0]],
-      minzoom: 9.5,
+      filter: ['==', ['get', 'maritime'], false],
+      minzoom: 0,
     },
     {
       id: 'Road labels',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'transportation_name',
+      'source-layer': 'road_label',
       layout: {
         'symbol-placement': 'line',
         'symbol-spacing': ['step', ['zoom'], 250, 21, 900],
@@ -371,14 +477,14 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 17%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', '$type', 'LineString'], ['!=', 'class', 'ferry']],
+      filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'class'], 'ferry']],
       minzoom: 9.5,
     },
     {
-      id: 'Place labels',
+      id: 'Island labels',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'place',
+      'source-layer': 'island_label',
       minzoom: 9.5,
       maxzoom: 16,
       layout: {
@@ -395,14 +501,60 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', '$type', 'Point'], ['!in', 'class', 'city', 'country', 'province', 'state', 'place']],
+      filter: ['all', ['has', 'name:vi'], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
+    },
+    {
+      id: 'Place labels',
+      type: 'symbol',
+      source: 'maptiler_planet',
+      'source-layer': 'place_label',
+      minzoom: 9.5,
+      maxzoom: 16,
+      layout: {
+        'symbol-sort-key': ['to-number', ['get', 'rank']],
+        'text-field': ['coalesce', ['get', 'name:vi'], ['get', 'name'], ['get', 'name:en']],
+        'text-font': ['Noto Sans Regular'],
+        'text-max-width': 10,
+        'text-size': ['interpolate', ['linear', 0.5, 1, 0.5, 1], ['zoom'], 3, 9, 6, 10, 8, 12, 10, 14],
+        visibility: 'visible',
+      },
+      paint: {
+        'text-color': 'hsl(0, 0%, 100%)',
+        'text-halo-blur': 0.5,
+        'text-halo-color': 'hsl(0, 0%, 0%)',
+        'text-halo-width': 1,
+      },
+      filter: ['!', ['within', VN_ARCHIPELAGO_MASK]],
+    },
+    {
+      id: 'Town labels',
+      type: 'symbol',
+      source: 'maptiler_planet',
+      'source-layer': 'town_label',
+      minzoom: 9.5,
+      maxzoom: 16,
+      layout: {
+        'symbol-sort-key': ['to-number', ['get', 'rank']],
+        'text-field': ['coalesce', ['get', 'name:vi'], ['get', 'name'], ['get', 'name:en']],
+        'text-font': ['Noto Sans Regular'],
+        'text-max-width': 10,
+        'text-size': ['interpolate', ['linear', 0.5, 1, 0.5, 1], ['zoom'], 3, 9, 6, 10, 8, 12, 10, 14],
+        visibility: 'visible',
+      },
+      paint: {
+        'text-color': 'hsl(0, 0%, 100%)',
+        'text-halo-blur': 0.5,
+        'text-halo-color': 'hsl(0, 0%, 0%)',
+        'text-halo-width': 1,
+      },
+      filter: ['!', ['within', VN_ARCHIPELAGO_MASK]],
     },
     {
       id: 'City labels',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'place',
-      minzoom: 9.5,
+      'source-layer': 'city_label',
+      minzoom: 6,
       maxzoom: 16,
       layout: {
         'symbol-sort-key': ['to-number', ['get', 'rank']],
@@ -418,32 +570,22 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', '$type', 'Point'], ['==', 'class', 'city'], ['!=', 'capital', 2]],
+      filter: ['all', ['!=', ['get', 'capital'], 20], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
     },
     {
       id: 'State labels',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'place',
-      minzoom: 9.5,
-      maxzoom: 8,
+      'source-layer': 'state_label',
+      // Tên tỉnh hiện khi thu nhỏ; từ 9.5 trở lên nhường chỗ cho tên xã/phường
+      minzoom: 6,
+      maxzoom: 9.5,
       layout: {
-        'symbol-sort-key': ['to-number', ['get', 'rank']],
         'text-field': ['coalesce', ['get', 'name:vi'], ['get', 'name'], ['get', 'name:en']],
         'text-font': ['Noto Sans Italic'],
         'text-letter-spacing': 0.05,
         'text-max-width': 10,
-        'text-size': [
-          'interpolate',
-          ['linear', 0.75, 1],
-          ['zoom'],
-          3,
-          ['step', ['get', 'rank'], 12, 1, 11, 2, 11],
-          6,
-          ['step', ['get', 'rank'], 13, 1, 12, 2, 12],
-          9,
-          ['step', ['get', 'rank'], 22, 1, 14, 2, 14],
-        ],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 6, 12, 9, 14],
         'text-transform': 'none',
         visibility: 'visible',
       },
@@ -452,16 +594,16 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-blur': 1,
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
-        'text-opacity': ['step', ['zoom'], 0, 3, ['case', ['<=', ['get', 'rank'], 3], 1, 0], 7, ['case', ['<=', ['get', 'rank'], 3], 0, 1]],
+        'text-opacity': 1,
       },
-      filter: ['all', ['==', '$type', 'Point'], ['in', 'class', 'state', 'province'], ['<=', 'rank', 6]],
+      filter: ['all', ['==', ['get', 'admin_level'], 30], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
     },
     {
       id: 'Capital city labels',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'place',
-      minzoom: 9.5,
+      'source-layer': 'city_label',
+      minzoom: 4,
       maxzoom: 16,
       layout: {
         'symbol-sort-key': ['to-number', ['get', 'rank']],
@@ -479,14 +621,14 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', 'capital', 2], ['==', 'class', 'city']],
+      filter: ['all', ['==', ['get', 'capital'], 20], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
     },
     {
       id: 'Country labels',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'place',
-      minzoom: 9.5,
+      'source-layer': 'country_label',
+      minzoom: 2,
       maxzoom: 12,
       layout: {
         'symbol-sort-key': ['to-number', ['get', 'rank']],
@@ -514,13 +656,13 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', '$type', 'Point'], ['in', 'class', 'country'], ['!=', 'iso_a2', 'VA']],
+      filter: ['all', ['!=', ['get', 'iso_a2'], 'VA'], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
     },
     {
       id: 'Public',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'poi',
+      'source-layer': 'poi_public',
       minzoom: 13,
       layout: {
         'icon-image': [
@@ -535,9 +677,9 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
           'police',
           ['in', 'Công an', ['get', 'name']],
           'police',
-          ['==', ['get', 'class'], 'police'],
+          ['any', ['==', ['get', 'class'], 'police'], ['==', ['get', 'subclass'], 'police']],
           'police',
-          ['==', ['get', 'class'], 'fire_station'],
+          ['any', ['==', ['get', 'class'], 'fire_station'], ['==', ['get', 'subclass'], 'fire_station']],
           'fire_station',
           'town_hall',
         ],
@@ -582,8 +724,11 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       metadata: {},
       filter: [
         'all',
-        ['==', '$type', 'Point'],
-        ['in', 'class', 'townhall', 'town_hall', 'courthouse', 'police', 'fire_station'],
+        [
+          'any',
+          ['in', ['get', 'class'], ['literal', ['townhall', 'town_hall', 'courthouse', 'police', 'fire_station']]],
+          ['in', ['get', 'subclass'], ['literal', ['townhall', 'town_hall', 'courthouse', 'police', 'fire_station']]],
+        ],
         ['has', 'name'],
       ],
     },
@@ -591,7 +736,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       id: 'Education',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'poi',
+      'source-layer': 'poi_education',
       minzoom: 13,
       layout: {
         'icon-image': 'school',
@@ -621,13 +766,13 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-opacity': 1,
       },
       metadata: {},
-      filter: ['all', ['==', '$type', 'Point'], ['in', 'class', 'school', 'college', 'university'], ['has', 'name']],
+      filter: ['all', ['in', ['get', 'class'], ['literal', ['school', 'college', 'university']]], ['has', 'name']],
     },
     {
       id: 'Healthcare',
       type: 'symbol',
       source: 'maptiler_planet',
-      'source-layer': 'poi',
+      'source-layer': 'poi_healthcare',
       minzoom: 13,
       layout: {
         'icon-image': 'hospital',
@@ -657,7 +802,44 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-opacity': 1,
       },
       metadata: {},
-      filter: ['all', ['==', '$type', 'Point'], ['==', 'class', 'hospital'], ['has', 'name']],
+      filter: ['all', ['==', ['get', 'class'], 'hospital'], ['has', 'name']],
+    },
+    {
+      id: 'VN special zone labels',
+      type: 'symbol',
+      source: 'vn-special-zone-labels',
+      minzoom: 6,
+      maxzoom: 9.5,
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-font': ['Noto Sans Bold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 6, 10, 9, 12],
+        'text-anchor': 'center',
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(0,0,0,0.8)',
+        'text-halo-width': 1.5,
+      },
+    },
+    {
+      id: 'VN archipelago labels',
+      type: 'symbol',
+      source: 'vn-islands-labels',
+      maxzoom: 9,
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-font': ['Noto Sans Bold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 3, 9, 5, 11, 8, 14],
+        'text-max-width': 20,
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(0,0,0,0.8)',
+        'text-halo-width': 1.5,
+      },
     },
   ],
 }) as unknown as StyleSpecification
