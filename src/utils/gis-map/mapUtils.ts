@@ -276,19 +276,19 @@ export const FIT_BOUNDS_GIS_SEGMENT = {
 
 export const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY || ''
 
-// Toạ độ gần đúng, cần đối chiếu nguồn chính thức.
+// Tâm quần đảo theo OpenStreetMap (Quần đảo Hoàng Sa, Đặc khu Trường Sa).
 export const VN_ARCHIPELAGO_LABELS: FeatureCollection<Point, { label: string }> = {
   type: 'FeatureCollection',
   features: [
     {
       type: 'Feature',
       properties: { label: 'QUẦN ĐẢO HOÀNG SA\n(TP. Đà Nẵng - Việt Nam)' },
-      geometry: { type: 'Point', coordinates: [112.0, 17.35] },
+      geometry: { type: 'Point', coordinates: [112.03, 16.41] },
     },
     {
       type: 'Feature',
       properties: { label: 'QUẦN ĐẢO TRƯỜNG SA\n(Tỉnh Khánh Hòa - Việt Nam)' },
-      geometry: { type: 'Point', coordinates: [114.2, 12.2] },
+      geometry: { type: 'Point', coordinates: [113.16, 9.67] },
     },
   ],
 }
@@ -836,6 +836,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-field': ['get', 'label'],
         'text-font': ['Noto Sans Bold'],
         'text-size': ['interpolate', ['linear'], ['zoom'], 3, 9, 5, 11, 8, 14],
+        'text-max-width': 20,
         'text-allow-overlap': true,
         'text-ignore-placement': true,
       },
