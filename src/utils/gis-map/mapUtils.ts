@@ -3,7 +3,7 @@ import type { Geometry } from '../../types/common/base'
 import { bboxToGeometry, geometryToPolygons, pointInGeometry } from '../communeBoundary'
 import type { MapBounds } from '../../types/auth/me'
 import type { Map as MapLibreMap, StyleSpecification } from 'maplibre-gl'
-import type { FeatureCollection, Point } from 'geojson'
+import type { FeatureCollection, MultiPolygon, Point, Polygon } from 'geojson'
 
 /** Fallback only — the map opens on the account's `map_bounds` (GET /auth/me). Centre of the surveyed communes. */
 export const DEFAULT_MAP_CENTER: [number, number] = [106.4975, 10.9715]
@@ -293,6 +293,31 @@ export const VN_ARCHIPELAGO_LABELS: FeatureCollection<Point, { label: string }> 
   ],
 }
 
+// Vùng khoanh Hoàng Sa, Trường Sa: ẩn nhãn địa danh MapTiler bên trong (tránh tên nước ngoài).
+export const VN_ARCHIPELAGO_MASK: Polygon | MultiPolygon = {
+  type: 'MultiPolygon',
+  coordinates: [
+    [
+      [
+        [110.8, 15.4],
+        [113.2, 15.4],
+        [113.2, 17.6],
+        [110.8, 17.6],
+        [110.8, 15.4],
+      ],
+    ],
+    [
+      [
+        [111.2, 6.8],
+        [116.5, 6.8],
+        [116.5, 12.1],
+        [111.2, 12.1],
+        [111.2, 6.8],
+      ],
+    ],
+  ],
+}
+
 export const SATELLITE_RASTER_PAINT = {
   'raster-opacity': 0.8,
   'raster-brightness-min': 0.04,
@@ -411,9 +436,13 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
       },
       filter: [
         'all',
-        ['==', '$type', 'Point'],
-        ['!in', 'class', 'city', 'country', 'province', 'state', 'place'],
-        ['any', ['!in', 'class', 'island', 'islet', 'archipelago'], ['has', 'name:vi']],
+        [
+          'all',
+          ['==', ['geometry-type'], 'Point'],
+          ['!', ['in', ['get', 'class'], ['literal', ['city', 'country', 'province', 'state', 'place']]]],
+          ['any', ['!', ['in', ['get', 'class'], ['literal', ['island', 'islet', 'archipelago']]]], ['has', 'name:vi']],
+        ],
+        ['!', ['within', VN_ARCHIPELAGO_MASK]],
       ],
     },
     {
@@ -437,7 +466,16 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', '$type', 'Point'], ['==', 'class', 'city'], ['!=', 'capital', 2]],
+      filter: [
+        'all',
+        [
+          'all',
+          ['==', ['geometry-type'], 'Point'],
+          ['==', ['get', 'class'], 'city'],
+          ['!=', ['get', 'capital'], 2],
+        ],
+        ['!', ['within', VN_ARCHIPELAGO_MASK]],
+      ],
     },
     {
       id: 'State labels',
@@ -473,7 +511,16 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-width': 1,
         'text-opacity': ['step', ['zoom'], 0, 3, ['case', ['<=', ['get', 'rank'], 3], 1, 0], 7, ['case', ['<=', ['get', 'rank'], 3], 0, 1]],
       },
-      filter: ['all', ['==', '$type', 'Point'], ['in', 'class', 'state', 'province'], ['<=', 'rank', 6]],
+      filter: [
+        'all',
+        [
+          'all',
+          ['==', ['geometry-type'], 'Point'],
+          ['in', ['get', 'class'], ['literal', ['state', 'province']]],
+          ['<=', ['to-number', ['get', 'rank'], 99], 6],
+        ],
+        ['!', ['within', VN_ARCHIPELAGO_MASK]],
+      ],
     },
     {
       id: 'Capital city labels',
@@ -498,7 +545,15 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', 'capital', 2], ['==', 'class', 'city']],
+      filter: [
+        'all',
+        [
+          'all',
+          ['==', ['get', 'capital'], 2],
+          ['==', ['get', 'class'], 'city'],
+        ],
+        ['!', ['within', VN_ARCHIPELAGO_MASK]],
+      ],
     },
     {
       id: 'Country labels',
@@ -533,7 +588,16 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['==', '$type', 'Point'], ['in', 'class', 'country'], ['!=', 'iso_a2', 'VA']],
+      filter: [
+        'all',
+        [
+          'all',
+          ['==', ['geometry-type'], 'Point'],
+          ['in', ['get', 'class'], ['literal', ['country']]],
+          ['!=', ['get', 'iso_a2'], 'VA'],
+        ],
+        ['!', ['within', VN_ARCHIPELAGO_MASK]],
+      ],
     },
     {
       id: 'Public',
