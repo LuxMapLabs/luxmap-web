@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useCommuneBoundary } from '../../../../../hooks/gis-map/useCommuneBoundary'
 import { useSelector, useDispatch } from 'react-redux'
 import { toast } from 'sonner'
 import { AssetModalFrame, AssetModalHeader, AssetModalFooter, AssetModalError } from '../../common/AssetModal'
@@ -22,7 +23,7 @@ import {
   FIT_BOUNDS_ASSET_ADD_INSTANT,
   FIT_BOUNDS_ASSET_ADD_SMOOTH,
   toLngLatBounds,
-  toBboxPolygonGeoJSON,
+  toBoundaryGeoJSON,
   isPointInBounds,
   OUTSIDE_MANAGED_AREA_MESSAGE,
   getCommuneBboxInfo,
@@ -123,6 +124,9 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const communeBoundsInfo = useMemo(() => {
     return getCommuneBboxInfo(activeCommuneId, userCommunes, adminCommunes, mapBounds)
   }, [activeCommuneId, userCommunes, adminCommunes, mapBounds])
+  const communeBoundary = useCommuneBoundary(activeCommuneId)
+  const boundaryRef = useRef(communeBoundary)
+  boundaryRef.current = communeBoundary
   const activeBounds = useMemo(
     () => communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox),
     [communeBoundsInfo, mapBounds]
@@ -423,7 +427,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     // Đặt cột ở giữa vùng bản đồ đang nhìn; người dùng kéo tới đúng chỗ
     const center = mapRef.current?.getCenter()
     if (!center) return
-    if (!isPointInBounds(activeBoundsRef.current, center.lng, center.lat)) {
+    if (!isPointInBounds(activeBoundsRef.current, center.lng, center.lat, boundaryRef.current)) {
       toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
       return
     }
@@ -487,7 +491,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     map.on('load', () => {
       const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
 
-      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      const bboxGeoJson = toBoundaryGeoJSON(boundaryRef.current, communeBoundsInfo.bbox || mapBounds?.bbox)
       if (!map.getSource('commune-bbox-boundary')) {
         map.addSource('commune-bbox-boundary', {
           type: 'geojson',
@@ -646,7 +650,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
     map.on('click', (e) => {
       if (noGpsRef.current) return
       if (!selectedSegmentIdRef.current) return
-      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
+      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat, boundaryRef.current)) {
         toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
         return
       }
@@ -681,14 +685,14 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
     if (source) {
-      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      const bboxGeoJson = toBoundaryGeoJSON(boundaryRef.current, communeBoundsInfo.bbox || mapBounds?.bbox)
       source.setData(bboxGeoJson || ({ type: 'FeatureCollection', features: [] } as any))
     }
 
     if (!selectedSegmentId && rows.length === 0 && activeBounds) {
       map.fitBounds(activeBounds, { padding: 40, duration: 600 })
     }
-  }, [communeBoundsInfo, mapBounds, selectedSegmentId, rows.length])
+  }, [communeBoundsInfo, mapBounds, communeBoundary, selectedSegmentId, rows.length])
 
   // Synchronize existing poles GeoJSON data when selected segment or allPoles changes
   useEffect(() => {
@@ -857,7 +861,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
         marker.on('dragend', () => {
           map.dragPan.enable()
           const raw = marker!.getLngLat()
-          if (!isPointInBounds(activeBoundsRef.current, raw.lng, raw.lat)) {
+          if (!isPointInBounds(activeBoundsRef.current, raw.lng, raw.lat, boundaryRef.current)) {
             marker!.setLngLat(dragStartPos)
             toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
             setRows((prev) => [...prev])

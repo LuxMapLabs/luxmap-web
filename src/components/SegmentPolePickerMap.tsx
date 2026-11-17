@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useCommuneBoundary } from '../hooks/gis-map/useCommuneBoundary'
+import type { Geometry } from '../types/common/base'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useSelector } from 'react-redux'
@@ -9,8 +11,8 @@ import {
   MAP_MAX_ZOOM,
   toLngLatBounds,
   getCommuneBboxInfo,
-  toBboxPolygonGeoJSON,
-  toBboxMaskGeoJSON,
+  toBoundaryGeoJSON,
+  toBoundaryMaskGeoJSON,
 } from '../utils/gis-map/mapUtils'
 import { isBend, polesOf, type OrderedPole } from '../utils/gis-map/segmentPoleOrder'
 import { MIN_ROAD_ZOOM } from '../utils/gis-map/segmentReshape'
@@ -71,11 +73,11 @@ const POLES_SRC = 'pick-poles'
 const LINE_SRC = 'pick-line'
 const PICKED_SRC = 'pick-road-points'
 const COMMUNE_SRC = 'pick-commune-outline'
-/** Viền khung xã (web chỉ có bbox của xã, chưa có ranh giới thật); không có khung thì không vẽ gì. */
-const communeOutline = (bbox: unknown) => toBboxPolygonGeoJSON(bbox) ?? emptyFc
+/** Viền ranh giới xã (chưa có ranh giới thì dùng khung bbox); không có gì thì không vẽ. */
+const communeOutline = (boundary: Geometry | null, bbox: unknown) => toBoundaryGeoJSON(boundary, bbox) ?? emptyFc
 const COMMUNE_MASK_SRC = 'pick-commune-mask'
-/** Phần ngoài khung xã tô tối như Bản đồ GIS; không có khung thì không phủ gì. */
-const communeMask = (bbox: unknown) => toBboxMaskGeoJSON(bbox) ?? emptyFc
+/** Phần ngoài ranh giới xã tô tối như Bản đồ GIS; không có gì thì không phủ. */
+const communeMask = (boundary: Geometry | null, bbox: unknown) => toBoundaryMaskGeoJSON(boundary, bbox) ?? emptyFc
 const emptyFc = { type: 'FeatureCollection' as const, features: [] }
 
 // Nhãn nhỏ ĐẦU / CUỐI trên cột đầu và cột cuối của tuyến
@@ -212,6 +214,9 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
   const communeBbox = communeInfo.bbox ?? mapBounds?.bbox ?? null
   const communeBboxRef = useRef(communeBbox)
   communeBboxRef.current = communeBbox
+  const communeBoundary = useCommuneBoundary(communeId)
+  const boundaryRef = useRef(communeBoundary)
+  boundaryRef.current = communeBoundary
 
   // Dữ liệu mới nhất, để lần vẽ đầu (sau sự kiện 'load') và các lần cập nhật dùng chung
   const dataRef = useRef({ poles, selected, highlightId, fixedLine, pickedPoints, suggestedIds })
@@ -424,7 +429,7 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
 
     map.on('load', () => {
       // Viền khung xã của tuyến: nằm dưới mọi lớp khác, để biết đâu là địa bàn mình
-      map.addSource(COMMUNE_MASK_SRC, { type: 'geojson', data: communeMask(communeBboxRef.current) })
+      map.addSource(COMMUNE_MASK_SRC, { type: 'geojson', data: communeMask(boundaryRef.current, communeBboxRef.current) })
       map.addLayer({
         id: 'pick-commune-mask',
         type: 'fill',
@@ -433,7 +438,7 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
       })
       map.addSource(COMMUNE_SRC, {
         type: 'geojson',
-        data: communeOutline(communeBboxRef.current),
+        data: communeOutline(boundaryRef.current, communeBboxRef.current),
       })
       map.addLayer({
         id: 'pick-commune-outline',
@@ -607,10 +612,10 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loadedRef.current) return
-    ;(map.getSource(COMMUNE_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeOutline(communeBbox))
-    ;(map.getSource(COMMUNE_MASK_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeMask(communeBbox))
+    ;(map.getSource(COMMUNE_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeOutline(communeBoundary, communeBbox))
+    ;(map.getSource(COMMUNE_MASK_SRC) as maplibregl.GeoJSONSource | undefined)?.setData(communeMask(communeBoundary, communeBbox))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(communeBbox)])
+  }, [JSON.stringify(communeBbox), communeBoundary])
 
   useEffect(() => {
     const canvas = mapRef.current?.getCanvas()

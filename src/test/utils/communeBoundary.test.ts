@@ -4,6 +4,8 @@ import {
   countVertices,
   geometryToPolygons,
   polygonsToBbox,
+  mergeGeometries,
+  pointInGeometry,
   polygonsToGeometry,
   simplifyRing,
 } from '../../utils/communeBoundary'
@@ -67,6 +69,21 @@ describe('bboxToGeometry', () => {
   it('khung thiếu hoặc ngược thì không có polygon', () => {
     expect(bboxToGeometry(null)).toBeNull()
     expect(bboxToGeometry({ min_lng: 107, min_lat: 11, max_lng: 106, max_lat: 12 })).toBeNull()
+  })
+})
+
+describe('pointInGeometry', () => {
+  const poly = { type: 'Polygon', coordinates: [square] }
+  it('trong/ngoài đa giác, tính cả lỗ', () => {
+    expect(pointInGeometry(poly, 106.5, 11.5)).toBe(true)
+    expect(pointInGeometry(poly, 108, 11.5)).toBe(false)
+    const hole = [[106.4, 11.4], [106.6, 11.4], [106.6, 11.6], [106.4, 11.6], [106.4, 11.4]]
+    expect(pointInGeometry({ type: 'Polygon', coordinates: [square, hole] }, 106.5, 11.5)).toBe(false)
+    expect(pointInGeometry(null, 106.5, 11.5)).toBe(false)
+  })
+  it('gộp nhiều ranh giới thành MultiPolygon', () => {
+    expect(mergeGeometries([poly, poly])?.type).toBe('MultiPolygon')
+    expect(mergeGeometries([null])).toBeNull()
   })
 })
 

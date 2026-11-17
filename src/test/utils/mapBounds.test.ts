@@ -5,7 +5,7 @@ import {
   applyMapBoundsLimits,
   getCommuneBboxInfo,
   toBboxPolygonGeoJSON,
-  toBboxMaskGeoJSON,
+  toBoundaryMaskGeoJSON,
 } from '../../utils/gis-map/mapUtils'
 import { mapCurrentUserToUser } from '../../utils/roleUtils'
 import type { CurrentUserResponse } from '../../types/auth/me'
@@ -120,16 +120,16 @@ describe('map bounds from GET /auth/me', () => {
     expect(poly?.geometry.coordinates[0][4]).toEqual([106.82473, 10.79622])
   })
 
-  it('toBboxMaskGeoJSON phủ cả thế giới trừ một lỗ đúng bằng khung xã; thiếu khung thì null', () => {
-    const mask = toBboxMaskGeoJSON(frame)
+  it('toBoundaryMaskGeoJSON phủ cả thế giới trừ một lỗ đúng bằng khung xã; thiếu khung thì null', () => {
+    const mask = toBoundaryMaskGeoJSON(null, frame)
     const [outer, hole] = mask!.geometry.coordinates
     expect(outer).toEqual([[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]])
     expect(hole).toHaveLength(5)
     expect(hole).toContainEqual([106.82473, 10.79622])
     expect(hole).toContainEqual([106.86508, 10.85715])
     expect(hole[0]).toEqual(hole[4])
-    expect(toBboxMaskGeoJSON(null)).toBeNull()
-    expect(toBboxMaskGeoJSON({ min_lng: 1, min_lat: 2 })).toBeNull()
+    expect(toBoundaryMaskGeoJSON(null, null)).toBeNull()
+    expect(toBoundaryMaskGeoJSON(null, { min_lng: 1, min_lat: 2 })).toBeNull()
   })
 
   it('getCommuneBboxInfo resolves bbox, center and bounds for chosen commune', () => {

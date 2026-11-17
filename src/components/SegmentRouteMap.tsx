@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react'
+import { useCommuneBoundary } from '../hooks/gis-map/useCommuneBoundary'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useSelector } from 'react-redux'
@@ -8,7 +9,7 @@ import {
   DEFAULT_MAP_CENTER,
   MAP_MAX_ZOOM,
   toLngLatBounds,
-  toBboxPolygonGeoJSON,
+  toBoundaryGeoJSON,
   getCommuneBboxInfo,
 } from '../utils/gis-map/mapUtils'
 import type { CommuneBbox } from '../types/admin/communes'
@@ -182,6 +183,10 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     return getCommuneBboxInfo(communeId, userCommunes, adminCommunes, mapBounds)
   }, [communeBbox, communeId, userCommunes, adminCommunes, mapBounds])
 
+  const communeBoundary = useCommuneBoundary(communeId)
+  const boundaryRef = useRef(communeBoundary)
+  boundaryRef.current = communeBoundary
+
   const polesRef = useRef<SegmentPoleItem[]>(poles)
   polesRef.current = poles
 
@@ -331,7 +336,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
 
       // Khung ranh giới xã
-      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      const bboxGeoJson = toBoundaryGeoJSON(boundaryRef.current, communeBoundsInfo.bbox || mapBounds?.bbox)
       map.addSource('commune-bbox-boundary', {
         type: 'geojson',
         data: bboxGeoJson || { type: 'FeatureCollection', features: [] },
@@ -456,14 +461,14 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     const map = mapRef.current
     if (!map || !loadedRef.current) return
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
-    const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+    const bboxGeoJson = toBoundaryGeoJSON(boundaryRef.current, communeBoundsInfo.bbox || mapBounds?.bbox)
     source?.setData(bboxGeoJson || { type: 'FeatureCollection', features: [] })
 
     const activeBounds = communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox)
     if (currentCoordsRef.current.length === 0 && activeBounds) {
       map.fitBounds(activeBounds, { padding: 40, duration: 600 })
     }
-  }, [communeBoundsInfo, mapBounds])
+  }, [communeBoundsInfo, mapBounds, communeBoundary])
 
   // Vẽ lại khi lộ trình truyền vào đổi
   useEffect(() => {

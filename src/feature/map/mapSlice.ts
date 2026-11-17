@@ -2,6 +2,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { CabinetPropertiesFeature, CabinetTopologyEdgePropertiesFeature } from '../../types/map/cabinets'
 import type { PolePropertiesFeature, PoleMapDetail } from '../../types/map/poles'
 import type { SegmentPropertiesFeature } from '../../types/map/segments'
+import type { CommunePropertiesFeature } from '../../types/map/communes'
 
 export interface MapState {
   poles: PolePropertiesFeature[]
@@ -9,6 +10,11 @@ export interface MapState {
   segments: SegmentPropertiesFeature[]
   isLoadingMap: boolean
   mapError: string | null
+
+  // Ranh giới các địa bàn của tài khoản (GET /map/communes)
+  communeBoundaries: CommunePropertiesFeature[]
+  isLoadingBoundaries: boolean
+  boundariesLoaded: boolean
 
   // All Topology Edges (Toàn bộ các đường dây mạch điện PostGIS từ Backend khi load map)
   allTopologyEdges: CabinetTopologyEdgePropertiesFeature[]
@@ -32,6 +38,10 @@ const initialState: MapState = {
   segments: [],
   isLoadingMap: false,
   mapError: null,
+
+  communeBoundaries: [],
+  isLoadingBoundaries: false,
+  boundariesLoaded: false,
 
   allTopologyEdges: [],
 
@@ -73,6 +83,21 @@ const mapSlice = createSlice({
     fetchMapLayersFailure: (state, action: PayloadAction<string>) => {
       state.isLoadingMap = false
       state.mapError = action.payload
+    },
+
+    // Ranh giới địa bàn
+    fetchCommuneBoundariesRequest: (state) => {
+      state.isLoadingBoundaries = true
+    },
+    fetchCommuneBoundariesSuccess: (state, action: PayloadAction<CommunePropertiesFeature[]>) => {
+      state.isLoadingBoundaries = false
+      state.boundariesLoaded = true
+      state.communeBoundaries = action.payload
+    },
+    fetchCommuneBoundariesFailure: (state) => {
+      state.isLoadingBoundaries = false
+      state.boundariesLoaded = true
+      state.communeBoundaries = []
     },
 
     // 2. Fetch Cabinet Topology
@@ -127,6 +152,9 @@ const mapSlice = createSlice({
 })
 
 export const {
+  fetchCommuneBoundariesRequest,
+  fetchCommuneBoundariesSuccess,
+  fetchCommuneBoundariesFailure,
   fetchMapLayersRequest,
   fetchMapLayersSuccess,
   fetchMapLayersFailure,

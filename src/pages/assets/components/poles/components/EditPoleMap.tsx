@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react'
+import { useCommuneBoundary } from '../../../../../hooks/gis-map/useCommuneBoundary'
 import { CollapsibleMapLegend } from '../../../../../components/CollapsibleMapLegend'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -14,7 +15,7 @@ import {
   DEFAULT_MAP_CENTER,
   MAP_MAX_ZOOM,
   toLngLatBounds,
-  toBboxPolygonGeoJSON,
+  toBoundaryGeoJSON,
   getCommuneBboxInfo,
   isPointInBounds,
   OUTSIDE_MANAGED_AREA_MESSAGE,
@@ -54,6 +55,9 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   const communeBoundsInfo = useMemo(() => {
     return getCommuneBboxInfo(communeId, userCommunes, adminCommunes, mapBounds)
   }, [communeId, userCommunes, adminCommunes, mapBounds])
+  const communeBoundary = useCommuneBoundary(communeId)
+  const boundaryRef = useRef(communeBoundary)
+  boundaryRef.current = communeBoundary
   const activeBounds = useMemo(
     () => communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox),
     [communeBoundsInfo, mapBounds]
@@ -159,7 +163,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     const handleMarkerDrag = () => {
       isUserInteractingRef.current = true
       const pos = marker.getLngLat()
-      if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) return
+      if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat, boundaryRef.current)) return
       onChangeCoordsRef.current({
         lng: Number(pos.lng.toFixed(6)),
         lat: Number(pos.lat.toFixed(6)),
@@ -169,7 +173,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     marker.on('drag', handleMarkerDrag)
     marker.on('dragend', () => {
       const endPos = marker.getLngLat()
-      if (!isPointInBounds(activeBoundsRef.current, endPos.lng, endPos.lat)) {
+      if (!isPointInBounds(activeBoundsRef.current, endPos.lng, endPos.lat, boundaryRef.current)) {
         marker.setLngLat(lastValidPos)
         onChangeCoordsRef.current({
           lng: Number(lastValidPos.lng.toFixed(6)),
@@ -183,7 +187,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
     // Click bản đồ để dời vị trí ghim (cột đặt tự do, không bám tim đường)
     map.on('click', (e: maplibregl.MapMouseEvent) => {
-      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
+      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat, boundaryRef.current)) {
         toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
         return
       }
@@ -293,7 +297,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         })
       }
 
-      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      const bboxGeoJson = toBoundaryGeoJSON(boundaryRef.current, communeBoundsInfo.bbox || mapBounds?.bbox)
       if (!map.getSource('commune-bbox-boundary')) {
         map.addSource('commune-bbox-boundary', {
           type: 'geojson',
@@ -358,10 +362,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
     if (source) {
-      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      const bboxGeoJson = toBoundaryGeoJSON(boundaryRef.current, communeBoundsInfo.bbox || mapBounds?.bbox)
       source.setData(bboxGeoJson || ({ type: 'FeatureCollection', features: [] } as any))
     }
-  }, [communeBoundsInfo, mapBounds])
+  }, [communeBoundsInfo, mapBounds, communeBoundary])
 
   // Tự động đồng bộ marker và focus camera (giữ nguyên 100% mức zoom của người dùng) khi lat / lng thay đổi
   useEffect(() => {

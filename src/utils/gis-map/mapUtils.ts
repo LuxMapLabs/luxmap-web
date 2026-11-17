@@ -1,4 +1,6 @@
 import type { CommuneBbox } from '../../types/admin/communes'
+import type { Geometry } from '../../types/common/base'
+import { bboxToGeometry, geometryToPolygons, pointInGeometry } from '../communeBoundary'
 import type { MapBounds } from '../../types/auth/me'
 import type { Map as MapLibreMap, StyleSpecification } from 'maplibre-gl'
 
@@ -61,14 +63,34 @@ export function toBboxPolygonGeoJSON(bbox?: any | null): GeoJSON.Feature<GeoJSON
   }
 }
 
+/** Ranh giới thật của địa bàn; chưa có thì dùng khung bbox như một đa giác 4 đỉnh. */
+const effectiveBoundary = (boundary: Geometry | null | undefined, bbox?: any | null): Geometry | null => {
+  if (geometryToPolygons(boundary).length > 0) return boundary ?? null
+  const b = toLngLatBounds(bbox)
+  return b ? bboxToGeometry({ min_lng: b[0][0], min_lat: b[0][1], max_lng: b[1][0], max_lat: b[1][1] }) : null
+}
+
+/** Viền địa bàn để vẽ trên bản đồ: ranh giới thật, hoặc khung bbox khi chưa có. */
+export function toBoundaryGeoJSON(
+  boundary: Geometry | null | undefined,
+  bbox?: any | null
+): GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon> | null {
+  const geometry = effectiveBoundary(boundary, bbox)
+  if (!geometry) return null
+  return { type: 'Feature', properties: {}, geometry: geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon }
+}
+
 /**
- * Lớp phủ làm tối phần NGOÀI khung xã (cả thế giới trừ khung): đa giác có một lỗ là khung xã.
- * Cùng kiểu với lớp "managed-area" của trang Bản đồ GIS. Khung không đủ 4 cạnh thì null.
+ * Lớp phủ làm tối phần NGOÀI địa bàn (cả thế giới trừ ranh giới): đa giác có lỗ là các vòng ngoài của ranh giới.
+ * Cùng kiểu với lớp "managed-area" của trang Bản đồ GIS.
  */
-export function toBboxMaskGeoJSON(bbox?: any | null): GeoJSON.Feature<GeoJSON.Polygon> | null {
-  const bounds = toLngLatBounds(bbox)
-  if (!bounds) return null
-  const [[minLng, minLat], [maxLng, maxLat]] = bounds
+export function toBoundaryMaskGeoJSON(
+  boundary: Geometry | null | undefined,
+  bbox?: any | null
+): GeoJSON.Feature<GeoJSON.Polygon> | null {
+  const geometry = effectiveBoundary(boundary, bbox)
+  const polygons = geometryToPolygons(geometry)
+  if (polygons.length === 0) return null
   return {
     type: 'Feature',
     properties: {},
@@ -76,7 +98,7 @@ export function toBboxMaskGeoJSON(bbox?: any | null): GeoJSON.Feature<GeoJSON.Po
       type: 'Polygon',
       coordinates: [
         [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]],
-        [[minLng, minLat], [minLng, maxLat], [maxLng, maxLat], [maxLng, minLat], [minLng, minLat]],
+        ...polygons.map(([outer]) => [...outer, outer[0]]),
       ],
     },
   }
@@ -645,12 +667,17 @@ export type LngLatBoundsTuple = [[number, number], [number, number]]
 /** Thông báo khi vị trí chọn nằm ngoài khu vực quản lý của xã. */
 export const OUTSIDE_MANAGED_AREA_MESSAGE = 'Vị trí nằm ngoài khu vực quản lý của xã'
 
-/** Điểm (lng, lat) có nằm trong khung bbox xã không. Không có khung (null) thì coi là hợp lệ. */
+/**
+ * Điểm (lng, lat) có nằm trong địa bàn không: theo ranh giới thật nếu có, nếu không thì theo khung bbox.
+ * Không có cả hai (null) thì coi là hợp lệ.
+ */
 export function isPointInBounds(
   bounds: LngLatBoundsTuple | null | undefined,
   lng: number,
-  lat: number
+  lat: number,
+  boundary?: Geometry | null
 ): boolean {
+  if (geometryToPolygons(boundary).length > 0) return pointInGeometry(boundary, lng, lat)
   if (!bounds) return true
   const [[minLng, minLat], [maxLng, maxLat]] = bounds
   return lng >= minLng && lng <= maxLng && lat >= minLat && lat <= maxLat

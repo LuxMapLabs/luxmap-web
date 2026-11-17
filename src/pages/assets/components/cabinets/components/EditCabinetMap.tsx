@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
+import { useCommuneBoundary } from '../../../../../hooks/gis-map/useCommuneBoundary'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Layers, Eye, EyeOff, X } from 'lucide-react'
@@ -14,7 +15,7 @@ import {
   DEFAULT_MAP_CENTER,
   MAP_MAX_ZOOM,
   toLngLatBounds,
-  toBboxPolygonGeoJSON,
+  toBoundaryGeoJSON,
   getCommuneBboxInfo,
   isPointInBounds,
   OUTSIDE_MANAGED_AREA_MESSAGE,
@@ -57,6 +58,9 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
   const communeBoundsInfo = useMemo(() => {
     return getCommuneBboxInfo(communeId, currentUser?.communes, adminCommunes, mapBounds)
   }, [communeId, currentUser, adminCommunes, mapBounds])
+  const communeBoundary = useCommuneBoundary(communeId)
+  const boundaryRef = useRef(communeBoundary)
+  boundaryRef.current = communeBoundary
   const activeBounds = useMemo(
     () => communeBoundsInfo.bounds || toLngLatBounds(mapBounds?.bbox),
     [communeBoundsInfo, mapBounds]
@@ -256,7 +260,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     const handleMarkerDrag = () => {
       isUserInteractingRef.current = true
       const pos = marker.getLngLat()
-      if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat)) return
+      if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat, boundaryRef.current)) return
       onChangeCoordsRef.current({
         lng: Number(pos.lng.toFixed(6)),
         lat: Number(pos.lat.toFixed(6)),
@@ -271,7 +275,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
         pinInner.style.boxShadow = '0 0 0 2.5px #581c87, 0 4px 16px rgba(124, 58, 237, 0.85), 0 3px 8px rgba(0,0,0,0.5)'
       }
       const endPos = marker.getLngLat()
-      if (!isPointInBounds(activeBoundsRef.current, endPos.lng, endPos.lat)) {
+      if (!isPointInBounds(activeBoundsRef.current, endPos.lng, endPos.lat, boundaryRef.current)) {
         marker.setLngLat(lastValidPos)
         onChangeCoordsRef.current({
           lng: Number(lastValidPos.lng.toFixed(6)),
@@ -285,7 +289,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     // Sự kiện nhấp chuột (click) lên bản đồ để di chuyển tủ điện ngay lập tức
     map.on('click', (e: maplibregl.MapMouseEvent) => {
-      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat)) {
+      if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat, boundaryRef.current)) {
         toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
         return
       }
@@ -304,7 +308,7 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
     map.on('load', () => {
       if (!isMounted) return
 
-      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      const bboxGeoJson = toBoundaryGeoJSON(boundaryRef.current, communeBoundsInfo.bbox || mapBounds?.bbox)
       if (!map.getSource('commune-bbox-boundary')) {
         map.addSource('commune-bbox-boundary', {
           type: 'geojson',
@@ -434,10 +438,10 @@ export const EditCabinetMap: React.FC<EditCabinetMapProps> = ({
 
     const source = map.getSource('commune-bbox-boundary') as maplibregl.GeoJSONSource | undefined
     if (source) {
-      const bboxGeoJson = toBboxPolygonGeoJSON(communeBoundsInfo.bbox || mapBounds?.bbox)
+      const bboxGeoJson = toBoundaryGeoJSON(boundaryRef.current, communeBoundsInfo.bbox || mapBounds?.bbox)
       source.setData(bboxGeoJson || ({ type: 'FeatureCollection', features: [] } as any))
     }
-  }, [communeBoundsInfo, mapBounds])
+  }, [communeBoundsInfo, mapBounds, communeBoundary])
 
   // Cập nhật GeoJSON toàn bộ các tuyến đường khi mapSegments thay đổi
   useEffect(() => {
