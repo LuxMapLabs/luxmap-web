@@ -97,7 +97,7 @@ import { useCommuneBoundary } from '../../hooks/gis-map/useCommuneBoundary'
 import { useGisMarkers } from '../../hooks/gis-map/useGisMarkers'
 import { useIotBridgeMarkers } from '../../hooks/gis-map/useIotBridgeMarkers'
 import type { SearchResultItem } from '../../utils/gis-map/gisSearchUtils'
-import { ElectricalMonitorDock, type ElectricalMonitorTarget } from './components/ElectricalMonitorDock'
+import { ElectricalMonitorModal, type ElectricalMonitorTarget } from './components/ElectricalMonitorModal'
 import { buildMonitorTarget } from '../../utils/iot/electricalMonitor'
 
 export const GisMapPage: React.FC = () => {
@@ -501,7 +501,7 @@ export const GisMapPage: React.FC = () => {
         <GisMapLegend />
 
         {electricalMonitor && (
-          <ElectricalMonitorDock
+          <ElectricalMonitorModal
             target={electricalMonitor}
             onSelectFeeder={(feederId) => setElectricalMonitor((m) => (m ? { ...m, activeFeederId: feederId } : m))}
             onClose={() => setElectricalMonitor(null)}

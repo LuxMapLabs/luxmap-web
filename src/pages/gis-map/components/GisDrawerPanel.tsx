@@ -1093,6 +1093,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                           )}
                         </div>
                         <FeederElectricalSummary
+                          feederId={fId}
                           nodeId={feederNodeId(fId, feeder)}
                           onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(fId, feederNodeId(fId, feeder)) : undefined}
                         />
@@ -1113,6 +1114,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60">
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">Số đo điện của mạch</span>
                     <FeederElectricalSummary
+                      feederId={selId}
                       nodeId={nodeId}
                       onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(selId, nodeId) : undefined}
                     />
