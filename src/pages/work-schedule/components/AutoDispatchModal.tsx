@@ -334,26 +334,32 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-700 border border-slate-200/80 hover:border-teal-300 transition-all cursor-pointer group shadow-2xs hover:shadow-xs active:scale-95"
                           title="Bấm để xem chi tiết danh sách lỗi trong ca này"
                         >
-                          <span>{item.pole_count} cột • {item.fault_ids?.length || 0} lỗi</span>
+                          <span>
+                            {item.pole_count === 0 && (item.fault_ids?.length || 0) > 0
+                              ? `Sự cố IoT • ${item.fault_ids?.length || 0} lỗi`
+                              : `${item.pole_count} cột • ${item.fault_ids?.length || 0} lỗi`}
+                          </span>
                           <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-teal-600 transition-colors" />
                         </button>
                       </div>
                     </div>
 
                     {/* Hàng 2: Danh sách mã cột trong ca */}
-                    <div className="flex items-center gap-2 flex-wrap text-xs">
-                      <span className="text-slate-400 font-medium shrink-0">Các cột:</span>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {(item.pole_ids || []).map((poleId) => (
-                          <span
-                            key={poleId}
-                            className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/80"
-                          >
-                            {poleId}
-                          </span>
-                        ))}
+                    {(item.pole_ids || []).length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <span className="text-slate-400 font-medium shrink-0">Các cột:</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {(item.pole_ids || []).map((poleId) => (
+                            <span
+                              key={poleId}
+                              className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/80"
+                            >
+                              {poleId}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Hàng 3: Cấu hình ngày làm việc & Kỹ sư */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 pt-1">

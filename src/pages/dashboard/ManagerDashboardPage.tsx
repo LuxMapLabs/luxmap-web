@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import type { RootState, AppDispatch } from '../../redux/store'
-import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
+import {
+  fetchDashboardDataRequest,
+  fetchDashboardIotRequest,
+  fetchFeederHistoryRequest,
+  setIncludeCalibrationRig,
+} from '../../feature/dashboard/dashboardSlice'
 import type { FaultItem } from '../../types/faults/faults'
 
 import { DashboardToolbar } from './components/DashboardToolbar'
@@ -12,6 +17,7 @@ import { WarrantyTableCard } from './components/WarrantyTableCard'
 import { FaultsTableCard, getFaultProgressInfo } from './components/FaultsTableCard'
 import { UrgentFaultsCard } from './components/UrgentFaultsCard'
 import { FaultDetailModal } from './components/FaultDetailModal'
+import { IotDiagnosticsCard } from './components/IotDiagnosticsCard'
 
 export const ManagerDashboardPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
@@ -23,8 +29,26 @@ export const ManagerDashboardPage: React.FC = () => {
   const warrantyTableRef = useRef<HTMLDivElement>(null)
 
   // Redux Global State (được quản lý và nạp bởi Redux-Saga)
-  const { segmentsList, warrantyList, faultsList, fixtureStatusRows, loading } = useSelector(
-    (state: RootState) => state.dashboard
+  const {
+    segmentsList,
+    warrantyList,
+    faultsList,
+    fixtureStatusRows,
+    iotSummary,
+    iotServers,
+    segmentFeederMap,
+    includeCalibrationRig,
+    selectedFeederHistory,
+    selectedFeederHistoryLoading,
+    iotLastUpdated,
+    loading,
+  } = useSelector((state: RootState) => state.dashboard)
+
+  const handleSelectFeeder = useCallback(
+    (feederId: string) => {
+      dispatch(fetchFeederHistoryRequest(feederId))
+    },
+    [dispatch]
   )
 
   // State Filters
@@ -49,11 +73,9 @@ export const ManagerDashboardPage: React.FC = () => {
     warrantyTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Navigate to work schedule creation for pole/segment faults, or open detail modal for unmapped/IoT faults
+  // Điều hướng sang trang tạo WorkOrder (hỗ trợ cả sự cố cột/tuyến lẫn sự cố từ IoT)
   const handleNavigateToCreateSchedule = (fault: FaultItem) => {
-    const type = String(fault.fault_type || '').toLowerCase()
-    const isOffline = type.includes('offline') || type.includes('node')
-    if (isOffline || (!fault.pole_id && !fault.segment_id)) {
+    if (!fault.pole_id && !fault.segment_id && !fault.origin_node_id && !fault.feeder_id) {
       setSelectedFault(fault)
       return
     }
@@ -74,6 +96,16 @@ export const ManagerDashboardPage: React.FC = () => {
   // Tải dữ liệu toàn diện qua Redux-Saga khi vào trang Dashboard
   useEffect(() => {
     dispatch(fetchDashboardDataRequest())
+  }, [dispatch])
+
+  // Tự động làm mới nhẹ dữ liệu IoT mỗi 30 giây khi tab đang hiển thị
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        dispatch(fetchDashboardIotRequest())
+      }
+    }, 30_000)
+    return () => window.clearInterval(timer)
   }, [dispatch])
 
   // Map tên tuyến đường
@@ -207,25 +239,46 @@ export const ManagerDashboardPage: React.FC = () => {
     return items
   }, [warrantyKpis.items, warrantyTab])
 
-  // 7. Lọc Danh sách Sự cố bóng đèn (Khung phải)
+  // 7. Lọc Danh sách Sự cố & Node IoT theo Tuyến đường
+  const selectedSegmentFeeders = useMemo(() => {
+    if (selectedSegment === 'all') return null
+    return new Set(segmentFeederMap[selectedSegment] || [])
+  }, [selectedSegment, segmentFeederMap])
+
+  const filteredIotSummary = useMemo(() => {
+    if (!selectedSegmentFeeders) return iotSummary
+    return iotSummary.filter((n) => n.feeder_id && selectedSegmentFeeders.has(n.feeder_id))
+  }, [iotSummary, selectedSegmentFeeders])
+
   const segmentFaults = useMemo(() => {
     if (selectedSegment === 'all') return faultsList
-    return faultsList.filter((f) => f.segment_id === selectedSegment)
-  }, [faultsList, selectedSegment])
+    return faultsList.filter(
+      (f) =>
+        f.segment_id === selectedSegment ||
+        (Boolean(f.feeder_id) && Boolean(selectedSegmentFeeders?.has(f.feeder_id as string)))
+    )
+  }, [faultsList, selectedSegment, selectedSegmentFeeders])
 
-  const offlineFaultsCount = useMemo(() => {
-    return segmentFaults.filter((f) => {
-      const type = String(f.fault_type).toLowerCase()
-      return type.includes('offline') || type.includes('node')
-    }).length
-  }, [segmentFaults])
+  const isIotCategoryFault = (faultType?: string | null) => {
+    const type = String(faultType || '').toLowerCase()
+    return (
+      type.includes('offline') ||
+      type.includes('node') ||
+      type === 'voltage_anomaly' ||
+      type === 'iot_hardware_fault'
+    )
+  }
+
+  const offlineFaultsCount = useMemo(
+    () => segmentFaults.filter((f) => isIotCategoryFault(f.fault_type)).length,
+    [segmentFaults]
+  )
 
   const blackoutFaultsCount = useMemo(() => {
     return segmentFaults.filter((f) => {
       const type = String(f.fault_type).toLowerCase()
       return (
-        !type.includes('offline') &&
-        !type.includes('node') &&
+        !isIotCategoryFault(type) &&
         (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
       )
     }).length
@@ -235,22 +288,19 @@ export const ManagerDashboardPage: React.FC = () => {
     return segmentFaults.filter((f) => {
       const type = String(f.fault_type).toLowerCase()
       return (
-        !type.includes('offline') &&
-        !type.includes('node') &&
+        !isIotCategoryFault(type) &&
         (type.includes('dim') || type.includes('runtime_decline'))
       )
     }).length
   }, [segmentFaults])
 
-  // Filter unassigned pole/segment faults for urgent scheduling card (excluding cabinet IoT offline alerts)
   const unassignedFaults = useMemo(
     () =>
-      segmentFaults.filter((f) => {
-        if (getFaultProgressInfo(f).key !== 'unassigned') return false
-        const type = String(f.fault_type || '').toLowerCase()
-        const isOffline = type.includes('offline') || type.includes('node')
-        return !isOffline && Boolean(f.pole_id || f.segment_id)
-      }),
+      segmentFaults.filter(
+        (f) =>
+          getFaultProgressInfo(f).key === 'unassigned' &&
+          Boolean(f.pole_id || f.segment_id || f.origin_node_id || f.feeder_id)
+      ),
     [segmentFaults]
   )
 
@@ -260,8 +310,7 @@ export const ManagerDashboardPage: React.FC = () => {
       list = list.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
         return (
-          !type.includes('offline') &&
-          !type.includes('node') &&
+          !isIotCategoryFault(type) &&
           (type.includes('out') || type.includes('blackout') || type.includes('segment_outage'))
         )
       })
@@ -269,16 +318,12 @@ export const ManagerDashboardPage: React.FC = () => {
       list = list.filter((f) => {
         const type = String(f.fault_type).toLowerCase()
         return (
-          !type.includes('offline') &&
-          !type.includes('node') &&
+          !isIotCategoryFault(type) &&
           (type.includes('dim') || type.includes('runtime_decline'))
         )
       })
     } else if (faultTab === 'offline') {
-      list = list.filter((f) => {
-        const type = String(f.fault_type).toLowerCase()
-        return type.includes('offline') || type.includes('node')
-      })
+      list = list.filter((f) => isIotCategoryFault(f.fault_type))
     }
     return list
   }, [segmentFaults, faultTab])
@@ -341,8 +386,21 @@ export const ManagerDashboardPage: React.FC = () => {
             blackoutCount={blackoutFaultsCount}
             dimCount={dimFaultsCount}
             offlineCount={offlineFaultsCount}
+            includeCalibrationRig={includeCalibrationRig}
+            onToggleCalibrationRig={(checked) => dispatch(setIncludeCalibrationRig(checked))}
           />
         </div>
+
+        {/* 4.5. Giám sát thiết bị IoT (1 Card gọn: Donut + Biểu đồ đường) */}
+        <IotDiagnosticsCard
+          summary={filteredIotSummary}
+          servers={iotServers}
+          feederHistory={selectedFeederHistory}
+          historyLoading={selectedFeederHistoryLoading}
+          onSelectFeeder={handleSelectFeeder}
+          iotLastUpdated={iotLastUpdated}
+          loading={loading}
+        />
 
         {/* 5. Bảng theo dõi bảo hành */}
         <div ref={warrantyTableRef} id="warranty-table-card" className="scroll-mt-4">

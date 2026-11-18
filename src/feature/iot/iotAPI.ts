@@ -19,9 +19,10 @@ import type {
   RegisteredNode,
 } from '../../types/iot/nodes'
 import type {
-  IotFeederArchivedSamplePagedResult,
   IotFeederElectricalResult,
+  IotFeederHistoryResult,
 } from '../../types/iot/feeders'
+import type { IotDiagnosticSummaryItemPagedResult } from '../../types/iot/diagnostics'
 
 /**
  * IoT bridge (docs/LUXMAP-IOT-FE.md của backend): gateway ESP32 + node LoRa. Lệnh Bật / Tắt / AUTO và nhật ký lệnh
@@ -103,14 +104,14 @@ export const iotAPI = {
     return response.data
   },
 
-  /** GET /api/v1/iot/feeders/{feederId}/electrical/history?page=&page_size=&sort_by= — lịch sử điện của mạch, mới nhất trước. */
+  /** GET /api/v1/iot/feeders/{feederId}/electrical/history — lịch sử điện trung bình 30 giây, mới nhất trước. */
   getFeederElectricalHistory: async (
     feederId: string,
-    params: { page: number; page_size: number; sort_by?: 'received_at' | 'measured_at' }
-  ): Promise<IotFeederArchivedSamplePagedResult> => {
-    const response = await apiClient.get<IotFeederArchivedSamplePagedResult>(
+    params: { page?: number; page_size?: number } = {}
+  ): Promise<IotFeederHistoryResult> => {
+    const response = await apiClient.get<IotFeederHistoryResult>(
       `/iot/feeders/${encodeURIComponent(feederId)}/electrical/history`,
-      { params: { sort_by: 'received_at', ...params } }
+      { params }
     )
     return response.data
   },
@@ -124,6 +125,14 @@ export const iotAPI = {
   /** GET /api/v1/iot/nodes/{nodeId}/diagnostics — `anomalies[]` và ước lượng số bóng thiếu. */
   getDiagnostics: async (nodeId: string): Promise<IotDiagnosticResult> => {
     const response = await apiClient.get<IotDiagnosticResult>(`/iot/nodes/${encodeURIComponent(nodeId)}/diagnostics`)
+    return response.data
+  },
+
+  /** GET /api/v1/iot/diagnostics/summary — tổng hợp chẩn đoán các node từ job nền, phân trang. */
+  getDiagnosticsSummary: async (params: { page?: number; page_size?: number } = {}): Promise<IotDiagnosticSummaryItemPagedResult> => {
+    const response = await apiClient.get<IotDiagnosticSummaryItemPagedResult>('/iot/diagnostics/summary', {
+      params: { page: 1, page_size: 200, ...params },
+    })
     return response.data
   },
 

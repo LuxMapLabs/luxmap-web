@@ -6,41 +6,11 @@ import type { DataSource, FeederPowerState, IotCommandHistoryStatus } from '../c
 import type { IotLocation } from './servers'
 
 export interface IotAnomaly {
-    code?: string | null
-    observed?: number
-    reference?: number
-    deviation_percent?: number
-    limit?: number
-}
-
-export interface IotArchivedData {
-    timestamp?: string | null
-    session_id?: string | null
-    sequence_number?: number
-    mode?: string | null
-    lamp_command?: string | null
-    lux?: number
-    voltage?: number
-    current?: number
-    power?: number
-}
-
-export interface IotArchivedReading {
-    data?: IotArchivedData
-    received_at?: string | null
-    gateway_id?: string | null
-}
-
-export interface IotArchivedSample {
-    cursor?: number
-    reading?: IotArchivedReading
-}
-
-export interface IotArchivedSamplePagedResult {
-    page?: number
-    page_size?: number
-    total?: number
-    items?: IotArchivedSample[]
+    code: 'telemetry_stale' | 'voltage_loss' | 'voltage_deviation' | 'lamp_count_shortfall' | 'ds3231_unavailable' | 'ds3231_read_failed' | 'ds3231_time_invalid' | 'ina226_unavailable' | 'ina226_read_failed' | 'ina226_shunt_out_of_range' | 'bh1750_unavailable' | 'bh1750_read_failed' | 'microsd_unavailable' | 'microsd_read_failed' | 'microsd_write_failed' | 'lora_tx_blocked' | 'lora_rx_frame_error'
+    observed: number
+    reference: number
+    deviation_percent: number
+    limit: number
 }
 
 export interface IotAutoSchedule {
@@ -54,8 +24,8 @@ export interface IotCommandHistoryItem {
     feeder_id?: string | null
     server_id?: string | null
     device_id?: string | null
-    mode?: string | null
-    command?: string | null
+    mode?: 'AUTO' | 'MANUAL'
+    command?: 'ON' | 'OFF' | null
     auto_schedule?: IotAutoSchedule
     requested_by?: string | null
     requested_at?: string | null
@@ -71,16 +41,16 @@ export interface IotCommandHistoryItemPagedResult {
 }
 
 export interface IotCommandRequest {
-    mode?: string | null
-    command?: string | null
+    mode?: 'AUTO' | 'MANUAL'
+    command?: 'ON' | 'OFF' | null
     auto_schedule?: IotAutoSchedule
 }
 
 export interface IotCommandStatus {
     node_id?: string | null
     command_id?: string | null
-    mode?: string | null
-    command?: string | null
+    mode?: 'AUTO' | 'MANUAL'
+    command?: 'ON' | 'OFF' | null
     command_acknowledged?: boolean
     auto_schedule?: IotAutoSchedule
     expires_at?: string | null
@@ -90,17 +60,23 @@ export interface IotCommandStatus {
 export interface IotDiagnosticResult {
     node_id?: string | null
     feeder_id?: string | null
-    status?: string | null
+    status?: 'normal' | 'anomaly' | 'stale' | 'no_data'
     measurement?: IotMeasurement
     anomalies?: IotAnomaly[]
     lamp_count?: LampCountEstimate
+    measured_at?: string | null
+    measurement_key?: string | null
+    sensor_health_key?: string | null
+    firmware_version?: string | null
+    calibration_version?: string | null
+    measurement_sequence?: number
     sensor_health?: IotSensorHealth
 }
 
 export interface IotElectricalResult {
     node_id?: string | null
     server_id?: string | null
-    status?: string | null
+    status?: 'online' | 'offline' | 'no_data'
     measurement?: IotMeasurement
     power_state?: FeederPowerState
 }
@@ -116,7 +92,7 @@ export interface IotMeasurement {
 export interface IotNodeStatus {
     node_id?: string | null
     server_id?: string | null
-    status?: string | null
+    status?: 'online' | 'offline' | 'no_data' | 'unconfigured' | 'source_unavailable'
     last_received_at?: string | null
     cabinet_id?: string | null
     commune_id?: string | null
@@ -131,18 +107,12 @@ export interface IotNodeStatusPagedResult {
 }
 
 export interface IotSensorHealth {
-    status?: string | null
+    status?: 'fresh' | 'stale' | 'unknown'
     received_at?: string | null
 }
 
-export interface IotTelemetryPage {
-    items?: IotArchivedSample[]
-    next_cursor?: number
-    has_more?: boolean
-}
-
 export interface LampCountEstimate {
-    status?: string | null
+    status?: 'insufficient_samples' | 'undetermined' | 'estimated'
     samples?: number
     required_samples?: number
     required_votes?: number
@@ -175,7 +145,8 @@ export interface NodeProfile {
     off_current_limit_ma?: number
     max_silence_seconds?: number
     use_ten_lamp_calibration?: boolean
-    lamp_count_calibration?: string | null
+    installed_lamp_count?: number
+    lamp_count_calibration?: '4v' | '5v' | '5v-quiet-v1' | null
 }
 
 export interface RegisterNodeRequest {
@@ -189,7 +160,8 @@ export interface RegisterNodeRequest {
     nominal_current_ma: number
     nominal_power_mw: number
     gateway_id?: string | null
-    lamp_count_calibration?: string | null
+    lamp_count_calibration?: '4v' | '5v' | '5v-quiet-v1' | null
+    installed_lamp_count?: number
 }
 
 export interface RegisteredNode {

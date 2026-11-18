@@ -164,6 +164,13 @@ export const WorkSchedulePage: React.FC = () => {
     initialFaultIds?: string[]
     initialTitle?: string
     initialNotes?: string
+    initialIotTarget?: {
+      cabinetId?: string | null
+      nodeId?: string | null
+      feederId?: string | null
+      faultId?: string | null
+      anomalyCode?: string | null
+    }
   } | null>(null)
 
   // Nhận diện điều hướng từ Bảng Giám Sát Sự Cố Dashboard (Hàng Chưa Phân Lịch)
@@ -175,10 +182,27 @@ export const WorkSchedulePage: React.FC = () => {
       const faultId = state.prefillFaultId || fault?.fault_id
       const segmentId = state.prefillSegmentId || fault?.segment_id
       const note = state.prefillNote || fault?.note || fault?.review_note || ''
+      const isIotFault = !poleId && !segmentId && Boolean(fault?.origin_node_id || fault?.cabinet_id || fault?.feeder_id)
+
+      const iotParts = [
+        fault?.cabinet_id && `Tủ ${fault.cabinet_id}`,
+        fault?.origin_node_id && `Node ${fault.origin_node_id}`,
+        fault?.feeder_id && `Mạch ${fault.feeder_id}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
 
       const suggestedTitle = poleId
         ? `Kiểm tra sự cố mất sáng - Cột ${poleId}`
+        : isIotFault
+        ? `Kiểm tra sự cố IoT - ${iotParts || fault?.origin_node_id}`
         : `Kiểm tra sự cố hiện trường ${segmentId ? `(${segmentId})` : ''}`
+
+      const prefillNotes = isIotFault
+        ? `[Sự cố IoT${iotParts ? ` - ${iotParts}` : ''}]: ${note || 'Kiểm tra thiết bị và tủ điện theo tọa độ GPS đính kèm.'}`
+        : note
+        ? `[Khảo sát hiện trường ghi nhận]: ${note}`
+        : undefined
 
       setPrefillContext({
         initialPhase: 'inspection',
@@ -186,7 +210,16 @@ export const WorkSchedulePage: React.FC = () => {
         initialPoleIds: poleId ? [poleId] : [],
         initialFaultIds: faultId ? [faultId] : [],
         initialTitle: suggestedTitle,
-        initialNotes: note ? `[Khảo sát hiện trường ghi nhận]: ${note}` : undefined,
+        initialNotes: prefillNotes,
+        initialIotTarget: isIotFault
+          ? {
+              cabinetId: fault?.cabinet_id,
+              nodeId: fault?.origin_node_id,
+              feederId: fault?.feeder_id,
+              faultId,
+              anomalyCode: fault?.iot_anomaly_code,
+            }
+          : undefined,
       })
 
       setManualDefaultDate(getTodayStr())
@@ -706,6 +739,7 @@ export const WorkSchedulePage: React.FC = () => {
       <CreateNextPhaseModal
         isOpen={isNextPhaseModalOpen}
         caseCode={nextPhaseContext?.caseCode || selectedCaseCode || ''}
+        caseTitle={selectedCase?.title || selectedCase?.phases?.[viewingPhaseIndex]?.title || ''}
         segment={formatSegmentDisplay(nextPhaseContext?.segment || selectedCase?.segment)}
         defaultPoleIds={
           nextPhaseContext?.poleIds && nextPhaseContext.poleIds.length > 0
@@ -736,6 +770,7 @@ export const WorkSchedulePage: React.FC = () => {
         initialFaultIds={prefillContext?.initialFaultIds}
         initialTitle={prefillContext?.initialTitle}
         initialNotes={prefillContext?.initialNotes}
+        initialIotTarget={prefillContext?.initialIotTarget}
         onClose={() => {
           setIsCreateManualOpen(false)
           setPrefillContext(null)

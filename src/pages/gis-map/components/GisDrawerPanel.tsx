@@ -98,6 +98,8 @@ const FAULT_TYPE_LABELS: Record<FaultType, string> = {
   segment_outage: 'Mất điện toàn tuyến',
   node_offline: 'Cảm biến IoT mất tín hiệu',
   runtime_decline: 'Suy giảm thời gian chiếu sáng',
+  voltage_anomaly: 'Bất thường điện áp',
+  iot_hardware_fault: 'Lỗi phần cứng IoT',
 }
 
 const SEVERITY_BADGES: Record<Severity, { label: string; className: string }> = {

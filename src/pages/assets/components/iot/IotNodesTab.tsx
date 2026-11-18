@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { Search, RefreshCw } from 'lucide-react'
 import iotAPI from '../../../../feature/iot/iotAPI'
-import type { IotNodeStatus } from '../../../../types/iot/nodes'
+import type { IotDiagnosticResult, IotNodeStatus } from '../../../../types/iot/nodes'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { FeederListItem } from '../../../../types/assets/feeders'
 import { apiErrorMessage } from '../../../../utils/iot/apiError'
@@ -23,6 +23,7 @@ export interface IotNodesTabProps {
  */
 export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders }) => {
   const [nodes, setNodes] = useState<IotNodeStatus[]>([])
+  const [diagnosticsByNode, setDiagnosticsByNode] = useState<Record<string, IotDiagnosticResult>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -35,7 +36,25 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders }) =
     setError(null)
     try {
       const result = await iotAPI.getNodes({ page: 1, page_size: FETCH_SIZE })
-      setNodes(result.items || [])
+      const items = result.items || []
+      setNodes(items)
+
+      const configuredIds = items
+        .filter((n) => n.node_id && n.status !== 'unconfigured')
+        .map((n) => n.node_id as string)
+
+      if (configuredIds.length > 0 && typeof iotAPI.getDiagnostics === 'function') {
+        const settled = await Promise.allSettled(configuredIds.map((id) => iotAPI.getDiagnostics(id)))
+        const map: Record<string, IotDiagnosticResult> = {}
+        settled.forEach((res, idx) => {
+          if (res.status === 'fulfilled' && res.value) {
+            map[configuredIds[idx]] = res.value
+          }
+        })
+        setDiagnosticsByNode(map)
+      } else {
+        setDiagnosticsByNode({})
+      }
     } catch (err) {
       setError(apiErrorMessage(err, 'Không đọc được danh sách thiết bị IoT.'))
     } finally {
@@ -107,6 +126,7 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders }) =
         iotNodes={paginatedNodes}
         cabinets={cabinets}
         feeders={feeders}
+        diagnosticsByNode={diagnosticsByNode}
         isLoading={isLoading}
         onShowDetail={(node) => node.node_id && setDetailNodeId(node.node_id)}
       />

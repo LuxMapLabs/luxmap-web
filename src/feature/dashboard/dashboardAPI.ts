@@ -9,6 +9,7 @@ import type { FaultItem, FaultItemPagedResult } from '../../types/faults/faults'
 export type { WarrantyItem }
 
 import type { SegmentListItem, SegmentListItemPagedResult } from '../../types/assets/segments'
+import type { PoleListItem, PoleListItemPagedResult } from '../../types/assets/poles'
 
 // --- CÁC HÀM GỌI API BACKEND THỰC TẾ ---
 
@@ -137,24 +138,42 @@ export async function fetchFaultsList(params: {
   commune_id?: string
   segment_id?: string
   status?: string
+  data_source?: string
   sort?: string
   page?: number
   page_size?: number
 }): Promise<FaultItem[]> {
   try {
-    const cleanParams: Record<string, any> = {
+    const cleanParams: Record<string, unknown> = {
       page_size: params.page_size || 100,
       sort: params.sort || '-detected_at',
     }
     if (params.commune_id) cleanParams.commune_id = params.commune_id
     if (params.segment_id) cleanParams.segment_id = params.segment_id
     if (params.status) cleanParams.status = params.status
+    if (params.data_source) cleanParams.data_source = params.data_source
     if (params.page) cleanParams.page = params.page
 
     const res = await apiClient.get<FaultItemPagedResult>('/faults', { params: cleanParams })
     return res.data?.items || []
   } catch (error) {
     console.warn('[DashboardAPI] Fetch faults failed:', error)
+    return []
+  }
+}
+
+/**
+ * Lấy danh sách cột đèn để ánh xạ tuyến đường (segment_id) -> các mạch điện (feeder_id)
+ * GET /api/v1/assets/poles
+ */
+export async function fetchDashboardPoles(): Promise<PoleListItem[]> {
+  try {
+    const res = await apiClient.get<PoleListItemPagedResult>('/assets/poles', {
+      params: { page: 1, page_size: 200 },
+    })
+    return res.data?.items || []
+  } catch (error) {
+    console.warn('[DashboardAPI] Fetch poles failed:', error)
     return []
   }
 }

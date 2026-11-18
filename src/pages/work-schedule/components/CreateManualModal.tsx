@@ -12,6 +12,15 @@ import { GpsPoleSelector } from './GpsPoleSelector'
 import { extractSegmentId } from '../../../utils/work-schedule/poleUtils'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 import { LateNightScheduleWarning } from './LateNightScheduleWarning'
+import { iotAnomalyLabel } from '../../../constants/iot'
+
+interface IotWorkOrderTarget {
+  cabinetId?: string | null
+  nodeId?: string | null
+  feederId?: string | null
+  faultId?: string | null
+  anomalyCode?: string | null
+}
 
 interface CreateManualModalProps {
   isOpen: boolean
@@ -24,6 +33,7 @@ interface CreateManualModalProps {
   initialFaultIds?: string[]
   initialTitle?: string
   initialNotes?: string
+  initialIotTarget?: IotWorkOrderTarget
   onClose: () => void
   onSubmit: (payload: {
     title: string
@@ -65,6 +75,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   initialFaultIds,
   initialTitle,
   initialNotes,
+  initialIotTarget,
   onClose,
   onSubmit,
 }) => {
@@ -229,10 +240,14 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   // - Kiểm tra: Bắt buộc phải chọn ít nhất 01 cột có sự cố
   // - Cập nhật vị trí cột: Bắt buộc chọn tuyến, ít nhất 01 cột và ít nhất 01 file PDF QR
   // - Khảo sát: Cho phép tạo bình thường vì đi rà quét tìm lỗi mới trên toàn tuyến
+  const isIotCabinetFault = Boolean(
+    initialIotTarget && selectedFaultIds.length > 0 && selectedPoleIds.length === 0
+  )
+
   const isSubmitDisabled =
-    !segment ||
+    (!isIotCabinetFault && !segment) ||
     (initPhase === 'repair' && selectedFaultIds.length === 0) ||
-    (initPhase === 'inspection' && selectedPoleIds.length === 0) ||
+    (initPhase === 'inspection' && !isIotCabinetFault && selectedPoleIds.length === 0) ||
     (initPhase === 'pole_gps_update' &&
       (selectedPoleIds.length === 0 || qrPdfFiles.length === 0))
 
@@ -254,7 +269,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       return
     }
 
-    if (initPhase === 'inspection' && selectedPoleIds.length === 0) {
+    if (initPhase === 'inspection' && !isIotCabinetFault && selectedPoleIds.length === 0) {
       toast.warning('Vui lòng chọn ít nhất 01 cột có sự cố cần kiểm tra trên tuyến này!')
       return
     }
@@ -408,77 +423,118 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               </div>
             )}
 
-            {/* Tuyến đường */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                Tuyến đường (*):
-              </label>
-              <OpsSelect
-                value={segment}
-                onChange={(val) => setSegment(val)}
-                icon={<MapPin className="w-3.5 h-3.5" />}
-                headerLabel="Danh sách tuyến đường"
-                headerBadge={`${segmentsList.length} tuyến`}
-                ariaLabel="Tuyến đường"
-                className="w-full"
-                triggerClassName="w-full min-h-[42px] px-3 py-2"
-                popoverClassName="w-full"
-                showTriggerBadge={false}
-                options={
-                  segmentsList.length === 0
-                    ? [
-                        {
-                          value: '',
-                          label: isLoadingAssets
-                            ? 'Đang tải danh sách tuyến...'
-                            : loadAssetsError
-                              ? 'Không tải được danh sách tuyến'
-                              : 'Chưa có tuyến đường trong địa bàn',
-                        },
-                      ]
-                    : segmentsList.map((s) => ({
-                        value: s,
-                        label: s,
-                        nativeLabel: s,
-                        dotColor: 'bg-teal-500',
-                      }))
-                }
-              />
-            </div>
+            {/* Đối tượng kiểm tra IoT (Tủ điện / Node) hoặc Tuyến đường + Cột */}
+            {isIotCabinetFault && (initPhase === 'inspection' || initPhase === 'repair') ? (
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                    Vị trí Tủ điện & Thiết bị IoT cần xử lý
+                  </span>
+                  {initialIotTarget?.faultId && (
+                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-white text-indigo-700 border border-indigo-200">
+                      {initialIotTarget.faultId}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                  <div className="bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-400 block">Tủ điện (Cabinet)</span>
+                    <strong className="font-mono text-slate-800">{initialIotTarget?.cabinetId || '-'}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-400 block">Node IoT</span>
+                    <strong className="font-mono text-slate-800">{initialIotTarget?.nodeId || '-'}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-400 block">Mạch (Feeder)</span>
+                    <strong className="font-mono text-slate-800">{initialIotTarget?.feederId || '-'}</strong>
+                  </div>
+                </div>
+                {initialIotTarget?.anomalyCode && (
+                  <p className="text-[11px] text-indigo-800">
+                    Lỗi ghi nhận: <strong>{iotAnomalyLabel(initialIotTarget.anomalyCode)}</strong>
+                  </p>
+                )}
+                <p className="text-[11px] text-slate-500">
+                  Lệnh công tác sẽ gửi trực tiếp tọa độ GPS của Tủ điện và ghi chú thiết bị xuống app kỹ sư.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Tuyến đường */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                    Tuyến đường (*):
+                  </label>
+                  <OpsSelect
+                    value={segment}
+                    onChange={(val) => setSegment(val)}
+                    icon={<MapPin className="w-3.5 h-3.5" />}
+                    headerLabel="Danh sách tuyến đường"
+                    headerBadge={`${segmentsList.length} tuyến`}
+                    ariaLabel="Tuyến đường"
+                    className="w-full"
+                    triggerClassName="w-full min-h-[42px] px-3 py-2"
+                    popoverClassName="w-full"
+                    showTriggerBadge={false}
+                    options={
+                      segmentsList.length === 0
+                        ? [
+                            {
+                              value: '',
+                              label: isLoadingAssets
+                                ? 'Đang tải danh sách tuyến...'
+                                : loadAssetsError
+                                  ? 'Không tải được danh sách tuyến'
+                                  : 'Chưa có tuyến đường trong địa bàn',
+                            },
+                          ]
+                        : segmentsList.map((s) => ({
+                            value: s,
+                            label: s,
+                            nativeLabel: s,
+                            dotColor: 'bg-teal-500',
+                          }))
+                    }
+                  />
+                </div>
 
-            {/* Cập nhật vị trí cột: Chọn cột trên tuyến (sort chưa có GPS lên đầu + tìm kiếm) */}
-            {initPhase === 'pole_gps_update' && (
-              <GpsPoleSelector
-                segmentId={extractSegmentId(segment)}
-                selectedPoleIds={selectedPoleIds}
-                onChange={setSelectedPoleIds}
-              />
-            )}
+                {/* Cập nhật vị trí cột: Chọn cột trên tuyến (sort chưa có GPS lên đầu + tìm kiếm) */}
+                {initPhase === 'pole_gps_update' && (
+                  <GpsPoleSelector
+                    segmentId={extractSegmentId(segment)}
+                    selectedPoleIds={selectedPoleIds}
+                    onChange={setSelectedPoleIds}
+                  />
+                )}
 
-            {/* 2. Với Kiểm tra: Chọn cột đèn có sự cố trên tuyến */}
-            {initPhase === 'inspection' && (
-              <PoleSelector
-                segmentStr={segment}
-                selectedPoleIds={selectedPoleIds}
-                onChange={(poleIds, faultIds) => {
-                  setSelectedPoleIds(poleIds)
-                  if (faultIds) setSelectedFaultIds(faultIds)
-                }}
-                taskKindName="Kiểm tra"
-                allowEmpty={false}
-              />
-            )}
+                {/* 2. Với Kiểm tra: Chọn cột đèn có sự cố trên tuyến */}
+                {initPhase === 'inspection' && (
+                  <PoleSelector
+                    segmentStr={segment}
+                    selectedPoleIds={selectedPoleIds}
+                    onChange={(poleIds, faultIds) => {
+                      setSelectedPoleIds(poleIds)
+                      if (faultIds) setSelectedFaultIds(faultIds)
+                    }}
+                    taskKindName="Kiểm tra"
+                    allowEmpty={false}
+                  />
+                )}
 
-            {/* 3. Với Sửa chữa: Chọn trực tiếp các sự cố đã xác nhận cần sửa */}
-            {initPhase === 'repair' && (
-              <FaultSelector
-                segmentStr={segment}
-                selectedFaultIds={selectedFaultIds}
-                onChange={(faultIds) => {
-                  setSelectedFaultIds(faultIds)
-                }}
-              />
+                {/* 3. Với Sửa chữa: Chọn trực tiếp các sự cố đã xác nhận cần sửa */}
+                {initPhase === 'repair' && (
+                  <FaultSelector
+                    segmentStr={segment}
+                    selectedFaultIds={selectedFaultIds}
+                    onChange={(faultIds) => {
+                      setSelectedFaultIds(faultIds)
+                    }}
+                  />
+                )}
+              </>
             )}
 
             {/* Kỹ sư phụ trách */}

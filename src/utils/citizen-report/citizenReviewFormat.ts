@@ -43,6 +43,8 @@ export const FAULT_TYPE_LABELS_VN: Record<FaultType, string> = {
   segment_outage: 'Mất điện toàn tuyến',
   node_offline: 'Mất tín hiệu điều khiển',
   runtime_decline: 'Suy giảm hiệu năng',
+  voltage_anomaly: 'Bất thường điện áp',
+  iot_hardware_fault: 'Lỗi phần cứng IoT',
 }
 
 export const SEVERITY_LABELS_VN: Record<Severity, string> = {

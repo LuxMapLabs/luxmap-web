@@ -27,6 +27,57 @@ export const IOT_NODE_STATUS: Record<string, IotStatusBadge> = {
   unconfigured: { label: 'Chưa gán nguồn đo', tone: 'muted' },
 }
 
+/** `GET /iot/nodes/{nodeId}/diagnostics` & `GET /iot/diagnostics/summary` → trạng thái chẩn đoán. */
+export const IOT_DIAGNOSTIC_STATUS: Record<string, IotStatusBadge> = {
+  normal: { label: 'Bình thường', tone: 'ok' },
+  anomaly: { label: 'Có cảnh báo', tone: 'bad' },
+  stale: { label: 'Dữ liệu quá hạn', tone: 'warn' },
+  no_data: { label: 'Chưa có dữ liệu', tone: 'muted' },
+  unconfigured: { label: 'Chưa cấu hình nguồn', tone: 'muted' },
+  source_unavailable: { label: 'Mất nguồn Bridge', tone: 'warn' },
+}
+
+/** `GET /iot/nodes/{nodeId}/diagnostics` → `sensor_health.status`. */
+export const IOT_SENSOR_HEALTH_STATUS: Record<string, IotStatusBadge> = {
+  fresh: { label: 'Phần cứng: Bản tin mới', tone: 'ok' },
+  stale: { label: 'Phần cứng: Bản tin quá hạn', tone: 'warn' },
+  unknown: { label: 'Phần cứng: Chưa có bản tin', tone: 'muted' },
+}
+
+/** 17 mã cảnh báo trong `docs/IOT-DIAGNOSTICS.md` (+ các mã điện cũ tương thích ngược). */
+export const IOT_ANOMALY_LABELS: Record<string, string> = {
+  // Mẫu điện và số bóng
+  telemetry_stale: 'Mẫu điện quá hạn (giây)',
+  voltage_loss: 'Mất điện áp khi đèn bật (V)',
+  voltage_deviation: 'Điện áp lệch danh định (V)',
+  lamp_count_shortfall: 'Thiếu bóng sáng',
+  current_when_off: 'Còn dòng khi lệnh OFF (mA)',
+  current_deviation: 'Dòng điện lệch danh định (mA)',
+  power_deviation: 'Công suất lệch danh định (mW)',
+  // DS3231 (Đồng hồ thời gian thực)
+  ds3231_unavailable: 'DS3231: Không nhận hoặc không khởi tạo được đồng hồ',
+  ds3231_read_failed: 'DS3231: Đọc giờ qua I²C thất bại',
+  ds3231_time_invalid: 'DS3231: Giờ không hợp lệ hoặc từng mất nguồn',
+  // INA226 (Cảm biến điện)
+  ina226_unavailable: 'INA226: Không nhận hoặc không khởi tạo được cảm biến điện',
+  ina226_read_failed: 'INA226: Đọc thanh ghi đo thất bại',
+  ina226_shunt_out_of_range: 'INA226: Số đo điện trở shunt chạm giới hạn',
+  // BH1750 (Cảm biến ánh sáng)
+  bh1750_unavailable: 'BH1750: Không nhận hoặc không khởi tạo được cảm biến ánh sáng',
+  bh1750_read_failed: 'BH1750: Đọc ánh sáng thất bại',
+  // MicroSD
+  microsd_unavailable: 'MicroSD: Không khởi tạo được hàng đợi trên thẻ',
+  microsd_read_failed: 'MicroSD: Không đọc được hàng đợi hoặc gặp bản ghi lỗi',
+  microsd_write_failed: 'MicroSD: Không ghi được mẫu lên thẻ',
+  // LoRa
+  lora_tx_blocked: 'LoRa: Kênh phát bị nghẽn (AUX giữ LOW ≥ 10 giây)',
+  lora_rx_frame_error: 'LoRa: Nhận lặp lại gói lỗi CRC hoặc sai khung',
+}
+
+export function iotAnomalyLabel(code?: string | null): string {
+  return (code && IOT_ANOMALY_LABELS[code]) || code || 'Cảnh báo'
+}
+
 const UNKNOWN: IotStatusBadge = { label: 'Không xác định', tone: 'muted' }
 
 export function iotStatusBadge(table: Record<string, IotStatusBadge>, status?: string | null): IotStatusBadge {

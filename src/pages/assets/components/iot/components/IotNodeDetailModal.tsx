@@ -6,21 +6,18 @@ import type {
   IotDiagnosticResult,
   IotElectricalResult,
 } from '../../../../../types/iot/nodes'
-import { IOT_NODE_STATUS, IOT_TONE_CLASS, iotStatusBadge } from '../../../../../constants/iot'
+import {
+  IOT_DIAGNOSTIC_STATUS,
+  IOT_NODE_STATUS,
+  IOT_SENSOR_HEALTH_STATUS,
+  IOT_TONE_CLASS,
+  iotAnomalyLabel,
+  iotStatusBadge,
+} from '../../../../../constants/iot'
 import { apiErrorMessage } from '../../../../../utils/iot/apiError'
 import type { FeederPowerState } from '../../../../../types/common/enums'
 
 const POWER_STATE_LABEL: Record<FeederPowerState, string> = { on: 'Mạch đang có tải', off: 'Mạch đã ngắt tải', unknown: 'Chưa rõ' }
-
-const ANOMALY_LABEL: Record<string, string> = {
-  telemetry_stale: 'Node im lặng quá lâu (giây)',
-  current_when_off: 'Còn dòng khi lệnh OFF (mA)',
-  voltage_loss: 'Mất điện áp (V)',
-  voltage_deviation: 'Điện áp lệch danh định (V)',
-  current_deviation: 'Dòng điện lệch danh định (mA)',
-  power_deviation: 'Công suất lệch danh định (mW)',
-  lamp_count_shortfall: 'Thiếu bóng sáng',
-}
 
 const formatTime = (value?: string | null) => {
   if (!value) return '—'
@@ -127,14 +124,33 @@ export const IotNodeDetailModal: React.FC<{ nodeId: string; onClose: () => void 
             ) : !diagnostics ? (
               <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {diagnostics.status && (() => {
+                    const diagBadge = iotStatusBadge(IOT_DIAGNOSTIC_STATUS, diagnostics.status)
+                    return (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[diagBadge.tone]}`}>
+                        {diagBadge.label}
+                      </span>
+                    )
+                  })()}
+                  {diagnostics.sensor_health && (() => {
+                    const shBadge = iotStatusBadge(IOT_SENSOR_HEALTH_STATUS, diagnostics.sensor_health.status)
+                    return (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[shBadge.tone]}`}>
+                        {shBadge.label}
+                        {diagnostics.sensor_health.received_at ? ` · ${formatTime(diagnostics.sensor_health.received_at)}` : ''}
+                      </span>
+                    )
+                  })()}
+                </div>
                 {anomalies.length === 0 ? (
                   <p className="text-emerald-700 dark:text-emerald-300 font-semibold">Không có cảnh báo.</p>
                 ) : (
                   <ul className="space-y-1">
                     {anomalies.map((a, i) => (
                       <li key={`${a.code}-${i}`} className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200">
-                        <strong>{(a.code && ANOMALY_LABEL[a.code]) || a.code || 'Cảnh báo'}</strong>
+                        <strong>{iotAnomalyLabel(a.code)}</strong>
                         {a.observed != null && <> · đo {num(a.observed)}</>}
                         {a.reference != null && <> · danh định {num(a.reference)}</>}
                         {a.deviation_percent != null && <> · lệch {num(a.deviation_percent, 1)}%</>}
@@ -146,12 +162,16 @@ export const IotNodeDetailModal: React.FC<{ nodeId: string; onClose: () => void 
                 {lamp && (
                   <p>
                     Ước lượng số bóng:{' '}
-                    {lamp.estimated_lit != null || lamp.estimated_missing != null ? (
+                    {lamp.status === 'estimated' || lamp.estimated_lit != null || lamp.estimated_missing != null ? (
                       <strong>
-                        {lamp.estimated_lit ?? '—'} sáng, {lamp.estimated_missing ?? '—'} thiếu
+                        {lamp.estimated_lit ?? '-'} sáng, {lamp.estimated_missing ?? '-'} thiếu
                       </strong>
+                    ) : lamp.status === 'undetermined' ? (
+                      <span className="text-amber-600 dark:text-amber-300">
+                        chưa xác định được nhóm hiệu chuẩn ({lamp.samples ?? 0}/{lamp.required_samples ?? '-'})
+                      </span>
                     ) : (
-                      <span className="text-slate-500">chưa đủ mẫu ({lamp.samples ?? 0}/{lamp.required_samples ?? '—'})</span>
+                      <span className="text-slate-500">chưa đủ mẫu ({lamp.samples ?? 0}/{lamp.required_samples ?? '-'})</span>
                     )}
                   </p>
                 )}

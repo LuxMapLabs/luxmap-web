@@ -1,6 +1,7 @@
 import { X, Calendar, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react'
 import type { FaultItem } from '../../../types/faults/faults'
 import { getFaultProgressInfo } from './FaultsTableCard'
+import { iotAnomalyLabel } from '../../../constants/iot'
 
 interface FaultDetailModalProps {
   fault: FaultItem | null
@@ -17,8 +18,12 @@ export const FaultDetailModal: React.FC<FaultDetailModalProps> = ({
 
   const faultTypeStr = String(fault.fault_type || '').toLowerCase()
   const isOffline = faultTypeStr.includes('offline') || faultTypeStr.includes('node')
+  const isVoltageAnomaly = faultTypeStr === 'voltage_anomaly'
+  const isIotHardware = faultTypeStr === 'iot_hardware_fault'
   const isBlackout =
     !isOffline &&
+    !isVoltageAnomaly &&
+    !isIotHardware &&
     (faultTypeStr.includes('out') ||
       faultTypeStr.includes('blackout') ||
       faultTypeStr.includes('segment_outage'))
@@ -55,6 +60,14 @@ export const FaultDetailModal: React.FC<FaultDetailModalProps> = ({
     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
       Mất kết nối IoT
     </span>
+  ) : isVoltageAnomaly ? (
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
+      Bất thường điện áp
+    </span>
+  ) : isIotHardware ? (
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
+      Lỗi phần cứng IoT
+    </span>
   ) : isBlackout ? (
     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
       Mất sáng hoàn toàn
@@ -68,12 +81,17 @@ export const FaultDetailModal: React.FC<FaultDetailModalProps> = ({
   const rawNote = (fault.note || fault.review_note || '').trim()
   const iotMatch = rawNote.match(/Thiết bị\s+(NODE-[\w-]+)\s+ở tủ\s+(CAB-[\w-]+)/i)
 
-  const targetLabel = fault.pole_id || (iotMatch ? iotMatch[1] : fault.fault_id || '-')
+  const targetLabel =
+    fault.pole_id || fault.origin_node_id || (iotMatch ? iotMatch[1] : fault.fault_id || '-')
 
   const segmentName =
     segmentNameMap[fault.segment_id || ''] ||
     fault.segment_id ||
-    (iotMatch ? iotMatch[2] : '-')
+    (fault.feeder_id || fault.cabinet_id
+      ? [fault.feeder_id, fault.cabinet_id].filter(Boolean).join(' · ')
+      : iotMatch
+      ? iotMatch[2]
+      : '-')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
@@ -132,6 +150,35 @@ export const FaultDetailModal: React.FC<FaultDetailModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Thông tin IoT & Phục hồi (nếu có) */}
+          {(fault.iot_anomaly_code || fault.origin_node_id || fault.feeder_id || fault.recovered_at) && (
+            <div className="bg-indigo-50/60 p-3 rounded-xl border border-indigo-100 space-y-1">
+              <div className="font-bold text-indigo-900">Chi tiết chẩn đoán IoT</div>
+              {fault.iot_anomaly_code && (
+                <div className="text-indigo-800">
+                  Mã lỗi: <strong>{iotAnomalyLabel(fault.iot_anomaly_code)}</strong>{' '}
+                  <span className="font-mono text-[10px] text-indigo-500">({fault.iot_anomaly_code})</span>
+                </div>
+              )}
+              {(fault.origin_node_id || fault.feeder_id || fault.cabinet_id) && (
+                <div className="font-mono text-[11px] text-slate-600">
+                  {[
+                    fault.origin_node_id && `Node: ${fault.origin_node_id}`,
+                    fault.feeder_id && `Mạch: ${fault.feeder_id}`,
+                    fault.cabinet_id && `Tủ: ${fault.cabinet_id}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
+              )}
+              {fault.recovered_at && (
+                <div className="text-emerald-700 font-semibold">
+                  Thiết bị đã tự phục hồi lúc {new Date(fault.recovered_at).toLocaleString('vi-VN')}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Ghi chú sự cố */}
           <div className="space-y-1.5">
