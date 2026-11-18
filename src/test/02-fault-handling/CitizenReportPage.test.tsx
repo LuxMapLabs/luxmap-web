@@ -39,6 +39,8 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
   const mockPublicQr: PublicQrInfo = {
     segment_name: 'Đường Tỉnh Lộ 8 (Đoạn Cầu Tân Quy)',
     commune_name: 'Xã Tân Thạnh Đông',
+    external_ref: null,
+    note: null,
     can_report: true,
     reason: null,
   }
@@ -144,11 +146,20 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
       render(
         <PoleInfoCard code="QR12345678901234" poleInfo={mockPublicQr} isLoading={false} />
       )
-      expect(screen.getByText('Vị trí cột đèn phản ánh')).toBeInTheDocument()
+      expect(screen.getByText('Cột đèn bạn đang báo')).toBeInTheDocument()
       expect(screen.getByText('Mã QR hợp lệ')).toBeInTheDocument()
       expect(screen.getByText('Đường Tỉnh Lộ 8 (Đoạn Cầu Tân Quy)')).toBeInTheDocument()
       expect(screen.getByText('Xã Tân Thạnh Đông')).toBeInTheDocument()
-      expect(screen.getByText('QR12345678901234')).toBeInTheDocument()
+      expect(screen.queryByText('QR12345678901234')).toBeNull()
+    })
+
+    it('PoleInfoCard hiển thị mã cột external_ref và ghi chú note khi backend trả về', () => {
+      const poleWithRef = { ...mockPublicQr, external_ref: 'POLE-0001', note: 'Đối diện cổng chào' }
+      render(
+        <PoleInfoCard code="QR12345678901234" poleInfo={poleWithRef} isLoading={false} />
+      )
+      expect(screen.getByText('POLE-0001')).toBeInTheDocument()
+      expect(screen.getByText('Đối diện cổng chào')).toBeInTheDocument()
     })
 
     it('PoleInfoCard hiển thị thẻ đỏ khi gặp lỗi 404 / thu hồi', () => {
@@ -313,7 +324,7 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
       expect(tiltButton).not.toBeNull()
 
       fireEvent.click(tiltButton!)
-      expect(tiltButton).toHaveClass('border-blue-600')
+      expect(tiltButton).toHaveClass('border-[#1f3864]')
     })
 
     it('nhập form hợp lệ và gửi phản ánh thành công, dispatch đúng action submitReportRequest', () => {
@@ -335,7 +346,7 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
       const phoneInput = screen.getByPlaceholderText(/Số điện thoại liên hệ/i)
       fireEvent.change(phoneInput, { target: { value: '0901234567' } })
 
-      const submitBtn = screen.getByRole('button', { name: /Gửi Phản Ánh Ngay/i })
+      const submitBtn = screen.getByRole('button', { name: /^Gửi phản ánh$/i })
       fireEvent.click(submitBtn)
 
       expect(dispatchSpy).toHaveBeenCalledWith(
@@ -393,7 +404,7 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
       const descInput = screen.getByPlaceholderText(/Ví dụ: Đèn bị tắt từ hôm qua/i)
       fireEvent.change(descInput, { target: { value: 'Đèn' } })
 
-      const submitBtn = screen.getByRole('button', { name: /Gửi Phản Ánh Ngay/i })
+      const submitBtn = screen.getByRole('button', { name: /^Gửi phản ánh$/i })
       fireEvent.click(submitBtn)
 
       expect(
@@ -416,7 +427,7 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
       const phoneInput = screen.getByPlaceholderText(/Số điện thoại liên hệ/i)
       fireEvent.change(phoneInput, { target: { value: '0123456789' } })
 
-      const submitBtn = screen.getByRole('button', { name: /Gửi Phản Ánh Ngay/i })
+      const submitBtn = screen.getByRole('button', { name: /^Gửi phản ánh$/i })
       fireEvent.click(submitBtn)
 
       expect(
@@ -443,7 +454,7 @@ describe('CitizenReportPage End-to-End Test Suite (TASK-CITIZEN-QR-END-TO-END)',
         target: { value: 'Đèn đường bị hở dây điện nguy hiểm người đi đường' },
       })
 
-      const submitBtn = screen.getByRole('button', { name: /Gửi Phản Ánh Ngay/i })
+      const submitBtn = screen.getByRole('button', { name: /^Gửi phản ánh$/i })
       fireEvent.click(submitBtn)
 
       expect(

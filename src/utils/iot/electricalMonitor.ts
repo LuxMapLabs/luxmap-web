@@ -5,6 +5,7 @@ import { findByIdOrRef } from '../assets/findByIdOrRef'
 const toMonitorFeeder = (f: FeederListItem): MonitorFeeder => ({
   feeder_id: f.feeder_id || '',
   label: f.external_ref || f.feeder_name || f.feeder_id || '',
+  name: f.feeder_name || '',
   node_id: f.control?.node_id || null,
 })
 
@@ -19,9 +20,14 @@ export function buildMonitorTarget(
 ): ElectricalMonitorTarget {
   const feeder = findByIdOrRef(feeders, (f) => f.feeder_id, feederId)
   if (!feeder?.feeder_id) {
-    return { title: `Mạch ${feederId}`, feeders: [{ feeder_id: feederId, label: feederId, node_id: fallbackNodeId ?? null }], activeFeederId: feederId }
+    return {
+      title: `Mạch ${feederId}`,
+      cabinetId: null,
+      feeders: [{ feeder_id: feederId, label: feederId, name: '', node_id: fallbackNodeId ?? null }],
+      activeFeederId: feederId,
+    }
   }
-  const cabinetId = feeder.cabinet?.cabinet_id
+  const cabinetId = feeder.cabinet?.cabinet_id ?? null
   const siblings = cabinetId ? feeders.filter((f) => f.feeder_id && f.cabinet?.cabinet_id === cabinetId) : [feeder]
   const items = siblings.map(toMonitorFeeder)
   if (fallbackNodeId) {
@@ -30,6 +36,7 @@ export function buildMonitorTarget(
   }
   return {
     title: feeder.cabinet?.cabinet_name || cabinetId || `Mạch ${items[0].label}`,
+    cabinetId,
     feeders: items,
     activeFeederId: feeder.feeder_id,
   }

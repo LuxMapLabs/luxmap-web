@@ -24,6 +24,7 @@ import { validateImportRow, type ValidationContext } from '../../validations/ass
 
 const showCommuneMock = vi.hoisted(() => ({ value: false }))
 vi.mock('../../hooks/useShowCommune', () => ({ useShowCommune: () => showCommuneMock.value }))
+vi.mock('../../utils/assets/decalCanvas', () => ({ renderDecalToCanvas: vi.fn(async () => ({ toDataURL: () => 'data:image/png;base64,TEST' })) }))
 
 describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
   // 100% Mock Data chuẩn DTO từ src/types/
@@ -618,8 +619,8 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText('QR-EXIST-01')).toBeInTheDocument()
-        expect(screen.getByText('QR-NEW-02')).toBeInTheDocument()
+        expect(screen.getByAltText('Tem QR POLE-ACTIVE')).toBeInTheDocument()
+        expect(screen.getByAltText('Tem QR POLE-EXPIRING')).toBeInTheDocument()
       })
 
       expect(getQrSpy).toHaveBeenCalledTimes(2)

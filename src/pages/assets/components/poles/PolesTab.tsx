@@ -487,10 +487,9 @@ export const PolesTab: React.FC<PolesTabProps> = ({
         pole={qrPole}
         segmentName={
           segments.find((s) => s.segment_id === qrPole?.segment_id)?.segment_name ||
-          qrPole?.segment_id ||
           ''
         }
-        communeName={qrPole?.commune_id || ''}
+        communeName={qrPole?.commune_name || ''}
         onClose={() => setQrPole(null)}
       />
 

@@ -1,5 +1,14 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('../../feature/iot/iotAPI', () => ({
+  default: {
+    getNodes: vi.fn(() => Promise.resolve({ total: 0, items: [] })),
+    getServers: vi.fn(() => Promise.resolve([])),
+    getFeederElectricalHistory: vi.fn(() => new Promise(() => {})),
+    getCommandHistory: vi.fn(() => Promise.resolve({ items: [] })),
+  },
+}))
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { store } from '../../redux/store'

@@ -55,6 +55,30 @@ import {
 } from '../../assets/components/fixtures/components/RetireFixtureModal'
 import { useAuthImage } from '../../../hooks/useAuthImage'
 import { POLE_LAMP_UI, poleFeatureLampState, poleLampState } from '../../../utils/gis-map/poleLampState'
+import {
+  IOT_GATEWAY_STATUS,
+  IOT_NODE_STATUS,
+  IOT_TONE_COLOR,
+  iotStatusBadge,
+  type IotTone,
+} from '../../../constants/iot'
+import { useCabinetIotStatus } from '../../../hooks/iot/useCabinetIotStatus'
+
+const IOT_TONE_ORDER: Record<IotTone, number> = {
+  bad: 0,
+  warn: 1,
+  ok: 2,
+  muted: 3,
+}
+
+/** Nhãn ngắn cho dòng mạch trong khung tủ (chỗ hẹp); nhãn đầy đủ vẫn ở title. */
+const NODE_STATUS_SHORT: Record<string, string> = {
+  online: 'online',
+  offline: 'mất tín hiệu',
+  no_data: 'chưa có số',
+  source_unavailable: 'lỗi nguồn đo',
+  unconfigured: 'chưa gán nguồn',
+}
 
 // Nhãn trạng thái cột: fixture_status + power_state của mạch (poleLampState)
 const poleStatusBadge = (p?: { fixture_status?: string | null; power_state?: string | null } | null) => {
@@ -469,6 +493,47 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   )
   const modeOf = (nodeId: string | null): FeederControlMode | undefined => (nodeId ? commandModes[nodeId] ?? undefined : undefined)
 
+  const [expandedFeederId, setExpandedFeederId] = useState<string | null>(null)
+
+  React.useEffect(() => {
+    setExpandedFeederId(null)
+  }, [selectedCabinet?.cabinet_id])
+
+  const cabinetId = selectedCabinet?.cabinet_id || null
+  const {
+    nodes: cabinetIotNodes,
+    servers: cabinetIotServers,
+    loading: cabinetIotLoading,
+    error: cabinetIotError,
+  } = useCabinetIotStatus(cabinetId)
+
+  const cabinetNodeGroups = useMemo(() => {
+    if (cabinetIotNodes.length === 0) return []
+    const countByLabel = new Map<string, { count: number; tone: IotTone; label: string }>()
+    for (const n of cabinetIotNodes) {
+      const badge = iotStatusBadge(IOT_NODE_STATUS, n.status)
+      const existing = countByLabel.get(badge.label)
+      if (existing) {
+        existing.count += 1
+      } else {
+        countByLabel.set(badge.label, { count: 1, tone: badge.tone, label: badge.label })
+      }
+    }
+    return Array.from(countByLabel.values()).sort(
+      (a, b) => IOT_TONE_ORDER[a.tone] - IOT_TONE_ORDER[b.tone] || a.label.localeCompare(b.label)
+    )
+  }, [cabinetIotNodes])
+
+  const cabinetNodeStatusMap = useMemo(() => {
+    const map: Record<string, string | null | undefined> = {}
+    for (const n of cabinetIotNodes) {
+      if (n.node_id) {
+        map[n.node_id] = n.status
+      }
+    }
+    return map
+  }, [cabinetIotNodes])
+
   return (
     <>
       {historyTarget && (
@@ -476,6 +541,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
           title={historyTarget.title}
           feeders={historyTarget.feeders}
           initialFeederId={historyTarget.initialFeederId}
+          nodeStatus={cabinetNodeStatusMap}
           onClose={() => setHistoryTarget(null)}
         />
       )}
@@ -950,7 +1016,64 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </span>
                 </div>
 
-                
+                {cabinetIotLoading && cabinetIotNodes.length === 0 ? (
+                  <div className="text-[11.5px] text-slate-500 dark:text-slate-400 py-0.5">
+                    Đang tải trạng thái IoT…
+                  </div>
+                ) : cabinetIotError && cabinetIotNodes.length === 0 ? (
+                  <div className="text-[11.5px] text-rose-600 dark:text-rose-400 py-0.5">
+                    {cabinetIotError}
+                  </div>
+                ) : cabinetIotNodes.length === 0 ? (
+                  <div className="text-[11.5px] text-slate-500 dark:text-slate-400 py-0.5">
+                    Chưa có node IoT gắn tủ này.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
+                    {/* Dòng Gateway */}
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-500 dark:text-slate-400 shrink-0 w-16 font-medium">Gateway</span>
+                      <div className="flex-1 space-y-1 min-w-0">
+                        {cabinetIotServers.length > 0 ? (
+                          cabinetIotServers.map((server) => {
+                            const badge = iotStatusBadge(IOT_GATEWAY_STATUS, server.status)
+                            return (
+                              <div key={server.server_id} className="flex items-center gap-1.5 flex-wrap">
+                                <span
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{ background: IOT_TONE_COLOR[badge.tone] }}
+                                />
+                                <span className="font-mono font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                                  {server.server_id}
+                                </span>
+                                <span className="text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                  {badge.label}
+                                </span>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <span className="text-slate-600 dark:text-slate-400">-</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dòng Node */}
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-500 dark:text-slate-400 shrink-0 w-16 font-medium">Node</span>
+                      <div className="flex-1 text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {cabinetNodeGroups.map((group, idx) => (
+                          <React.Fragment key={group.label}>
+                            {idx > 0 && <span className="text-slate-400 dark:text-slate-500"> · </span>}
+                            <span className={`whitespace-nowrap ${group.tone === 'bad' ? 'text-rose-600 dark:text-rose-400 font-semibold' : ''}`}>
+                              {group.count} {group.label}
+                            </span>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Feeder Circuits Section with Individual On/Off Controls */}
@@ -974,7 +1097,12 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                             feeders: cabinetFeeders.flatMap((f: any) => {
                               const node = feederNodeId(f.feeder_id, f)
                               return node && f.feeder_id
-                                ? [{ feederId: f.feeder_id, label: f.external_ref || f.feeder_name || f.feeder_id, nodeId: node }]
+                                ? [{
+                                    feederId: f.feeder_id,
+                                    label: f.external_ref || f.feeder_name || f.feeder_id,
+                                    name: f.feeder_name || '',
+                                    nodeId: node,
+                                  }]
                                 : []
                             }),
                             initialFeederId: firstFeederId,
@@ -990,22 +1118,38 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   })()}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {cabinetFeeders.map((feeder: any, idx: number) => {
                     const fId = feeder.feeder_id || feeder.external_ref || `fdr-${idx}`
                     const cabFeeder = (selectedCabinet?.feeders || []).find((cf: any) => cf.feeder_id === fId)
-                    const currentMode = modeOf(feederNodeId(fId, feeder))
+                    const nodeId = feederNodeId(fId, feeder)
+                    const currentMode = modeOf(nodeId)
                     const feederPoles = cabinetConnectedPoles.filter(
                       (p) => p.properties.feeder_id === fId || (idx === 0 && !p.properties.feeder_id)
                     )
                     const poleCount = feederPoles.length || feeder.pole_count || 0
                     const fName = feeder.feeder_name || `Mạch ${idx + 1}`
                     const fCode = feeder.external_ref || fId
+                    const isExpanded = expandedFeederId === fId
+
+                    const nodeObj = nodeId ? cabinetIotNodes.find((n) => n.node_id === nodeId) : undefined
+                    const nodeBadge = nodeId
+                      ? iotStatusBadge(IOT_NODE_STATUS, nodeObj ? nodeObj.status : undefined)
+                      : null
+                    const nodeStatusShort = nodeId
+                      ? (nodeObj?.status ? NODE_STATUS_SHORT[nodeObj.status] : undefined) ?? 'không rõ'
+                      : ''
+                    const nodeToneClass =
+                      nodeBadge?.tone === 'bad'
+                        ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                        : nodeBadge?.tone === 'warn'
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-slate-500 dark:text-slate-400'
 
                     return (
                       <div
                         key={fId}
-                        className={`p-2.5 rounded-xl border transition-all ${
+                        className={`px-2.5 py-2 rounded-xl border transition-all ${
                           currentMode === 'off'
                             ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600'
                             : currentMode === 'on'
@@ -1013,26 +1157,111 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                             : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-700/60 shadow-2xs'
                         }`}
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className={`w-2 h-2 rounded-full shrink-0 ${
-                                  currentMode === 'on'
-                                    ? 'bg-emerald-500 animate-pulse'
-                                    : currentMode === 'off'
-                                    ? 'bg-white ring-1 ring-slate-400'
-                                    : 'bg-indigo-500'
+                        <div className="flex items-center justify-between gap-2">
+                          {/* Vùng trái: button bấm để mở/đóng */}
+                          <button
+                            type="button"
+                            aria-expanded={isExpanded}
+                            aria-controls={`feeder-detail-${fId}`}
+                            title={fName}
+                            onClick={() => setExpandedFeederId((prev) => (prev === fId ? null : fId))}
+                            className="flex-1 min-w-0 text-left cursor-pointer group rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                          >
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {nodeBadge ? (
+                                  <span
+                                    className="w-2 h-2 rounded-full shrink-0"
+                                    style={{ background: IOT_TONE_COLOR[nodeBadge.tone] }}
+                                  />
+                                ) : (
+                                  <span className="w-2 h-2 rounded-full shrink-0 border border-slate-400 dark:border-slate-500 bg-transparent" />
+                                )}
+                                <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate">
+                                  {fName}
+                                </span>
+                                <span className="sr-only">{fCode}</span>
+                              </div>
+                              <ChevronDown
+                                className={`w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 shrink-0 transition-transform motion-reduce:transition-none ${
+                                  isExpanded ? 'rotate-180' : ''
                                 }`}
                               />
-                              <span className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate">
-                                {fName}
+                            </div>
+                            <div className="mt-0.5 pl-3.5 flex items-center gap-1 min-w-0 text-[10.5px]">
+                              {nodeId ? (
+                                <>
+                                  <span className="font-mono font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+                                    {nodeId}
+                                  </span>
+                                  <span className="text-slate-400 dark:text-slate-500 shrink-0">·</span>
+                                  <span className={`truncate ${nodeToneClass}`} title={nodeBadge?.label}>
+                                    {nodeStatusShort}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-slate-400 dark:text-slate-500">
+                                  Chưa gắn IoT
+                                </span>
+                              )}
+                            </div>
+                          </button>
+
+                          {/* 3-State Segmented Control: ON / OFF / AUTO */}
+                          {canControlLighting && (
+                            <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleControlFeederMode(fId, 'on', { feederName: fName, feederCode: fCode, poleCount })}
+                                aria-pressed={currentMode === 'on'}
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                                  currentMode === 'on'
+                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'
+                                }`}
+                                title="Bật nguồn cưỡng bức ngay lập tức"
+                              >
+                                Bật
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleControlFeederMode(fId, 'off', { feederName: fName, feederCode: fCode, poleCount })}
+                                aria-pressed={currentMode === 'off'}
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                                  currentMode === 'off'
+                                    ? 'bg-rose-600 text-white shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'
+                                }`}
+                                title="Ngắt nguồn cưỡng bức (Tắt)"
+                              >
+                                Tắt
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleControlFeederMode(fId, 'auto', { feederName: fName, feederCode: fCode, poleCount })}
+                                aria-pressed={currentMode === 'auto'}
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                                  currentMode === 'auto'
+                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600'
+                                }`}
+                                title="Chạy tự động theo lịch hẹn giờ"
+                              >
+                                Auto
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Vùng chi tiết chỉ render khi mở */}
+                        {isExpanded && (
+                          <div id={`feeder-detail-${fId}`} className="mt-2 pt-2 border-t border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10.5px] text-slate-500 dark:text-slate-400">
+                              <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
+                                {fCode}
                               </span>
-                            </div>
-                            <div className="mt-0.5 font-mono font-medium text-[10.5px] text-slate-600 dark:text-slate-300 truncate">
-                              {fCode}
-                            </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10.5px] text-slate-500 dark:text-slate-400">
                               <span
                                 className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${feederPowerBadge(
                                   cabFeeder?.power_state ?? feeder.power_state
@@ -1042,63 +1271,13 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                               </span>
                               <span className="whitespace-nowrap">{poleCount} cột đèn</span>
                             </div>
+                            <FeederElectricalSummary
+                              feederId={fId}
+                              nodeId={nodeId}
+                              onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(fId, nodeId) : undefined}
+                            />
                           </div>
-
-                          {/* 3-State Segmented Control: ON / OFF / AUTO */}
-                          {canControlLighting && (
-                          <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => handleControlFeederMode(fId, 'on', { feederName: fName, feederCode: fCode, poleCount })}
-                              aria-pressed={currentMode === 'on'}
-                              className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                                currentMode === 'on'
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'
-                              }`}
-                              title="Bật nguồn cưỡng bức ngay lập tức"
-                            >
-                              <Sun className="w-3 h-3" />
-                              <span>Bật</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleControlFeederMode(fId, 'off', { feederName: fName, feederCode: fCode, poleCount })}
-                              aria-pressed={currentMode === 'off'}
-                              className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                                currentMode === 'off'
-                                  ? 'bg-rose-600 text-white shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'
-                              }`}
-                              title="Ngắt nguồn cưỡng bức (Tắt)"
-                            >
-                              <Moon className="w-3 h-3" />
-                              <span>Tắt</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleControlFeederMode(fId, 'auto', { feederName: fName, feederCode: fCode, poleCount })}
-                              aria-pressed={currentMode === 'auto'}
-                              className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                                currentMode === 'auto'
-                                  ? 'bg-indigo-600 text-white shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600'
-                              }`}
-                              title="Chạy tự động theo lịch hẹn giờ"
-                            >
-                              <Clock className="w-3 h-3" />
-                              <span>Auto</span>
-                            </button>
-                          </div>
-                          )}
-                        </div>
-                        <FeederElectricalSummary
-                          feederId={fId}
-                          nodeId={feederNodeId(fId, feeder)}
-                          onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(fId, feederNodeId(fId, feeder)) : undefined}
-                        />
+                        )}
                       </div>
                     )
                   })}
@@ -1137,7 +1316,12 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       setHistoryTarget({
                         title: `Mạch ${selectedFeeder.feeder_name || selId}`,
                         feeders: selectedFeederNodeId
-                          ? [{ feederId: selId, label: selectedFeeder.external_ref || selId, nodeId: selectedFeederNodeId }]
+                          ? [{
+                              feederId: selId,
+                              label: selectedFeeder.external_ref || selId,
+                              name: selectedFeeder.feeder_name || '',
+                              nodeId: selectedFeederNodeId,
+                            }]
                           : [],
                         initialFeederId: selId,
                       })
