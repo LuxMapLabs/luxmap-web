@@ -98,6 +98,7 @@ export interface DispatchProposal {
     pole_count?: number
     max_severity?: Severity
     unassigned_reason?: string | null
+    cabinet_id?: string | null
 }
 
 export interface DispatchSkipped {
@@ -335,6 +336,11 @@ export interface WorkOrderFaultDetail {
     fault_status?: FaultStatus
     severity?: Severity
     inspection_outcome?: InspectionOutcome
+    origin_node_id?: string | null
+    feeder_id?: string | null
+    cabinet_id?: string | null
+    iot_anomaly_code?: string | null
+    recovered_at?: string | null
 }
 
 export interface WorkOrderItem {

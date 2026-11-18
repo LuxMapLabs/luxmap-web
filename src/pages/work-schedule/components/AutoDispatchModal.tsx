@@ -132,7 +132,7 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
           due_date: p.due_date || p.scheduled_date,
           assigned_to: p.assigned_to || undefined,
           fault_ids: hasFaults ? p.fault_ids : undefined,
-          segment_id: hasFaults ? undefined : p.segment_id,
+          segment_id: hasFaults ? undefined : (p.segment_id ?? undefined),
           note: p.note,
         }
       })
@@ -173,7 +173,7 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
         due_date: p.due_date || p.scheduled_date,
         assigned_to: p.assigned_to || undefined,
         fault_ids: hasFaults ? p.fault_ids : undefined,
-        segment_id: hasFaults ? undefined : p.segment_id,
+        segment_id: hasFaults ? undefined : (p.segment_id ?? undefined),
         note: p.note,
       }
 
@@ -305,10 +305,21 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
                           #{idx + 1}
                         </span>
                         <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
-                          <MapPin className="w-3 h-3 text-slate-500" />
-                          {item.segment_name || item.segment_id}
-                        </span>
+                        {item.segment_name || item.segment_id ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+                            <MapPin className="w-3 h-3 text-slate-500" />
+                            {item.segment_name || item.segment_id}
+                          </span>
+                        ) : item.cabinet_id ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <Zap className="w-3 h-3 text-indigo-500" />
+                            Tủ {item.cabinet_id}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500">
+                            -
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -542,7 +553,11 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
           isOpen={!!viewingFaultsProposal}
           onClose={() => setViewingFaultsProposal(null)}
           proposalTitle={viewingFaultsProposal.title || ''}
-          segmentName={viewingFaultsProposal.segment_name || viewingFaultsProposal.segment_id || ''}
+          segmentName={
+            viewingFaultsProposal.segment_name ||
+            viewingFaultsProposal.segment_id ||
+            (viewingFaultsProposal.cabinet_id ? `Tủ ${viewingFaultsProposal.cabinet_id}` : '-')
+          }
           faultIds={viewingFaultsProposal.fault_ids || []}
           poleIds={viewingFaultsProposal.pole_ids || []}
         />
