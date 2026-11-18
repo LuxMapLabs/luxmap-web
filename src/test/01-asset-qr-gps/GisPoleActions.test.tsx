@@ -3,6 +3,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act, cleanup, waitFor, within } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore, type Action, type Middleware } from '@reduxjs/toolkit'
+import createSagaMiddleware from 'redux-saga'
+import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 
 // Thẻ cầu IoT trong panel tự gọi API khi mở cột: chặn để test không ra mạng
 vi.mock('../../feature/iot/iotAPI', () => ({
@@ -96,10 +98,12 @@ const setup = (
     dispatched.push(action as Action)
     return next(action)
   }
+  const sagaMiddleware = createSagaMiddleware()
   const store = configureStore({
     reducer: rootReducer,
-    middleware: (getDefault) => getDefault({ serializableCheck: false }).concat(recorder),
+    middleware: (getDefault) => getDefault({ serializableCheck: false }).concat(recorder, sagaMiddleware),
   })
+  sagaMiddleware.run(iotMonitorSaga)
   store.dispatch(loginSuccess({ user: { user_id: 'U-1', username: 'u', role } as unknown as CurrentUserResponse }))
   store.dispatch(fetchPoleDetailSuccess(detail))
   store.dispatch(

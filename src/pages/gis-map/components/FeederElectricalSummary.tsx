@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch } from '../../../redux/store'
 import { AlertTriangle, LineChart as LineChartIcon, Radio } from 'lucide-react'
 import { Line, LineChart, ResponsiveContainer, YAxis } from 'recharts'
 import { useElectricalSeries } from '../../../hooks/iot/useElectricalSeries'
 import { formatMetric } from '../../../utils/iot/electricalSeries'
-import iotAPI from '../../../feature/iot/iotAPI'
-import type { IotDiagnosticResult } from '../../../types/iot/nodes'
+import {
+  fetchDiagnosticsRequest,
+  selectNodeDiagnostics,
+  type IotMonitorState,
+} from '../../../feature/iot/iotMonitorSlice'
 import { iotAnomalyLabel } from '../../../constants/iot'
 
 /** Số mẫu gần nhất vẽ sparkline trong khung tủ. */
@@ -24,26 +29,14 @@ export const FeederElectricalSummary: React.FC<{
     maxPoints: SPARKLINE_SAMPLES,
     live: Boolean(nodeId),
   })
-  const [diagnostics, setDiagnostics] = useState<IotDiagnosticResult | null>(null)
+  const dispatch = useDispatch<AppDispatch>()
+  const entry = useSelector((s: { iotMonitor: IotMonitorState }) => selectNodeDiagnostics(s, nodeId))
+  const diagnostics = entry && !entry.loading ? entry.data : null
 
   useEffect(() => {
-    if (!nodeId || typeof iotAPI.getDiagnostics !== 'function') {
-      setDiagnostics(null)
-      return
-    }
-    let cancelled = false
-    iotAPI
-      .getDiagnostics(nodeId)
-      .then((res) => {
-        if (!cancelled) setDiagnostics(res)
-      })
-      .catch(() => {
-        if (!cancelled) setDiagnostics(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [nodeId])
+    if (!nodeId) return
+    dispatch(fetchDiagnosticsRequest(nodeId))
+  }, [nodeId, dispatch])
 
   const anomalies = diagnostics?.anomalies || []
 

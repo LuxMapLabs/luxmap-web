@@ -1,5 +1,9 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { renderWithSagaStore } from '../utils/sagaStore'
+import iotMonitorReducer from '../../feature/iot/iotMonitorSlice'
+import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 import { IotNodesTab } from '../../pages/assets/components/iot/IotNodesTab'
 import iotAPI from '../../feature/iot/iotAPI'
 import assetReducer, {
@@ -24,6 +28,12 @@ vi.mock('../../feature/iot/iotAPI', () => ({
 }))
 
 const api = vi.mocked(iotAPI)
+
+const renderTab = (ui: React.ReactElement) =>
+  renderWithSagaStore(ui, {
+    reducers: { iotMonitor: iotMonitorReducer },
+    sagas: [iotMonitorSaga],
+  })
 
 describe('IotNodesTab (GET /iot/nodes)', () => {
   const cabinets = [
@@ -65,7 +75,7 @@ describe('IotNodesTab (GET /iot/nodes)', () => {
   })
 
   it('lists the nodes from /iot/nodes with bridge status, server and the feeder on relay 1', async () => {
-    render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
+    renderTab(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
 
     const row1 = (await screen.findByText('IOT-NODE-001')).closest('tr')!
     expect(api.getNodes).toHaveBeenCalledWith({ page: 1, page_size: 200 })
@@ -85,7 +95,7 @@ describe('IotNodesTab (GET /iot/nodes)', () => {
   })
 
   it('filters by server id', async () => {
-    render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
+    renderTab(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
     await screen.findByText('IOT-NODE-001')
 
     fireEvent.change(screen.getByPlaceholderText(/Tìm theo mã thiết bị/), { target: { value: 'iot-server-01' } })
@@ -96,13 +106,13 @@ describe('IotNodesTab (GET /iot/nodes)', () => {
 
   it('shows the API error message', async () => {
     api.getNodes.mockRejectedValue({ response: { data: { error: { message: 'Bạn không có quyền.' } } } })
-    render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
+    renderTab(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
 
     expect(await screen.findByText('Bạn không có quyền.')).toBeInTheDocument()
   })
 
   it('is view-only for the manager: each row offers only a read-only detail, no create / edit / delete', async () => {
-    render(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
+    renderTab(<IotNodesTab cabinets={cabinets} feeders={feeders} />)
     const row1 = (await screen.findByText('IOT-NODE-001')).closest('tr')!
 
     expect(within(row1).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual(['Chi tiết'])

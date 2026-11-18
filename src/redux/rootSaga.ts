@@ -18,6 +18,7 @@ import avatarSaga from '../feature/avatar/avatarSaga'
 import superiorDashboardSaga from '../feature/dashboard/superiorDashboardSaga'
 import reportsSaga from '../feature/reports/reportsSaga'
 import iotBridgeSaga from '../feature/iot/iotBridgeSaga'
+import iotMonitorSaga from '../feature/iot/iotMonitorSaga'
 
 export default function* rootSaga() {
     yield all([
@@ -40,5 +41,6 @@ export default function* rootSaga() {
         fork(superiorDashboardSaga),
         fork(reportsSaga),
         fork(iotBridgeSaga),
+        fork(iotMonitorSaga),
     ])
 }

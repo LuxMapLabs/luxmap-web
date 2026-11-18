@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch } from '../../../../../redux/store'
 import { createPortal } from 'react-dom'
 import { AlertTriangle, Loader2, X, Zap } from 'lucide-react'
-import iotAPI from '../../../../../feature/iot/iotAPI'
-import type {
-  IotDiagnosticResult,
-  IotElectricalResult,
-} from '../../../../../types/iot/nodes'
+import {
+  fetchDiagnosticsRequest,
+  fetchNodeElectricalRequest,
+  selectNodeDiagnostics,
+  selectNodeElectrical,
+  type IotMonitorState,
+} from '../../../../../feature/iot/iotMonitorSlice'
 import {
   IOT_DIAGNOSTIC_STATUS,
   IOT_NODE_STATUS,
@@ -14,7 +18,6 @@ import {
   iotAnomalyLabel,
   iotStatusBadge,
 } from '../../../../../constants/iot'
-import { apiErrorMessage } from '../../../../../utils/iot/apiError'
 import type { FeederPowerState } from '../../../../../types/common/enums'
 
 const POWER_STATE_LABEL: Record<FeederPowerState, string> = { on: 'Mạch đang có tải', off: 'Mạch đã ngắt tải', unknown: 'Chưa rõ' }
@@ -46,21 +49,19 @@ const ErrorLine: React.FC<{ text: string }> = ({ text }) => (
  * Lịch sử điện (biểu đồ) và lịch sử lệnh xem ở drawer bản đồ GIS, không lặp lại ở đây.
  */
 export const IotNodeDetailModal: React.FC<{ nodeId: string; onClose: () => void }> = ({ nodeId, onClose }) => {
-  const [electrical, setElectrical] = useState<IotElectricalResult | null>(null)
-  const [electricalError, setElectricalError] = useState<string | null>(null)
-  const [diagnostics, setDiagnostics] = useState<IotDiagnosticResult | null>(null)
-  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
+  const dispatch = useDispatch<AppDispatch>()
+  const elEntry = useSelector((s: { iotMonitor: IotMonitorState }) => selectNodeElectrical(s, nodeId))
+  const diagEntry = useSelector((s: { iotMonitor: IotMonitorState }) => selectNodeDiagnostics(s, nodeId))
+
+  const electrical = elEntry?.data ?? null
+  const electricalError = elEntry?.error ?? null
+  const diagnostics = diagEntry && !diagEntry.loading ? diagEntry.data : null
+  const diagnosticsError = diagEntry?.error ?? null
 
   useEffect(() => {
-    iotAPI
-      .getElectrical(nodeId)
-      .then(setElectrical)
-      .catch((err) => setElectricalError(apiErrorMessage(err, 'Không đọc được mẫu điện.')))
-    iotAPI
-      .getDiagnostics(nodeId)
-      .then(setDiagnostics)
-      .catch((err) => setDiagnosticsError(apiErrorMessage(err, 'Không đọc được kết quả chẩn đoán.')))
-  }, [nodeId])
+    dispatch(fetchNodeElectricalRequest(nodeId))
+    dispatch(fetchDiagnosticsRequest(nodeId))
+  }, [nodeId, dispatch])
 
   const badge = iotStatusBadge(IOT_NODE_STATUS, electrical?.status)
   const m = electrical?.measurement

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   AlertTriangle,
   Zap,
@@ -26,11 +26,17 @@ import type { SegmentInfo, PoleFeature } from '../GisMapPage'
 import cabinetSvg from '../../../assets/icons/cabinet.svg'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../../../redux/store'
-import { fetchPoleDetailRequest, clearPoleDetail, fetchCabinetTopologyRequest } from '../../../feature/map/mapSlice'
+import { fetchPoleDetailRequest, clearPoleDetail } from '../../../feature/map/mapSlice'
 import { IotCommandHistoryModal, type CommandHistoryFeeder } from './IotCommandHistoryModal'
-import iotAPI from '../../../feature/iot/iotAPI'
-import { commandBody, latestSuccessAutoSchedule } from '../../../utils/iot/iotCommand'
-import { apiErrorMessage } from '../../../utils/iot/apiError'
+import {
+  sendCommandRequest,
+  resetCommandSend,
+  fetchAutoPrefillRequest,
+  clearAutoPrefill,
+  selectCommandSend,
+  selectAutoPrefill,
+} from '../../../feature/iot/iotMonitorSlice'
+import { commandBody } from '../../../utils/iot/iotCommand'
 import { toast } from 'sonner'
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
@@ -226,7 +232,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   // AUTO luôn kèm lịch: bấm Auto mở form lịch (điền sẵn lịch đang có trên node), gửi từ form.
   // Hộp xác nhận lệnh: Bật / Tắt hỏi lại trước khi gửi, AUTO mở form lịch
   const [commandTarget, setCommandTarget] = useState<FeederCommandTarget | null>(null)
-  const [sendingCommand, setSendingCommand] = useState(false)
+  const commandSentRef = useRef(false)
+  const commandSend = useSelector(selectCommandSend)
+  const sendingCommand = commandSend.status === 'sending'
   // Đổi giá trị để đọc lại chế độ mạch (lịch sử lệnh) ngay sau khi gửi lệnh
   const [modeRefresh, setModeRefresh] = useState(0)
   // Nhật ký lệnh (GET /iot/nodes/{nodeId}/command/history): các mạch có node để chọn, mạch mở sẵn
@@ -236,27 +244,64 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     initialFeederId?: string | null
   } | null>(null)
 
-  const sendFeederCommand = async (
+  const autoReqSeq = useRef(0)
+  const pendingAutoRef = useRef<{
+    requestId: string
+    feederId: string
+    nodeId: string
+    mode: FeederControlMode
+    info: Pick<FeederCommandTarget, 'feederName' | 'feederCode' | 'poleCount'>
+  } | null>(null)
+  const autoPrefill = useSelector(selectAutoPrefill)
+
+  useEffect(() => {
+    dispatch(resetCommandSend())
+    return () => {
+      dispatch(clearAutoPrefill())
+    }
+  }, [dispatch])
+
+  useEffect(() => {
+    if (commandSend.status === 'succeeded' && commandSentRef.current) {
+      setCommandTarget(null)
+      setModeRefresh((n) => n + 1)
+      commandSentRef.current = false
+      dispatch(resetCommandSend())
+    } else if (commandSend.status === 'failed') {
+      commandSentRef.current = false
+      dispatch(resetCommandSend())
+    }
+  }, [commandSend.status, dispatch])
+
+  useEffect(() => {
+    if (autoPrefill?.status === 'ready' && autoPrefill.requestId === pendingAutoRef.current?.requestId) {
+      const { feederId, nodeId, mode, info } = pendingAutoRef.current
+      setCommandTarget({ feederId, nodeId, mode, initial: autoPrefill.schedule, ...info })
+      pendingAutoRef.current = null
+      dispatch(clearAutoPrefill())
+    }
+  }, [autoPrefill, dispatch])
+
+  const sendFeederCommand = (
     feederId: string,
     nodeId: string,
     mode: FeederControlMode,
     schedule?: { day_start: string; night_start: string }
   ) => {
-    setSendingCommand(true)
-    try {
-      await iotAPI.sendCommand(nodeId, schedule ? { ...commandBody('auto'), auto_schedule: schedule } : commandBody(mode))
-      toast.success(`Đã gửi lệnh ${mode === 'on' ? 'Bật' : mode === 'off' ? 'Tắt' : 'AUTO'} tới ${nodeId}, chờ node xác nhận.`)
-      setCommandTarget(null)
-      setModeRefresh((n) => n + 1)
-      if (selectedCabinet?.cabinet_id) dispatch(fetchCabinetTopologyRequest(selectedCabinet.cabinet_id))
-    } catch (err) {
-      toast.error(apiErrorMessage(err, `Không gửi được lệnh tới IoT bridge (mạch ${feederId}).`))
-    } finally {
-      setSendingCommand(false)
-    }
+    commandSentRef.current = true
+    const body = schedule ? { ...commandBody('auto'), auto_schedule: schedule } : commandBody(mode)
+    dispatch(
+      sendCommandRequest({
+        feederId,
+        nodeId,
+        mode,
+        body,
+        cabinetId: selectedCabinet?.cabinet_id || null,
+      })
+    )
   }
 
-  const handleControlFeederMode = async (
+  const handleControlFeederMode = (
     feederId: string,
     mode: FeederControlMode,
     info: Pick<FeederCommandTarget, 'feederName' | 'feederCode' | 'poleCount'> = {}
@@ -271,9 +316,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       setCommandTarget({ feederId, nodeId, mode, initial: null, ...info })
       return
     }
-    // Điền sẵn lịch AUTO node đã thực sự chạy (lệnh AUTO success mới nhất), không lấy lệnh pending / expired
-    const history = await iotAPI.getCommandHistory(nodeId, { page: 1, page_size: 20 }).catch(() => null)
-    setCommandTarget({ feederId, nodeId, mode, initial: latestSuccessAutoSchedule(history?.items), ...info })
+    const requestId = String(++autoReqSeq.current)
+    pendingAutoRef.current = { requestId, feederId, nodeId, mode, info }
+    dispatch(fetchAutoPrefillRequest({ requestId, feederId, nodeId }))
   }
 
   const effectiveFixtureStatus =

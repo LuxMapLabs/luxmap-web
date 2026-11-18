@@ -18,6 +18,7 @@ import avatarReducer from '../feature/avatar/avatarSlice'
 import superiorDashboardReducer from '../feature/dashboard/superiorDashboardSlice'
 import reportsReducer from '../feature/reports/reportsSlice'
 import iotBridgeReducer from '../feature/iot/iotBridgeSlice'
+import iotMonitorReducer from '../feature/iot/iotMonitorSlice'
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -39,6 +40,7 @@ const rootReducer = combineReducers({
     superiorDashboard: superiorDashboardReducer,
     reports: reportsReducer,
     iotBridge: iotBridgeReducer,
+    iotMonitor: iotMonitorReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>

@@ -1,11 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch } from '../../../redux/store'
 import { createPortal } from 'react-dom'
 import { AlertCircle, CheckCircle2, Clock, History, Loader2, Moon, RotateCw, Sun, Timer, User, X } from 'lucide-react'
-import iotAPI from '../../../feature/iot/iotAPI'
+import {
+  clearCommandHistory,
+  fetchCommandHistoryRequest,
+  resetCommandHistory,
+  selectCommandHistory,
+  type IotMonitorState,
+} from '../../../feature/iot/iotMonitorSlice'
 import type { IotCommandHistoryItem } from '../../../types/iot/nodes'
 import type { IotCommandHistoryStatus } from '../../../types/common/enums'
 import { currentChoice, type IotCommandChoice } from '../../../utils/iot/iotCommand'
-import { apiErrorMessage } from '../../../utils/iot/apiError'
 import { FeederPicker } from './FeederPicker'
 import type { MonitorFeeder } from './ElectricalMonitorModal'
 
@@ -80,6 +87,8 @@ function pageNumbers(page: number, pages: number): Array<number | '…'> {
 
 const formatTime = (value?: string | null) => (value ? new Date(value).toLocaleString('vi-VN') : '—')
 
+const EMPTY_ITEMS: IotCommandHistoryItem[] = []
+
 /**
  * Nhật ký lệnh Bật / Tắt / AUTO của node IoT gán cho mạch: GET /iot/nodes/{nodeId}/command/history
  * (mới nhất trước, `status` success | pending | expired), phân trang `HISTORY_PAGE_SIZE` lệnh. Tủ nhiều mạch thì chọn
@@ -92,17 +101,20 @@ export const IotCommandHistoryModal: React.FC<{
   nodeStatus?: Record<string, string | null | undefined>
   onClose: () => void
 }> = ({ title, feeders, initialFeederId, nodeStatus = {}, onClose }) => {
+  const key = useId()
+  const dispatch = useDispatch<AppDispatch>()
   const [feederId, setFeederId] = useState(
     feeders.find((f) => f.feederId === initialFeederId)?.feederId ?? feeders[0]?.feederId ?? null
   )
   const active = feeders.find((f) => f.feederId === feederId) ?? null
   const nodeId = active?.nodeId ?? null
 
-  const [items, setItems] = useState<IotCommandHistoryItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const entry = useSelector((s: { iotMonitor: IotMonitorState }) => selectCommandHistory(s, key))
+  const items = entry?.items ?? EMPTY_ITEMS
+  const total = entry?.total ?? 0
+  const page = entry?.page ?? 1
+  const loading = entry?.loading ?? false
+  const error = entry?.error ?? null
   const [filter, setFilter] = useState<'all' | IotCommandHistoryStatus>('all')
 
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -123,41 +135,24 @@ export const IotCommandHistoryModal: React.FC<{
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const requestSeq = useRef(0)
-
   const loadPage = useCallback(
-    async (id: string, nextPage: number) => {
-      const seq = ++requestSeq.current
-      setLoading(true)
-      try {
-        const result = await iotAPI.getCommandHistory(id, { page: nextPage, page_size: HISTORY_PAGE_SIZE })
-        if (seq !== requestSeq.current) return
-        const fresh = result.items || []
-        setItems(fresh)
-        setTotal(result.total ?? fresh.length)
-        setPage(nextPage)
-        setError(null)
-      } catch (err) {
-        if (seq !== requestSeq.current) return
-        setError(apiErrorMessage(err, 'Không đọc được lịch sử lệnh.'))
-      } finally {
-        if (seq === requestSeq.current) {
-          setLoading(false)
-        }
-      }
+    (id: string, nextPage: number) => {
+      dispatch(fetchCommandHistoryRequest({ key, nodeId: id, page: nextPage }))
     },
-    []
+    [dispatch, key]
   )
 
   useEffect(() => {
-    requestSeq.current += 1
-    setItems([])
-    setTotal(0)
-    setError(null)
-    setPage(1)
+    dispatch(resetCommandHistory({ key, nodeId: nodeId ?? '' }))
     setFilter('all')
     if (nodeId) loadPage(nodeId, 1)
-  }, [nodeId, loadPage])
+  }, [nodeId, loadPage, dispatch, key])
+
+  useEffect(() => {
+    return () => {
+      dispatch(clearCommandHistory({ key }))
+    }
+  }, [dispatch, key])
 
   const hasPending = items.some((item) => item.status === 'pending')
   // Lệnh đang chờ node xác nhận: đọc lại trang đang xem để thấy nó thành success / expired
