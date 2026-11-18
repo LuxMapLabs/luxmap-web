@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Button } from '../../../../components/Button'
 import { useDispatch, useSelector } from 'react-redux'
-import { Search, Plus, Upload, Filter, Printer } from 'lucide-react'
+import { Search, Plus, Filter, Printer } from 'lucide-react'
 import { OpsSelect } from '../../../../components/ops/OpsSelect'
 import type { RootState } from '../../../../redux/rootReducer'
 import { fetchMapLayersRequest } from '../../../../feature/map/mapSlice'
@@ -34,7 +34,6 @@ export interface PolesTabProps {
   onAddPoles: (dataList: PoleListItem[]) => void
   onUpdatePole: (updated: PoleListItem) => void
   onDeletePole?: (poleId: string) => void
-  onOpenImport: () => void
   onViewCabinetDetail?: (cabinet: CabinetListItem) => void
   onSelectFixture?: (fixtureCode: string) => void
   onSelectCabinet?: (cabinetCode: string) => void
@@ -52,7 +51,6 @@ export const PolesTab: React.FC<PolesTabProps> = ({
   onAddPoles,
   onUpdatePole,
   onDeletePole,
-  onOpenImport,
   onViewCabinetDetail,
   onSelectFixture,
   onSelectCabinet,
@@ -365,14 +363,6 @@ export const PolesTab: React.FC<PolesTabProps> = ({
             }
           >
             {selectedPoles.length > 0 ? `In tem QR (${selectedPoles.length})` : 'In tem QR'}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onOpenImport}
-            leftIcon={<Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />}
-            title="Nhập dữ liệu tài sản từ file CSV"
-          >
-            Import dữ liệu
           </Button>
           <Button
             variant="primary"

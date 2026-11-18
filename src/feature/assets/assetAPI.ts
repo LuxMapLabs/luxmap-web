@@ -1,7 +1,8 @@
+import axios from 'axios'
 import apiClient from '../../config/apiClient'
 import type { IotCommandRequest, IotCommandStatus } from '../../types/iot/nodes'
 import type { IotPoleControl } from '../../types/iot/poles'
-import type { ImportResult } from '../../types/assets/import'
+import type { WorkbookImportResult } from '../../types/assets/import'
 import type {
   SegmentListItemPagedResult,
   SegmentDetail,
@@ -40,8 +41,6 @@ import type {
   SetRelayRequest,
   IotNodeCredential,
 } from '../../types/assets/iot-nodes'
-
-export type ImportAssetCategory = 'segments' | 'cabinets' | 'feeders' | 'poles' | 'fixtures' | 'poles_and_fixtures'
 
 export interface AssetQueryParams {
   page?: number
@@ -249,68 +248,40 @@ export const assetAPI = {
   },
 
   /**
-   * Nạp danh mục Tuyến đường qua CSV/GeoJSON
-   * POST /api/v1/assets/import/segments
+   * Nạp toàn bộ tài sản qua file Excel (.xlsx)
+   * POST /api/v1/assets/import/workbook
    */
-  importSegments: async (file: File): Promise<ImportResult> => {
+  importWorkbook: async (file: File): Promise<WorkbookImportResult> => {
     const formData = new FormData()
     formData.append('file', file)
-    const response = await apiClient.post<ImportResult>('/assets/import/segments', formData, {
+    // Chỉ dùng một nguồn dữ liệu, Backend bắt buộc trường này
+    formData.append('data_source', 'field')
+    const response = await apiClient.post<WorkbookImportResult>('/assets/import/workbook', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return response.data
   },
 
   /**
-   * Nạp danh mục Tủ điện qua CSV
-   * POST /api/v1/assets/import/cabinets
+   * Tải toàn bộ tài sản ra file Excel (.xlsx) từ Backend dưới dạng ArrayBuffer
+   * GET /api/v1/assets/export/workbook
    */
-  importCabinets: async (file: File): Promise<ImportResult> => {
-    const formData = new FormData()
-    formData.append('file', file)
-    const response = await apiClient.post<ImportResult>('/assets/import/cabinets', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+  exportWorkbook: async (): Promise<ArrayBuffer> => {
+    const res = await apiClient.get<ArrayBuffer>('/assets/export/workbook', {
+      responseType: 'arraybuffer',
     })
-    return response.data
+    return res.data
   },
 
   /**
-   * Nạp danh mục Mạch điện qua CSV
-   * POST /api/v1/assets/import/feeders
+   * Tải tệp mẫu Excel (.xlsx) tĩnh của FE dưới dạng ArrayBuffer
+   * GET /templates/assets-workbook.xlsx
    */
-  importFeeders: async (file: File): Promise<ImportResult> => {
-    const formData = new FormData()
-    formData.append('file', file)
-    const response = await apiClient.post<ImportResult>('/assets/import/feeders', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+  getTemplateWorkbook: async (): Promise<ArrayBuffer> => {
+    const res = await axios.get<ArrayBuffer>('/templates/assets-workbook.xlsx', {
+      responseType: 'arraybuffer',
     })
-    return response.data
-  },
-
-  /**
-   * Nạp danh mục Cột điện chiếu sáng qua CSV
-   * POST /api/v1/assets/import/poles
-   */
-  importPoles: async (file: File): Promise<ImportResult> => {
-    const formData = new FormData()
-    formData.append('file', file)
-    const response = await apiClient.post<ImportResult>('/assets/import/poles', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return response.data
-  },
-
-  /**
-   * Nạp danh mục Bóng đèn chiếu sáng qua CSV
-   * POST /api/v1/assets/import/fixtures
-   */
-  importFixtures: async (file: File): Promise<ImportResult> => {
-    const formData = new FormData()
-    formData.append('file', file)
-    const response = await apiClient.post<ImportResult>('/assets/import/fixtures', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return response.data
+    return res.data
   },
 
   /**

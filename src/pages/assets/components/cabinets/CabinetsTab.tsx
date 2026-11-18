@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Button } from '../../../../components/Button'
-import { Search, Plus, Upload, MapPin } from 'lucide-react'
+import { Search, Plus, MapPin } from 'lucide-react'
 import { OpsSelect } from '../../../../components/ops/OpsSelect'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { SegmentListItem } from '../../../../types/assets/segments'
@@ -21,7 +21,6 @@ export interface CabinetsTabProps {
   onAddCabinets: (dataList: CabinetListItem[]) => void
   onUpdateCabinet: (updated: CabinetListItem) => void
   onDeleteCabinet?: (cabinetId: string) => void
-  onOpenImport: () => void
 }
 
 export const CabinetsTab: React.FC<CabinetsTabProps> = ({
@@ -34,7 +33,6 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
   onAddCabinets,
   onUpdateCabinet,
   onDeleteCabinet,
-  onOpenImport,
 }) => {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('')
@@ -186,15 +184,6 @@ export const CabinetsTab: React.FC<CabinetsTabProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            onClick={onOpenImport}
-            leftIcon={<Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />}
-            title="Nhập dữ liệu tài sản từ file CSV"
-          >
-            Import dữ liệu
-          </Button>
-
           <Button
             variant="primary"
             onClick={() => setIsAddCabinetModalOpen(true)}

@@ -26,7 +26,7 @@ import type {
   CreateCabinetRequest,
 } from '../../types/assets/cabinets'
 import type { SegmentListItem } from '../../types/assets/segments'
-import type { ImportResult } from '../../types/assets/import'
+import type { WorkbookImportResult } from '../../types/assets/import'
 
 
 vi.mock('../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
@@ -156,7 +156,6 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       onAddCabinet: vi.fn(),
       onAddCabinets: vi.fn(),
       onUpdateCabinet: vi.fn(),
-      onOpenImport: vi.fn(),
     }
   })
 
@@ -169,7 +168,7 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       ).toBeInTheDocument()
       expect(screen.getByText('Tất cả trạng thái định vị')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Thêm Tủ Điện/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Import Dữ Liệu/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Import dữ liệu/i })).toBeNull()
     })
 
     it('hiển thị danh sách tủ điện với đầy đủ thông tin chuẩn DTO CabinetListItem trên bảng', () => {
@@ -220,13 +219,10 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
       expect(screen.queryByText('CAB-TL01')).toBeNull()
     })
 
-    it('kích hoạt onOpenImport khi người dùng click nút "Import Dữ Liệu"', () => {
+    it('khẳng định nút "Import Dữ Liệu" không còn hiển thị trên CabinetsTab', () => {
       render(<Provider store={configureStore({ reducer: rootReducer })}><CabinetsTab {...defaultProps} /></Provider>)
 
-      const importBtn = screen.getByRole('button', { name: /Import Dữ Liệu/i })
-      fireEvent.click(importBtn)
-
-      expect(defaultProps.onOpenImport).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('button', { name: /Import dữ liệu/i })).toBeNull()
     })
 
     it('mở modal xem chi tiết và xác nhận KHÔNG CÓ nút Chỉnh Sửa ở footer', () => {
@@ -378,12 +374,18 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     })
 
     it('xử lý Redux state importAssetSuccess ghi nhận kết quả import từ Backend', () => {
-      const mockResult: ImportResult = {
-        inserted: 7,
-        updated: 3,
-        unchanged: 0,
+      const mockResult: WorkbookImportResult = {
+        committed: true,
+        cabinets: { inserted: 7, updated: 3, unchanged: 0 },
+        segments: { inserted: 0, updated: 0, unchanged: 0 },
+        feeders: { inserted: 0, updated: 0, unchanged: 0 },
+        poles: { inserted: 0, updated: 0, unchanged: 0 },
+        fixtures: { inserted: 0, updated: 0, unchanged: 0 },
         failed: 0,
         total_errors: 0,
+        rows: [],
+        total_warnings: 0,
+        warnings: [],
       }
       const initialState = {
         ...assetReducer(undefined, { type: '@@INIT' }),
@@ -486,10 +488,12 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
     })
 
     it('bắt lỗi 422 (Unprocessable Entity) khi Import CSV tủ điện bị lỗi thẩm định phía Backend', () => {
-      const mockFile = new File(['mock content'], 'cabinets.csv', { type: 'text/csv' })
+      const mockFile = new File(['mock content'], 'assets.xlsx', {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
       const importingState = assetReducer(
         undefined,
-        importAssetRequest({ category: 'cabinets', file: mockFile })
+        importAssetRequest({ file: mockFile })
       )
       expect(importingState.isImporting).toBe(true)
       expect(importingState.error).toBeNull()
@@ -587,7 +591,6 @@ describe('CabinetsTab & Cabinet Components Test Suite (Task 2)', () => {
             onAddCabinets={vi.fn()}
             onUpdateCabinet={vi.fn()}
             onDeleteCabinet={mockDelete}
-            onOpenImport={vi.fn()}
           />
         </Provider>
       )

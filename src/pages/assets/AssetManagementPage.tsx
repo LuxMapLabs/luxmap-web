@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../../redux/rootReducer'
-import { closeExportModal } from '../../feature/assets/assetSlice'
+import { closeImportModal } from '../../feature/assets/assetSlice'
 import {
   Boxes,
   Zap,
@@ -17,7 +17,6 @@ import { SegmentsTab } from './components/segments/SegmentsTab'
 import { FeedersTab } from './components/feeders/FeedersTab'
 import { IotNodesTab } from './components/iot/IotNodesTab'
 import { ImportAssetModal } from './components/ImportAssetModal'
-import { ExportAssetModal, type ExportableCategory } from './components/ExportAssetModal'
 import { AssetTabs } from './components/common/AssetTabs'
 import { useAssetData } from '../../hooks/assets/useAssetData'
 
@@ -32,19 +31,11 @@ export type AssetCategory =
 
 export const AssetManagementPage: React.FC = () => {
   const dispatch = useDispatch()
-  const isExportModalOpen = useSelector((state: RootState) => Boolean(state.assets.isExportModalOpen))
   const [activeCategory, setActiveCategory] = useState<AssetCategory>('segments')
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const isImportModalOpen = useSelector((state: RootState) => Boolean(state.assets.isImportModalOpen))
   const [selectedFixtureCode, setSelectedFixtureCode] = useState<string>('')
   const [selectedPoleCode, setSelectedPoleCode] = useState<string>('')
   const [selectedCabinetCode, setSelectedCabinetCode] = useState<string>('')
-
-  const exportCategory: ExportableCategory =
-    activeCategory === 'iot_nodes'
-      ? 'cabinets'
-      : activeCategory === 'poles_and_fixtures'
-      ? 'poles'
-      : activeCategory
 
   // Chuyển tab và xóa các mã đang được chọn sẵn ở những tab khác
   const selectCategory = (
@@ -190,7 +181,6 @@ export const AssetManagementPage: React.FC = () => {
             onDeleteSegment={handleDeleteSegment}
             onDrawSegment={handleDrawSegment}
             drawableSegmentIds={drawableSegmentIds}
-            onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}
 
@@ -206,7 +196,6 @@ export const AssetManagementPage: React.FC = () => {
             onAddCabinets={handleAddCabinets}
             onUpdateCabinet={handleUpdateCabinet}
             onDeleteCabinet={handleDeleteCabinet}
-            onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}
 
@@ -220,7 +209,6 @@ export const AssetManagementPage: React.FC = () => {
             onAddFeeder={handleAddFeeder}
             onUpdateFeeder={handleUpdateFeeder}
             onDeleteFeeder={handleDeleteFeeder}
-            onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}
 
@@ -243,7 +231,6 @@ export const AssetManagementPage: React.FC = () => {
             onAddPoles={handleAddPoles}
             onUpdatePole={handleUpdatePole}
             onDeletePole={handleDeletePole}
-            onOpenImport={() => setIsImportModalOpen(true)}
             onViewCabinetDetail={() => {
               setActiveCategory('cabinets')
             }}
@@ -266,7 +253,6 @@ export const AssetManagementPage: React.FC = () => {
             onAddFixtures={handleAddFixtures}
             onUpdateFixture={handleUpdateFixture}
             onRetireFixture={handleRetireFixture}
-            onOpenImport={() => setIsImportModalOpen(true)}
           />
         )}
       </div>
@@ -274,21 +260,8 @@ export const AssetManagementPage: React.FC = () => {
       {/* Global Import Modal */}
       <ImportAssetModal
         isOpen={isImportModalOpen}
-        category={activeCategory === 'iot_nodes' ? 'cabinets' : activeCategory}
-        onClose={() => setIsImportModalOpen(false)}
+        onClose={() => dispatch(closeImportModal())}
         onImportSuccess={handleImportSuccess}
-      />
-
-      {/* Global Export Modal */}
-      <ExportAssetModal
-        isOpen={isExportModalOpen}
-        initialCategory={exportCategory}
-        onClose={() => dispatch(closeExportModal())}
-        poles={poles}
-        cabinets={cabinets}
-        segments={segments}
-        feeders={feeders}
-        fixtures={fixtures}
       />
     </div>
   )

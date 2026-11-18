@@ -553,7 +553,6 @@ describe('PolesTab & Warranty Status Test Suite (BE-31 / 2026-10-12)', () => {
             onAddPoles={vi.fn()}
             onUpdatePole={vi.fn()}
             onDeletePole={mockDelete}
-            onOpenImport={vi.fn()}
           />
         </Provider>
       )

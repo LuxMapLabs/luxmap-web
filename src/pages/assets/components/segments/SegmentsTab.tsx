@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Button } from '../../../../components/Button'
-import { Search, Plus, Upload, Route } from 'lucide-react'
+import { Search, Plus, Route } from 'lucide-react'
 import { OpsSelect } from '../../../../components/ops/OpsSelect'
 import type { SegmentListItem } from '../../../../types/assets/segments'
 import { SegmentTable } from './components/SegmentTable'
@@ -19,7 +19,6 @@ export interface SegmentsTabProps {
   onDrawSegment?: (segmentId: string) => void
   /** Tuyến chưa có hình nhưng đã có từ 2 cột có GPS */
   drawableSegmentIds?: ReadonlySet<string>
-  onOpenImport: () => void
 }
 
 export const SegmentsTab: React.FC<SegmentsTabProps> = ({
@@ -30,7 +29,6 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
   onDeleteSegment,
   onDrawSegment,
   drawableSegmentIds,
-  onOpenImport,
 }) => {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('')
@@ -154,15 +152,6 @@ export const SegmentsTab: React.FC<SegmentsTabProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            onClick={onOpenImport}
-            leftIcon={<Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />}
-            title="Nhập dữ liệu tài sản từ file CSV"
-          >
-            Import dữ liệu
-          </Button>
-
           <Button
             variant="primary"
             onClick={() => setIsAddSegmentModalOpen(true)}

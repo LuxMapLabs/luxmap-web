@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Button } from '../../../../components/Button'
-import { Search, Plus, Upload } from 'lucide-react'
+import { Search, Plus } from 'lucide-react'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../../../types/assets/feeders'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { PoleListItem } from '../../../../types/assets/poles'
@@ -19,7 +19,6 @@ export interface FeedersTabProps {
   onAddFeeder: (data: CreateFeederRequest) => void
   onUpdateFeeder: (feederId: string, data: UpdateFeederRequest) => void
   onDeleteFeeder: (feederId: string) => void
-  onOpenImport: () => void
 }
 
 export const FeedersTab: React.FC<FeedersTabProps> = ({
@@ -30,7 +29,6 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
   onAddFeeder,
   onUpdateFeeder,
   onDeleteFeeder,
-  onOpenImport,
 }) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -86,16 +84,8 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons: Import CSV & Add Feeder */}
+        {/* Action Buttons: Add Feeder */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={onOpenImport}
-            leftIcon={<Upload className="w-4 h-4 text-blue-600 dark:text-sky-400" />}
-            title="Nhập dữ liệu tài sản từ file CSV"
-          >
-            Import dữ liệu
-          </Button>
           <Button
             variant="primary"
             onClick={() => setIsAddModalOpen(true)}
