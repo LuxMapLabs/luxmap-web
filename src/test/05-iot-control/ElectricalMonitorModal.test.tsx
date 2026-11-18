@@ -23,19 +23,19 @@ vi.mock('../../feature/iot/iotAPI', () => ({
 const api = vi.mocked(iotAPI)
 
 const sample = (
-  cursor: number,
+  _cursor: number,
   minute: number,
   current: number,
-  nodeId: string | null = 'NODE-001',
-  serverId: string | null = 'srv-1'
+  _nodeId: string | null = 'NODE-001',
+  _serverId: string | null = 'srv-1'
 ) => ({
-  cursor,
-  node_id: nodeId,
-  server_id: serverId,
-  reading: {
-    received_at: `2026-11-16T01:${String(minute).padStart(2, '0')}:00Z`,
-    data: { voltage: 5, current, power: current * 5, lamp_command: 'ON' },
-  },
+  period_start: `2026-11-16T01:${String(minute).padStart(2, '0')}:00Z`,
+  period_end: `2026-11-16T01:${String(minute).padStart(2, '0')}:30Z`,
+  sample_count: 3,
+  voltage_avg: 5,
+  current_ma_avg: current,
+  power_mw_avg: current * 5,
+  is_complete: true,
 })
 
 const target: ElectricalMonitorTarget = {
