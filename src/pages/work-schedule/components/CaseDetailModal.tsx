@@ -29,6 +29,7 @@ import { fetchWorkOrdersRequest, type ScheduleCase } from '../../../feature/work
 import { fetchDashboardDataRequest } from '../../../feature/dashboard/dashboardSlice'
 import type { WorkOrderAssignee, WorkOrderPoleLocation, EvidenceItem, PolePhotoItem } from '../../../types/workorders/orders'
 import { FAULT_TYPE_LABELS_VN } from '../../../utils/citizen-report/citizenReviewFormat'
+import { iotAnomalyLabel } from '../../../constants/iot'
 import { FieldReportDetailModal } from './FieldReportDetailModal'
 import { EditScheduleModal } from './EditScheduleModal'
 import { CancelScheduleModal } from './CancelScheduleModal'
@@ -1265,12 +1266,32 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                   className="p-2.5 rounded-xl border border-indigo-200 bg-white text-xs flex flex-wrap items-center justify-between gap-2"
                                 >
                                   <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                       <span className="font-mono font-bold text-slate-900">{f.fault_id}</span>
                                       <span className="text-[11px] font-semibold text-slate-600">
                                         {(f.fault_type && FAULT_TYPE_LABELS_VN[f.fault_type]) || f.fault_type || '-'}
                                       </span>
+                                      {f.iot_anomaly_code && (
+                                        <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10.5px] font-semibold">
+                                          {iotAnomalyLabel(f.iot_anomaly_code)}
+                                        </span>
+                                      )}
+                                      {f.recovered_at && (
+                                        <span
+                                          className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10.5px] font-semibold"
+                                          title={`Tự phục hồi lúc ${new Date(f.recovered_at).toLocaleString('vi-VN')}`}
+                                        >
+                                          Đã tự phục hồi
+                                        </span>
+                                      )}
                                     </div>
+                                    {(f.cabinet_id || f.feeder_id || f.origin_node_id) && (
+                                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px] font-mono text-indigo-700 mt-1">
+                                        {f.cabinet_id && <span>Tủ: {f.cabinet_id}</span>}
+                                        {f.feeder_id && <span>Mạch: {f.feeder_id}</span>}
+                                        {f.origin_node_id && <span>Node: {f.origin_node_id}</span>}
+                                      </div>
+                                    )}
                                     {f.location?.lat != null && f.location?.lng != null && (
                                       <div className="text-[10.5px] font-mono text-slate-400 mt-0.5">
                                         GPS tủ: {f.location.lat.toFixed(6)}, {f.location.lng.toFixed(6)}
