@@ -1,16 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { GatewayRoutesPanel } from '../../pages/iot-bridge/components/GatewayRoutesPanel'
 import { IotServerFormModal } from '../../pages/iot-bridge/components/IotServerFormModal'
+import iotBridgeReducer from '../../feature/iot/iotBridgeSlice'
+import iotBridgeSaga from '../../feature/iot/iotBridgeSaga'
 import iotAPI from '../../feature/iot/iotAPI'
+import { communeAPI } from '../../feature/communes/communeAPI'
+import { renderWithSagaStore, type SagaStore } from '../utils/sagaStore'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
+    getServers: vi.fn(),
+    getNodes: vi.fn(),
     getGatewayRoutes: vi.fn(),
     putGatewayRoute: vi.fn(),
     issueGatewayCredential: vi.fn(),
+    getGatewayCredential: vi.fn(),
+    revokeGatewayCredential: vi.fn(),
     registerServer: vi.fn(),
     updateServerLocation: vi.fn(),
+  },
+}))
+
+vi.mock('../../feature/communes/communeAPI', () => ({
+  communeAPI: {
+    getCommunes: vi.fn(),
   },
 }))
 
@@ -37,6 +51,8 @@ vi.mock('../../components/LocationPickerMap', () => ({
 }))
 
 const api = vi.mocked(iotAPI)
+const communesApi = vi.mocked(communeAPI)
+
 const communes = [
   {
     commune_id: 'COM-001',
@@ -47,13 +63,25 @@ const communes = [
   { commune_id: 'COM-002', name: 'Xã chưa có khung' },
 ]
 
+const renderWithStore = (ui: React.ReactElement, customStore?: SagaStore) =>
+  renderWithSagaStore(ui, {
+    reducers: { iotBridge: iotBridgeReducer },
+    sagas: [iotBridgeSaga],
+    store: customStore,
+  })
+
 describe('IotServerFormModal', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    api.getServers.mockResolvedValue([])
+    api.getNodes.mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] })
+    communesApi.getCommunes.mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] } as never)
+  })
 
   const submitButton = () => screen.getByRole('button', { name: /Đăng ký server/ })
 
   it('rejects the reserved server id "default" without calling the API', async () => {
-    render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
+    renderWithStore(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'Default' } })
     fireEvent.click(submitButton())
 
@@ -62,7 +90,7 @@ describe('IotServerFormModal', () => {
   })
 
   it('hides the map until a commune is chosen', () => {
-    render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
+    renderWithStore(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
     expect(screen.queryByText('Ghim trên bản đồ')).not.toBeInTheDocument()
     expect(screen.getByTestId('iot-server-map-placeholder')).toHaveTextContent('Chọn xã / phường để hiện bản đồ')
 
@@ -73,7 +101,7 @@ describe('IotServerFormModal', () => {
   })
 
   it('outlines the selected commune on the map and drops it when switching to a commune without a frame', () => {
-    render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
+    renderWithStore(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
     expect(screen.getByText('Ghim trên bản đồ')).toHaveAttribute('data-boundary-min-lng', '106.3')
@@ -83,7 +111,7 @@ describe('IotServerFormModal', () => {
   })
 
   it('starts with no commune selected and refuses to register until one is chosen', async () => {
-    render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
+    renderWithStore(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
     expect(screen.getByRole('combobox')).toHaveValue('')
 
     fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'iot-server-01' } })
@@ -94,13 +122,13 @@ describe('IotServerFormModal', () => {
   })
 
   it('says the commune list is still loading instead of showing a blank select', () => {
-    render(<IotServerFormModal server={null} communes={[]} communeStatus="loading" onClose={vi.fn()} onSaved={vi.fn()} />)
+    renderWithStore(<IotServerFormModal server={null} communes={[]} communeStatus="loading" onClose={vi.fn()} onSaved={vi.fn()} />)
     expect(screen.getByRole('combobox')).toHaveDisplayValue('Đang tải danh sách…')
     expect(screen.getByText('Đang tải danh sách xã / phường…')).toBeInTheDocument()
   })
 
   it('opens a new registration without a pin and never sends the commune centre as the gateway location', async () => {
-    render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
+    renderWithStore(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'iot-server-01' } })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
     expect(screen.getByText('Ghim trên bản đồ')).toHaveAttribute('data-unpicked', 'true')
@@ -114,7 +142,7 @@ describe('IotServerFormModal', () => {
   it('registers a server with the commune and the location pinned on the map', async () => {
     api.registerServer.mockResolvedValue({ server_id: 'iot-server-01' })
     const onSaved = vi.fn()
-    render(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={onSaved} />)
+    renderWithStore(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={onSaved} />)
     fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'iot-server-01' } })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
     fireEvent.click(screen.getByText('Ghim trên bản đồ'))
@@ -129,12 +157,12 @@ describe('IotServerFormModal', () => {
         location: { lat: 10.97, lng: 106.5 },
       })
     )
-    expect(onSaved).toHaveBeenCalled()
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
   })
 
   it('edits only commune and location of an existing server', async () => {
     api.updateServerLocation.mockResolvedValue(undefined)
-    render(
+    renderWithStore(
       <IotServerFormModal
         server={{ server_id: 'iot-server-01', commune_id: 'COM-001', location: { lat: 10, lng: 106 } }}
         communes={communes}
@@ -153,22 +181,68 @@ describe('IotServerFormModal', () => {
       })
     )
   })
+
+  it('does not call onSaved again when re-mounting on the same store after a successful save', async () => {
+    api.registerServer.mockResolvedValue({ server_id: 'iot-server-01' })
+    const onSaved = vi.fn()
+    const { store, unmount } = renderWithStore(
+      <IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={onSaved} />
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'iot-server-01' } })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
+    fireEvent.click(screen.getByText('Ghim trên bản đồ'))
+    fireEvent.click(submitButton())
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+
+    unmount()
+
+    const onSavedSecond = vi.fn()
+    renderWithStore(
+      <IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={onSavedSecond} />,
+      store
+    )
+
+    expect(onSavedSecond).not.toHaveBeenCalled()
+  })
+
+  it('shows backend error message in the form when API fails and does not call onSaved', async () => {
+    api.registerServer.mockRejectedValue({
+      response: { data: { error: { message: 'Server ID đã tồn tại.' } } },
+    })
+    const onSaved = vi.fn()
+    renderWithStore(
+      <IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={onSaved} />
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'iot-server-01' } })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
+    fireEvent.click(screen.getByText('Ghim trên bản đồ'))
+    fireEvent.click(submitButton())
+
+    expect(await screen.findByText('Server ID đã tồn tại.')).toBeInTheDocument()
+    expect(onSaved).not.toHaveBeenCalled()
+  })
 })
 
 describe('GatewayRoutesPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    api.getGatewayRoutes.mockResolvedValue([{ gateway_id: 'LUXMAP-GW001', device_ids: ['LUXMAP-P001'], credential_issued: false }])
+    api.getGatewayRoutes.mockResolvedValue([
+      { gateway_id: 'LUXMAP-GW001', device_ids: ['LUXMAP-P001'], credential_issued: false },
+    ])
   })
 
   it('adds a gateway → device route', async () => {
     api.putGatewayRoute.mockResolvedValue(undefined)
-    render(<GatewayRoutesPanel serverId="iot-server-01" />)
+    renderWithStore(<GatewayRoutesPanel serverId="iot-server-01" />)
     await screen.findByText('LUXMAP-GW001')
 
-    fireEvent.change(screen.getByPlaceholderText('LUXMAP-GW001'), { target: { value: 'LUXMAP-GW002' } })
-    fireEvent.change(screen.getByPlaceholderText('LUXMAP-P001'), { target: { value: 'LUXMAP-P002' } })
-    fireEvent.click(screen.getByText('Thêm tuyến'))
+    fireEvent.click(screen.getByRole('button', { name: /\+ Thêm gateway|Thêm gateway/ }))
+    fireEvent.change(screen.getByPlaceholderText('VD: LUXMAP-GW006'), { target: { value: 'LUXMAP-GW002' } })
+    fireEvent.change(screen.getByPlaceholderText('VD: LUXMAP-P006'), { target: { value: 'LUXMAP-P002' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm' }))
 
     await waitFor(() =>
       expect(api.putGatewayRoute).toHaveBeenCalledWith('iot-server-01', 'LUXMAP-GW002', { device_id: 'LUXMAP-P002' })
@@ -176,29 +250,200 @@ describe('GatewayRoutesPanel', () => {
   })
 
   it('does not send a route whose id has a slash (it would break the MQTT topic)', async () => {
-    render(<GatewayRoutesPanel serverId="iot-server-01" />)
+    renderWithStore(<GatewayRoutesPanel serverId="iot-server-01" />)
     await screen.findByText('LUXMAP-GW001')
 
-    fireEvent.change(screen.getByPlaceholderText('LUXMAP-GW001'), { target: { value: 'GW/1' } })
-    fireEvent.change(screen.getByPlaceholderText('LUXMAP-P001'), { target: { value: 'LUXMAP-P002' } })
-    fireEvent.click(screen.getByText('Thêm tuyến'))
+    fireEvent.click(screen.getByRole('button', { name: /\+ Thêm gateway|Thêm gateway/ }))
+    fireEvent.change(screen.getByPlaceholderText('VD: LUXMAP-GW006'), { target: { value: 'GW/1' } })
+    fireEvent.change(screen.getByPlaceholderText('VD: LUXMAP-P006'), { target: { value: 'LUXMAP-P002' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm' }))
 
     expect(await screen.findByText(/Gateway ID và Device ID/)).toBeInTheDocument()
     expect(api.putGatewayRoute).not.toHaveBeenCalled()
   })
 
-  it('shows the one-time MQTT password after issuing a credential', async () => {
+  it('shows the MQTT password after issuing a key', async () => {
     api.issueGatewayCredential.mockResolvedValue({
       client_id: 'LUXMAP-GW001',
       username: 'LUXMAP-GW001',
       password: 'one-time-secret',
       node_ids: ['LUXMAP-P001'],
     })
-    render(<GatewayRoutesPanel serverId="iot-server-01" />)
+    renderWithStore(<GatewayRoutesPanel serverId="iot-server-01" />)
 
-    fireEvent.click(await screen.findByText('Cấp secret'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cấp key' }))
 
     await waitFor(() => expect(api.issueGatewayCredential).toHaveBeenCalledWith('iot-server-01', 'LUXMAP-GW001'))
     expect(await screen.findByLabelText('Password')).toHaveValue('one-time-secret')
+  })
+
+  it('views key, calls getGatewayCredential and toggles password visibility', async () => {
+    api.getGatewayRoutes.mockResolvedValue([
+      { gateway_id: 'LUXMAP-GW001', device_ids: ['LUXMAP-P001'], credential_issued: true },
+    ])
+    api.getGatewayCredential.mockResolvedValue({
+      client_id: 'LUXMAP-GW001',
+      username: 'LUXMAP-GW001',
+      password: 'my-secret-password',
+      node_ids: ['LUXMAP-P001'],
+    })
+
+    renderWithStore(<GatewayRoutesPanel serverId="iot-server-01" />)
+    await screen.findByText('LUXMAP-GW001')
+
+    fireEvent.click(screen.getByRole('button', { name: /Xem key/ }))
+
+    await waitFor(() =>
+      expect(api.getGatewayCredential).toHaveBeenCalledWith('iot-server-01', 'LUXMAP-GW001')
+    )
+
+    const passwordInput = await screen.findByLabelText('Password')
+    expect(passwordInput).toHaveAttribute('type', 'password')
+    expect(passwordInput).toHaveValue('my-secret-password')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hiện mật khẩu' }))
+    expect(passwordInput).toHaveAttribute('type', 'text')
+    expect(passwordInput).toHaveValue('my-secret-password')
+  })
+
+  it('handles 409 when viewing key and shows error without opening the credential modal', async () => {
+    api.getGatewayRoutes.mockResolvedValue([
+      { gateway_id: 'LUXMAP-GW001', device_ids: ['LUXMAP-P001'], credential_issued: true },
+    ])
+    api.getGatewayCredential.mockRejectedValue({
+      response: {
+        data: {
+          error: {
+            code: 'IOT_CREDENTIAL_NOT_RETRIEVABLE',
+            message: 'Key cũ chỉ có hash. Cần thu hồi rồi cấp mới để có thể xem lại.',
+          },
+        },
+      },
+    })
+
+    const { store } = renderWithStore(<GatewayRoutesPanel serverId="iot-server-01" />)
+    await screen.findByText('LUXMAP-GW001')
+
+    fireEvent.click(screen.getByRole('button', { name: /Xem key/ }))
+
+    await waitFor(() => {
+      expect(store.getState().iotBridge.credentialError).toBe(
+        'Key cũ chỉ có hash. Cần thu hồi rồi cấp mới để có thể xem lại.'
+      )
+    })
+    expect(screen.queryByText('Key MQTT của gateway')).not.toBeInTheDocument()
+  })
+
+  it('opens confirm modal on revoke, cancels on Huỷ, and revokes on confirmation without using window.confirm', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    api.getGatewayRoutes.mockResolvedValue([
+      { gateway_id: 'LUXMAP-GW001', device_ids: ['LUXMAP-P001'], credential_issued: true },
+    ])
+    api.revokeGatewayCredential.mockResolvedValue(undefined)
+
+    renderWithStore(<GatewayRoutesPanel serverId="iot-server-01" />)
+    await screen.findByText('LUXMAP-GW001')
+
+    // Bấm "Thu hồi"
+    fireEvent.click(screen.getByRole('button', { name: /Thu hồi/ }))
+    expect(await screen.findByText(/Thu hồi key của LUXMAP-GW001\?/)).toBeInTheDocument()
+
+    // Bấm "Huỷ"
+    fireEvent.click(screen.getByRole('button', { name: 'Huỷ' }))
+    expect(api.revokeGatewayCredential).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Thu hồi key của LUXMAP-GW001\?/)).not.toBeInTheDocument()
+
+    // Bấm lại "Thu hồi"
+    fireEvent.click(screen.getByRole('button', { name: /Thu hồi/ }))
+    expect(await screen.findByText(/Thu hồi key của LUXMAP-GW001\?/)).toBeInTheDocument()
+
+    // Bấm "Thu hồi key" (xác nhận)
+    fireEvent.click(screen.getByRole('button', { name: 'Thu hồi key' }))
+
+    await waitFor(() => {
+      expect(api.revokeGatewayCredential).toHaveBeenCalledWith('iot-server-01', 'LUXMAP-GW001')
+    })
+    // Sau đó getGatewayRoutes được gọi lại
+    await waitFor(() => {
+      expect(api.getGatewayRoutes).toHaveBeenCalledTimes(2)
+    })
+    // Hộp xác nhận đóng
+    await waitFor(() => {
+      expect(screen.queryByText(/Thu hồi key của LUXMAP-GW001\?/)).not.toBeInTheDocument()
+    })
+
+    expect(confirmSpy).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
+
+  it('shows backend error message directly under the gateway when viewing key fails with 409', async () => {
+    const errorMsg = 'Key cũ chỉ có hash. Cần thu hồi rồi cấp mới để có thể xem lại.'
+    api.getGatewayRoutes.mockResolvedValue([
+      { gateway_id: 'LUXMAP-GW001', device_ids: ['LUXMAP-P001'], credential_issued: true },
+    ])
+    api.getGatewayCredential.mockRejectedValue({
+      response: {
+        data: {
+          error: {
+            code: 'IOT_CREDENTIAL_NOT_RETRIEVABLE',
+            message: errorMsg,
+          },
+        },
+      },
+    })
+
+    renderWithStore(<GatewayRoutesPanel serverId="iot-server-01" />)
+    await screen.findByText('LUXMAP-GW001')
+
+    fireEvent.click(screen.getByRole('button', { name: /Xem key/ }))
+
+    expect(await screen.findByText(errorMsg)).toBeInTheDocument()
+    expect(screen.getAllByText(errorMsg)).toHaveLength(1)
+  })
+
+  it('does not display view error under a viewed gateway when an issue credential action fails on another gateway', async () => {
+    api.getGatewayRoutes.mockResolvedValue([
+      { gateway_id: 'LUXMAP-GW001', device_ids: ['LUXMAP-P001'], credential_issued: true },
+      { gateway_id: 'LUXMAP-GW002', device_ids: ['LUXMAP-P002'], credential_issued: false },
+    ])
+    api.getGatewayCredential.mockResolvedValue({
+      client_id: 'LUXMAP-GW001',
+      username: 'LUXMAP-GW001',
+      password: 'password-gw1',
+      node_ids: ['LUXMAP-P001'],
+    })
+    api.issueGatewayCredential.mockRejectedValue({
+      response: {
+        data: {
+          error: {
+            message: 'Gateway bridge unavailable (502)',
+          },
+        },
+      },
+    })
+
+    renderWithStore(<GatewayRoutesPanel serverId="iot-server-01" />)
+    await screen.findByText('LUXMAP-GW001')
+    await screen.findByText('LUXMAP-GW002')
+
+    // 1. Xem key GW001 thành công
+    fireEvent.click(screen.getByRole('button', { name: /Xem key/ }))
+    expect(await screen.findByLabelText('Password')).toBeInTheDocument()
+
+    // 2. Đóng modal
+    fireEvent.click(screen.getByText('Đóng'))
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+    })
+
+    // 3. Cấp key GW002 bị lỗi 502
+    fireEvent.click(screen.getByRole('button', { name: 'Cấp key' }))
+    await waitFor(() => {
+      expect(api.issueGatewayCredential).toHaveBeenCalledWith('iot-server-01', 'LUXMAP-GW002')
+    })
+
+    // 4. Không có dòng nhắc lỗi xem key nào hiển thị
+    expect(screen.queryByText(/Key cũ chỉ có hash/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Gateway bridge unavailable (502)')).not.toBeInTheDocument()
   })
 })

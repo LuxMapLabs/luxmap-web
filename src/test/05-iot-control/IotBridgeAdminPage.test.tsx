@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { Provider } from 'react-redux'
-import { configureStore } from '@reduxjs/toolkit'
+import { screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { IotBridgeAdminPage } from '../../pages/iot-bridge/IotBridgeAdminPage'
 import { RegisterNodeModal } from '../../pages/iot-bridge/components/RegisterNodeModal'
 import { IotNodeDetailModal } from '../../pages/assets/components/iot/components/IotNodeDetailModal'
+import iotBridgeReducer from '../../feature/iot/iotBridgeSlice'
+import iotBridgeSaga from '../../feature/iot/iotBridgeSaga'
+import iotMonitorReducer from '../../feature/iot/iotMonitorSlice'
+import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 import iotAPI from '../../feature/iot/iotAPI'
 import { assetAPI } from '../../feature/assets/assetAPI'
 import { communeAPI } from '../../feature/communes/communeAPI'
+import { renderWithSagaStore } from '../utils/sagaStore'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
@@ -39,13 +42,11 @@ const servers = [
 const nodes = [{ node_id: 'NODE-001', server_id: 'iot-server-01', status: 'online' as const, cabinet_id: 'CAB-001', commune_id: 'COM-001' }]
 
 const renderPage = (role: string) =>
-  render(
-    <Provider store={configureStore({ reducer: { auth: () => ({ user: { role } }) } })}>
-      <IotBridgeAdminPage />
-    </Provider>
-  )
-
-const WRITE_CONTROLS = ['Đăng ký server', 'Tuyến gateway', 'Sửa vị trí', 'Đăng ký node']
+  renderWithSagaStore(<IotBridgeAdminPage />, {
+    role,
+    reducers: { iotBridge: iotBridgeReducer },
+    sagas: [iotBridgeSaga],
+  })
 
 describe('IotBridgeAdminPage role gating (server và node: Admin tạo / chỉnh, vai trò khác chỉ xem)', () => {
   beforeEach(() => {
@@ -63,8 +64,8 @@ describe('IotBridgeAdminPage role gating (server và node: Admin tạo / chỉnh
 
     expect(screen.getByRole('button', { name: /Đăng ký server/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Đăng ký node/ })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Tuyến gateway/ })).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: /Sửa vị trí/ })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /Sửa vị trí/ })).toHaveLength(1)
+    expect(await screen.findByRole('heading', { name: /^Gateway/ })).toBeInTheDocument()
   })
 
   it('hides (not just disables) every create / edit control from the manager, who still sees servers and nodes', async () => {
@@ -72,9 +73,19 @@ describe('IotBridgeAdminPage role gating (server và node: Admin tạo / chỉnh
     await screen.findAllByText('iot-server-01')
     const nodeRow = (await screen.findByText('NODE-001')).closest('tr')!
 
-    for (const label of WRITE_CONTROLS) {
+    const MANAGER_HIDDEN_CONTROLS = [
+      'Sửa vị trí',
+      'Đăng ký server',
+      'Đăng ký node',
+      'Thêm gateway',
+      'Cấp key',
+      'Xem key',
+      'Thu hồi',
+    ]
+    for (const label of MANAGER_HIDDEN_CONTROLS) {
       expect(screen.queryByRole('button', { name: new RegExp(label) })).not.toBeInTheDocument()
     }
+    expect(screen.queryByRole('heading', { name: /^Gateway/ })).not.toBeInTheDocument()
     expect(within(nodeRow).getByRole('button', { name: /Chi tiết/ })).toBeInTheDocument()
   })
 
@@ -87,9 +98,81 @@ describe('IotBridgeAdminPage role gating (server và node: Admin tạo / chỉnh
 
     expect(await screen.findByText('Đăng ký node IoT')).toBeInTheDocument()
   })
+
+  it('selects the first server by default, and clicking the second server fetches its routes', async () => {
+    renderPage('system_admin')
+    await screen.findAllByText('iot-server-01')
+    await waitFor(() => expect(api.getGatewayRoutes).toHaveBeenCalledWith('iot-server-01'))
+
+    const secondServerBtn = screen.getByRole('button', { name: /iot-server-09/ })
+    fireEvent.click(secondServerBtn)
+
+    await waitFor(() => expect(api.getGatewayRoutes).toHaveBeenCalledWith('iot-server-09'))
+    expect(await screen.findByRole('heading', { name: /^Gateway/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'iot-server-09' })).toBeInTheDocument()
+  })
+
+  it('clicking server name in the node table selects that server in the list above', async () => {
+    api.getNodes.mockResolvedValue({
+      page: 1,
+      page_size: 200,
+      total: 1,
+      items: [{ node_id: 'NODE-009', server_id: 'iot-server-09', status: 'online' as const, cabinet_id: 'CAB-009', commune_id: 'COM-009' }],
+    })
+    renderPage('system_admin')
+    await screen.findAllByText('iot-server-01')
+    expect(await screen.findByRole('heading', { name: /^Gateway/ })).toBeInTheDocument()
+
+    const nodeRow = (await screen.findByText('NODE-009')).closest('tr')!
+    const serverLink = within(nodeRow).getByRole('button', { name: 'iot-server-09' })
+    fireEvent.click(serverLink)
+
+    await waitFor(() => expect(api.getGatewayRoutes).toHaveBeenCalledWith('iot-server-09'))
+    expect(await screen.findByRole('heading', { name: /^Gateway/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'iot-server-09' })).toBeInTheDocument()
+  })
+
+  it('filters nodes correctly using status filter chips', async () => {
+    const mixedNodes = [
+      { node_id: 'NODE-ON', server_id: 'iot-server-01', status: 'online' as const, cabinet_id: 'CAB-001' },
+      { node_id: 'NODE-OFF', server_id: 'iot-server-01', status: 'offline' as const, cabinet_id: 'CAB-001' },
+    ]
+    api.getNodes.mockResolvedValue({ page: 1, page_size: 200, total: 2, items: mixedNodes })
+
+    renderPage('system_admin')
+    await screen.findByText('NODE-ON')
+    await screen.findByText('NODE-OFF')
+
+    const offlineChip = await screen.findByRole('button', { name: /Node mất tín hiệu \(1\)/ })
+    fireEvent.click(offlineChip)
+
+    expect(screen.queryByText('NODE-ON')).not.toBeInTheDocument()
+    expect(screen.getByText('NODE-OFF')).toBeInTheDocument()
+
+    const allChip = screen.getByRole('button', { name: /Tất cả \(2\)/ })
+    fireEvent.click(allChip)
+
+    expect(screen.getByText('NODE-ON')).toBeInTheDocument()
+    expect(screen.getByText('NODE-OFF')).toBeInTheDocument()
+  })
+
+  it('shows error box and retry button when getServers fails, while nodes still render; clicking retry calls getServers again', async () => {
+    api.getServers.mockRejectedValueOnce(new Error('Network error'))
+    renderPage('system_admin')
+
+    expect(await screen.findByText('Không đọc được danh sách server IoT.')).toBeInTheDocument()
+    expect(await screen.findByText('NODE-001')).toBeInTheDocument()
+
+    api.getServers.mockResolvedValueOnce(servers)
+    const retryBtn = screen.getByRole('button', { name: 'Thử lại' })
+    fireEvent.click(retryBtn)
+
+    await screen.findAllByText('iot-server-01')
+    expect(api.getServers).toHaveBeenCalledTimes(2)
+  })
 })
 
-describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
+describe('RegisterNodeModal (POST /iot/nodes)', () => {
   const cabinets = [
     { cabinet_id: 'CAB-001', cabinet_name: 'Tủ A', commune_id: 'COM-001', iot_node_ids: ['NODE-001'] },
     { cabinet_id: 'CAB-002', cabinet_name: 'Tủ B', commune_id: 'COM-001', iot_node_ids: ['NODE-003'] },
@@ -102,6 +185,12 @@ describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
   const modal = (onSaved = vi.fn()) => (
     <RegisterNodeModal servers={servers} communes={communeList} communeStatus="ready" onClose={vi.fn()} onSaved={onSaved} />
   )
+  const renderModal = (onSaved = vi.fn()) =>
+    renderWithSagaStore(modal(onSaved), {
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
   const select = (name: string) => screen.getByRole('combobox', { name })
   const feeders = [
     { feeder_id: 'FDR-001', feeder_name: 'Mạch 1', cabinet: { cabinet_id: 'CAB-001' } },
@@ -112,6 +201,8 @@ describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    api.getServers.mockResolvedValue(servers)
+    api.getNodes.mockResolvedValue({ page: 1, page_size: 200, total: 1, items: nodes })
     assets.getCabinets.mockResolvedValue({ items: cabinets } as never)
     assets.getFeeders.mockResolvedValue({ items: feeders } as never)
   })
@@ -147,7 +238,7 @@ describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
       gateway_id: 'LUXMAP-GW002',
     })
     const onSaved = vi.fn()
-    render(modal(onSaved))
+    renderModal(onSaved)
     await fill()
     fireEvent.change(screen.getByPlaceholderText('500'), { target: { value: '500' } })
     fireEvent.click(screen.getByRole('button', { name: 'Đăng ký node' }))
@@ -166,11 +257,11 @@ describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
         nominal_power_mw: 500,
       })
     )
-    expect(onSaved).toHaveBeenCalled()
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
   })
 
   it('refuses a missing nominal value without calling the API', async () => {
-    render(modal())
+    renderModal()
     await fill()
     fireEvent.click(screen.getByRole('button', { name: 'Đăng ký node' }))
 
@@ -179,14 +270,14 @@ describe('RegisterNodeModal (POST /iot/nodes/register)', () => {
   })
 
   it('fixes the data source to the team-built hardware: no choice, no simulated option', async () => {
-    render(modal())
+    renderModal()
     expect(screen.queryByRole('combobox', { name: 'Nguồn dữ liệu' })).not.toBeInTheDocument()
     expect(screen.getByTestId('register-node-data-source')).toHaveTextContent('Phần cứng nhóm tự dựng (calibration_rig)')
     expect(screen.queryByText(/simulated/)).not.toBeInTheDocument()
   })
 
   it('asks for the commune first: cabinet, feeder and server stay locked until one is chosen', async () => {
-    render(modal())
+    renderModal()
     expect(select('Tủ điện')).toBeDisabled()
     expect(select('Mạch (rơ-le #1)')).toBeDisabled()
     expect(select('Server IoT')).toBeDisabled()
@@ -220,7 +311,10 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
   })
 
   it('shows latest sample and anomaly; electrical and command history live in the GIS drawer, not here', async () => {
-    render(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />)
+    renderWithSagaStore(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />, {
+      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+      sagas: [iotBridgeSaga, iotMonitorSaga],
+    })
 
     expect(await screen.findByText('Mạch đã ngắt tải')).toBeInTheDocument()
     expect(await screen.findByText('Mất điện áp khi đèn bật (V)')).toBeInTheDocument()
@@ -231,7 +325,10 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
 
   it('shows the backend error message when the source is not configured (503)', async () => {
     api.getElectrical.mockRejectedValue({ response: { data: { error: { message: 'Chưa cấu hình nguồn đo.' } } } })
-    render(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />)
+    renderWithSagaStore(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />, {
+      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+      sagas: [iotBridgeSaga, iotMonitorSaga],
+    })
 
     expect(await screen.findByText('Chưa cấu hình nguồn đo.')).toBeInTheDocument()
   })
