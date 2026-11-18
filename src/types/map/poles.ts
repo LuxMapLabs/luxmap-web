@@ -6,10 +6,6 @@ import type { FaultStatus, FaultType, FeederPowerState, FixtureStatus, FixtureTy
 import type { PoleAssetPhotoItem } from '../assets/poles'
 import type { Geometry } from '../common/base'
 
-export type CommuneId = string
-
-export type PoleId = string
-
 export interface PoleMapBaseline {
     baseline_value?: number
     baseline_window_nights?: number
@@ -108,20 +104,20 @@ export interface PoleMapStatus {
 }
 
 export interface PoleProperties {
-    pole_id: PoleId
     power_state?: FeederPowerState
+    pole_id: string | null
     segment_id: string | null
     fixture_status: FixtureStatus
     status_confidence?: number
-    power_source: PowerSource
-    fixture_type: FixtureType
-    lamp_watt: number
-    lamp_count: number
-    fixture_count: number
-    install_date: string | null
+    power_source?: PowerSource
+    fixture_type?: FixtureType
+    lamp_watt?: number
+    lamp_count?: number
+    fixture_count?: number
+    install_date?: string | null
     warranty_expiry?: string | null
     warranty_status: WarrantyStatus
-    commune_id: CommuneId
+    commune_id: string | null
     last_seen_at?: string | null
     last_sweep_id?: string | null
     open_fault_count: number
@@ -140,6 +136,4 @@ export interface PolePropertiesFeatureCollection {
     crs_note?: string | null
     features: PolePropertiesFeature[]
 }
-
-export type SegmentId = string
 
