@@ -1,17 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
   QrCode,
-  Copy,
   FileDown,
-  Check,
-  MapPin,
   Loader2,
   Ban,
   RefreshCw,
-  Calendar,
-  KeyRound,
+  ExternalLink,
 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { jsPDF } from 'jspdf'
@@ -47,11 +43,9 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
     (state: RootState) => state.qrCode
   )
 
-  const [copied, setCopied] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
-  const decalCardRef = useRef<HTMLDivElement | null>(null)
 
   const poleId = pole?.pole_id || ''
   const poleCode = pole?.external_ref || ''
@@ -70,7 +64,6 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
 
   // 2. URL báo cáo thực tế lấy trực tiếp từ Backend
   const reportUrl = currentPoleQr?.url || ''
-  const qrCodeText = currentPoleQr?.code || ''
   const isActive = currentPoleQr?.active ?? false
 
   // 3. Tạo Data URL hình ảnh mã QR bằng thư viện qrcode từ reportUrl Backend
@@ -110,18 +103,6 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
 
   if (!isOpen || !pole) return null
 
-  const handleCopyLink = async () => {
-    if (!reportUrl) return
-    try {
-      await navigator.clipboard.writeText(reportUrl)
-      setCopied(true)
-      toast.success('Đã sao chép liên kết báo cáo sự cố!')
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      toast.error('Không thể sao chép liên kết vào bộ nhớ tạm.')
-    }
-  }
-
   // Hành động: Cấp mã QR mới
   const handleIssue = () => {
     if (!poleId) return
@@ -155,8 +136,8 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
         poleCode,
         segmentName,
         communeName,
+        note: pole.note || '',
         qrDataUrl,
-        qrCodeText,
       })
 
       const imgData = canvas.toDataURL('image/png')
@@ -208,14 +189,11 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-white text-sm sm:text-base flex items-center gap-2">
-                <span>Mã QR Cột Đèn</span>
+                <span>Mã QR</span>
                 <span className="font-mono text-amber-300 text-xs bg-white/10 px-2 py-0.5 rounded-full">
                   {poleCode}
                 </span>
               </h3>
-              <p className="text-[11px] text-slate-200 dark:text-slate-400">
-                Quản lý & in tem QR dán cột đèn (Backend Server)
-              </p>
             </div>
           </div>
           <button
@@ -228,121 +206,83 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-5 sm:p-6 space-y-4 text-center text-xs text-slate-800 dark:text-slate-200 print:hidden max-h-[82vh] overflow-y-auto">
-          {/* Thông tin định danh & Trạng thái Backend */}
-          <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left space-y-2">
-            <div className="flex justify-between items-center text-[11px]">
-              <span className="text-slate-500 dark:text-slate-400">Vị trí dán nhãn:</span>
-              <strong className="text-slate-900 dark:text-white font-mono">{poleCode || '-'}</strong>
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-              <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className="truncate">
-                {(segmentName || '-') + ' — ' + (communeName || '-')}
-              </span>
-            </div>
-
-            {/* Trạng thái mã QR do Backend cấp */}
-            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 dark:text-slate-400">Trạng thái mã:</span>
-              {isFetching ? (
-                <span className="text-slate-400 flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Đang kiểm tra...
-                </span>
-              ) : currentPoleQr ? (
-                isActive ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold text-[10px]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Đang hoạt động (Active)
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-semibold text-[10px]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                    Đã thu hồi (Revoked)
-                  </span>
-                )
-              ) : (
-                <span className="text-amber-600 dark:text-amber-400 font-medium">
-                  Chưa cấp mã QR
-                </span>
-              )}
-            </div>
-
-            {currentPoleQr && (
-              <div className="grid grid-cols-2 gap-2 pt-1 text-[10.5px] text-slate-600 dark:text-slate-400 font-mono">
-                <div className="flex items-center gap-1">
-                  <KeyRound className="w-3 h-3 text-slate-400 shrink-0" />
-                  <span>Mã: <strong>{currentPoleQr.code}</strong></span>
+        <div className="p-5 sm:p-6 space-y-4 text-xs text-slate-800 dark:text-slate-200 print:hidden max-h-[82vh] overflow-y-auto">
+          {/* Khối mới: QR bên trái, trạng thái & thông tin bên phải */}
+          <div className="flex items-center gap-4 text-left">
+            {/* Trái: ô QR w-32 h-32 */}
+            <div className="w-32 h-32 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white p-2 shrink-0 flex items-center justify-center">
+              {isFetching || isIssuing ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                 </div>
-                <div className="flex items-center gap-1 justify-end">
-                  <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                  <span>Ngày cấp: {currentPoleQr.created_at ? new Date(currentPoleQr.created_at).toLocaleDateString('vi-VN') : '---'}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* QR Code Container */}
-          <div className="relative inline-block p-4 bg-white rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-md">
-            {isFetching || isIssuing ? (
-              <div className="w-52 h-52 flex flex-col items-center justify-center text-slate-400 gap-2">
-                <Loader2 className="w-7 h-7 animate-spin text-blue-600" />
-                <span className="text-xs font-medium">Đang xử lý mã QR...</span>
-              </div>
-            ) : qrDataUrl && isActive ? (
-              <div>
+              ) : qrDataUrl && isActive ? (
                 <img
                   src={qrDataUrl}
                   alt={`Mã QR ${poleCode}`}
-                  className="w-52 h-52 mx-auto rounded-lg shadow-2xs object-contain"
+                  className="w-full h-full object-contain rounded-lg"
                 />
-                <p className="mt-2 font-mono text-[11px] font-bold text-slate-700 tracking-wider">
-                  MÃ: {qrCodeText}
-                </p>
-              </div>
-            ) : currentPoleQr && !isActive ? (
-              <div className="w-52 h-52 flex flex-col items-center justify-center p-3 text-center space-y-2">
-                <Ban className="w-10 h-10 text-rose-500 opacity-80 mx-auto" />
-                <p className="font-bold text-rose-700 text-xs">Mã QR đã bị thu hồi</p>
-                <p className="text-[11px] text-slate-500">
-                  Tem quét này đã bị vô hiệu hóa. Vui lòng bấm cấp mã mới để in tem thay thế.
-                </p>
-              </div>
-            ) : (
-              <div className="w-52 h-52 flex flex-col items-center justify-center p-3 text-center space-y-2">
-                <QrCode className="w-10 h-10 text-slate-300 mx-auto" />
-                <p className="text-xs text-slate-500 font-medium">Cột đèn này chưa có mã QR</p>
-                <button
-                  type="button"
-                  onClick={handleIssue}
-                  disabled={isIssuing}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-                >
-                  Cấp mã QR ngay
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* URL Box */}
-          {reportUrl && isActive && (
-            <div className="flex items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-              <input
-                type="text"
-                readOnly
-                value={reportUrl}
-                className="w-full bg-transparent text-[11px] font-mono text-slate-600 dark:text-slate-300 outline-none px-1 truncate select-all"
-              />
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                title="Sao chép liên kết"
-                className="p-1.5 rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 shrink-0 cursor-pointer"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
+              ) : currentPoleQr && !isActive ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-center p-1 space-y-1">
+                  <Ban className="w-6 h-6 text-rose-500 opacity-80" />
+                  <span className="font-bold text-rose-700 dark:text-rose-400 text-[11px]">
+                    Đã thu hồi
+                  </span>
+                </div>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-center p-1 space-y-1">
+                  <QrCode className="w-6 h-6 text-slate-300 dark:text-slate-600" />
+                  <span className="text-slate-500 text-[11px] font-medium">Chưa có mã</span>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Phải: Thông tin & Trạng thái */}
+            <div className="flex-1 min-w-0 space-y-2">
+              <div>
+                {isFetching ? (
+                  <span className="text-slate-400 flex items-center gap-1 text-[11px]">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Đang kiểm tra...
+                  </span>
+                ) : currentPoleQr ? (
+                  isActive ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold text-[10px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Đang hoạt động
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-semibold text-[10px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      Đã thu hồi
+                    </span>
+                  )
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-semibold text-[10px]">
+                    Chưa cấp mã
+                  </span>
+                )}
+              </div>
+
+              {currentPoleQr?.created_at && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Cấp ngày {new Date(currentPoleQr.created_at).toLocaleDateString('vi-VN')}
+                </p>
+              )}
+
+              {reportUrl && isActive && (
+                <div>
+                  <a
+                    href={reportUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs rounded-lg cursor-pointer transition"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Mở trang báo sự cố</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Hộp xác nhận thu hồi (Revoke Confirmation) */}
           {showRevokeConfirm && (
@@ -395,12 +335,12 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
                   {isExportingPdf ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Đang xuất file PDF Decal A6...</span>
+                      <span>Đang xuất PDF...</span>
                     </>
                   ) : (
                     <>
                       <FileDown className="w-4 h-4" />
-                      <span>Tải Tem QR (File PDF Decal A6)</span>
+                      <span>Tải tem QR (PDF A6)</span>
                     </>
                   )}
                 </button>
@@ -413,7 +353,7 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
                     className="py-2 px-2.5 rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[11px] font-semibold transition cursor-pointer flex items-center justify-center gap-1"
                   >
                     <Ban className="w-3.5 h-3.5" />
-                    <span>Thu hồi mã QR</span>
+                    <span>Thu hồi mã</span>
                   </button>
 
                   <button
@@ -423,7 +363,7 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
                     className="py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-semibold transition cursor-pointer flex items-center justify-center gap-1"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Cấp lại mã khác</span>
+                    <span>Cấp mã mới</span>
                   </button>
                 </div>
               </div>
@@ -434,7 +374,7 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
                 className="w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>Cấp mã QR mới</span>
+                <span>Cấp mã mới</span>
               </button>
             ) : (
               <button
@@ -443,88 +383,9 @@ export const PoleQrModal: React.FC<PoleQrModalProps> = ({
                 className="w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>Cấp mã QR mới thay thế</span>
+                <span>Cấp mã mới</span>
               </button>
             )}
-          </div>
-        </div>
-
-        {/* Khối Decal in riêng biệt */}
-        <div
-          id="single-decal-print-zone"
-          className="fixed -left-[9999px] top-0 pointer-events-none opacity-100 z-[-50] print:static print:opacity-100 print:pointer-events-auto"
-        >
-          <div
-            ref={decalCardRef}
-            className="single-decal-card bg-white text-slate-900 border-2 border-[#1f3864] rounded-2xl p-4 shadow-none w-[420px]"
-            style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
-          >
-            {/* Header Tem */}
-            <div className="border-b border-slate-300 pb-2 mb-2.5 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-blue-600 inline-block" />
-                <strong className="text-xs font-black tracking-wide text-[#1f3864] uppercase">
-                  LUXMAP — CHIẾU SÁNG ĐÔ THỊ
-                </strong>
-              </div>
-              <span className="text-[10px] font-bold text-slate-600">
-                Tem Quét Báo Sự Cố
-              </span>
-            </div>
-
-            {/* Body Tem: Mã QR bên trái, Thông tin bên phải */}
-            <div className="flex items-center gap-4">
-              <div className="shrink-0 bg-white p-1 rounded-xl border border-slate-300 flex items-center justify-center">
-                {qrDataUrl ? (
-                  <img
-                    src={qrDataUrl}
-                    alt={`Mã QR ${poleCode}`}
-                    className="w-28 h-28 object-contain"
-                  />
-                ) : (
-                  <div className="w-28 h-28 flex items-center justify-center text-[10px] text-slate-400">
-                    Đang tải...
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0 space-y-2">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">
-                    TUYẾN ĐƯỜNG
-                  </span>
-                  <p className="text-sm font-bold text-slate-900 truncate">
-                    {segmentName || 'Chưa gắn tuyến'}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">
-                    ĐỊA BÀN QUẢN LÝ
-                  </span>
-                  <div className="flex items-center gap-1 text-xs text-slate-700 font-medium">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="truncate">{communeName || 'Địa bàn chung'}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">
-                    MÃ TEM QUÉT
-                  </span>
-                  <strong className="text-xs font-black font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-block tracking-wider">
-                    {qrCodeText || poleCode || '---'}
-                  </strong>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Tem */}
-            <div className="mt-3 pt-2 border-t border-dashed border-slate-300 text-center">
-              <p className="text-[10px] font-medium text-slate-600">
-                📱 Dùng camera điện thoại quét mã QR để báo sự cố đèn chiếu sáng
-              </p>
-            </div>
           </div>
         </div>
       </div>

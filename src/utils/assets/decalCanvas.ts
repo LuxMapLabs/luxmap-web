@@ -1,19 +1,26 @@
 /**
- * Tiện ích vẽ Tem QR Decal Cột Đèn chất lượng cao lên thẻ HTML Canvas
- * - Hoàn toàn độc lập với CSS Tailwind v4 (Triệt tiêu 100% lỗi parse màu "oklch" của html2canvas)
- * - Hỗ trợ hiển thị 100% TIẾNG VIỆT CÓ DẤU sắc nét bằng Canvas 2D Text API
- * - Chuẩn kích thước tỉ lệ tem decal: 105mm x 60mm (Tỉ lệ 7:4, render ở độ phân giải 1050px x 600px cho độ sắc nét cực cao)
- * - Thiết kế tối ưu không gian: Bỏ mã cột POLE-xxxx, mở rộng kích thước mã QR to rõ,
- *   bên phải hiển thị nổi bật: TUYẾN ĐƯỜNG, ĐỊA BÀN QUẢN LÝ và MÃ TEM QUÉT 16 ký tự Backend.
+ * Tiện ích vẽ Tem QR Decal dán cột đèn (1050px x 600px)
+ * Nguồn duy nhất cho in ấn PDF và xem trước trực tiếp trên giao diện
  */
 
 export interface DecalCanvasData {
-  poleCode?: string | null
+  poleCode?: string | null // external_ref
   segmentName?: string | null
   communeName?: string | null
+  note?: string | null
   qrDataUrl: string
-  qrCodeText?: string | null
 }
+
+const NAVY = '#1f3864'
+const AMBER = '#F5A623'
+const INK = '#0f172a'
+const BODY = '#334155'
+const MUTED = '#64748b'
+const LINE = '#cbd5e1'
+const PLATE_LABEL = '#c7d3ea'
+
+const TEXT = '"Be Vietnam Pro", "Segoe UI", Roboto, Arial, sans-serif'
+const DISPLAY = '"Plus Jakarta Sans", "Segoe UI", Arial, sans-serif'
 
 /**
  * Tải ảnh từ data URL thành đối tượng HTMLImageElement
@@ -43,6 +50,50 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number):
 }
 
 /**
+ * Tách và cắt ngắn văn bản theo số dòng tối đa trên Canvas
+ */
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number
+): string[] {
+  const trimmed = text.trim()
+  if (!trimmed) return []
+
+  const words = trimmed.split(/\s+/)
+  const lines: string[] = []
+  let currentLine = ''
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]
+    const testLine = currentLine ? `${currentLine} ${word}` : word
+    if (ctx.measureText(testLine).width <= maxWidth) {
+      currentLine = testLine
+    } else {
+      if (lines.length + 1 === maxLines) {
+        const remaining = [currentLine, ...words.slice(i)].filter(Boolean).join(' ')
+        lines.push(fitText(ctx, remaining, maxWidth))
+        return lines
+      }
+      if (currentLine) {
+        lines.push(currentLine)
+        currentLine = word
+      } else {
+        lines.push(fitText(ctx, word, maxWidth))
+        currentLine = ''
+      }
+    }
+  }
+
+  if (currentLine && lines.length < maxLines) {
+    lines.push(currentLine)
+  }
+
+  return lines
+}
+
+/**
  * Vẽ khung chữ nhật bo góc
  */
 function roundRect(
@@ -67,9 +118,15 @@ function roundRect(
 }
 
 /**
- * Vẽ icon MapPin vector sắc nét chuẩn Lucide MapPin
+ * Vẽ icon MapPin vector sắc nét
  */
-function drawMapPinIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+function drawMapPinIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  color: string
+) {
   ctx.save()
   ctx.translate(x, y)
   const scale = size / 24
@@ -103,6 +160,18 @@ function drawMapPinIcon(ctx: CanvasRenderingContext2D, x: number, y: number, siz
  * @returns HTMLCanvasElement đã được vẽ hoàn chỉnh
  */
 export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCanvasElement> {
+  if (typeof document !== 'undefined' && document.fonts?.load) {
+    try {
+      await Promise.all([
+        document.fonts.load('600 32px "Be Vietnam Pro"'),
+        document.fonts.load('500 24px "Be Vietnam Pro"'),
+        document.fonts.load('800 56px "Plus Jakarta Sans"'),
+      ])
+    } catch {
+      /* dùng font dự phòng */
+    }
+  }
+
   const canvas = document.createElement('canvas')
   const width = 1050
   const height = 600
@@ -114,161 +183,132 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
     throw new Error('Không thể khởi tạo Canvas 2D context.')
   }
 
-  // 1. Nền trắng toàn bộ
+  // 1. Nền trắng
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, width, height)
 
-  // 2. Đường viền bao ngoài bo góc chuẩn công nghiệp (Border xanh than đậm #1f3864)
-  const margin = 20
-  const cardW = width - margin * 2
-  const cardH = height - margin * 2
-  roundRect(ctx, margin, margin, cardW, cardH, 28)
+  // Khung thẻ và dải dưới (CTA): vùng y từ 496 đến 580, nền AMBER, nằm gọn trong góc bo của khung
+  ctx.save()
+  roundRect(ctx, 20, 20, 1010, 560, 28)
   ctx.fillStyle = '#ffffff'
   ctx.fill()
-  ctx.lineWidth = 6
-  ctx.strokeStyle = '#1f3864'
-  ctx.stroke()
+  ctx.clip()
+  ctx.fillStyle = AMBER
+  ctx.fillRect(20, 496, 1010, 84)
+  ctx.restore()
 
-  // 3. Header Tem
-  const headerY = margin + 50
-  // Biểu tượng chấm tròn xanh
-  ctx.beginPath()
-  ctx.arc(margin + 40, headerY - 10, 11, 0, Math.PI * 2)
-  ctx.fillStyle = '#2563eb'
-  ctx.fill()
-
-  // Tiêu đề thương hiệu
-  ctx.fillStyle = '#1f3864'
-  ctx.font = 'bold 27px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  ctx.textAlign = 'left'
+  // Chữ CTA: Đèn không sáng? Quét mã QR để báo cho đơn vị quản lý, 600 28px TEXT, căn giữa, middle tại y=538
+  ctx.save()
+  ctx.fillStyle = NAVY
+  ctx.font = `600 28px ${TEXT}`
+  ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('LUXMAP — CHIẾU SÁNG ĐÔ THỊ', margin + 66, headerY - 10)
+  const ctaText = fitText(
+    ctx,
+    'Đèn không sáng? Quét mã QR để báo cho đơn vị quản lý',
+    950
+  )
+  ctx.fillText(ctaText, 525, 538)
+  ctx.restore()
 
-  // Nhãn phụ bên phải
-  ctx.fillStyle = '#475569'
-  ctx.font = 'bold 20px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  ctx.textAlign = 'right'
-  ctx.fillText('Tem Quét Báo Sự Cố', margin + cardW - 35, headerY - 10)
-
-  // Đường kẻ phân cách Header
-  ctx.beginPath()
-  ctx.moveTo(margin + 28, margin + 82)
-  ctx.lineTo(margin + cardW - 28, margin + 82)
-  ctx.strokeStyle = '#e2e8f0'
-  ctx.lineWidth = 2
-  ctx.stroke()
-
-  // 4. Vẽ Mã QR (Khối bên trái - Phóng to lên 360px cho quét cực nhạy)
-  const qrBoxX = margin + 35
-  const qrBoxY = margin + 100
-  const qrBoxSize = 360
-
-  // Hộp viền chứa QR
-  roundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 24)
-  ctx.fillStyle = '#f8fafc'
+  // 2. QR (trái): hộp roundRect(56, 56, 400, 400, 20) nền trắng, viền LINE 2px
+  roundRect(ctx, 56, 56, 400, 400, 20)
+  ctx.fillStyle = '#ffffff'
   ctx.fill()
-  ctx.lineWidth = 3
-  ctx.strokeStyle = '#cbd5e1'
+  ctx.lineWidth = 2
+  ctx.strokeStyle = LINE
   ctx.stroke()
 
-  // Vẽ hình ảnh QR code
   if (data.qrDataUrl) {
     try {
       const qrImg = await loadImage(data.qrDataUrl)
-      const qrPadding = 16
-      ctx.drawImage(
-        qrImg,
-        qrBoxX + qrPadding,
-        qrBoxY + qrPadding,
-        qrBoxSize - qrPadding * 2,
-        qrBoxSize - qrPadding * 2
-      )
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(qrImg, 70, 70, 372, 372)
+      ctx.imageSmoothingEnabled = true
     } catch (err) {
       console.error('Lỗi khi vẽ mã QR lên canvas:', err)
     }
   }
 
-  // 5. Khối thông tin định danh (Bên phải - Tối ưu hiển thị Tuyến, Địa bàn và Mã tem quét 16 ký tự)
-  const infoX = qrBoxX + qrBoxSize + 40
-  const maxInfoWidth = margin + cardW - infoX - 35
+  // 3. Cột phải: x = 500, maxW = 494. Baseline alphabetic, căn trái trừ khi ghi khác
+  const x = 500
+  const maxW = 494
 
-  let currentY = qrBoxY + 36
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
 
-  // 5.1. TUYẾN ĐƯỜNG
-  ctx.fillStyle = '#64748b'
-  ctx.font = 'bold 18px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  ctx.fillText('TUYẾN ĐƯỜNG', infoX, currentY)
-
-  currentY += 40
-  ctx.fillStyle = '#0f172a'
-  ctx.font = 'bold 30px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  const segText = fitText(ctx, data.segmentName || 'Chưa gắn tuyến', maxInfoWidth)
-  ctx.fillText(segText, infoX, currentY)
-
-  // 5.2. ĐỊA BÀN QUẢN LÝ (kèm icon MapPin)
-  currentY += 56
-  ctx.fillStyle = '#64748b'
-  ctx.font = 'bold 18px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  ctx.fillText('ĐỊA BÀN QUẢN LÝ', infoX, currentY)
-
-  currentY += 40
-  drawMapPinIcon(ctx, infoX, currentY - 24, 28, '#059669')
-
-  ctx.fillStyle = '#1e293b'
-  ctx.font = 'bold 26px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  const comText = fitText(ctx, data.communeName || 'Địa bàn chung', maxInfoWidth - 40)
-  ctx.fillText(comText, infoX + 38, currentY)
-
-  // 5.3. MÃ TEM QUÉT (16 KÝ TỰ BACKEND)
-  currentY += 56
-  ctx.fillStyle = '#64748b'
-  ctx.font = 'bold 18px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  ctx.fillText('MÃ TEM QUÉT', infoX, currentY)
-
-  currentY += 46
-  const displayCode = data.qrCodeText || data.poleCode || '---'
-
-  // Badge nền nổi bật cho Mã tem quét
-  const badgePadX = 16
-  const badgeH = 46
-  ctx.font = '900 32px "Consolas", "Courier New", monospace'
-  const codeWidth = ctx.measureText(displayCode).width
-  const badgeW = Math.min(codeWidth + badgePadX * 2, maxInfoWidth)
-
-  roundRect(ctx, infoX, currentY - 34, badgeW, badgeH, 10)
-  ctx.fillStyle = '#eff6ff'
-  ctx.fill()
-  ctx.lineWidth = 2
-  ctx.strokeStyle = '#bfdbfe'
-  ctx.stroke()
-
-  ctx.fillStyle = '#1d4ed8'
-  ctx.fillText(fitText(ctx, displayCode, badgeW - badgePadX * 2), infoX + badgePadX, currentY)
-
-  // 6. Đường kẻ phân cách Footer
-  const footerDividerY = margin + cardH - 65
+  // - Thương hiệu: chấm tròn AMBER bán kính 9 tại (509, 77)
   ctx.beginPath()
-  ctx.setLineDash([8, 6])
-  ctx.moveTo(margin + 28, footerDividerY)
-  ctx.lineTo(margin + cardW - 28, footerDividerY)
-  ctx.strokeStyle = '#cbd5e1'
-  ctx.lineWidth = 2
-  ctx.stroke()
-  ctx.setLineDash([]) // Reset dash
+  ctx.arc(509, 77, 9, 0, Math.PI * 2)
+  ctx.fillStyle = AMBER
+  ctx.fill()
 
-  // 7. Footer Hướng dẫn người dân
-  const footerY = margin + cardH - 26
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillStyle = '#475569'
-  ctx.font = 'bold 20px "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-  ctx.fillText(
-    '📱 Dùng camera điện thoại quét mã QR để báo sự cố đèn chiếu sáng',
-    margin + cardW / 2,
-    footerY
-  )
+  // Chữ LuxMap 800 28px DISPLAY NAVY tại (526, 86)
+  ctx.fillStyle = NAVY
+  ctx.font = `800 28px ${DISPLAY}`
+  ctx.fillText('LuxMap', 526, 86)
+
+  // Ngay sau (đo width + 14px) chữ Chiếu sáng công cộng 500 22px TEXT MUTED cùng baseline 86
+  const luxMapWidth = ctx.measureText('LuxMap').width
+  ctx.fillStyle = MUTED
+  ctx.font = `500 22px ${TEXT}`
+  ctx.fillText('Chiếu sáng công cộng', 526 + luxMapWidth + 14, 86)
+
+  // - Biển mã cột: roundRect(500, 108, 494, 108, 14) nền NAVY
+  roundRect(ctx, 500, 108, 494, 108, 14)
+  ctx.fillStyle = NAVY
+  ctx.fill()
+
+  // Nhãn Mã cột 500 20px TEXT PLATE_LABEL tại (524, 140)
+  ctx.fillStyle = PLATE_LABEL
+  ctx.font = `500 20px ${TEXT}`
+  ctx.fillText('Mã cột', 524, 140)
+
+  // Mã cột 800 56px DISPLAY trắng tại (524, 198), fitText tối đa 446px, rỗng thì -
+  const poleCodeValue = data.poleCode && data.poleCode.trim() ? data.poleCode.trim() : '-'
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `800 56px ${DISPLAY}`
+  ctx.fillText(fitText(ctx, poleCodeValue, 446), 524, 198)
+
+  // - Tuyến đường 500 20px TEXT MUTED tại (500, 258); giá trị 600 32px TEXT INK tại (500, 296), fitText maxW, rỗng -
+  ctx.fillStyle = MUTED
+  ctx.font = `500 20px ${TEXT}`
+  ctx.fillText('Tuyến đường', x, 258)
+
+  const segmentValue = data.segmentName && data.segmentName.trim() ? data.segmentName.trim() : '-'
+  ctx.fillStyle = INK
+  ctx.font = `600 32px ${TEXT}`
+  ctx.fillText(fitText(ctx, segmentValue, maxW), x, 296)
+
+  // - Địa bàn nhãn 500 20px TEXT tại (500, 336); drawMapPinIcon(ctx, 500, 348, 26, NAVY); giá trị 500 28px TEXT INK tại (536, 372), fitText maxW - 36, rỗng -
+  ctx.fillStyle = MUTED
+  ctx.font = `500 20px ${TEXT}`
+  ctx.fillText('Địa bàn', x, 336)
+
+  drawMapPinIcon(ctx, x, 348, 26, NAVY)
+
+  const communeValue = data.communeName && data.communeName.trim() ? data.communeName.trim() : '-'
+  ctx.fillStyle = INK
+  ctx.font = `500 28px ${TEXT}`
+  ctx.fillText(fitText(ctx, communeValue, maxW - 36), 536, 372)
+
+  // - Ghi chú nhãn 500 20px TEXT tại (500, 412); giá trị 500 24px TEXT BODY, wrapText maxW tối đa 2 dòng, dòng 1 y=444, dòng 2 y=474. Rỗng/null/chỉ khoảng trắng thì -
+  ctx.fillStyle = MUTED
+  ctx.font = `500 20px ${TEXT}`
+  ctx.fillText('Ghi chú', x, 412)
+
+  const noteRaw = data.note && data.note.trim() ? data.note.trim() : '-'
+  ctx.fillStyle = BODY
+  ctx.font = `500 24px ${TEXT}`
+  const noteLines = wrapText(ctx, noteRaw, maxW, 2)
+  if (noteLines[0]) ctx.fillText(noteLines[0], x, 444)
+  if (noteLines[1]) ctx.fillText(noteLines[1], x, 474)
+
+  // 4. Viền khung ngoài sau cùng (NAVY 6px) để viền nằm trên
+  roundRect(ctx, 20, 20, 1010, 560, 28)
+  ctx.lineWidth = 6
+  ctx.strokeStyle = NAVY
+  ctx.stroke()
 
   return canvas
 }

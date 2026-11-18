@@ -30,7 +30,6 @@ import {
   Info,
   Phone,
   User,
-  Shield,
   Ban,
 } from 'lucide-react'
 
@@ -50,35 +49,35 @@ const FAULT_OPTIONS: readonly FaultOptionItem[] = [
     id: 'lamp_out',
     kind: 'lamp_out',
     title: 'Đèn tắt hoàn toàn / Mất chiếu sáng',
-    desc: 'Bóng đèn tắt hẳn vào ban đêm, chập chờn hoặc cháy hỏng chấn lưu',
+    desc: 'Đèn tắt hẳn vào ban đêm',
     icon: LightbulbOff,
   },
   {
     id: 'lamp_dim',
     kind: 'lamp_dim',
     title: 'Đèn sáng yếu / Chập chờn',
-    desc: 'Ánh sáng mờ suy giảm độ rọi, nhấp nháy liên tục không đủ quan sát',
+    desc: 'Sáng mờ hoặc nhấp nháy',
     icon: ZapOff,
   },
   {
     id: 'pole_damaged',
     kind: 'pole_damaged',
     title: 'Cột đèn nghiêng / Nguy cơ gãy đổ',
-    desc: 'Móng cột bị lún nứt, thân cột bị va quẹt hoặc nghiêng ngả nguy hiểm',
+    desc: 'Cột lún, nứt, bị va quẹt hoặc nghiêng',
     icon: AlertTriangle,
   },
   {
     id: 'other',
     kind: 'other',
     title: 'Hở dây điện / Sự cố nguy hiểm khác',
-    desc: 'Ưu tiên khẩn cấp: Rò rỉ điện, đứt dây hoặc chạm chập có nguy cơ tai nạn',
+    desc: 'Rò điện, đứt dây, chập cháy. Ưu tiên xử lý gấp',
     icon: AlertTriangle,
   },
   {
     id: 'other_generic',
     kind: 'other',
     title: 'Khác',
-    desc: 'Sự cố không thuộc các mục trên. Vui lòng mô tả rõ ở bước 2',
+    desc: 'Mô tả rõ ở bước 2',
     icon: HelpCircle,
   },
 ] as const
@@ -398,20 +397,19 @@ export const CitizenReportPage: React.FC = () => {
     isSubmitting || isPendingSubmit || isLookingUp || !isValidCode || !currentPole || currentPole.can_report === false
 
   return (
-    <div className="min-h-screen bg-slate-100/70 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col items-center p-3 sm:p-6 antialiased">
+    <div className="min-h-screen bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col items-center p-3 sm:p-6 antialiased">
       {/* Container chuẩn Mobile-First (tối đa 560px để giữ trải nghiệm form tập trung) */}
       <main className="w-full max-w-lg space-y-4 sm:space-y-5">
         {/* Header thương hiệu công ích */}
-        <header className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs text-center space-y-1.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-[11px] font-semibold">
-            <Shield className="w-3.5 h-3.5" />
-            <span>Cổng Tiếp Nhận Phản Ánh Công Cộng</span>
+        <header className="px-1 pt-1 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#F5A623]" aria-hidden="true" />
+            <span className="text-sm font-extrabold text-[#1f3864] dark:text-blue-200">LuxMap</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Chiếu sáng công cộng</span>
           </div>
-          <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug">
-            Báo Cáo Sự Cố Chiếu Sáng Đèn Đường
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Chung tay vì những cung đường an toàn và sáng đẹp
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Báo đèn hỏng</h1>
+          <p className="text-xs text-slate-600 dark:text-slate-400">
+            Phản ánh được gửi thẳng tới đơn vị quản lý chiếu sáng của xã. Không cần đăng nhập.
           </p>
         </header>
 
@@ -440,7 +438,7 @@ export const CitizenReportPage: React.FC = () => {
           {/* Lựa chọn hiện trạng sự cố */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-              1. Tình trạng sự cố bạn đang nhìn thấy <span className="text-rose-500">*</span>
+              1. Đèn đang bị gì? <span className="text-rose-500">*</span>
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {FAULT_OPTIONS.map((opt) => {
@@ -450,19 +448,20 @@ export const CitizenReportPage: React.FC = () => {
                   <button
                     key={opt.id}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => setSelectedOptionId(opt.id)}
                     className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer ${
                       opt.id === 'other_generic' ? 'sm:col-span-2 ' : ''
                     }${
                       isSelected
-                        ? 'border-blue-600 dark:border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 shadow-xs'
+                        ? 'border-[#1f3864] dark:border-blue-300 bg-[#1f3864]/5 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
                         : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                     }`}
                   >
                     <div
                       className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
                         isSelected
-                          ? 'bg-blue-600 text-white'
+                          ? 'bg-[#1f3864] text-white'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                       }`}
                     >
@@ -470,7 +469,7 @@ export const CitizenReportPage: React.FC = () => {
                     </div>
                     <div className="space-y-0.5">
                       <div className="text-xs font-bold leading-tight">{opt.title}</div>
-                      <div className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
+                      <div className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-1">
                         {opt.desc}
                       </div>
                     </div>
@@ -495,7 +494,7 @@ export const CitizenReportPage: React.FC = () => {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ví dụ: Đèn bị tắt từ hôm qua, ngã ba tối gây nguy hiểm cho người đi xe máy..."
-              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition resize-none"
+              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#1f3864]/40 dark:focus:ring-blue-300/50 transition resize-none"
             />
           </div>
 
@@ -551,18 +550,18 @@ export const CitizenReportPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className={`w-full rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-slate-50/70 dark:bg-slate-850 flex items-center justify-center gap-2 transition text-slate-600 dark:text-slate-300 cursor-pointer active:scale-99 ${
+                className={`w-full rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-[#1f3864] dark:hover:border-blue-300 bg-slate-50/70 dark:bg-slate-850 flex items-center justify-center gap-2 transition text-slate-600 dark:text-slate-300 cursor-pointer active:scale-99 ${
                   mediaPreviews.length > 0 ? 'py-2.5 px-3' : 'py-4 px-4 flex-col gap-1.5'
                 }`}
               >
                 {mediaPreviews.length > 0 ? (
                   <>
-                    <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <Plus className="w-4 h-4 text-[#1f3864] dark:text-blue-200" />
                     <span className="text-xs font-semibold">Thêm ảnh ({mediaFiles.length}/3)</span>
                   </>
                 ) : (
                   <>
-                    <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-full bg-[#1f3864]/10 dark:bg-slate-800 text-[#1f3864] dark:text-blue-200 flex items-center justify-center">
                       <Camera className="w-5 h-5" />
                     </div>
                     <span className="text-xs font-semibold">Chụp ảnh hoặc tải ảnh từ máy</span>
@@ -578,7 +577,7 @@ export const CitizenReportPage: React.FC = () => {
           {/* Thông tin người phản ánh (Tùy chọn) */}
           <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
-              <Info className="w-3.5 h-3.5 text-blue-500" />
+              <Info className="w-3.5 h-3.5 text-[#1f3864] dark:text-blue-300" />
               <span>Thông tin liên hệ (Không bắt buộc)</span>
             </div>
 
@@ -590,7 +589,7 @@ export const CitizenReportPage: React.FC = () => {
                   placeholder="Họ và tên của bạn"
                   value={reporterName}
                   onChange={(e) => setReporterName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#1f3864]/40 dark:focus:ring-blue-300/50 transition"
                 />
               </div>
 
@@ -603,7 +602,7 @@ export const CitizenReportPage: React.FC = () => {
                   placeholder="Số điện thoại liên hệ"
                   value={reporterPhone}
                   onChange={handlePhoneChange}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#1f3864]/40 dark:focus:ring-blue-300/50 transition"
                 />
               </div>
             </div>
@@ -624,7 +623,7 @@ export const CitizenReportPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm transition shadow-md hover:shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-4 rounded-xl bg-[#1f3864] hover:bg-[#162a4d] dark:bg-blue-600 dark:hover:bg-blue-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm transition shadow-xs active:scale-98 cursor-pointer flex items-center justify-center gap-2"
           >
             {isSubmitting || isPendingSubmit ? (
               <>
@@ -644,16 +643,11 @@ export const CitizenReportPage: React.FC = () => {
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                <span>Gửi Phản Ánh Ngay</span>
+                <span>Gửi phản ánh</span>
               </>
             )}
           </button>
         </form>
-
-        {/* Footer ghi nhận */}
-        <footer className="text-center text-[11px] text-slate-400 py-2">
-          Hệ thống Quản lý Chiếu sáng Thông minh LuxMap · Đồng hành cùng an toàn giao thông
-        </footer>
       </main>
 
       {/* Modal báo nộp thành công */}

@@ -5,6 +5,8 @@
 export interface PublicQrInfo {
     segment_name: string | null
     commune_name: string | null
+    external_ref: string | null
+    note: string | null
     can_report: boolean
     reason: string | null
 }
