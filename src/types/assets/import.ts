@@ -30,14 +30,21 @@ export interface WorkbookImportResult {
     failed?: number
     total_errors?: number
     truncated?: boolean
-    rows?: ImportRowError[]
+    rows?: WorkbookRowError[]
     total_warnings?: number
-    warnings?: ImportRowError[]
+    warnings?: WorkbookRowError[]
 }
 
 export interface WorkbookKindCounts {
     inserted?: number
     updated?: number
     unchanged?: number
+}
+
+export interface WorkbookRowError {
+    sheet?: string | null
+    row?: number
+    column?: string | null
+    message?: string | null
 }
 
