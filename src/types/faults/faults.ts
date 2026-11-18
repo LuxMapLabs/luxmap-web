@@ -47,6 +47,11 @@ export interface FaultItem {
     reported_by?: string | null
     review_note?: string | null
     allowed_actions: string[]
+    origin_node_id?: string | null
+    feeder_id?: string | null
+    cabinet_id?: string | null
+    iot_anomaly_code?: string | null
+    recovered_at?: string | null
 }
 
 export interface FaultItemPagedResult {
@@ -107,6 +112,11 @@ export interface ReportedFault {
     reported_by?: string | null
     review_note?: string | null
     allowed_actions: string[]
+    origin_node_id?: string | null
+    feeder_id?: string | null
+    cabinet_id?: string | null
+    iot_anomaly_code?: string | null
+    recovered_at?: string | null
     client_op_id: string | null
 }
 

@@ -3,15 +3,18 @@
  * Sinh tự động từ endpoint Backend
  */
 import type { RoadClass } from '../common/enums'
+import type { SegmentId } from './poles'
 import type { Geometry } from '../common/base'
 
+export type NodeId = string
+
 export interface SegmentProperties {
-    segment_id: string | null
+    segment_id: SegmentId
     segment_name: string | null
     road_class: RoadClass
     length_m: number
     pole_count: number
-    controller_node_ids: string[]
+    controller_node_ids: NodeId[]
     has_active_segment_fault: boolean
 }
 

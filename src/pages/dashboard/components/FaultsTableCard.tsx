@@ -4,6 +4,7 @@ import { OpsCard } from '../../../components/ops/OpsCard'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 import { OpsTabs } from '../../../components/ops/OpsTabs'
 import type { FaultItem } from '../../../types/faults/faults'
+import { iotAnomalyLabel } from '../../../constants/iot'
 
 export type ProgressFilterType =
   | 'all'
@@ -23,6 +24,8 @@ interface FaultsTableCardProps {
   blackoutCount: number
   dimCount: number
   offlineCount: number
+  includeCalibrationRig?: boolean
+  onToggleCalibrationRig?: (checked: boolean) => void
 }
 
 export function getFaultProgressInfo(fault: FaultItem): {
@@ -109,6 +112,8 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
   blackoutCount,
   dimCount,
   offlineCount,
+  includeCalibrationRig = false,
+  onToggleCalibrationRig,
 }) => {
   // State lọc theo Tiến độ xử lý
   const [progressFilter, setProgressFilter] = useState<ProgressFilterType>('all')
@@ -149,8 +154,20 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
       title="Sự cố bóng đèn"
       description="Tổng hợp từ xe quét AI, khảo sát, cảm biến IoT và người dân quét QR"
       actions={
-        <OpsSelect
-          value={progressFilter}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {onToggleCalibrationRig && (
+            <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeCalibrationRig}
+                onChange={(e) => onToggleCalibrationRig(e.target.checked)}
+                className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+              />
+              <span>Kèm dữ liệu bộ thử</span>
+            </label>
+          )}
+          <OpsSelect
+            value={progressFilter}
           onChange={(val) => setProgressFilter(val as ProgressFilterType)}
           headerLabel="Tiến độ xử lý sự cố"
           headerBadge={`${faults.length} sự cố`}
@@ -199,7 +216,8 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
               badge: progressCounts.verified,
             },
           ]}
-        />
+          />
+        </div>
       }
       flush
     >
@@ -211,7 +229,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
             { key: 'all', label: 'Tất cả', count: totalCount },
             { key: 'blackout', label: 'Mất sáng hoàn toàn', count: blackoutCount },
             { key: 'dim', label: 'Sáng yếu / Suy giảm', count: dimCount },
-            { key: 'offline', label: 'Mất kết nối IoT', count: offlineCount },
+            { key: 'offline', label: 'Sự cố IoT', count: offlineCount },
           ]}
         />
       </div>
@@ -231,8 +249,12 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                 displayedFaults.map((fault, idx) => {
                   const faultTypeStr = String(fault.fault_type || '').toLowerCase()
                   const isOffline = faultTypeStr.includes('offline') || faultTypeStr.includes('node')
+                  const isVoltageAnomaly = faultTypeStr === 'voltage_anomaly'
+                  const isIotHardware = faultTypeStr === 'iot_hardware_fault'
                   const isBlackout =
                     !isOffline &&
+                    !isVoltageAnomaly &&
+                    !isIotHardware &&
                     (faultTypeStr.includes('out') ||
                       faultTypeStr.includes('blackout') ||
                       faultTypeStr.includes('segment_outage'))
@@ -258,16 +280,25 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                   const rawNote = (fault.note || fault.review_note || '').trim()
                   const iotMatch = rawNote.match(/Thiết bị\s+(NODE-[\w-]+)\s+ở tủ\s+(CAB-[\w-]+)/i)
 
-                  const primaryCode = fault.pole_id || (iotMatch ? iotMatch[1] : fault.fault_id || '-')
+                  const primaryCode =
+                    fault.pole_id ||
+                    fault.origin_node_id ||
+                    (iotMatch ? iotMatch[1] : fault.fault_id || '-')
 
                   const segmentName =
                     segmentNameMap[fault.segment_id || ''] ||
                     fault.segment_id ||
-                    (iotMatch ? iotMatch[2] : '-')
+                    (fault.feeder_id || fault.cabinet_id
+                      ? [fault.feeder_id, fault.cabinet_id].filter(Boolean).join(' · ')
+                      : iotMatch
+                      ? iotMatch[2]
+                      : '-')
 
                   const progress = getFaultProgressInfo(fault)
                   const isUnassigned = progress.key === 'unassigned'
-                  const canSchedulePole = Boolean(fault.pole_id || fault.segment_id) && !isOffline
+                  const canSchedulePole = Boolean(
+                    fault.pole_id || fault.segment_id || fault.origin_node_id || fault.feeder_id
+                  )
 
                   return (
                     <tr
@@ -304,27 +335,48 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                         </div>
                       </td>
                       <td className="py-3 px-3">
-                        {isOffline ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60">
-                            Mất kết nối IoT
-                          </span>
-                        ) : isBlackout ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200/60">
-                            Mất sáng hoàn toàn
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
-                            Sáng yếu / Suy giảm
-                          </span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1">
+                          {isOffline ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60">
+                              Mất kết nối IoT
+                            </span>
+                          ) : isVoltageAnomaly ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200/60">
+                              Bất thường điện áp
+                            </span>
+                          ) : isIotHardware ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60">
+                              Lỗi phần cứng IoT
+                            </span>
+                          ) : isBlackout ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200/60">
+                              Mất sáng hoàn toàn
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
+                              Sáng yếu / Suy giảm
+                            </span>
+                          )}
+                          {fault.recovered_at && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                              Đã tự phục hồi
+                            </span>
+                          )}
+                        </div>
                         <div
                           className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[200px]"
-                          title={fault.note || ''}
+                          title={
+                            fault.iot_anomaly_code
+                              ? iotAnomalyLabel(fault.iot_anomaly_code)
+                              : fault.note || ''
+                          }
                         >
-                          {fault.note ||
-                            (isOffline
-                              ? 'Bộ điều khiển ngắt kết nối với máy chủ'
-                              : 'Cần kiểm tra điện áp & bóng')}
+                          {fault.iot_anomaly_code
+                            ? iotAnomalyLabel(fault.iot_anomaly_code)
+                            : fault.note ||
+                              (isOffline
+                                ? 'Bộ điều khiển ngắt kết nối với máy chủ'
+                                : 'Cần kiểm tra điện áp & bóng')}
                         </div>
                       </td>
                       <td className="py-3 px-3">

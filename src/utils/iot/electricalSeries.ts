@@ -1,4 +1,4 @@
-import type { IotFeederArchivedSample } from '../../types/iot/feeders'
+import type { IotFeederAverage } from '../../types/iot/feeders'
 
 export type ElectricalMetric = 'power' | 'current' | 'voltage'
 
@@ -34,24 +34,24 @@ export interface ElectricalPoint {
 
 const finite = (v?: number | null) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
-export function toElectricalPoint(sample: IotFeederArchivedSample): ElectricalPoint | null {
-  const time = sample.reading?.received_at ? Date.parse(sample.reading.received_at) : NaN
-  if (typeof sample.cursor !== 'number' || !Number.isFinite(time)) return null
-  const d = sample.reading?.data
+export function toElectricalPoint(sample: IotFeederAverage): ElectricalPoint | null {
+  const ts = sample.period_start || sample.period_end
+  const time = ts ? Date.parse(ts) : NaN
+  if (!Number.isFinite(time)) return null
   return {
-    key: `${sample.server_id ?? ''}:${sample.cursor}`,
-    cursor: sample.cursor,
+    key: ts || String(time),
+    cursor: time,
     time,
-    current: finite(d?.current),
-    voltage: finite(d?.voltage),
-    power: finite(d?.power),
-    lamp: d?.lamp_command ?? null,
-    node: sample.node_id ?? null,
+    current: finite(sample.current_ma_avg),
+    voltage: finite(sample.voltage_avg),
+    power: finite(sample.power_mw_avg),
+    lamp: null,
+    node: null,
   }
 }
 
 /** Gộp mẫu mới vào chuỗi theo key (không trùng), sắp theo thời gian nhận, giữ `maxPoints` điểm mới nhất. */
-export function mergeElectricalPoints(prev: ElectricalPoint[], samples: IotFeederArchivedSample[], maxPoints: number): ElectricalPoint[] {
+export function mergeElectricalPoints(prev: ElectricalPoint[], samples: IotFeederAverage[], maxPoints: number): ElectricalPoint[] {
   const byKey = new Map(prev.map((p) => [p.key, p]))
   for (const s of samples) {
     const p = toElectricalPoint(s)

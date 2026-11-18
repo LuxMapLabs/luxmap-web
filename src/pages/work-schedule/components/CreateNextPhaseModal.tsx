@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X, Wrench, Search, Calendar, User, FileText } from 'lucide-react'
+import { X, Wrench, Search, Calendar, User, FileText, MapPin } from 'lucide-react'
 import type { TaskKind } from '../../../types/common/enums'
 import type { WorkOrderAssignee } from '../../../types/workorders/orders'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
@@ -9,6 +9,7 @@ import { LateNightScheduleWarning } from './LateNightScheduleWarning'
 interface CreateNextPhaseModalProps {
   isOpen: boolean
   caseCode: string
+  caseTitle?: string
   segment?: string
   defaultPoleIds?: string[]
   targetNextPhaseType: 'inspection' | 'repair'
@@ -35,6 +36,7 @@ const getTodayStr = () => {
 export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   isOpen,
   caseCode,
+  caseTitle = '',
   segment = '',
   defaultPoleIds = [],
   targetNextPhaseType,
@@ -123,6 +125,24 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
         {/* Form Body với thân cuộn mượt mà và footer cố định */}
         <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+            {/* Đối tượng thực hiện: Tủ/Node IoT hoặc Tuyến đường + Cột */}
+            {!segment?.trim() && selectedPoleIds.length === 0 ? (
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-1.5 text-xs">
+                <div className="font-bold text-indigo-900 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>
+                    Vị trí Tủ điện & Thiết bị IoT cần {isRepair ? 'Sửa chữa' : 'Kiểm tra'}
+                  </span>
+                </div>
+                {caseTitle && (
+                  <p className="font-semibold text-slate-800">{caseTitle}</p>
+                )}
+                <p className="text-[11px] text-slate-500">
+                  Hệ thống tự động kế thừa toàn bộ sự cố đã xác nhận và tọa độ GPS của Tủ điện từ giai đoạn trước.
+                </p>
+              </div>
+            ) : (
+              <>
             {/* Tuyến đường của sự vụ */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-700">Tuyến đường:</label>
@@ -182,6 +202,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
                   ))}
                 </div>
               </div>
+            )}
+              </>
             )}
 
             {/* Chọn Kỹ sư */}

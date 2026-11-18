@@ -10,7 +10,7 @@ vi.mock('../../feature/assets/assetAPI', () => ({
   },
 }))
 
-const accepted = { command_id: 'cmd-1', mode: 'MANUAL', command: 'ON', command_acknowledged: false }
+const accepted = { command_id: 'cmd-1', mode: 'MANUAL' as const, command: 'ON' as const, command_acknowledged: false }
 const get = vi.mocked(assetAPI.getIotNodeCommand)
 const post = vi.mocked(assetAPI.sendIotNodeCommand)
 

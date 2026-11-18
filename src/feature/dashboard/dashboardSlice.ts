@@ -3,6 +3,9 @@ import type { SegmentListItem } from '../../types/assets/segments'
 import type { WarrantyList } from '../../types/statistics/warranty'
 import type { FaultItem } from '../../types/faults/faults'
 import type { FixtureStatusRow } from '../../types/statistics/fixture-status'
+import type { IotDiagnosticSummaryItem } from '../../types/iot/diagnostics'
+import type { IotServerStatus } from '../../types/iot/servers'
+import type { IotFeederAverage } from '../../types/iot/feeders'
 
 export interface DashboardState {
   loading: boolean
@@ -12,6 +15,18 @@ export interface DashboardState {
   faultsList: FaultItem[]
   /** statistics/fixture-status (group_by=segment): số cột theo trạng thái, tính ở backend */
   fixtureStatusRows: FixtureStatusRow[]
+  /** Tổng hợp chẩn đoán IoT từ GET /iot/diagnostics/summary */
+  iotSummary: IotDiagnosticSummaryItem[]
+  /** Trạng thái gateway IoT từ GET /iot/servers */
+  iotServers: IotServerStatus[]
+  /** Ánh xạ segment_id -> danh sách feeder_id thuộc tuyến */
+  segmentFeederMap: Record<string, string[]>
+  /** Kèm dữ liệu bộ thử (calibration_rig) trong danh sách sự cố */
+  includeCalibrationRig: boolean
+  /** Lịch sử điện 30s của mạch đang chọn trên biểu đồ IoT */
+  selectedFeederHistory: IotFeederAverage[]
+  selectedFeederHistoryLoading: boolean
+  iotLastUpdated: string | null
   lastUpdated: string | null
 }
 
@@ -29,6 +44,13 @@ const initialState: DashboardState = {
   },
   faultsList: [],
   fixtureStatusRows: [],
+  iotSummary: [],
+  iotServers: [],
+  segmentFeederMap: {},
+  includeCalibrationRig: false,
+  selectedFeederHistory: [],
+  selectedFeederHistoryLoading: false,
+  iotLastUpdated: null,
   lastUpdated: null,
 }
 
@@ -37,6 +59,14 @@ export interface FetchDashboardSuccessPayload {
   warranty: WarrantyList
   faults: FaultItem[]
   fixtureStatusRows: FixtureStatusRow[]
+  iotSummary: IotDiagnosticSummaryItem[]
+  iotServers: IotServerStatus[]
+  segmentFeederMap: Record<string, string[]>
+}
+
+export interface FetchDashboardIotSuccessPayload {
+  iotSummary: IotDiagnosticSummaryItem[]
+  iotServers: IotServerStatus[]
 }
 
 const dashboardSlice = createSlice({
@@ -56,12 +86,41 @@ const dashboardSlice = createSlice({
       state.warrantyList = action.payload.warranty
       state.faultsList = action.payload.faults
       state.fixtureStatusRows = action.payload.fixtureStatusRows
-      state.lastUpdated = new Date().toISOString()
+      state.iotSummary = action.payload.iotSummary
+      state.iotServers = action.payload.iotServers
+      state.segmentFeederMap = action.payload.segmentFeederMap
+      const nowIso = new Date().toISOString()
+      state.iotLastUpdated = nowIso
+      state.lastUpdated = nowIso
       state.error = null
     },
     fetchDashboardDataFailure: (state, action: PayloadAction<string>) => {
       state.loading = false
       state.error = action.payload
+    },
+    fetchDashboardIotRequest: () => {
+      // Saga làm mới nhẹ dữ liệu IoT mỗi 30s
+    },
+    fetchDashboardIotSuccess: (
+      state,
+      action: PayloadAction<FetchDashboardIotSuccessPayload>
+    ) => {
+      state.iotSummary = action.payload.iotSummary
+      state.iotServers = action.payload.iotServers
+      state.iotLastUpdated = new Date().toISOString()
+    },
+    setIncludeCalibrationRig: (state, action: PayloadAction<boolean>) => {
+      state.includeCalibrationRig = action.payload
+    },
+    updateFaultsListSuccess: (state, action: PayloadAction<FaultItem[]>) => {
+      state.faultsList = action.payload
+    },
+    fetchFeederHistoryRequest: (state, _action: PayloadAction<string>) => {
+      state.selectedFeederHistoryLoading = true
+    },
+    fetchFeederHistorySuccess: (state, action: PayloadAction<IotFeederAverage[]>) => {
+      state.selectedFeederHistory = action.payload
+      state.selectedFeederHistoryLoading = false
     },
     resetDashboardState: () => initialState,
   },
@@ -71,6 +130,12 @@ export const {
   fetchDashboardDataRequest,
   fetchDashboardDataSuccess,
   fetchDashboardDataFailure,
+  fetchDashboardIotRequest,
+  fetchDashboardIotSuccess,
+  setIncludeCalibrationRig,
+  updateFaultsListSuccess,
+  fetchFeederHistoryRequest,
+  fetchFeederHistorySuccess,
   resetDashboardState,
 } = dashboardSlice.actions
 

@@ -1,12 +1,12 @@
 import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
-import { Cpu, Zap, Clock, Cable, Eye } from 'lucide-react'
-import type { IotNodeStatus } from '../../../../../types/iot/nodes'
+import { Cpu, Zap, Clock, Cable, Eye, AlertTriangle } from 'lucide-react'
+import type { IotDiagnosticResult, IotNodeStatus } from '../../../../../types/iot/nodes'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 import { IotNodeTableSkeleton } from './IotNodeTableSkeleton'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
-import { IOT_NODE_STATUS, IOT_TONE_CLASS, iotStatusBadge } from '../../../../../constants/iot'
+import { IOT_NODE_STATUS, IOT_TONE_CLASS, iotAnomalyLabel, iotStatusBadge } from '../../../../../constants/iot'
 import { feederOnRelayOne } from '../../../../../utils/iot/iotRegistration'
 
 export interface IotNodeTableProps {
@@ -14,6 +14,7 @@ export interface IotNodeTableProps {
   iotNodes: IotNodeStatus[]
   cabinets: CabinetListItem[]
   feeders: FeederListItem[]
+  diagnosticsByNode?: Record<string, IotDiagnosticResult>
   isLoading?: boolean
   /** Mở chi tiết chỉ đọc (mẫu điện, chẩn đoán, lịch sử). */
   onShowDetail: (node: IotNodeStatus) => void
@@ -26,7 +27,14 @@ const formatDateTime = (dateStr?: string | null) => {
   return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export const IotNodeTable: React.FC<IotNodeTableProps> = ({ iotNodes, cabinets, feeders, isLoading = false, onShowDetail }) => {
+export const IotNodeTable: React.FC<IotNodeTableProps> = ({
+  iotNodes,
+  cabinets,
+  feeders,
+  diagnosticsByNode,
+  isLoading = false,
+  onShowDetail,
+}) => {
   const showCommune = useShowCommune()
   const cabinetOf = (cabinetId?: string | null) => cabinets.find((c) => c.cabinet_id === cabinetId)
 
@@ -70,6 +78,8 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({ iotNodes, cabinets, 
                 const feederId = feederOnRelayOne(feeders, node.node_id)?.feeder_id
                 const badge = iotStatusBadge(IOT_NODE_STATUS, node.status)
                 const receivedAt = formatDateTime(node.last_received_at)
+                const diag = node.node_id ? diagnosticsByNode?.[node.node_id] : undefined
+                const anomalies = diag?.anomalies || []
 
                 return (
                   <tr key={nodeId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
@@ -124,9 +134,20 @@ export const IotNodeTable: React.FC<IotNodeTableProps> = ({ iotNodes, cabinets, 
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[badge.tone]}`}>
-                        {badge.label}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[badge.tone]}`}>
+                          {badge.label}
+                        </span>
+                        {anomalies.length > 0 && (
+                          <span
+                            title={anomalies.map((a) => iotAnomalyLabel(a.code)).join(' • ')}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                          >
+                            <AlertTriangle className="w-3 h-3" />
+                            {anomalies.length} cảnh báo
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">

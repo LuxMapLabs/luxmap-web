@@ -79,7 +79,7 @@ function openApiTypeToTs(prop) {
     }
 
     if (prop.enum) {
-        return prop.enum.map(v => typeof v === 'string' ? `'${v}'` : v).join(' | ')
+        return prop.enum.map(v => v === null ? 'null' : (typeof v === 'string' ? `'${v}'` : v)).join(' | ')
     }
 
     if (prop.type === 'array') {
@@ -115,7 +115,7 @@ function openApiTypeToTs(prop) {
 
 function generateInterface(name, schema) {
     if (schema.enum) {
-        const enumValues = schema.enum.map(v => typeof v === 'string' ? `'${v}'` : v).join(' | ')
+        const enumValues = schema.enum.map(v => v === null ? 'null' : (typeof v === 'string' ? `'${v}'` : v)).join(' | ')
         return `export type ${name} = ${enumValues}\n`
     }
 

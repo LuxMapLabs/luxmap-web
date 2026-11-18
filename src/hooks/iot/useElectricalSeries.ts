@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import iotAPI from '../../feature/iot/iotAPI'
-import type { IotFeederArchivedSample } from '../../types/iot/feeders'
+import type { IotFeederAverage } from '../../types/iot/feeders'
 import { apiErrorMessage } from '../../utils/iot/apiError'
 import { mergeElectricalPoints, toElectricalPoint, type ElectricalPoint } from '../../utils/iot/electricalSeries'
 
@@ -28,7 +28,7 @@ interface Options {
   live?: boolean
 }
 
-const sampleTime = (s: IotFeederArchivedSample) => toElectricalPoint(s)?.time ?? null
+const sampleTime = (s: IotFeederAverage) => toElectricalPoint(s)?.time ?? null
 
 /**
  * Chuỗi mẫu điện của một mạch điện: tải mẫu mới nhất theo mạch (một trang, hoặc đủ `windowMs`).
@@ -50,7 +50,7 @@ export function useElectricalSeries(
   const [error, setError] = useState<string | null>(null)
 
   const absorb = useCallback(
-    (samples: IotFeederArchivedSample[]) => {
+    (samples: IotFeederAverage[]) => {
       // Không có mẫu mới thì không đổi state: biểu đồ không vẽ lại
       if (samples.length === 0) return
       setPoints((prev) => {

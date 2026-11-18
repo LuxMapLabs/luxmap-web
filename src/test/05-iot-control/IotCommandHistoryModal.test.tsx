@@ -7,7 +7,13 @@ vi.mock('../../feature/iot/iotAPI', () => ({ default: { getCommandHistory: vi.fn
 
 const api = vi.mocked(iotAPI)
 
-const item = (id: string, mode: string, command: string | null, status: 'success' | 'pending' | 'expired', extra = {}) => ({
+const item = (
+  id: string,
+  mode: 'AUTO' | 'MANUAL',
+  command: 'ON' | 'OFF' | null,
+  status: 'success' | 'pending' | 'expired',
+  extra = {}
+) => ({
   command_id: id,
   node_id: 'NODE-004',
   feeder_id: 'FDR-010',

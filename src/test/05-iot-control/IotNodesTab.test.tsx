@@ -41,7 +41,7 @@ describe('IotNodesTab (GET /iot/nodes)', () => {
     {
       node_id: 'IOT-NODE-001',
       server_id: 'iot-server-01',
-      status: 'online',
+      status: 'online' as const,
       last_received_at: '2026-11-13T02:00:00Z',
       cabinet_id: 'CAB-001',
       commune_id: 'COM-001',
@@ -49,7 +49,7 @@ describe('IotNodesTab (GET /iot/nodes)', () => {
     {
       node_id: 'IOT-NODE-002',
       server_id: null,
-      status: 'unconfigured',
+      status: 'unconfigured' as const,
       last_received_at: null,
       cabinet_id: 'CAB-002',
       commune_id: 'COM-002',
@@ -60,7 +60,7 @@ describe('IotNodesTab (GET /iot/nodes)', () => {
     vi.clearAllMocks()
     api.getNodes.mockResolvedValue({ page: 1, page_size: 200, total: 2, items: nodes })
     api.getServers.mockResolvedValue([])
-    api.getElectrical.mockResolvedValue({ node_id: 'IOT-NODE-001', status: 'online' })
+    api.getElectrical.mockResolvedValue({ node_id: 'IOT-NODE-001', status: 'online' as const })
     api.getDiagnostics.mockResolvedValue({ node_id: 'IOT-NODE-001', anomalies: [] })
   })
 

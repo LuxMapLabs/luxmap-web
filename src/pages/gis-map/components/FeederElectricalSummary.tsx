@@ -1,8 +1,11 @@
-import React from 'react'
-import { LineChart as LineChartIcon, Radio } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { AlertTriangle, LineChart as LineChartIcon, Radio } from 'lucide-react'
 import { Line, LineChart, ResponsiveContainer, YAxis } from 'recharts'
 import { useElectricalSeries } from '../../../hooks/iot/useElectricalSeries'
 import { formatMetric } from '../../../utils/iot/electricalSeries'
+import iotAPI from '../../../feature/iot/iotAPI'
+import type { IotDiagnosticResult } from '../../../types/iot/nodes'
+import { iotAnomalyLabel } from '../../../constants/iot'
 
 /** Số mẫu gần nhất vẽ sparkline trong khung tủ. */
 export const SPARKLINE_SAMPLES = 30
@@ -21,6 +24,28 @@ export const FeederElectricalSummary: React.FC<{
     maxPoints: SPARKLINE_SAMPLES,
     live: Boolean(nodeId),
   })
+  const [diagnostics, setDiagnostics] = useState<IotDiagnosticResult | null>(null)
+
+  useEffect(() => {
+    if (!nodeId || typeof iotAPI.getDiagnostics !== 'function') {
+      setDiagnostics(null)
+      return
+    }
+    let cancelled = false
+    iotAPI
+      .getDiagnostics(nodeId)
+      .then((res) => {
+        if (!cancelled) setDiagnostics(res)
+      })
+      .catch(() => {
+        if (!cancelled) setDiagnostics(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [nodeId])
+
+  const anomalies = diagnostics?.anomalies || []
 
   if (!nodeId && !latest) {
     if (loading) {
@@ -33,7 +58,8 @@ export const FeederElectricalSummary: React.FC<{
   }
 
   return (
-    <div className="mt-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 flex items-center gap-2" data-testid="feeder-electrical-summary">
+    <div className="mt-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1.5" data-testid="feeder-electrical-summary">
+      <div className="flex items-center gap-2">
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
           <Radio className="w-3 h-3 text-indigo-500 shrink-0" />
@@ -77,6 +103,22 @@ export const FeederElectricalSummary: React.FC<{
         >
           <LineChartIcon className="w-3 h-3" /> Biểu đồ
         </button>
+      )}
+      </div>
+      {anomalies.length > 0 && (
+        <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-[10.5px] text-rose-800 dark:text-rose-200 space-y-0.5">
+          <div className="font-bold flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3 shrink-0" />
+            <span>Cảnh báo chẩn đoán ({anomalies.length})</span>
+          </div>
+          <ul className="list-disc list-inside space-y-0.5">
+            {anomalies.map((a, idx) => (
+              <li key={`${a.code}-${idx}`} className="truncate" title={iotAnomalyLabel(a.code)}>
+                {iotAnomalyLabel(a.code)}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )

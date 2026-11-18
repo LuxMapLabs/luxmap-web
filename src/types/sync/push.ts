@@ -14,7 +14,7 @@ export interface SyncConflict {
     op_type?: string | null
     reason?: string | null
     message?: string | null
-    server_state?: any
+    server_state?: Record<string, any>
 }
 
 export interface SyncError {
