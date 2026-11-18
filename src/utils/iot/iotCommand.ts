@@ -1,4 +1,4 @@
-import type { IotAutoSchedule, IotCommandHistoryItem, IotCommandStatus } from '../../types/iot/nodes'
+import type { IotAutoSchedule, IotCommandHistoryItem, IotCommandRequest, IotCommandStatus } from '../../types/iot/nodes'
 
 /** Lịch AUTO mặc định khi node chưa có lịch nào. */
 export const DEFAULT_AUTO_SCHEDULE = { day_start: '06:00', night_start: '18:00' }
@@ -6,7 +6,7 @@ export const DEFAULT_AUTO_SCHEDULE = { day_start: '06:00', night_start: '18:00' 
 /** Nút người dùng bấm, ánh xạ sang body của POST /iot/nodes/{id}/command. */
 export type IotCommandChoice = 'on' | 'off' | 'auto'
 
-export function commandBody(choice: IotCommandChoice) {
+export function commandBody(choice: IotCommandChoice): IotCommandRequest {
   return choice === 'auto'
     ? { mode: 'AUTO', command: null }
     : { mode: 'MANUAL', command: choice === 'on' ? 'ON' : 'OFF' }

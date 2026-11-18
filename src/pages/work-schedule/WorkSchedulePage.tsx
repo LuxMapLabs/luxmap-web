@@ -739,7 +739,7 @@ export const WorkSchedulePage: React.FC = () => {
       <CreateNextPhaseModal
         isOpen={isNextPhaseModalOpen}
         caseCode={nextPhaseContext?.caseCode || selectedCaseCode || ''}
-        caseTitle={selectedCase?.title || selectedCase?.phases?.[viewingPhaseIndex]?.title || ''}
+        caseTitle={selectedCase?.title || ''}
         segment={formatSegmentDisplay(nextPhaseContext?.segment || selectedCase?.segment)}
         defaultPoleIds={
           nextPhaseContext?.poleIds && nextPhaseContext.poleIds.length > 0

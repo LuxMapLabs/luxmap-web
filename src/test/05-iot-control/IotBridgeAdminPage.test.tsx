@@ -33,10 +33,10 @@ const assets = vi.mocked(assetAPI)
 const communes = vi.mocked(communeAPI)
 
 const servers = [
-  { server_id: 'iot-server-01', status: 'online', commune_id: 'COM-001', location: { lat: 10.78, lng: 106.7 } },
-  { server_id: 'iot-server-09', status: 'offline', commune_id: 'COM-009', location: undefined },
+  { server_id: 'iot-server-01', status: 'online' as const, commune_id: 'COM-001', location: { lat: 10.78, lng: 106.7 } },
+  { server_id: 'iot-server-09', status: 'offline' as const, commune_id: 'COM-009', location: undefined },
 ]
-const nodes = [{ node_id: 'NODE-001', server_id: 'iot-server-01', status: 'online', cabinet_id: 'CAB-001', commune_id: 'COM-001' }]
+const nodes = [{ node_id: 'NODE-001', server_id: 'iot-server-01', status: 'online' as const, cabinet_id: 'CAB-001', commune_id: 'COM-001' }]
 
 const renderPage = (role: string) =>
   render(
@@ -208,14 +208,14 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
     api.getElectrical.mockResolvedValue({
       node_id: 'NODE-001',
       server_id: 'iot-server-01',
-      status: 'online',
-      power_state: 'off',
+      status: 'online' as const,
+      power_state: 'off' as const,
       measurement: { received_at: '2026-11-16T01:00:00Z', lamp_command: 'OFF', voltage: 5, current_ma: 0.5, power_mw: 2.5 },
     })
     api.getDiagnostics.mockResolvedValue({
       node_id: 'NODE-001',
-      status: 'anomaly',
-      anomalies: [{ code: 'current_when_off', observed: 12, limit: 5 }],
+      status: 'anomaly' as const,
+      anomalies: [{ code: 'voltage_loss' as const, observed: 12, reference: 220, deviation_percent: 94.5, limit: 200 }],
     })
   })
 
@@ -223,7 +223,7 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
     render(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />)
 
     expect(await screen.findByText('Mạch đã ngắt tải')).toBeInTheDocument()
-    expect(await screen.findByText('Còn dòng khi lệnh OFF (mA)')).toBeInTheDocument()
+    expect(await screen.findByText('Mất điện áp khi đèn bật (V)')).toBeInTheDocument()
     expect(screen.queryByText('Lịch sử điện')).not.toBeInTheDocument()
     expect(screen.queryByText('Lịch sử lệnh')).not.toBeInTheDocument()
     expect(api.getFeederElectricalHistory).not.toHaveBeenCalled()

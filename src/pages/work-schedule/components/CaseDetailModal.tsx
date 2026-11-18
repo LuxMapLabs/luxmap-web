@@ -1006,7 +1006,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                           <Zap className="w-3.5 h-3.5 text-indigo-600" />
                           Vị trí Tủ điện &amp; Thiết bị IoT cần tác nghiệp
                         </span>
-                        {firstLoc && (
+                        {firstLoc && firstLoc.lat != null && firstLoc.lng != null && (
                           <span className="font-mono text-[10.5px] font-semibold text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
                             {firstLoc.lat.toFixed(5)}, {firstLoc.lng.toFixed(5)}
                           </span>
@@ -1268,12 +1268,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                     <div className="flex items-center gap-2">
                                       <span className="font-mono font-bold text-slate-900">{f.fault_id}</span>
                                       <span className="text-[11px] font-semibold text-slate-600">
-                                        {FAULT_TYPE_LABELS_VN[f.fault_type] || f.fault_type}
+                                        {(f.fault_type && FAULT_TYPE_LABELS_VN[f.fault_type]) || f.fault_type || '-'}
                                       </span>
                                     </div>
-                                    <div className="text-[10.5px] font-mono text-slate-400 mt-0.5">
-                                      GPS tủ: {f.location.lat.toFixed(6)}, {f.location.lng.toFixed(6)}
-                                    </div>
+                                    {f.location?.lat != null && f.location?.lng != null && (
+                                      <div className="text-[10.5px] font-mono text-slate-400 mt-0.5">
+                                        GPS tủ: {f.location.lat.toFixed(6)}, {f.location.lng.toFixed(6)}
+                                      </div>
+                                    )}
                                   </div>
                                   <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${outcomeBadge.cls}`}>
                                     {outcomeBadge.label}
