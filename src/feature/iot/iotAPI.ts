@@ -86,12 +86,27 @@ export const iotAPI = {
     )
   },
 
-  /** POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential — password chỉ trả MỘT lần; cấp lại → 409. */
+  /** POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential — cấp key lần đầu; gateway đã có key → 409; muốn xem lại dùng GET. */
   issueGatewayCredential: async (serverId: string, gatewayId: string): Promise<IotGatewayCredential> => {
     const response = await apiClient.post<IotGatewayCredential>(
       `/iot/servers/${encodeURIComponent(serverId)}/gateways/${encodeURIComponent(gatewayId)}/credential`
     )
     return response.data
+  },
+
+  /** GET /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential — xem lại key. 404: chưa có key hoặc đã thu hồi; 409: key cũ chỉ có hash, cần thu hồi rồi cấp mới. */
+  getGatewayCredential: async (serverId: string, gatewayId: string): Promise<IotGatewayCredential> => {
+    const response = await apiClient.get<IotGatewayCredential>(
+      `/iot/servers/${encodeURIComponent(serverId)}/gateways/${encodeURIComponent(gatewayId)}/credential`
+    )
+    return response.data
+  },
+
+  /** DELETE /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential — 204: thu hồi key, gateway đang kết nối bị ngắt. */
+  revokeGatewayCredential: async (serverId: string, gatewayId: string): Promise<void> => {
+    await apiClient.delete(
+      `/iot/servers/${encodeURIComponent(serverId)}/gateways/${encodeURIComponent(gatewayId)}/credential`
+    )
   },
 
   // ---- Dữ liệu điện và chẩn đoán (mục 5) ----
@@ -139,11 +154,11 @@ export const iotAPI = {
   // ---- Admin (ManageSettings): đăng ký node ----
 
   /**
-   * POST /api/v1/iot/nodes/register — tạo node ở tủ, gán mạch vào rơ-le #1, lưu nguồn đo và tuyến MQTT trong một lần.
+   * POST /api/v1/iot/nodes — tạo node ở tủ, gán mạch vào rơ-le #1, lưu nguồn đo và tuyến MQTT trong một lần.
    * 201 khi tạo mới, 200 khi gửi lại đúng hồ sơ; hồ sơ khác cho cùng mạch / thiết bị → 409.
    */
   registerNode: async (body: RegisterNodeRequest): Promise<RegisteredNode> => {
-    const response = await apiClient.post<RegisteredNode>('/iot/nodes/register', body)
+    const response = await apiClient.post<RegisteredNode>('/iot/nodes', body)
     return response.data
   },
 }
