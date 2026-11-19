@@ -126,13 +126,6 @@ export const ASSET_SHEETS: Record<string, AssetColumnDef[]> = {
       example: 'verified',
       rule: 'Chọn trong danh sách, xem sheet Danh mục.',
     },
-    {
-      key: 'geom_wkt',
-      label: 'Lộ trình mạch',
-      required: false,
-      example: 'LINESTRING(106.70 10.77, 106.71 10.78)',
-      rule: 'Để trống thì giữ lộ trình đã có.',
-    },
   ],
   'Cột điện': [
     {
@@ -617,11 +610,6 @@ export async function styleAssetWorkbook(
         exportWs.getRow(1).eachCell((cell, colNumber) => {
           if (cell.value != null) {
             const key = String(cell.value).trim();
-            if (!targetKeyToCol.has(key)) {
-              throw new Error(
-                `Sheet "${exportWs.name}" trong tệp xuất có cột lạ: "${key}"`,
-              );
-            }
             exportColToKey.set(colNumber, key);
           }
         });

@@ -2,15 +2,24 @@
  * Tiện ích xử lý và chuẩn hóa hình ảnh (Client-side Image Processing)
  */
 
+/** Kích thước thu nhỏ giữ tỉ lệ sao cho cạnh dài không vượt `maxEdge`; không bao giờ phóng to. */
+export const fitWithin = (width: number, height: number, maxEdge?: number): { width: number; height: number } => {
+  const longest = Math.max(width, height)
+  if (!maxEdge || longest <= maxEdge) return { width, height }
+  const scale = maxEdge / longest
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
+}
+
 /**
  * Chuyển đổi tệp ảnh sang định dạng JPEG chuẩn qua HTML5 Canvas
  * Đảm bảo 100% tệp xuất ra luôn có magic bytes JPEG (FF D8 FF) theo yêu cầu nghiêm ngặt của Backend C#
  *
  * @param file Tệp ảnh gốc (JPG, PNG, WEBP, HEIC, ...)
  * @param quality Mức chất lượng nén JPEG (mặc định 0.85)
+ * @param maxEdge Cạnh dài tối đa (px); ảnh lớn hơn được thu nhỏ giữ tỉ lệ. Bỏ trống = giữ nguyên kích thước
  * @returns Promise<File> Tệp File mới định dạng image/jpeg với đuôi mở rộng .jpg
  */
-export const convertToJpeg = (file: File, quality = 0.85): Promise<File> => {
+export const convertToJpeg = (file: File, quality = 0.85, maxEdge?: number): Promise<File> => {
   return new Promise((resolve, reject) => {
     const img = new Image()
     const objectUrl = URL.createObjectURL(file)
@@ -18,8 +27,9 @@ export const convertToJpeg = (file: File, quality = 0.85): Promise<File> => {
     img.onload = () => {
       URL.revokeObjectURL(objectUrl)
       const canvas = document.createElement('canvas')
-      canvas.width = img.naturalWidth || img.width
-      canvas.height = img.naturalHeight || img.height
+      const size = fitWithin(img.naturalWidth || img.width, img.naturalHeight || img.height, maxEdge)
+      canvas.width = size.width
+      canvas.height = size.height
 
       const ctx = canvas.getContext('2d')
       if (!ctx) {
@@ -31,7 +41,7 @@ export const convertToJpeg = (file: File, quality = 0.85): Promise<File> => {
       // Tô nền trắng nhằm tránh biến nền trong suốt của PNG thành màu đen khi đổi sang JPEG
       ctx.fillStyle = '#FFFFFF'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(img, 0, 0)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
       canvas.toBlob(
         (blob) => {
