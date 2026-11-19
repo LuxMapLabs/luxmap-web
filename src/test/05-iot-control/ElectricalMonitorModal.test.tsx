@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { renderWithSagaStore } from '../utils/sagaStore'
+import iotMonitorReducer from '../../feature/iot/iotMonitorSlice'
+import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 import {
   ElectricalMonitorModal,
   HISTORY_PAGE_SAMPLES,
@@ -49,8 +52,14 @@ const target: ElectricalMonitorTarget = {
   activeFeederId: 'FDR-009',
 }
 
+const renderWithMonitor = (ui: React.ReactElement) =>
+  renderWithSagaStore(ui, {
+    reducers: { iotMonitor: iotMonitorReducer },
+    sagas: [iotMonitorSaga],
+  })
+
 const renderModal = (t: ElectricalMonitorTarget = target, onSelectFeeder = vi.fn(), onClose = vi.fn()) =>
-  render(<ElectricalMonitorModal target={t} onSelectFeeder={onSelectFeeder} onClose={onClose} />)
+  renderWithMonitor(<ElectricalMonitorModal target={t} onSelectFeeder={onSelectFeeder} onClose={onClose} />)
 
 describe('ElectricalMonitorModal (popup giám sát điện tủ GIS)', () => {
   beforeEach(() => {
@@ -399,7 +408,7 @@ describe('FeederElectricalSummary (dòng số đo trong mạch của khung tủ)
 
   it('shows the latest power, current and voltage of the feeder node, and opens the chart', async () => {
     const open = vi.fn()
-    render(<FeederElectricalSummary feederId="FDR-009" nodeId="NODE-001" onOpenChart={open} />)
+    renderWithMonitor(<FeederElectricalSummary feederId="FDR-009" nodeId="NODE-001" onOpenChart={open} />)
     await waitFor(() =>
       expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-009', { page: 1, page_size: SPARKLINE_SAMPLES })
     )
@@ -411,7 +420,7 @@ describe('FeederElectricalSummary (dòng số đo trong mạch của khung tủ)
 
   it('a feeder without an IoT node and no samples shows unattached message', async () => {
     api.getFeederElectricalHistory.mockResolvedValueOnce({ page: 1, page_size: 30, total: 0, items: [] })
-    render(<FeederElectricalSummary feederId="FDR-011" nodeId={null} onOpenChart={vi.fn()} />)
+    renderWithMonitor(<FeederElectricalSummary feederId="FDR-011" nodeId={null} onOpenChart={vi.fn()} />)
     await waitFor(() =>
       expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-011', { page: 1, page_size: SPARKLINE_SAMPLES })
     )
@@ -420,7 +429,7 @@ describe('FeederElectricalSummary (dòng số đo trong mạch của khung tủ)
   })
 
   it('a feeder without an IoT node but with samples shows numbers and "Không gắn node"', async () => {
-    render(<FeederElectricalSummary feederId="FDR-011" nodeId={null} onOpenChart={vi.fn()} />)
+    renderWithMonitor(<FeederElectricalSummary feederId="FDR-011" nodeId={null} onOpenChart={vi.fn()} />)
     await waitFor(() =>
       expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-011', { page: 1, page_size: SPARKLINE_SAMPLES })
     )

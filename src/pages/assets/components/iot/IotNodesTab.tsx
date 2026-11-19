@@ -1,16 +1,16 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch } from '../../../../redux/store'
 import { Search, RefreshCw } from 'lucide-react'
-import iotAPI from '../../../../feature/iot/iotAPI'
-import type { IotDiagnosticResult, IotNodeStatus } from '../../../../types/iot/nodes'
+import {
+  fetchNodesTabRequest,
+  selectNodesTab,
+} from '../../../../feature/iot/iotMonitorSlice'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
 import type { FeederListItem } from '../../../../types/assets/feeders'
-import { apiErrorMessage } from '../../../../utils/iot/apiError'
 import { IotNodeTable } from './components/IotNodeTable'
 import { IotNodeDetailModal } from './components/IotNodeDetailModal'
 import { TablePagination } from '../common/TablePagination'
-
-/** `page_size` tối đa của API. Số node IoT (một node / tủ) nhỏ, nên tải một lần rồi lọc, phân trang ở client. */
-const FETCH_SIZE = 200
 
 export interface IotNodesTabProps {
   cabinets: CabinetListItem[]
@@ -22,45 +22,16 @@ export interface IotNodesTabProps {
  * Quản trị hệ thống ở trang IoT Bridge; Quản lý chỉ xem chi tiết và điều khiển mạch trên bản đồ.
  */
 export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders }) => {
-  const [nodes, setNodes] = useState<IotNodeStatus[]>([])
-  const [diagnosticsByNode, setDiagnosticsByNode] = useState<Record<string, IotDiagnosticResult>>({})
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const dispatch = useDispatch<AppDispatch>()
+  const { nodes, diagnosticsByNode, isLoading, error } = useSelector(selectNodesTab)
   const [searchQuery, setSearchQuery] = useState('')
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const result = await iotAPI.getNodes({ page: 1, page_size: FETCH_SIZE })
-      const items = result.items || []
-      setNodes(items)
-
-      const configuredIds = items
-        .filter((n) => n.node_id && n.status !== 'unconfigured')
-        .map((n) => n.node_id as string)
-
-      if (configuredIds.length > 0 && typeof iotAPI.getDiagnostics === 'function') {
-        const settled = await Promise.allSettled(configuredIds.map((id) => iotAPI.getDiagnostics(id)))
-        const map: Record<string, IotDiagnosticResult> = {}
-        settled.forEach((res, idx) => {
-          if (res.status === 'fulfilled' && res.value) {
-            map[configuredIds[idx]] = res.value
-          }
-        })
-        setDiagnosticsByNode(map)
-      } else {
-        setDiagnosticsByNode({})
-      }
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Không đọc được danh sách thiết bị IoT.'))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
+  const load = useCallback(() => {
+    dispatch(fetchNodesTabRequest())
+  }, [dispatch])
 
   useEffect(() => {
     load()

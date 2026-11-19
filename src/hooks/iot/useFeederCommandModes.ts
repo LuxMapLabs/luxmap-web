@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react'
-import iotAPI from '../../feature/iot/iotAPI'
-import { latestSuccessChoice, type IotCommandChoice } from '../../utils/iot/iotCommand'
+import { useEffect, useId } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch } from '../../redux/store'
+import type { IotCommandChoice } from '../../utils/iot/iotCommand'
+import {
+  selectCommandModes,
+  startCommandModes,
+  stopCommandModes,
+  type IotMonitorState,
+} from '../../feature/iot/iotMonitorSlice'
 
 /** Chu kỳ đọc lại lịch sử lệnh: lệnh vừa gửi còn pending, node ACK thì mới thành success. */
-export const COMMAND_MODE_POLL_MS = 10_000
+export { COMMAND_MODE_POLL_MS } from '../../feature/iot/iotMonitorSlice'
 
 /**
  * Chế độ Bật / Tắt / AUTO đang chạy của từng node, theo lệnh `success` mới nhất ở
@@ -11,36 +18,27 @@ export const COMMAND_MODE_POLL_MS = 10_000
  * `refreshKey` đổi (vd. sau khi gửi lệnh) thì đọc lại ngay.
  */
 export function useFeederCommandModes(nodeIds: string[], refreshKey = 0): Record<string, IotCommandChoice | null> {
-  const [modes, setModes] = useState<Record<string, IotCommandChoice | null>>({})
-  const key = [...new Set(nodeIds)].sort().join(',')
+  const key = useId()
+  const dispatch = useDispatch<AppDispatch>()
+  const modes = useSelector((s: { iotMonitor: IotMonitorState }) => selectCommandModes(s, key))
 
+  const ids = [...new Set(nodeIds)].sort().join(',')
+
+  // Effect 1: nạp dữ liệu khi ids hoặc refreshKey thay đổi, không stop khi đổi tham số để giữ modes cũ
   useEffect(() => {
-    const ids = key ? key.split(',') : []
-    if (ids.length === 0) {
-      setModes({})
-      return
+    if (!ids) {
+      dispatch(stopCommandModes({ key }))
+    } else {
+      dispatch(startCommandModes({ key, nodeIds: ids.split(',') }))
     }
-    let cancelled = false
-    const load = async () => {
-      const entries = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const page = await iotAPI.getCommandHistory(id, { page: 1, page_size: 20 })
-            return [id, latestSuccessChoice(page.items)] as const
-          } catch {
-            return [id, null] as const
-          }
-        })
-      )
-      if (!cancelled) setModes(Object.fromEntries(entries))
-    }
-    load()
-    const timer = window.setInterval(load, COMMAND_MODE_POLL_MS)
+  }, [ids, refreshKey, dispatch, key])
+
+  // Effect 2: chỉ dừng khi component unmount
+  useEffect(() => {
     return () => {
-      cancelled = true
-      window.clearInterval(timer)
+      dispatch(stopCommandModes({ key }))
     }
-  }, [key, refreshKey])
+  }, [dispatch, key])
 
   return modes
 }

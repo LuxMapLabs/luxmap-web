@@ -235,11 +235,11 @@ export interface ProblemDetails {
 }
 
 export interface RejectCancellationRequest {
-    reject_reason: string | null
+    reject_reason?: string | null
 }
 
 export interface RequestCancellationRequest {
-    reason: string | null
+    reason?: string | null
 }
 
 export interface ReviewWorkOrderRequest {

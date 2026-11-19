@@ -1,5 +1,10 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { Provider } from 'react-redux'
+import { makeSagaStore, type SagaStore } from '../utils/sagaStore'
+import iotMonitorReducer from '../../feature/iot/iotMonitorSlice'
+import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 import { useCabinetIotStatus, CABINET_IOT_REFRESH_MS } from '../../hooks/iot/useCabinetIotStatus'
 import iotAPI from '../../feature/iot/iotAPI'
 
@@ -11,17 +16,26 @@ vi.mock('../../feature/iot/iotAPI', () => ({
 }))
 
 describe('useCabinetIotStatus', () => {
+  let store: SagaStore
+
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
+    store = makeSagaStore({
+      reducers: { iotMonitor: iotMonitorReducer },
+      sagas: [iotMonitorSaga],
+    })
   })
 
   afterEach(() => {
     vi.useRealTimers()
   })
 
+  const wrapper = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(Provider, { store, children })
+
   it('null không gọi API', async () => {
-    const { result } = renderHook(() => useCabinetIotStatus(null))
+    const { result } = renderHook(() => useCabinetIotStatus(null), { wrapper })
     expect(result.current.loading).toBe(false)
     expect(result.current.nodes).toEqual([])
     expect(result.current.servers).toEqual([])
@@ -44,7 +58,7 @@ describe('useCabinetIotStatus', () => {
       { server_id: 'SRV-2', status: 'offline' },
     ])
 
-    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'))
+    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'), { wrapper })
 
     await act(async () => {
       await Promise.resolve()
@@ -74,7 +88,7 @@ describe('useCabinetIotStatus', () => {
       { server_id: 'SRV-1', status: 'online' },
     ])
 
-    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'))
+    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'), { wrapper })
 
     await act(async () => {
       await Promise.resolve()
@@ -100,7 +114,7 @@ describe('useCabinetIotStatus', () => {
       { server_id: 'SRV-3', status: 'offline' },
     ])
 
-    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'))
+    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'), { wrapper })
 
     await act(async () => {
       await Promise.resolve()
@@ -119,7 +133,7 @@ describe('useCabinetIotStatus', () => {
       { server_id: 'SRV-1', status: 'online' },
     ])
 
-    renderHook(() => useCabinetIotStatus('CAB-1'))
+    renderHook(() => useCabinetIotStatus('CAB-1'), { wrapper })
 
     await act(async () => {
       await Promise.resolve()
@@ -144,7 +158,7 @@ describe('useCabinetIotStatus', () => {
       { server_id: 'SRV-1', status: 'online' },
     ])
 
-    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'))
+    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'), { wrapper })
 
     await act(async () => {
       await Promise.resolve()
@@ -173,7 +187,7 @@ describe('useCabinetIotStatus', () => {
     vi.mocked(iotAPI.getNodes).mockRejectedValueOnce(new Error('API failure'))
     vi.mocked(iotAPI.getServers).mockResolvedValueOnce([])
 
-    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'))
+    const { result } = renderHook(() => useCabinetIotStatus('CAB-1'), { wrapper })
 
     await act(async () => {
       await Promise.resolve()
@@ -193,7 +207,7 @@ describe('useCabinetIotStatus', () => {
       { server_id: 'SRV-1', status: 'online' },
     ])
 
-    const { unmount } = renderHook(() => useCabinetIotStatus('CAB-1'))
+    const { unmount } = renderHook(() => useCabinetIotStatus('CAB-1'), { wrapper })
 
     await act(async () => {
       await Promise.resolve()

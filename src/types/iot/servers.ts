@@ -26,7 +26,7 @@ export interface IotLocation {
 
 export interface IotServerStatus {
     server_id?: string | null
-    status?: 'online' | 'offline' | 'unconfigured' | 'broker_down' | 'unreachable'
+    status?: string | null
     commune_id?: string | null
     location?: IotLocation
 }

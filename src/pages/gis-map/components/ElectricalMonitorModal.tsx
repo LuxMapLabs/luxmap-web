@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch } from '../../../redux/store'
 import { createPortal } from 'react-dom'
 import { Activity, AlertTriangle, Loader2, X } from 'lucide-react'
 import {
@@ -16,8 +18,12 @@ import {
 } from 'recharts'
 import { useElectricalSeries, ELECTRICAL_POLL_MS } from '../../../hooks/iot/useElectricalSeries'
 import { useCabinetIotStatus } from '../../../hooks/iot/useCabinetIotStatus'
-import iotAPI from '../../../feature/iot/iotAPI'
-import type { IotFeederElectricalResult } from '../../../types/iot/feeders'
+import {
+  startFeederElectrical,
+  stopFeederElectrical,
+  selectFeederElectrical,
+  type IotMonitorState,
+} from '../../../feature/iot/iotMonitorSlice'
 import { IOT_NODE_STATUS, IOT_TONE_CLASS, iotStatusBadge } from '../../../constants/iot'
 import { FeederPicker } from './FeederPicker'
 import {
@@ -514,7 +520,10 @@ export const ElectricalMonitorModal: React.FC<{
     target.feeders.find((f) => f.feeder_id === target.activeFeederId) || target.feeders[0] || null
 
   const [range, setRange] = useState<ElectricalRange>('6h')
-  const [feederElectrical, setFeederElectrical] = useState<IotFeederElectricalResult | null>(null)
+  const key = useId()
+  const dispatch = useDispatch<AppDispatch>()
+  const feederElectrical =
+    useSelector((s: { iotMonitor: IotMonitorState }) => selectFeederElectrical(s, key)) ?? null
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const isPickerOpenRef = useRef(false)
   useEffect(() => {
@@ -588,34 +597,18 @@ export const ElectricalMonitorModal: React.FC<{
   }, [onClose])
 
   useEffect(() => {
-    let cancelled = false
-    let timer: number | undefined
-    setFeederElectrical(null)
     if (!active?.feeder_id) return
-
-    const schedule = () => {
-      if (!cancelled && active?.node_id) {
-        timer = window.setTimeout(poll, ELECTRICAL_POLL_MS)
-      }
-    }
-
-    const poll = async () => {
-      try {
-        const res = await iotAPI.getFeederElectrical(active.feeder_id)
-        if (!cancelled) setFeederElectrical(res)
-      } catch {
-        if (!cancelled) setFeederElectrical(null)
-      }
-      schedule()
-    }
-
-    poll()
-
+    dispatch(
+      startFeederElectrical({
+        key,
+        feederId: active.feeder_id,
+        repeat: Boolean(active.node_id),
+      })
+    )
     return () => {
-      cancelled = true
-      if (timer) window.clearTimeout(timer)
+      dispatch(stopFeederElectrical({ key }))
     }
-  }, [active?.feeder_id, active?.node_id])
+  }, [active?.feeder_id, active?.node_id, key, dispatch])
 
   const badge =
     active?.node_id && feederElectrical?.status

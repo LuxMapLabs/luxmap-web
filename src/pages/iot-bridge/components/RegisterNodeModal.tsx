@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { CheckCircle2, Cpu, Gauge, MapPin } from 'lucide-react'
-import { toast } from 'sonner'
-import iotAPI from '../../../feature/iot/iotAPI'
-import { assetAPI } from '../../../feature/assets/assetAPI'
+import type { AppDispatch, RootState } from '../../../redux/store'
+import {
+  fetchNodeAssetsRequest,
+  registerNodeRequest,
+  resetNodeSubmit,
+} from '../../../feature/iot/iotBridgeSlice'
 import type { IotServerStatus } from '../../../types/iot/servers'
 import type { RegisteredNode } from '../../../types/iot/nodes'
-import type { CabinetListItem } from '../../../types/assets/cabinets'
-import type { FeederListItem } from '../../../types/assets/feeders'
 import type { CommuneItem } from '../../../types/admin/communes'
-import { apiErrorMessage } from '../../../utils/iot/apiError'
 import { isValidBridgeId } from '../../../utils/iot/iotRegistration'
 import {
   AssetModalError,
@@ -18,9 +19,6 @@ import {
 } from '../../assets/components/common/AssetModal'
 import { Field, inputClass } from './IotBridgeModal'
 import type { CommuneLoadStatus } from './IotServerFormModal'
-
-/** `page_size` tối đa của API; tủ / mạch của các xã thử nghiệm ít, đọc một trang. */
-const PAGE = { page: 1, page_size: 200 }
 
 const positive = (value: string) => {
   const n = Number(value)
@@ -47,9 +45,17 @@ export const RegisterNodeModal: React.FC<{
   onClose: () => void
   onSaved: (node: RegisteredNode) => void
 }> = ({ servers, communes, communeStatus, onClose, onSaved }) => {
-  const [cabinets, setCabinets] = useState<CabinetListItem[]>([])
-  const [feeders, setFeeders] = useState<FeederListItem[]>([])
-  const [assetsLoaded, setAssetsLoaded] = useState(false)
+  const dispatch = useDispatch<AppDispatch>()
+  const {
+    cabinets,
+    feeders,
+    nodeAssetsStatus,
+    nodeAssetsError,
+    nodeSubmit,
+    nodeSubmitError,
+    registeredNode,
+  } = useSelector((s: RootState) => s.iotBridge)
+
   const [communeId, setCommuneId] = useState('')
   const [cabinetId, setCabinetId] = useState('')
   const [feederId, setFeederId] = useState('')
@@ -60,18 +66,29 @@ export const RegisterNodeModal: React.FC<{
   const [voltage, setVoltage] = useState('')
   const [currentMa, setCurrentMa] = useState('')
   const [powerMw, setPowerMw] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  const assetsLoaded = nodeAssetsStatus === 'ready' || nodeAssetsStatus === 'error'
+  const saving = nodeSubmit === 'submitting'
+  const error = localError || nodeSubmitError || nodeAssetsError
+
+  const submittedRef = useRef(false)
+  const hasSavedRef = useRef(false)
 
   useEffect(() => {
-    Promise.all([assetAPI.getCabinets(PAGE), assetAPI.getFeeders(PAGE)])
-      .then(([cab, fdr]) => {
-        setCabinets(cab.items || [])
-        setFeeders(fdr.items || [])
-      })
-      .catch((err) => setError(apiErrorMessage(err, 'Không đọc được danh sách tủ điện / mạch.')))
-      .finally(() => setAssetsLoaded(true))
-  }, [])
+    dispatch(resetNodeSubmit())
+    dispatch(fetchNodeAssetsRequest())
+    return () => {
+      dispatch(resetNodeSubmit())
+    }
+  }, [dispatch])
+
+  useEffect(() => {
+    if (submittedRef.current && nodeSubmit === 'succeeded' && registeredNode && !hasSavedRef.current) {
+      hasSavedRef.current = true
+      onSaved(registeredNode)
+    }
+  }, [nodeSubmit, registeredNode, onSaved])
 
   // Một tủ gắn được nhiều node, mỗi node đúng một mạch (backend: `iot_node_ids` của tủ, `control.node_id` của mạch).
   const communeCabinets = useMemo(
@@ -89,22 +106,22 @@ export const RegisterNodeModal: React.FC<{
     setServerId('')
   }
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
+    setLocalError(null)
     const v = positive(voltage)
     const c = positive(currentMa)
     const p = positive(powerMw)
-    if (!communeId) return setError('Chọn xã / phường trước.')
-    if (!cabinetId || !feederId || !serverId) return setError('Chọn tủ điện, mạch và server IoT.')
-    if (!isValidBridgeId(deviceId.trim())) return setError('Device ID bắt đầu bằng chữ/số, chỉ gồm chữ, số, "-" hoặc "_".')
+    if (!communeId) return setLocalError('Chọn xã / phường trước.')
+    if (!cabinetId || !feederId || !serverId) return setLocalError('Chọn tủ điện, mạch và server IoT.')
+    if (!isValidBridgeId(deviceId.trim())) return setLocalError('Device ID bắt đầu bằng chữ/số, chỉ gồm chữ, số, "-" hoặc "_".')
     if (gatewayId.trim() && !isValidBridgeId(gatewayId.trim()))
-      return setError('Gateway ID bắt đầu bằng chữ/số, chỉ gồm chữ, số, "-" hoặc "_".')
-    if (v === null || c === null || p === null) return setError('Điện áp, dòng, công suất danh định phải là số dương.')
+      return setLocalError('Gateway ID bắt đầu bằng chữ/số, chỉ gồm chữ, số, "-" hoặc "_".')
+    if (v === null || c === null || p === null) return setLocalError('Điện áp, dòng, công suất danh định phải là số dương.')
 
-    setSaving(true)
-    try {
-      const node = await iotAPI.registerNode({
+    submittedRef.current = true
+    dispatch(
+      registerNodeRequest({
         server_id: serverId,
         cabinet_id: cabinetId,
         feeder_id: feederId,
@@ -116,13 +133,7 @@ export const RegisterNodeModal: React.FC<{
         nominal_current_ma: c,
         nominal_power_mw: p,
       })
-      toast.success(`Đã đăng ký ${node.node_id} (gateway ${node.gateway_id})`)
-      onSaved(node)
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Không đăng ký được node IoT.'))
-    } finally {
-      setSaving(false)
-    }
+    )
   }
 
   const cabinetHint = !communeId

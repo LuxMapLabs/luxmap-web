@@ -1,5 +1,9 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
+import { screen, fireEvent, waitFor, within, act } from '@testing-library/react'
+import { renderWithSagaStore } from '../utils/sagaStore'
+import iotMonitorReducer from '../../feature/iot/iotMonitorSlice'
+import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 import { IotCommandHistoryModal, HISTORY_PAGE_SIZE } from '../../pages/gis-map/components/IotCommandHistoryModal'
 import iotAPI from '../../feature/iot/iotAPI'
 
@@ -32,6 +36,12 @@ const feeders = [
   { feederId: 'FDR-011', label: 'FDR-CAB-TL8-C', name: 'Mạch C - Tỉnh Lộ 8', nodeId: 'NODE-005' },
 ]
 
+const renderModal = (ui: React.ReactElement) =>
+  renderWithSagaStore(ui, {
+    reducers: { iotMonitor: iotMonitorReducer },
+    sagas: [iotMonitorSaga],
+  })
+
 describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -49,7 +59,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
   })
 
   it('reads the history of the chosen feeder node and shows mode, status, sender and AUTO schedule', async () => {
-    render(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
 
     await waitFor(() => expect(api.getCommandHistory).toHaveBeenCalledWith('NODE-004', { page: 1, page_size: HISTORY_PAGE_SIZE }))
     const rows = await screen.findAllByTestId('iot-command-row')
@@ -64,7 +74,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
   })
 
   it('filters by status on the loaded commands', async () => {
-    render(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
     await screen.findAllByTestId('iot-command-row')
 
     const status = screen.getByRole('group', { name: 'Trạng thái' })
@@ -77,7 +87,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
   })
 
   it('switches feeder using FeederPicker button "Mạch sau"', async () => {
-    render(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
     await screen.findAllByTestId('iot-command-row')
 
     const nextBtn = screen.getByRole('button', { name: 'Mạch sau' })
@@ -89,7 +99,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
   })
 
   it('switches feeder by opening FeederPicker popover and selecting option', async () => {
-    render(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
     await screen.findAllByTestId('iot-command-row')
 
     const pickerBtn = screen.getByRole('button', { name: /Mạch B - Tỉnh Lộ 8/ })
@@ -106,7 +116,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
 
   it('Escape closes picker without calling onClose, second Escape calls onClose', async () => {
     const onClose = vi.fn()
-    render(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={onClose} />)
+    renderModal(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={onClose} />)
     await screen.findAllByTestId('iot-command-row')
 
     const pickerBtn = screen.getByRole('button', { name: /Mạch B - Tỉnh Lộ 8/ })
@@ -127,7 +137,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
     api.getCommandHistory.mockRejectedValueOnce({
       response: { data: { error: { message: 'Lỗi mạng' } } },
     })
-    render(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Không tải được nhật ký lệnh')
@@ -175,7 +185,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
         items: [item('cmd-b', 'MANUAL', 'ON', 'success', { node_id: 'NODE-005', feeder_id: 'FDR-011' })],
       })
 
-    render(<IotCommandHistoryModal title="Tủ" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
 
     // While Node A is loading, switch to Node B (FDR-011) via "Mạch sau"
     const nextBtn = screen.getByRole('button', { name: 'Mạch sau' })
@@ -217,7 +227,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
           }) as never
       )
 
-    render(<IotCommandHistoryModal title="Tủ" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
 
     // Node A fails with role="alert"
     const alert = await screen.findByRole('alert')
@@ -252,7 +262,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
     api.getCommandHistory
       .mockResolvedValueOnce({ page: 1, page_size: HISTORY_PAGE_SIZE, total: 25, items: [item('c25', 'MANUAL', 'OFF', 'success')] })
       .mockResolvedValueOnce({ page: 3, page_size: HISTORY_PAGE_SIZE, total: 25, items: [item('c5', 'MANUAL', 'ON', 'success')] })
-    render(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
     await screen.findAllByTestId('iot-command-row')
 
     const nav = screen.getByRole('navigation', { name: 'Phân trang' })
@@ -273,12 +283,12 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
       total: 1,
       items: [{ ...item('c1', 'MANUAL', 'ON', 'success'), status: undefined }],
     })
-    render(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
     expect(await screen.findByText('Chưa rõ trạng thái')).toBeInTheDocument()
   })
 
   it('a feeder without a node calls nothing and says so', () => {
-    render(<IotCommandHistoryModal title="Mạch FDR-012" feeders={[]} onClose={vi.fn()} />)
+    renderModal(<IotCommandHistoryModal title="Mạch FDR-012" feeders={[]} onClose={vi.fn()} />)
     expect(screen.getByText('Mạch chưa gắn node IoT nên chưa có lệnh nào.')).toBeInTheDocument()
     expect(api.getCommandHistory).not.toHaveBeenCalled()
   })

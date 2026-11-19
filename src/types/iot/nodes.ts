@@ -6,11 +6,11 @@ import type { DataSource, FeederPowerState, IotCommandHistoryStatus } from '../c
 import type { IotLocation } from './servers'
 
 export interface IotAnomaly {
-    code: 'telemetry_stale' | 'voltage_loss' | 'voltage_deviation' | 'lamp_count_shortfall' | 'ds3231_unavailable' | 'ds3231_read_failed' | 'ds3231_time_invalid' | 'ina226_unavailable' | 'ina226_read_failed' | 'ina226_shunt_out_of_range' | 'bh1750_unavailable' | 'bh1750_read_failed' | 'microsd_unavailable' | 'microsd_read_failed' | 'microsd_write_failed' | 'lora_tx_blocked' | 'lora_rx_frame_error'
-    observed: number
-    reference: number
-    deviation_percent: number
-    limit: number
+    code?: string | null
+    observed?: number
+    reference?: number
+    deviation_percent?: number
+    limit?: number
 }
 
 export interface IotAutoSchedule {
@@ -24,8 +24,8 @@ export interface IotCommandHistoryItem {
     feeder_id?: string | null
     server_id?: string | null
     device_id?: string | null
-    mode?: 'AUTO' | 'MANUAL'
-    command?: 'ON' | 'OFF' | null
+    mode?: string | null
+    command?: string | null
     auto_schedule?: IotAutoSchedule
     requested_by?: string | null
     requested_at?: string | null
@@ -41,16 +41,16 @@ export interface IotCommandHistoryItemPagedResult {
 }
 
 export interface IotCommandRequest {
-    mode?: 'AUTO' | 'MANUAL'
-    command?: 'ON' | 'OFF' | null
+    mode?: string | null
+    command?: string | null
     auto_schedule?: IotAutoSchedule
 }
 
 export interface IotCommandStatus {
     node_id?: string | null
     command_id?: string | null
-    mode?: 'AUTO' | 'MANUAL'
-    command?: 'ON' | 'OFF' | null
+    mode?: string | null
+    command?: string | null
     command_acknowledged?: boolean
     auto_schedule?: IotAutoSchedule
     expires_at?: string | null
@@ -60,9 +60,13 @@ export interface IotCommandStatus {
 export interface IotDiagnosticResult {
     node_id?: string | null
     feeder_id?: string | null
-    status?: 'normal' | 'anomaly' | 'stale' | 'no_data'
+    status?: string | null
     measurement?: IotMeasurement
     anomalies?: IotAnomaly[]
+    connection_status?: 'online' | 'offline' | 'no_data'
+    electrical_status?: 'fresh' | 'stale' | 'no_data'
+    last_seen_at?: string | null
+    last_command_ack_at?: string | null
     lamp_count?: LampCountEstimate
     measured_at?: string | null
     measurement_key?: string | null
@@ -79,6 +83,9 @@ export interface IotElectricalResult {
     status?: 'online' | 'offline' | 'no_data'
     measurement?: IotMeasurement
     power_state?: FeederPowerState
+    electrical_status?: 'fresh' | 'stale' | 'no_data'
+    last_seen_at?: string | null
+    last_command_ack_at?: string | null
 }
 
 export interface IotMeasurement {
@@ -94,6 +101,9 @@ export interface IotNodeStatus {
     server_id?: string | null
     status?: 'online' | 'offline' | 'no_data' | 'unconfigured' | 'source_unavailable'
     last_received_at?: string | null
+    electrical_status?: 'fresh' | 'stale' | 'no_data' | 'unconfigured' | 'source_unavailable'
+    last_seen_at?: string | null
+    last_command_ack_at?: string | null
     cabinet_id?: string | null
     commune_id?: string | null
     location?: IotLocation
@@ -107,12 +117,12 @@ export interface IotNodeStatusPagedResult {
 }
 
 export interface IotSensorHealth {
-    status?: 'fresh' | 'stale' | 'unknown'
+    status?: string | null
     received_at?: string | null
 }
 
 export interface LampCountEstimate {
-    status?: 'insufficient_samples' | 'undetermined' | 'estimated'
+    status?: string | null
     samples?: number
     required_samples?: number
     required_votes?: number
@@ -146,7 +156,7 @@ export interface NodeProfile {
     max_silence_seconds?: number
     use_ten_lamp_calibration?: boolean
     installed_lamp_count?: number
-    lamp_count_calibration?: '4v' | '5v' | '5v-quiet-v1' | null
+    lamp_count_calibration?: string | null
 }
 
 export interface RegisterNodeRequest {
@@ -160,7 +170,7 @@ export interface RegisterNodeRequest {
     nominal_current_ma: number
     nominal_power_mw: number
     gateway_id?: string | null
-    lamp_count_calibration?: '4v' | '5v' | '5v-quiet-v1' | null
+    lamp_count_calibration?: string | null
     installed_lamp_count?: number
 }
 

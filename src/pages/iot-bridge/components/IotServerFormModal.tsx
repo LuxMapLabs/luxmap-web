@@ -1,9 +1,14 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { CheckCircle2, Globe, MapPin, RadioTower, Server } from 'lucide-react'
-import iotAPI from '../../../feature/iot/iotAPI'
+import type { AppDispatch, RootState } from '../../../redux/store'
+import {
+  registerServerRequest,
+  resetServerSubmit,
+  updateServerLocationRequest,
+} from '../../../feature/iot/iotBridgeSlice'
 import type { IotServerStatus } from '../../../types/iot/servers'
 import type { CommuneItem } from '../../../types/admin/communes'
-import { apiErrorMessage } from '../../../utils/iot/apiError'
 import { isValidServerId } from '../../../utils/iot/iotRegistration'
 import { LocationPickerMap } from '../../../components/LocationPickerMap'
 import { Field, inputClass } from './IotBridgeModal'
@@ -45,44 +50,66 @@ export const IotServerFormModal: React.FC<{
   onClose: () => void
   onSaved: () => void
 }> = ({ server, communes, communeStatus, onClose, onSaved }) => {
+  const dispatch = useDispatch<AppDispatch>()
+  const { serverSubmit, serverSubmitError } = useSelector((s: RootState) => s.iotBridge)
+
   const editing = Boolean(server?.server_id)
   const [serverId, setServerId] = useState(server?.server_id || '')
   const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL)
   const [communeId, setCommuneId] = useState(server?.commune_id || '')
   const [picked, setPicked] = useState<Coords | null>(server?.location ?? null)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  const saving = serverSubmit === 'submitting'
+  const error = localError || serverSubmitError
+
+  const submittedRef = useRef(false)
+  const hasSavedRef = useRef(false)
+
+  useEffect(() => {
+    dispatch(resetServerSubmit())
+    return () => {
+      dispatch(resetServerSubmit())
+    }
+  }, [dispatch])
+
+  useEffect(() => {
+    if (submittedRef.current && serverSubmit === 'succeeded' && !hasSavedRef.current) {
+      hasSavedRef.current = true
+      onSaved()
+    }
+  }, [serverSubmit, onSaved])
 
   const commune = communes.find((c) => c.commune_id === communeId)
   // Vị trí gửi đi CHỈ là chỗ người dùng tự ghim (`picked`). Tâm xã chỉ để căn bản đồ, không bao giờ thành vị trí gateway.
   const mapCenter = picked ?? centerOf(commune)
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
+    setLocalError(null)
     if (!editing && !isValidServerId(serverId.trim()))
-      return setError('Server ID chỉ gồm chữ, số, "-" hoặc "_" (tối đa 64 ký tự) và không được là "default".')
-    if (!editing && !baseUrl.trim()) return setError('Cần địa chỉ HTTP của IoT Bridge.')
-    if (!communeId) return setError('Cần chọn xã/phường.')
-    if (!picked) return setError('Hãy bấm lên bản đồ để đặt vị trí gateway.')
+      return setLocalError('Server ID chỉ gồm chữ, số, "-" hoặc "_" (tối đa 64 ký tự) và không được là "default".')
+    if (!editing && !baseUrl.trim()) return setLocalError('Cần địa chỉ HTTP của IoT Bridge.')
+    if (!communeId) return setLocalError('Cần chọn xã/phường.')
+    if (!picked) return setLocalError('Hãy bấm lên bản đồ để đặt vị trí gateway.')
 
-    setSaving(true)
-    try {
-      if (editing) {
-        await iotAPI.updateServerLocation(server!.server_id!, { commune_id: communeId, location: picked })
-      } else {
-        await iotAPI.registerServer({
+    submittedRef.current = true
+    if (editing) {
+      dispatch(
+        updateServerLocationRequest({
+          serverId: server!.server_id!,
+          body: { commune_id: communeId, location: picked },
+        })
+      )
+    } else {
+      dispatch(
+        registerServerRequest({
           server_id: serverId.trim(),
           base_url: baseUrl.trim(),
           commune_id: communeId,
           location: picked,
         })
-      }
-      onSaved()
-    } catch (err) {
-      setError(apiErrorMessage(err, editing ? 'Không cập nhật được vị trí server.' : 'Không đăng ký được server.'))
-    } finally {
-      setSaving(false)
+      )
     }
   }
 

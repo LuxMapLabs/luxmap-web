@@ -19,7 +19,7 @@ export interface IotFeederElectricalResult {
     feeder_id?: string | null
     node_id?: string | null
     server_id?: string | null
-    status?: 'online' | 'offline' | 'no_data' | 'unconfigured'
+    status?: string | null
     measurement?: IotMeasurement
     power_state?: FeederPowerState
 }

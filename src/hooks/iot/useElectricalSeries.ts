@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
-import iotAPI from '../../feature/iot/iotAPI'
-import type { IotFeederAverage } from '../../types/iot/feeders'
-import { apiErrorMessage } from '../../utils/iot/apiError'
-import { mergeElectricalPoints, toElectricalPoint, type ElectricalPoint } from '../../utils/iot/electricalSeries'
+import { useEffect, useId } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch } from '../../redux/store'
+import type { ElectricalPoint } from '../../utils/iot/electricalSeries'
+import {
+  selectElectricalSeries,
+  startElectricalSeries,
+  stopElectricalSeries,
+  type IotMonitorState,
+} from '../../feature/iot/iotMonitorSlice'
 
 /**
  * Chu kỳ lấy mẫu mới định kỳ cho mạch đang gắn node (trang 1, 20 mẫu gần nhất).
  * Node chỉ ghi một mẫu điện mỗi 10 s (`SAMPLE_INTERVAL` của firmware), hỏi dày hơn chỉ về rỗng.
  */
-export const ELECTRICAL_POLL_MS = 10_000
-
-/** Trần số trang tải ngược khi xem theo khoảng thời gian (mỗi trang một request BE → server IoT). */
-export const ELECTRICAL_MAX_PAGES = 50
+export { ELECTRICAL_POLL_MS, ELECTRICAL_MAX_PAGES } from '../../feature/iot/iotMonitorSlice'
 
 interface Options {
   /** Số mẫu mỗi trang khi tải đầu (tối đa 200 theo `page_size` của API). */
@@ -28,7 +30,7 @@ interface Options {
   live?: boolean
 }
 
-const sampleTime = (s: IotFeederAverage) => toElectricalPoint(s)?.time ?? null
+const EMPTY_POINTS: ElectricalPoint[] = []
 
 /**
  * Chuỗi mẫu điện của một mạch điện: tải mẫu mới nhất theo mạch (một trang, hoặc đủ `windowMs`).
@@ -43,91 +45,42 @@ export function useElectricalSeries(
   feederId: string | null | undefined,
   { initial, maxPoints, windowMs, live = true }: Options
 ) {
-  const [points, setPoints] = useState<ElectricalPoint[]>([])
-  const [loading, setLoading] = useState(Boolean(feederId))
-  // Còn đang tải ngược các trang cũ cho đủ `windowMs` (`loading` đã tắt từ trang đầu): chuỗi còn dài thêm
-  const [backfilling, setBackfilling] = useState(Boolean(feederId))
-  const [error, setError] = useState<string | null>(null)
-
-  const absorb = useCallback(
-    (samples: IotFeederAverage[]) => {
-      // Không có mẫu mới thì không đổi state: biểu đồ không vẽ lại
-      if (samples.length === 0) return
-      setPoints((prev) => {
-        const merged = mergeElectricalPoints(prev, samples, maxPoints)
-        if (!windowMs || merged.length === 0) return merged
-        const from = merged[merged.length - 1].time - windowMs
-        return merged.filter((p) => p.time >= from)
-      })
-    },
-    [maxPoints, windowMs]
-  )
+  const key = useId()
+  const dispatch = useDispatch<AppDispatch>()
+  const entry = useSelector((s: { iotMonitor: IotMonitorState }) => selectElectricalSeries(s, key))
 
   useEffect(() => {
-    setPoints([])
-    setError(null)
-    if (!feederId) {
-      setLoading(false)
-      setBackfilling(false)
-      return
-    }
-    let cancelled = false
-    let timer: number | undefined
-    setLoading(true)
-    setBackfilling(true)
-
-    const schedule = () => {
-      if (!cancelled && live) timer = window.setTimeout(poll, ELECTRICAL_POLL_MS)
-    }
-    const poll = async () => {
-      try {
-        const page = await iotAPI.getFeederElectricalHistory(feederId, { page: 1, page_size: 20 })
-        if (cancelled) return
-        absorb(page.items || [])
-        setError(null)
-      } catch (err) {
-        if (!cancelled) setError(apiErrorMessage(err, 'Không lấy được mẫu điện mới.'))
-      }
-      schedule()
-    }
-
-    // Lần tải đầu lỗi (vd. 503 node chưa cấu hình nguồn đo) thì thử lại sau một chu kỳ, không dừng hẳn:
-    // nguồn được cấu hình rồi thì biểu đồ tự chạy, không cần mở lại bảng.
-    const load = async () => {
-      let newest: number | null = null
-      try {
-        for (let page = 1; ; page++) {
-          const result = await iotAPI.getFeederElectricalHistory(feederId, { page, page_size: initial })
-          if (cancelled) return
-          const items = result.items || []
-          absorb(items)
-          if (page === 1) setLoading(false)
-          if (!windowMs || items.length < initial || page >= ELECTRICAL_MAX_PAGES) break
-          if (typeof result.total === 'number' && page * initial >= result.total) break
-          // Trang mới nhất trước: mẫu cũ nhất của trang này đã ra ngoài khoảng thì đủ
-          const times = items.map(sampleTime).filter((t): t is number => t !== null)
-          if (times.length === 0) break
-          newest ??= Math.max(...times)
-          if (newest - Math.min(...times) >= windowMs) break
-        }
-        setError(null)
-        setBackfilling(false)
-        if (live) schedule()
-      } catch (err) {
-        if (cancelled) return
-        setLoading(false)
-        setBackfilling(false)
-        setError(apiErrorMessage(err, 'Không đọc được lịch sử điện.'))
-        if (live) timer = window.setTimeout(load, ELECTRICAL_POLL_MS)
-      }
-    }
-    load()
-
+    if (!feederId) return
+    dispatch(
+      startElectricalSeries({
+        key,
+        feederId,
+        initial,
+        maxPoints,
+        windowMs,
+        live,
+      })
+    )
     return () => {
-      cancelled = true
-      if (timer) window.clearTimeout(timer)
+      dispatch(stopElectricalSeries({ key }))
     }
-  }, [feederId, initial, windowMs, live, absorb])
+  }, [feederId, initial, maxPoints, windowMs, live, dispatch, key])
 
-  return { points, latest: points[points.length - 1] ?? null, loading, backfilling, error }
+  if (entry) {
+    return {
+      points: entry.points,
+      latest: entry.points[entry.points.length - 1] ?? null,
+      loading: entry.loading,
+      backfilling: entry.backfilling,
+      error: entry.error,
+    }
+  }
+
+  return {
+    points: EMPTY_POINTS,
+    latest: null,
+    loading: Boolean(feederId),
+    backfilling: Boolean(feederId),
+    error: null,
+  }
 }
