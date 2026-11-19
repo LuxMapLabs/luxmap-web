@@ -610,11 +610,6 @@ export async function styleAssetWorkbook(
         exportWs.getRow(1).eachCell((cell, colNumber) => {
           if (cell.value != null) {
             const key = String(cell.value).trim();
-            if (!targetKeyToCol.has(key)) {
-              throw new Error(
-                `Sheet "${exportWs.name}" trong tệp xuất có cột lạ: "${key}"`,
-              );
-            }
             exportColToKey.set(colNumber, key);
           }
         });

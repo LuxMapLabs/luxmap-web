@@ -466,15 +466,33 @@ describe('styleAssetWorkbook', { timeout: 30000 }, () => {
     expect(cellKhongXuat?.value).toBe(9999);
   }, 30000);
 
-  it('tệp xuất có cột lạ sẽ khiến styleAssetWorkbook ném lỗi (reject)', async () => {
+  it('tệp xuất có cột lạ thì bỏ qua cột đó, vẫn chép các cột còn lại', async () => {
     const origAb = getOriginalTemplateBuffer();
     const invalidExportAb = await createMockExportBuffer({
       unknownColumn: true,
     });
 
-    await expect(
-      styleAssetWorkbook(origAb, invalidExportAb),
-    ).rejects.toThrow();
+    const styledExportAb = await styleAssetWorkbook(origAb, invalidExportAb);
+    const wbExport = new ExcelJS.Workbook();
+    await wbExport.xlsx.load(styledExportAb);
+
+    const wsTuyen = wbExport.getWorksheet('Tuyến đường');
+    expect(wsTuyen).toBeDefined();
+    expect(wsTuyen?.getCell('A2').value).toBe('TUYEN-01');
+
+    const row1Values: unknown[] = [];
+    wsTuyen?.getRow(1).eachCell((cell) => {
+      row1Values.push(cell.value);
+    });
+    expect(row1Values).not.toContain('cot_khong_hop_le');
+
+    const allValues: unknown[] = [];
+    wsTuyen?.eachRow((row) => {
+      row.eachCell((cell) => {
+        allValues.push(cell.value);
+      });
+    });
+    expect(allValues).not.toContain('Gia tri la');
   }, 30000);
 
   it('giữ nguyên số lượng, vùng và công thức data validation, bổ sung prompt hướng dẫn', async () => {
