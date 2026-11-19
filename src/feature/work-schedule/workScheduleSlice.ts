@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { WorkOrderItem, WorkOrderDetail, WorkOrderAssignee, WorkOrderItemPagedResult, CreateWorkOrderRequest, PatchWorkOrderRequest, FollowUpWorkOrderRequest, WorkOrderAttachmentItem, WorkOrderPoleLocation } from '../../types/workorders/orders'
+import type { SetPoleLocationRequest } from '../../types/assets/poles'
 import type { TaskKind } from '../../types/common/enums'
 import type { GetWorkOrdersFilter } from './workScheduleAPI'
 import {
@@ -111,6 +112,8 @@ export interface WorkScheduleState {
     | 'has_cancel'
     | 'overdue_not_started'
     | 'overdue_no_report'
+  /** Tọa độ GPS tạm do Quản lý kéo thả tinh chỉnh trong popup Xem GIS (chỉ lưu thật khi bấm Duyệt báo cáo) */
+  editedGpsByWorkOrder: Record<string, Record<string, SetPoleLocationRequest>>
 }
 
 const now = new Date()
@@ -144,6 +147,7 @@ const initialState: WorkScheduleState = {
   currentMonth: now.getMonth(),
   currentYear: now.getFullYear(),
   filterPhase: 'all',
+  editedGpsByWorkOrder: {},
 }
 
 export const workScheduleSlice = createSlice({
@@ -371,6 +375,7 @@ export const workScheduleSlice = createSlice({
         workOrderId: string
         note?: string
         materials_note?: string
+        editedPoleLocations?: Record<string, SetPoleLocationRequest>
       }>
     ) {
       state.isSubmitting = true
@@ -510,6 +515,23 @@ export const workScheduleSlice = createSlice({
       state.busyGpsPolesError = null
       state.busyGpsPoleIds = []
     },
+    saveEditedGpsLocations(
+      state,
+      action: PayloadAction<{
+        workOrderId: string
+        locations: Record<string, SetPoleLocationRequest>
+      }>
+    ) {
+      const { workOrderId, locations } = action.payload
+      if (Object.keys(locations).length === 0) {
+        delete state.editedGpsByWorkOrder[workOrderId]
+      } else {
+        state.editedGpsByWorkOrder[workOrderId] = locations
+      }
+    },
+    clearEditedGpsLocations(state, action: PayloadAction<string>) {
+      delete state.editedGpsByWorkOrder[action.payload]
+    },
   },
 })
 
@@ -529,6 +551,8 @@ export const {
   fetchBusyGpsPolesSuccess,
   fetchBusyGpsPolesFailure,
   clearBusyGpsPoles,
+  saveEditedGpsLocations,
+  clearEditedGpsLocations,
   createWorkOrderRequest,
   createWorkOrderSuccess,
   createWorkOrderFailure,
