@@ -6,7 +6,7 @@ const toClientPath = (avatarUrl: string): string => avatarUrl.replace(/^\/api\/v
 
 export const avatarAPI = {
   /**
-   * Tải ảnh đại diện lên (JPEG, tối đa 1 MB)
+   * Tải ảnh đại diện lên (JPEG hoặc PNG, tối đa 1 MB)
    * POST /api/v1/auth/me/avatar
    */
   upload: async (file: File): Promise<AvatarResponse> => {

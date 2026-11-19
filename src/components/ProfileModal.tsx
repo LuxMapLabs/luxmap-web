@@ -13,8 +13,9 @@ export interface ProfileModalProps {
   user: CurrentUserResponse | null
 }
 
-// Backend chỉ nhận JPEG, tối đa 1 MB
+// Backend nhận JPEG hoặc PNG (lưu lại thành JPEG), tối đa 1 MB
 const MAX_AVATAR_BYTES = 1024 * 1024
+const AVATAR_TYPES = ['image/jpeg', 'image/png']
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, user }) => {
   const [isEditing, setIsEditing] = useState(false)
@@ -74,8 +75,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (file.type !== 'image/jpeg') {
-      setAvatarError('Chỉ chấp nhận ảnh JPEG (.jpg).')
+    if (!AVATAR_TYPES.includes(file.type)) {
+      setAvatarError('Chỉ chấp nhận ảnh JPEG hoặc PNG.')
       return
     }
     if (file.size > MAX_AVATAR_BYTES) {
@@ -133,7 +134,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   >
                     <Camera className="w-4 h-4" />
                   </button>
-                  <input ref={fileRef} type="file" accept="image/jpeg" onChange={handlePickAvatar} className="hidden" />
+                  <input ref={fileRef} type="file" accept="image/jpeg,image/png" onChange={handlePickAvatar} className="hidden" />
                 </>
               )}
             </div>
@@ -190,7 +191,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
               </div>
               <div className="flex items-start gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11.5px] text-slate-600">
                 <Info className="w-4 h-4 shrink-0 mt-px" />
-                <span>Ảnh đại diện (JPEG, tối đa 1 MB) được lưu ngay khi chọn. Họ tên và email do Quản trị viên quản lý.</span>
+                <span>Ảnh đại diện (JPEG hoặc PNG, tối đa 1 MB) được lưu ngay khi chọn. Họ tên và email do Quản trị viên quản lý.</span>
               </div>
             </div>
           ) : (

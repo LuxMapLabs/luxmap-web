@@ -25,7 +25,7 @@ function* handleFetchAvatar(action: PayloadAction<string>) {
 
 const uploadErrorMessage = (status?: number): string => {
   if (status === 413) return 'Ảnh vượt quá dung lượng cho phép (tối đa 1 MB).'
-  if (status === 415) return 'Chỉ chấp nhận ảnh định dạng JPEG.'
+  if (status === 415) return 'Chỉ chấp nhận ảnh định dạng JPEG hoặc PNG.'
   if (status === 400) return 'Ảnh không hợp lệ hoặc quá lớn (tối đa 512px cạnh dài, 16 triệu điểm ảnh).'
   if (status === 503) return 'Kho lưu trữ ảnh đang tạm thời không khả dụng. Vui lòng thử lại sau.'
   return 'Không thể cập nhật ảnh đại diện. Vui lòng thử lại.'
