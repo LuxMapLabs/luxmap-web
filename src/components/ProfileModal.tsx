@@ -5,6 +5,7 @@ import type { CurrentUserResponse } from '../types/auth/me'
 import type { RootState } from '../redux/rootReducer'
 import { uploadAvatarRequest, removeAvatarRequest } from '../feature/avatar/avatarSlice'
 import { UserAvatar } from './UserAvatar'
+import { convertToJpeg } from '../utils/imageUtils'
 import { getRoleName, isAdmin as checkIsAdmin, isManagementAgency, isMaintenanceEngineer, isFieldCrew } from '../utils/roleUtils'
 
 export interface ProfileModalProps {
@@ -13,14 +14,18 @@ export interface ProfileModalProps {
   user: CurrentUserResponse | null
 }
 
-// Backend nhận JPEG hoặc PNG (lưu lại thành JPEG), tối đa 1 MB
+// Backend nhận JPEG hoặc PNG tối đa 1 MB và tự thu về cạnh dài 512 px. Ảnh được thu nhỏ ngay trên trình duyệt
+// trước khi gửi, nên người dùng chọn ảnh dung lượng bao nhiêu cũng được.
 const MAX_AVATAR_BYTES = 1024 * 1024
 const AVATAR_TYPES = ['image/jpeg', 'image/png']
+const AVATAR_MAX_EDGE = 1024
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, user }) => {
   const dispatch = useDispatch()
   const isAvatarSubmitting = useSelector((state: RootState) => state.avatar.isSubmitting)
   const [avatarError, setAvatarError] = useState<string | null>(null)
+  const [isPreparing, setIsPreparing] = useState(false)
+  const isAvatarBusy = isPreparing || isAvatarSubmitting
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Xoá lỗi ảnh cũ mỗi lần mở / đổi người dùng
@@ -66,7 +71,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
       ? user.communes.map((c) => c.name || c.commune_id || '').filter(Boolean)
       : (user.commune_ids || []).filter((c) => c !== '*')
 
-  const handlePickAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -74,12 +79,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
       setAvatarError('Chỉ chấp nhận ảnh JPEG hoặc PNG.')
       return
     }
-    if (file.size > MAX_AVATAR_BYTES) {
-      setAvatarError('Ảnh tối đa 1 MB.')
-      return
-    }
     setAvatarError(null)
-    dispatch(uploadAvatarRequest(file))
+    setIsPreparing(true)
+    try {
+      const resized = await convertToJpeg(file, 0.85, AVATAR_MAX_EDGE)
+      if (resized.size > MAX_AVATAR_BYTES) {
+        setAvatarError('Ảnh quá lớn, vui lòng chọn ảnh khác.')
+        return
+      }
+      dispatch(uploadAvatarRequest(resized))
+    } catch {
+      setAvatarError('Không đọc được ảnh này, vui lòng chọn ảnh khác.')
+    } finally {
+      setIsPreparing(false)
+    }
   }
 
   return (
@@ -112,14 +125,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                 alt={displayName}
                 className={`w-24 h-24 rounded-full ${isAdmin ? 'bg-gradient-to-br from-secondary to-primary' : 'bg-gradient-to-br from-blue-500 to-indigo-600'} text-white text-3xl font-bold flex items-center justify-center ring-4 ring-slate-100`}
               />
-              {isAvatarSubmitting && (
+              {isAvatarBusy && (
                 <div className="absolute inset-0 rounded-full bg-white/70 flex items-center justify-center">
                   <Loader2 className="w-6 h-6 animate-spin text-slate-600" />
                 </div>
               )}
               <button
                 type="button"
-                disabled={isAvatarSubmitting}
+                disabled={isAvatarBusy}
                 onClick={() => fileRef.current?.click()}
                 className="disabled:opacity-50 absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center border-2 border-white hover:bg-slate-700 transition cursor-pointer"
                 title="Đổi ảnh đại diện"
@@ -132,12 +145,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
             {avatarError ? (
               <p className="mt-2 text-[11px] text-rose-600 font-medium">{avatarError}</p>
             ) : (
-              <p className="mt-2 text-[11px] text-slate-400">JPEG hoặc PNG, tối đa 1 MB</p>
+              <p className="mt-2 text-[11px] text-slate-400">Ảnh JPEG hoặc PNG</p>
             )}
             {user.avatar_url && (
               <button
                 type="button"
-                disabled={isAvatarSubmitting}
+                disabled={isAvatarBusy}
                 onClick={() => dispatch(removeAvatarRequest())}
                 className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
               >

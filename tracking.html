@@ -28,6 +28,14 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>19/11/2026 — Ảnh đại diện: thu nhỏ trên trình duyệt trước khi gửi</dt>
+        <dd>Người dùng chọn ảnh JPEG/PNG dung lượng bao nhiêu cũng được: <code>convertToJpeg</code> (thêm tham số <code>maxEdge</code> + hàm <code>fitWithin</code>) thu về cạnh dài 1024 px, nền trắng, JPEG 0.85 rồi mới upload. Giới hạn backend (1 MB, 16 triệu pixel) giữ nguyên. Chú thích dưới avatar thành "Ảnh JPEG hoặc PNG"; có spinner khi đang xử lý; ảnh không đọc được hoặc vẫn quá 1 MB sau khi thu nhỏ → báo lỗi.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/utils/imageUtils.ts</code>; <code>src/components/ProfileModal.tsx</code>; <code>src/test/00-common/ProfileModal.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(profile): downscale avatars in the browser before upload</code> — nhánh <code>feat/avatar-downscale</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>vitest</code> 690/690 (6 test mới), build, eslint; phá thử bỏ <code>maxEdge</code> → test đỏ. ✅ Trình duyệt thật (vite dev): PNG nhiễu 30 MB 4000×3000 → JPEG 1024×768 240 KB, magic <code>FF D8 FF</code>, vùng trong suốt trắng; ảnh dọc → 768×1024; ảnh 600×400 giữ nguyên. ⚠️ Chưa thử upload trên prod.</dd>
         <dt>19/11/2026 — Hồ sơ: đổi ảnh ngay ở màn xem, bỏ chế độ sửa</dt>
         <dd>Nút máy ảnh và "Gỡ ảnh đại diện" đặt thẳng trên màn xem; dòng chú thích "JPEG hoặc PNG, tối đa 1 MB" dưới avatar. Bỏ nút "Chỉnh sửa hồ sơ", nút "Xong", hai ô chỉ đọc và khung ghi chú. Danh sách thông tin thêm dòng "Họ và tên"; "Tên đăng nhập" đổi icon @.</dd>
         <dt>File thay đổi</dt>
