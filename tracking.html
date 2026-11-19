@@ -20,7 +20,7 @@
     <p>Giao diện web quản lý tài sản và sự cố chiếu sáng. Bảng này bắt đầu ghi nhận từ ngày 20/10/2026; chưa tổng hợp lịch sử toàn dự án.</p>
     <section>
       <h2>Công việc hiện tại</h2>
-      <p>Hồ sơ cá nhân: họ tên và email chỉ đọc; ảnh đại diện nhận JPEG hoặc PNG.</p>
+      <p>Hồ sơ cá nhân: một màn xem duy nhất, đổi ảnh đại diện (JPEG/PNG) ngay tại đó; họ tên và email chỉ đọc.</p>
       <label for="task-progress">Tiến độ bản sửa mã nguồn: 100%</label>
       <progress id="task-progress" value="100" max="100">100%</progress>
       <p>Lịch sử: hoàn tất ngày 20/10/2026, bản sửa <code>6b7a826</code> đã lên Production tại <a href="https://luxmap.com.vn">luxmap.com.vn</a> qua VPS. Vercel chỉ là bản Preview.</p>
@@ -28,6 +28,14 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>19/11/2026 — Hồ sơ: đổi ảnh ngay ở màn xem, bỏ chế độ sửa</dt>
+        <dd>Nút máy ảnh và "Gỡ ảnh đại diện" đặt thẳng trên màn xem; dòng chú thích "JPEG hoặc PNG, tối đa 1 MB" dưới avatar. Bỏ nút "Chỉnh sửa hồ sơ", nút "Xong", hai ô chỉ đọc và khung ghi chú. Danh sách thông tin thêm dòng "Họ và tên"; "Tên đăng nhập" đổi icon @.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/components/ProfileModal.tsx</code>; <code>src/test/00-common/ProfileModal.test.tsx</code> (mới); <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(profile): change avatar from the profile view</code> — nhánh <code>feat/avatar-png-picker</code> (PR #136).</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>npm run build</code>, eslint, <code>vitest</code> 684/684 (3 test mới cho ProfileModal); phá thử bỏ PNG khỏi danh sách cho phép → test đỏ, khôi phục xanh. ⚠️ Chưa xem trên trình duyệt.</dd>
         <dt>19/11/2026 — Ảnh đại diện nhận PNG</dt>
         <dd>Bộ chọn ảnh nhận <code>image/jpeg</code> và <code>image/png</code>; thông báo lỗi và ghi chú đổi thành "JPEG hoặc PNG". Backend nhận PNG và lưu lại thành JPEG ở LuxMapLabs/luxmap_backend#285 — backend đã lên VPS 19/11 06:51 UTC.</dd>
         <dt>File thay đổi</dt>
