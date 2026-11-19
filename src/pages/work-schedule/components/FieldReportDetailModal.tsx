@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   FileText,
   Map as MapIcon,
+  Cpu,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
@@ -18,6 +19,8 @@ import type { ScheduleCase, SchedulePhase } from '../../../feature/work-schedule
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import { EvidenceItem, WorkOrderPole, PolePhotoItem, WorkOrderPoleLocation } from '../../../types/workorders/orders'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
+import { FAULT_TYPE_LABELS_VN } from '../../../utils/citizen-report/citizenReviewFormat'
+import { iotAnomalyLabel } from '../../../constants/iot'
 import { EvidenceImage } from './EvidenceImage'
 import { PolePhotoImage } from './PolePhotoImage'
 import { PoleVideoPlayer } from './PoleVideoPlayer'
@@ -203,6 +206,27 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
       ? workOrderDetail.pole_locations
       : report?.poleGpsLocations || []
 
+  // Phân loại báo cáo IoT (không tuyến, không cột) để hiển thị đúng Mạch & Node thay vì Cột đèn
+  const normalizedSeg = (caseItem.segment || '').trim()
+  const hasSegment = Boolean(
+    normalizedSeg && normalizedSeg !== '-' && normalizedSeg !== '—'
+  )
+  const detailFaults = isTargetDetail && workOrderDetail?.faults ? workOrderDetail.faults : []
+  const iotFaults = detailFaults.filter((f) => !f.pole_id && !f.segment_id)
+  const iotCabinets = Array.from(
+    new Set(
+      iotFaults
+        .map((f) => f.cabinet_id)
+        .filter((v): v is string => Boolean(v))
+    )
+  )
+  const isIotReport =
+    phase.phaseType !== 'survey' &&
+    phase.phaseType !== 'pole_gps_update' &&
+    !hasSegment &&
+    poles.length === 0 &&
+    polePhotos.length === 0
+
   // Lọc các cột đèn có cảnh báo / bất thường
   const abnormalPoles = poles.filter(
     (p) =>
@@ -255,7 +279,12 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                 </h2>
               </div>
               <p className="text-xs text-slate-500 font-medium line-clamp-1 mt-0.5">
-                {formatSegmentDisplay(caseItem.segment)} — Nộp bởi: <strong>{phase.assigneeName}</strong> lúc {effectiveSubmittedAt || 'Đang cập nhật'}
+                {hasSegment
+                  ? formatSegmentDisplay(caseItem.segment)
+                  : iotCabinets.length > 0
+                    ? `Tủ ${iotCabinets.join(', ')}`
+                    : caseItem.title || '-'}{' '}
+                — Nộp bởi: <strong>{phase.assigneeName}</strong> lúc {effectiveSubmittedAt || 'Đang cập nhật'}
               </p>
             </div>
           </div>
@@ -844,17 +873,90 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           {/* TAB 3: KẾT QUẢ KHẢO SÁT & ĐÁNH GIÁ KỸ THUẬT */}
           {activeTab === 'ai' && (
             <div className="flex flex-col gap-4 animate-in fade-in duration-150">
-              {/* Thẻ danh sách cột đèn kỹ sư hiện trường ghi nhận */}
+              {/* Thẻ danh sách cột đèn hoặc Mạch & Node IoT kỹ sư hiện trường ghi nhận */}
               <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-3">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                    Danh Sách Cột Đèn Ghi Nhận Từ Kỹ Sư Hiện Trường
+                    {isIotReport ? (
+                      <>
+                        <Cpu className="w-4 h-4 text-indigo-600" />
+                        Danh Sách Mạch (Feeder) &amp; Node IoT Ghi Nhận Từ Kỹ Sư Hiện Trường
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        Danh Sách Cột Đèn Ghi Nhận Từ Kỹ Sư Hiện Trường
+                      </>
+                    )}
                   </h4>
                 </div>
 
-                {/* Danh sách cột đèn được kỹ sư báo cáo (hoặc có sự cố trên tuyến) */}
-                {phase.phaseType === 'survey' && polePhotos.length > 0 ? (
+                {/* Nhánh riêng cho phiếu IoT: hiển thị Tủ, Mạch, Node & kết quả kiểm tra */}
+                {isIotReport ? (
+                  iotFaults.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {iotFaults.map((f, idx) => {
+                        const outcome = f.inspection_outcome
+                        const outcomeBadge =
+                          outcome === 'fault_present'
+                            ? { label: 'Xác nhận có sự cố', cls: 'bg-rose-100 text-rose-800 border-rose-200' }
+                            : outcome === 'fault_absent'
+                            ? { label: 'Thiết bị bình thường', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
+                            : outcome === 'inconclusive'
+                            ? { label: 'Chưa kết luận', cls: 'bg-amber-100 text-amber-800 border-amber-200' }
+                            : { label: 'Đã tiếp nhận / xử lý', cls: 'bg-slate-100 text-slate-700 border-slate-200' }
+                        const typeLabel =
+                          (f.fault_type && FAULT_TYPE_LABELS_VN[f.fault_type]) || f.fault_type || '-'
+
+                        return (
+                          <div
+                            key={f.fault_id || idx}
+                            className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200 flex flex-wrap items-start justify-between gap-2.5 text-xs"
+                          >
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono font-bold text-slate-900">{f.fault_id || '-'}</span>
+                                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-purple-50 text-purple-700 border border-purple-200/70">
+                                  {typeLabel}
+                                </span>
+                                {f.iot_anomaly_code && (
+                                  <span className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                    {iotAnomalyLabel(f.iot_anomaly_code)}
+                                  </span>
+                                )}
+                                {f.recovered_at && (
+                                  <span
+                                    className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    title={`Tự phục hồi lúc ${new Date(f.recovered_at).toLocaleString('vi-VN')}`}
+                                  >
+                                    Đã tự phục hồi
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-mono text-indigo-800">
+                                <span>Tủ: {f.cabinet_id || '-'}</span>
+                                <span>Mạch: {f.feeder_id || '-'}</span>
+                                <span>Node: {f.origin_node_id || '-'}</span>
+                              </div>
+                              {f.location?.lat != null && f.location?.lng != null && (
+                                <div className="text-[10.5px] font-mono text-slate-500">
+                                  GPS tủ: {f.location.lat.toFixed(6)}, {f.location.lng.toFixed(6)}
+                                </div>
+                              )}
+                            </div>
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${outcomeBadge.cls}`}>
+                              {outcomeBadge.label}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                      Chưa có dữ liệu thiết bị IoT (Mạch / Node) gắn với lệnh công tác này.
+                    </div>
+                  )
+                ) : phase.phaseType === 'survey' && polePhotos.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {polePhotos.map((photo, idx) => {
                       const effectiveState = photo.final_cv_state || photo.cv_state

@@ -244,8 +244,6 @@ describe('iotBridgeSaga integration tests', () => {
         cabinet_id: 'CAB-1',
         feeder_id: 'FDR-1',
         device_id: 'DEV-NEW',
-        gateway_id: 'GW-NEW',
-        data_source: 'calibration_rig',
         nominal_voltage: 5,
         nominal_current_ma: 100,
         nominal_power_mw: 500,

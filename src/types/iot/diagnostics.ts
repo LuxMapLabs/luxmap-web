@@ -7,8 +7,6 @@ export interface IotDiagnosticSummaryItem {
     feeder_id?: string | null
     diagnostic_status?: string | null
     anomaly_codes?: string[]
-    estimated_lit?: number
-    estimated_missing?: number
     fault_ids?: string[]
     evaluated_at?: string | null
     connection_status?: 'online' | 'offline' | 'no_data' | 'unconfigured' | 'source_unavailable'

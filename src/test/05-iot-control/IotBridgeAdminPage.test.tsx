@@ -235,7 +235,6 @@ describe('RegisterNodeModal (POST /iot/nodes)', () => {
       server_id: 'iot-server-01',
       device_id: 'LUXMAP-P002',
       feeder_id: 'FDR-002',
-      gateway_id: 'LUXMAP-GW002',
     })
     const onSaved = vi.fn()
     renderModal(onSaved)
@@ -249,9 +248,6 @@ describe('RegisterNodeModal (POST /iot/nodes)', () => {
         cabinet_id: 'CAB-002',
         feeder_id: 'FDR-002',
         device_id: 'LUXMAP-P002',
-        gateway_id: 'LUXMAP-GW002',
-        data_source: 'calibration_rig',
-        supports_remote_control: true,
         nominal_voltage: 5,
         nominal_current_ma: 100,
         nominal_power_mw: 500,

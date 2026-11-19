@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { X, Edit3, Calendar, User, MapPin, FileText, Wrench, Loader2, AlertTriangle } from 'lucide-react'
+import { useSelector } from 'react-redux'
+import { X, Edit3, Calendar, User, MapPin, FileText, Wrench, Loader2, AlertTriangle, Cpu } from 'lucide-react'
 import { toast } from 'sonner'
+import type { RootState } from '../../../redux/rootReducer'
 import type { ScheduleCase, SchedulePhase } from '../../../feature/work-schedule/workScheduleSlice'
 import type { WorkOrderAssignee } from '../../../types/workorders/orders'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
@@ -35,6 +37,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const [assigneeId, setAssigneeId] = useState('')
   const [materialsNote, setMaterialsNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
 
   const todayYmd = getLocalTodayYmd()
   const overdueInfo = getPhaseOverdueInfo(currentPhase, caseItem?.isTerminated, undefined, todayYmd)
@@ -54,6 +57,29 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   }, [isOpen, currentPhase, caseItem, assignees])
 
   if (!isOpen || !caseItem || !currentPhase) return null
+
+  const normalizedSeg = (caseItem.segment || '').trim()
+  const hasSegment = Boolean(
+    normalizedSeg && normalizedSeg !== '-' && normalizedSeg !== '—'
+  )
+  const isIotOrder =
+    !hasSegment &&
+    (currentPhase.phaseType === 'inspection' || currentPhase.phaseType === 'repair')
+  const detailFaults =
+    workOrderDetail &&
+    (workOrderDetail.work_order_id === currentPhase.workOrderId ||
+      workOrderDetail.work_order_id === caseItem.code)
+      ? workOrderDetail.faults || []
+      : []
+  const iotCabinets = Array.from(
+    new Set(detailFaults.map((f) => f.cabinet_id).filter((v): v is string => Boolean(v)))
+  )
+  const iotFeeders = Array.from(
+    new Set(detailFaults.map((f) => f.feeder_id).filter((v): v is string => Boolean(v)))
+  )
+  const iotNodes = Array.from(
+    new Set(detailFaults.map((f) => f.origin_node_id).filter((v): v is string => Boolean(v)))
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -146,19 +172,48 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             />
           </div>
 
-          {/* Tuyến đường (Chỉ đọc) */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" />
-              Tuyến đường phụ trách
-            </label>
-            <input
-              type="text"
-              disabled
-              value={caseItem.segment}
-              className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 outline-none cursor-not-allowed select-none"
-            />
-          </div>
+          {/* Đối tượng phụ trách: Thiết bị IoT & Tủ điện hoặc Tuyến đường (Chỉ đọc) */}
+          {isIotOrder ? (
+            <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2 text-xs">
+              <div className="font-bold text-indigo-900 flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Thiết bị IoT &amp; Tủ điện phụ trách</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="px-2.5 py-2 rounded-xl bg-white border border-indigo-100">
+                  <span className="block text-[10px] font-semibold text-slate-400">Tủ điện</span>
+                  <span className="font-mono font-bold text-indigo-950">
+                    {iotCabinets.length > 0 ? iotCabinets.join(', ') : '-'}
+                  </span>
+                </div>
+                <div className="px-2.5 py-2 rounded-xl bg-white border border-indigo-100">
+                  <span className="block text-[10px] font-semibold text-slate-400">Mạch (Feeder)</span>
+                  <span className="font-mono font-bold text-indigo-950">
+                    {iotFeeders.length > 0 ? iotFeeders.join(', ') : '-'}
+                  </span>
+                </div>
+                <div className="px-2.5 py-2 rounded-xl bg-white border border-indigo-100">
+                  <span className="block text-[10px] font-semibold text-slate-400">Node IoT</span>
+                  <span className="font-mono font-bold text-indigo-950">
+                    {iotNodes.length > 0 ? iotNodes.join(', ') : '-'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                Tuyến đường phụ trách
+              </label>
+              <input
+                type="text"
+                disabled
+                value={caseItem.segment}
+                className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 outline-none cursor-not-allowed select-none"
+              />
+            </div>
+          )}
 
           {/* Thông báo khóa Ngày thực hiện khi phiếu đã quá hạn */}
           {isScheduledDateLocked && (
@@ -249,7 +304,11 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               rows={3}
               value={materialsNote}
               onChange={(e) => setMaterialsNote(e.target.value)}
-              placeholder="Ví dụ: Cần mang theo thang nâng 12m, 02 bóng LED 100W, đồng hồ đo Lux..."
+              placeholder={
+                isIotOrder
+                  ? 'Ví dụ: Kiểm tra nguồn tủ, cầu chì, cảm biến dòng/áp, kết nối Node IoT...'
+                  : 'Ví dụ: Cần mang theo thang nâng 12m, 02 bóng LED 100W, đồng hồ đo Lux...'
+              }
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white resize-none transition"
             />
           </div>

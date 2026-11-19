@@ -33,7 +33,6 @@ import { AutoDispatchModal } from './components/AutoDispatchModal'
 import { RecurringSurveyModal } from './components/RecurringSurveyModal'
 import { fetchFaultsList } from '../../feature/dashboard/dashboardAPI'
 import { NOTIFICATION_TARGET_PARAMS } from '../../utils/notifications/notificationRoute'
-import { formatSegmentDisplay } from '../../utils/work-schedule/workScheduleUtils'
 import { extractSegmentId } from '../../utils/work-schedule/poleUtils'
 import type { SurveyRecurringItem } from '../../types/survey-schedules/recurring'
 
@@ -414,7 +413,7 @@ export const WorkSchedulePage: React.FC = () => {
     setNextPhaseContext({
       caseCode: effectiveCaseCode,
       parentWorkOrderId: effectiveParentWorkOrderId,
-      segment: formatSegmentDisplay(selectedCase?.segment),
+      segment: selectedCase?.segment || '',
       targetNextPhaseType: phaseType,
       poleIds: effectivePoleIds,
     })
@@ -740,7 +739,8 @@ export const WorkSchedulePage: React.FC = () => {
         isOpen={isNextPhaseModalOpen}
         caseCode={nextPhaseContext?.caseCode || selectedCaseCode || ''}
         caseTitle={selectedCase?.title || ''}
-        segment={formatSegmentDisplay(nextPhaseContext?.segment || selectedCase?.segment)}
+        segment={nextPhaseContext?.segment || selectedCase?.segment || ''}
+        faults={workOrderDetail?.faults || []}
         defaultPoleIds={
           nextPhaseContext?.poleIds && nextPhaseContext.poleIds.length > 0
             ? nextPhaseContext.poleIds

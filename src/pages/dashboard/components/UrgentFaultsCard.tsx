@@ -15,17 +15,26 @@ const MAX_ITEMS = 4
 function getUrgentFaultDisplay(fault: FaultItem, segmentNameMap: Record<string, string>) {
   const faultTypeStr = String(fault.fault_type || '').toLowerCase()
   const isOffline = faultTypeStr.includes('offline') || faultTypeStr.includes('node')
+  const isVoltageAnomaly = faultTypeStr === 'voltage_anomaly'
+  const isCurrentAnomaly = faultTypeStr === 'current_anomaly'
+  const isIotHardware = faultTypeStr === 'iot_hardware_fault'
   const isBlackout =
     !isOffline &&
+    !isVoltageAnomaly &&
+    !isCurrentAnomaly &&
+    !isIotHardware &&
     (faultTypeStr.includes('out') ||
       faultTypeStr.includes('blackout') ||
       faultTypeStr.includes('segment_outage'))
 
   const noteText = (fault.note || fault.review_note || '').trim()
   const iotMatch = noteText.match(/Thiết bị\s+(NODE-[\w-]+)\s+ở tủ\s+(CAB-[\w-]+)/i)
+  const iotIdentity = [fault.origin_node_id, fault.cabinet_id].filter(Boolean).join(' • ')
 
   const primaryText = fault.pole_id
     ? fault.pole_id
+    : iotIdentity
+    ? iotIdentity
     : iotMatch
     ? `${iotMatch[1]} • ${iotMatch[2]}`
     : fault.fault_id || '-'
@@ -33,11 +42,25 @@ function getUrgentFaultDisplay(fault: FaultItem, segmentNameMap: Record<string, 
   const hasValidSegment = Boolean(fault.segment_id && segmentNameMap[fault.segment_id])
   const secondaryText = hasValidSegment
     ? segmentNameMap[fault.segment_id!]
-    : fault.segment_id || noteText || '-'
+    : fault.segment_id || noteText || [fault.feeder_id, fault.cabinet_id].filter(Boolean).join(' · ') || '-'
 
-  const typeLabel = isOffline ? 'Mất kết nối IoT' : isBlackout ? 'Mất sáng' : 'Sáng yếu'
+  const typeLabel = isOffline
+    ? 'Mất kết nối IoT'
+    : isVoltageAnomaly
+    ? 'Bất thường điện áp'
+    : isCurrentAnomaly
+    ? 'Bất thường dòng điện'
+    : isIotHardware
+    ? 'Lỗi phần cứng IoT'
+    : isBlackout
+    ? 'Mất sáng'
+    : 'Sáng yếu'
   const typeBadgeClass = isOffline
     ? 'bg-purple-50 text-purple-700 border-purple-200/70'
+    : isVoltageAnomaly || isCurrentAnomaly
+    ? 'bg-orange-50 text-orange-700 border-orange-200/70'
+    : isIotHardware
+    ? 'bg-sky-50 text-sky-700 border-sky-200/70'
     : isBlackout
     ? 'bg-red-50 text-red-700 border-red-200/70'
     : 'bg-amber-50 text-amber-700 border-amber-200/70'

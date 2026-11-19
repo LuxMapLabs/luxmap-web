@@ -265,6 +265,7 @@ export const ManagerDashboardPage: React.FC = () => {
       type.includes('offline') ||
       type.includes('node') ||
       type === 'voltage_anomaly' ||
+      type === 'current_anomaly' ||
       type === 'iot_hardware_fault'
     )
   }

@@ -12,6 +12,7 @@ import {
 } from '../../../../../feature/iot/iotMonitorSlice'
 import {
   IOT_DIAGNOSTIC_STATUS,
+  IOT_ELECTRICAL_STATUS,
   IOT_NODE_STATUS,
   IOT_SENSOR_HEALTH_STATUS,
   IOT_TONE_CLASS,
@@ -66,7 +67,7 @@ export const IotNodeDetailModal: React.FC<{ nodeId: string; onClose: () => void 
   const badge = iotStatusBadge(IOT_NODE_STATUS, electrical?.status)
   const m = electrical?.measurement
   const anomalies = diagnostics?.anomalies || []
-  const lamp = diagnostics?.lamp_count
+  const electricalWindow = diagnostics?.electrical_window
 
   return createPortal(
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -100,10 +101,24 @@ export const IotNodeDetailModal: React.FC<{ nodeId: string; onClose: () => void 
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[badge.tone]}`}>{badge.label}</span>
+                  {electrical.electrical_status && (() => {
+                    const elBadge = iotStatusBadge(IOT_ELECTRICAL_STATUS, electrical.electrical_status)
+                    return (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[elBadge.tone]}`}>
+                        {elBadge.label}
+                      </span>
+                    )
+                  })()}
                   {electrical.power_state && (
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">{POWER_STATE_LABEL[electrical.power_state] || electrical.power_state}</span>
                   )}
                 </div>
+                {(electrical.last_seen_at || electrical.last_command_ack_at) && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    {electrical.last_seen_at && <span>Liên lạc gần nhất: <strong className="font-mono text-slate-700 dark:text-slate-200">{formatTime(electrical.last_seen_at)}</strong></span>}
+                    {electrical.last_command_ack_at && <span>ACK lệnh gần nhất: <strong className="font-mono text-slate-700 dark:text-slate-200">{formatTime(electrical.last_command_ack_at)}</strong></span>}
+                  </div>
+                )}
                 {m ? (
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <div><span className="block text-[10px] text-slate-400">Nhận lúc</span>{formatTime(m.received_at)}</div>
@@ -160,19 +175,18 @@ export const IotNodeDetailModal: React.FC<{ nodeId: string; onClose: () => void 
                     ))}
                   </ul>
                 )}
-                {lamp && (
+                {electricalWindow && (
                   <p>
-                    Ước lượng số bóng:{' '}
-                    {lamp.status === 'estimated' || lamp.estimated_lit != null || lamp.estimated_missing != null ? (
+                    Cửa sổ đo điện (2 mẫu liên tiếp):{' '}
+                    {electricalWindow.status === 'evaluated' ? (
                       <strong>
-                        {lamp.estimated_lit ?? '-'} sáng, {lamp.estimated_missing ?? '-'} thiếu
+                        {num(electricalWindow.voltage_avg, 2)} V · {num(electricalWindow.current_ma_avg, 2)} mA ·{' '}
+                        {num(electricalWindow.power_mw_avg, 1)} mW
                       </strong>
-                    ) : lamp.status === 'undetermined' ? (
-                      <span className="text-amber-600 dark:text-amber-300">
-                        chưa xác định được nhóm hiệu chuẩn ({lamp.samples ?? 0}/{lamp.required_samples ?? '-'})
-                      </span>
                     ) : (
-                      <span className="text-slate-500">chưa đủ mẫu ({lamp.samples ?? 0}/{lamp.required_samples ?? '-'})</span>
+                      <span className="text-slate-500">
+                        chưa đủ mẫu ({electricalWindow.samples ?? 0}/{electricalWindow.required_samples ?? 2})
+                      </span>
                     )}
                   </p>
                 )}
