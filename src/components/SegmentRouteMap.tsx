@@ -29,7 +29,7 @@ export interface SegmentPoleItem {
   atlas?: string
 }
 
-/** Bản đồ chỉ xem lộ trình một tuyến đường cùng các cột đèn thuộc tuyến. */
+/** Bản đồ lộ trình một tuyến đường cùng các cột đèn thuộc tuyến (hỗ trợ kéo thả tinh chỉnh vị trí cột khi truyền editablePoleIds). */
 export interface SegmentRouteMapProps {
   coordinates?: [number, number][]
   startCoord?: [number, number] // [lng, lat]
@@ -38,6 +38,9 @@ export interface SegmentRouteMapProps {
   poles?: SegmentPoleItem[]
   communeId?: string | null
   communeBbox?: CommuneBbox | null
+  editablePoleIds?: string[]
+  invalidPoleIds?: string[]
+  onPoleLocationChange?: (poleId: string, lng: number, lat: number) => void
 }
 
 // Coordinate validator (checks if longitude and latitude are in valid range)
@@ -137,6 +140,74 @@ const createTerminalPinElement = (isStart: boolean, label: string) => {
   return el
 }
 
+// Ghim cột đèn cho phép Quản lý giữ chuột kéo thả để tinh chỉnh vị trí trên ảnh vệ tinh
+const createDraggablePoleMarkerElement = (label: string, isInvalid: boolean) => {
+  const el = document.createElement('div')
+  el.className = 'segment-draggable-pole-pin'
+  el.style.display = 'flex'
+  el.style.flexDirection = 'column'
+  el.style.alignItems = 'center'
+  el.style.pointerEvents = 'auto'
+  el.style.zIndex = '48'
+  el.style.userSelect = 'none'
+  el.style.cursor = 'grab'
+  el.title = `Cột ${label} — Giữ chuột và kéo để điều chỉnh tọa độ GPS`
+
+  const badgeBg = isInvalid ? '#e11d48' : '#7c3aed'
+  const dotBg = isInvalid ? '#fb7185' : '#fde047'
+  const dotBorder = isInvalid ? '#881337' : '#4c1d95'
+
+  el.innerHTML = `
+    <div class="draggable-pole-badge" style="
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2.5px 7px;
+      background: ${badgeBg};
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      border-radius: 6px;
+      border: 1.5px solid #ffffff;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.45);
+      white-space: nowrap;
+      transform: translateY(-2px);
+    ">
+      <span>✥ ${label}</span>
+    </div>
+    <div class="draggable-pole-arrow" style="
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid ${badgeBg};
+      margin-top: -2px;
+    "></div>
+    <div class="draggable-pole-dot" style="
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: ${dotBg};
+      border: 2.5px solid ${dotBorder};
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.85), 0 2px 6px rgba(0,0,0,0.5);
+      margin-top: -1px;
+    "></div>
+  `
+  return el
+}
+
+const areCoordsEqual = (a: [number, number][], b: [number, number][]): boolean => {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (Math.abs(a[i][0] - b[i][0]) > 0.0000001 || Math.abs(a[i][1] - b[i][1]) > 0.0000001) {
+      return false
+    }
+  }
+  return true
+}
+
 // Bỏ các điểm trùng nhau liên tiếp
 const dedupeConsecutive = (coords: [number, number][]): [number, number][] => {
   const out: [number, number][] = []
@@ -155,6 +226,9 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   poles = [],
   communeId,
   communeBbox,
+  editablePoleIds = [],
+  invalidPoleIds = [],
+  onPoleLocationChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -162,7 +236,11 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const startMarkerRef = useRef<maplibregl.Marker | null>(null)
   const endMarkerRef = useRef<maplibregl.Marker | null>(null)
   const vertexMarkersRef = useRef<maplibregl.Marker[]>([])
+  const draggablePoleMarkersRef = useRef<Map<string, { marker: maplibregl.Marker; isInvalid: boolean }>>(new Map())
+  const draggingPoleIdRef = useRef<string | null>(null)
   const currentCoordsRef = useRef<[number, number][]>([])
+  const onPoleLocationChangeRef = useRef(onPoleLocationChange)
+  onPoleLocationChangeRef.current = onPoleLocationChange
 
   const currentUser = useSelector((state: RootState) => state?.auth?.user)
   const mapBounds = currentUser?.map_bounds
@@ -190,14 +268,33 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const polesRef = useRef<SegmentPoleItem[]>(poles)
   polesRef.current = poles
 
+  const startLng = startCoord?.[0]
+  const startLat = startCoord?.[1]
+  const endLng = endCoord?.[0]
+  const endLat = endCoord?.[1]
+  const stableStartCoord = useMemo<[number, number] | undefined>(
+    () =>
+      typeof startLng === 'number' && typeof startLat === 'number'
+        ? [startLng, startLat]
+        : undefined,
+    [startLng, startLat]
+  )
+  const stableEndCoord = useMemo<[number, number] | undefined>(
+    () =>
+      typeof endLng === 'number' && typeof endLat === 'number'
+        ? [endLng, endLat]
+        : undefined,
+    [endLng, endLat]
+  )
+
   // Hộp bao của lộ trình + cột đèn
   const getBounds = useCallback((coords?: [number, number][]): maplibregl.LngLatBoundsLike | null => {
     const pts: [number, number][] = []
     const source = coords && coords.length > 0 ? coords : currentCoordsRef.current
     source.forEach((pt) => isValidCoord(pt) && pts.push(pt))
     if (!coords || coords.length === 0) {
-      if (isValidCoord(startCoord)) pts.push(startCoord)
-      if (isValidCoord(endCoord)) pts.push(endCoord)
+      if (isValidCoord(stableStartCoord)) pts.push(stableStartCoord)
+      if (isValidCoord(stableEndCoord)) pts.push(stableEndCoord)
     }
     polesRef.current.forEach((p) => isValidCoord(p.coord) && pts.push(p.coord))
     if (pts.length === 0) return null
@@ -218,7 +315,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       [minLng, minLat],
       [maxLng, maxLat],
     ]
-  }, [startCoord, endCoord])
+  }, [stableStartCoord, stableEndCoord])
 
   // Vẽ lại đường, các mốc đỉnh và hai nhãn đầu/cuối theo lộ trình mới
   const renderRoute = useCallback(
@@ -237,20 +334,23 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
         properties: {},
       })
 
-      vertexMarkersRef.current.forEach((m) => m.remove())
-      vertexMarkersRef.current = valid.map((pt, idx) =>
-        new maplibregl.Marker({
-          element: createVertexMarkerElement(
-            idx === 0,
-            idx === valid.length - 1,
-            valid.length === 1,
-            isMatchingPoleCoord(pt, polesRef.current)
-          ),
-          anchor: 'center',
-        })
-          .setLngLat(pt)
-          .addTo(map)
-      )
+      // Khi đang giữ chuột kéo ghim cột, không xóa/tạo lại DOM mốc đỉnh liên tục để tránh giật lag
+      if (!draggingPoleIdRef.current) {
+        vertexMarkersRef.current.forEach((m) => m.remove())
+        vertexMarkersRef.current = valid.map((pt, idx) =>
+          new maplibregl.Marker({
+            element: createVertexMarkerElement(
+              idx === 0,
+              idx === valid.length - 1,
+              valid.length === 1,
+              isMatchingPoleCoord(pt, polesRef.current)
+            ),
+            anchor: 'center',
+          })
+            .setLngLat(pt)
+            .addTo(map)
+        )
+      }
 
       const placePin = (
         ref: React.MutableRefObject<maplibregl.Marker | null>,
@@ -273,15 +373,23 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
             .addTo(map)
         }
       }
-      placePin(startMarkerRef, valid[0] ?? startCoord, true)
-      placePin(endMarkerRef, valid.length > 1 ? valid[valid.length - 1] : endCoord, false)
+      const effectiveStart = valid[0] ?? stableStartCoord
+      const effectiveEnd = valid.length > 1 ? valid[valid.length - 1] : stableEndCoord
+      const hasDistinctLine =
+        valid.length >= 2 ||
+        (isValidCoord(effectiveStart) &&
+          isValidCoord(effectiveEnd) &&
+          calculateDistanceMeters(effectiveStart, effectiveEnd) > 0.5)
+      placePin(startMarkerRef, hasDistinctLine ? effectiveStart : undefined, true)
+      placePin(endMarkerRef, hasDistinctLine ? effectiveEnd : undefined, false)
     },
-    [startCoord, endCoord]
+    [stableStartCoord, stableEndCoord]
   )
 
   // Khởi tạo bản đồ một lần
   useEffect(() => {
     if (!containerRef.current) return
+    const draggablePoleMarkers = draggablePoleMarkersRef.current
 
     const validPoles = poles.filter((p) => isValidCoord(p.coord))
     const validRawCoords = coordinates.filter(isValidCoord)
@@ -392,34 +500,33 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       })
 
       // Cột đèn
-      if (validPoles.length > 0) {
-        map.addSource('segment-poles', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: validPoles.map((p) => ({
-              type: 'Feature' as const,
-              geometry: { type: 'Point' as const, coordinates: p.coord },
-              properties: { id: p.id, code: p.code || p.id, status: p.status || 'normal', atlas: p.atlas || '' },
-            })),
-          },
-        })
-        map.addLayer({
-          id: 'segment-poles-core',
-          type: 'circle',
-          source: 'segment-poles',
-          paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3],
-            'circle-color': '#fde047',
-            'circle-stroke-width': 1.2,
-            'circle-stroke-color': '#0f172a',
-            'circle-opacity': 0.9,
-          },
-        })
-      }
+      map.addSource('segment-poles', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: validPoles.map((p) => ({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: p.coord },
+            properties: { id: p.id, code: p.code || p.id, status: p.status || 'normal', atlas: p.atlas || '' },
+          })),
+        },
+      })
+      map.addLayer({
+        id: 'segment-poles-core',
+        type: 'circle',
+        source: 'segment-poles',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3],
+          'circle-color': '#fde047',
+          'circle-stroke-width': 1.2,
+          'circle-stroke-color': '#0f172a',
+          'circle-opacity': 0.9,
+        },
+      })
 
       loadedRef.current = true
       renderRoute(route)
+      syncEditableMarkers(polesRef.current, editablePoleIds, invalidPoleIds)
 
       const b = getBounds()
       if (b) map.fitBounds(b, ROUTE_FIT_SMOOTH)
@@ -449,12 +556,116 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
       endMarkerRef.current = null
       vertexMarkersRef.current.forEach((m) => m.remove())
       vertexMarkersRef.current = []
+      draggablePoleMarkers.forEach((entry) => entry.marker.remove())
+      draggablePoleMarkers.clear()
       map.remove()
       mapRef.current = null
     }
     // Bản đồ chỉ khởi tạo một lần; thay đổi lộ trình sau đó được xử lý ở effect bên dưới.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Đồng bộ các ghim cột cho phép kéo thả tinh chỉnh vị trí
+  const syncEditableMarkers = useCallback(
+    (currentPoles: SegmentPoleItem[], editableIds: string[], invalidIds: string[]) => {
+      const map = mapRef.current
+      if (!map || !loadedRef.current) return
+
+      const validPoles = currentPoles.filter((p) => isValidCoord(p.coord))
+      const polesSource = map.getSource('segment-poles') as maplibregl.GeoJSONSource | undefined
+      polesSource?.setData({
+        type: 'FeatureCollection',
+        features: validPoles.map((p) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: p.coord },
+          properties: { id: p.id, code: p.code || p.id, status: p.status || 'normal', atlas: p.atlas || '' },
+        })),
+      })
+
+      const editableSet = new Set(editableIds)
+      const invalidSet = new Set(invalidIds)
+      const activeEditablePoles = validPoles.filter((p) => editableSet.has(p.id))
+      const activeIds = new Set(activeEditablePoles.map((p) => p.id))
+
+      // Gỡ bỏ các marker không còn nằm trong danh sách editable
+      Array.from(draggablePoleMarkersRef.current.entries()).forEach(([id, entry]) => {
+        if (!activeIds.has(id)) {
+          entry.marker.remove()
+          draggablePoleMarkersRef.current.delete(id)
+        }
+      })
+
+      activeEditablePoles.forEach((p) => {
+        const isInvalid = invalidSet.has(p.id)
+        const currentEntry = draggablePoleMarkersRef.current.get(p.id)
+        if (currentEntry) {
+          if (draggingPoleIdRef.current !== p.id) {
+            currentEntry.marker.setLngLat(p.coord)
+          }
+          // Cập nhật trực tiếp màu sắc trên DOM của ghim mà không bao giờ xóa/tạo lại marker
+          if (currentEntry.isInvalid !== isInvalid) {
+            const el = currentEntry.marker.getElement()
+            const badge = el.querySelector('.draggable-pole-badge') as HTMLElement | null
+            const arrow = el.querySelector('.draggable-pole-arrow') as HTMLElement | null
+            const dot = el.querySelector('.draggable-pole-dot') as HTMLElement | null
+            if (badge) badge.style.background = isInvalid ? '#e11d48' : '#7c3aed'
+            if (arrow) arrow.style.borderTopColor = isInvalid ? '#e11d48' : '#7c3aed'
+            if (dot) {
+              dot.style.background = isInvalid ? '#fb7185' : '#fde047'
+              dot.style.borderColor = isInvalid ? '#881337' : '#4c1d95'
+            }
+            currentEntry.isInvalid = isInvalid
+          }
+        } else {
+          const el = createDraggablePoleMarkerElement(p.code || p.id, isInvalid)
+          const marker = new maplibregl.Marker({
+            element: el,
+            draggable: true,
+            anchor: 'bottom',
+          })
+            .setLngLat(p.coord)
+            .addTo(map)
+
+          let rafId: number | null = null
+          marker.on('dragstart', () => {
+            draggingPoleIdRef.current = p.id
+            el.style.cursor = 'grabbing'
+          })
+          marker.on('drag', () => {
+            if (rafId !== null) return
+            rafId = window.requestAnimationFrame(() => {
+              rafId = null
+              const lngLat = marker.getLngLat()
+              const newLng = Math.round(lngLat.lng * 1000000) / 1000000
+              const newLat = Math.round(lngLat.lat * 1000000) / 1000000
+              onPoleLocationChangeRef.current?.(p.id, newLng, newLat)
+            })
+          })
+          marker.on('dragend', () => {
+            if (rafId !== null) {
+              window.cancelAnimationFrame(rafId)
+              rafId = null
+            }
+            const lngLat = marker.getLngLat()
+            const newLng = Math.round(lngLat.lng * 1000000) / 1000000
+            const newLat = Math.round(lngLat.lat * 1000000) / 1000000
+            draggingPoleIdRef.current = null
+            el.style.cursor = 'grab'
+            onPoleLocationChangeRef.current?.(p.id, newLng, newLat)
+            renderRoute(currentCoordsRef.current)
+          })
+
+          draggablePoleMarkersRef.current.set(p.id, { marker, isInvalid })
+        }
+      })
+    },
+    [renderRoute]
+  )
+
+  // Cập nhật các ghim cột khi danh sách cột hoặc trạng thái hợp lệ thay đổi
+  useEffect(() => {
+    syncEditableMarkers(poles, editablePoleIds, invalidPoleIds)
+  }, [poles, editablePoleIds, invalidPoleIds, syncEditableMarkers])
 
   // Cập nhật khung ranh giới xã khi đổi địa bàn
   useEffect(() => {
@@ -472,7 +683,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
 
   // Vẽ lại khi lộ trình truyền vào đổi
   useEffect(() => {
-    if (coordinates === currentCoordsRef.current) return
+    if (areCoordsEqual(coordinates, currentCoordsRef.current)) return
     renderRoute(coordinates)
   }, [coordinates, renderRoute])
 
@@ -493,9 +704,18 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const controlClass =
     'w-7 h-7 bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 backdrop-blur-md rounded-lg shadow-md border border-slate-200/80 dark:border-slate-600/80 flex items-center justify-center transition cursor-pointer'
 
+  const effectiveMinHeight = height && height !== '100%' ? height : '340px'
+
   return (
-    <div className="relative w-full h-full min-h-[480px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner group">
-      <div ref={containerRef} style={{ height, width: '100%' }} className="w-full h-full min-h-[480px] bg-blue-50" />
+    <div
+      style={{ height, minHeight: effectiveMinHeight }}
+      className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner group"
+    >
+      <div
+        ref={containerRef}
+        style={{ height: '100%', width: '100%', minHeight: effectiveMinHeight }}
+        className="w-full h-full bg-blue-50"
+      />
 
       <div className="absolute top-2 right-2 z-50 flex flex-col gap-1">
         <button

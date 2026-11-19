@@ -13,8 +13,23 @@ import type {
 import type { RootState } from '../../redux/rootReducer'
 import { fetchDashboardDataRequest } from '../dashboard/dashboardSlice'
 import { fetchSegmentsList } from '../dashboard/dashboardAPI'
-import type { SegmentListItem } from '../../types/assets/segments'
+import type { SegmentListItem, SegmentDetail } from '../../types/assets/segments'
+import type { SetPoleLocationRequest, PoleListItem, PoleListItemPagedResult } from '../../types/assets/poles'
 import { fetchAssetsRequest } from '../assets/assetSlice'
+import assetAPI from '../assets/assetAPI'
+import { fetchMapLayersRequest } from '../map/mapSlice'
+import {
+  isSameLine,
+  orderPolesByChain,
+  orderedPolesOfSegment,
+  VERTEX_MATCH_METERS,
+} from '../../utils/gis-map/segmentPoleOrder'
+import {
+  calculateDistanceMeters,
+  calculateRouteLengthMeters,
+  parseLineStringWkt,
+  projectPointOnSegment,
+} from '../../utils/gis-map/routeUtils'
 import {
   fetchWorkOrdersRequest,
   fetchWorkOrdersSuccess,
@@ -29,6 +44,7 @@ import {
   fetchBusyGpsPolesRequest,
   fetchBusyGpsPolesSuccess,
   fetchBusyGpsPolesFailure,
+  clearEditedGpsLocations,
   createWorkOrderRequest,
   createWorkOrderSuccess,
   createWorkOrderFailure,
@@ -107,9 +123,18 @@ function extractApiErrorMessage(err: unknown, fallbackMessage: string): string {
 
     if (code === 'POLE_OFF_SEGMENT') {
       const polesText = formatOffSegmentPoles(details?.poles)
-      return polesText
-        ? `Cột nằm ngoài phạm vi tuyến đường: ${polesText}`
-        : 'Tọa độ cột nằm ngoài phạm vi tuyến đường cho phép.'
+      if (polesText) {
+        return `Cột nằm ngoài hành lang tuyến đường cho phép: ${polesText}. Vui lòng mở Xem GIS để điều chỉnh lại.`
+      }
+      const distM = typeof details?.distance_m === 'number' ? details.distance_m : undefined
+      const corrM = typeof details?.corridor_m === 'number' ? details.corridor_m : undefined
+      if (distM !== undefined && corrM !== undefined) {
+        return `Vị trí cột điều chỉnh cách tuyến ${distM.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} m, nằm ngoài hành lang cho phép (${corrM.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} m) quanh tuyến đường.`
+      }
+      if (distM !== undefined) {
+        return `Vị trí cột điều chỉnh cách tuyến ${distM.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} m, nằm ngoài hành lang tuyến đường cho phép.`
+      }
+      return 'Tọa độ cột nằm ngoài phạm vi hành lang tuyến đường cho phép (tối đa 25 m).'
     }
     if (code === 'POLE_ALREADY_IN_WORK_ORDER') {
       const poleId = typeof details?.pole_id === 'string' ? details.pole_id : ''
@@ -138,6 +163,8 @@ function extractApiErrorMessage(err: unknown, fallbackMessage: string): string {
         scheduled_date: 'Ngày thực hiện không hợp lệ (không được sau hạn hoàn thành).',
         due_date: 'Hạn hoàn thành không hợp lệ.',
         pole_locations: 'Dữ liệu tọa độ GPS báo cáo không hợp lệ.',
+        lat: 'Vĩ độ (Lat) của cột đèn không hợp lệ (phải nằm trong khoảng -90 đến 90).',
+        lng: 'Kinh độ (Lng) của cột đèn không hợp lệ (phải nằm trong khoảng -180 đến 180).',
         fault_ids: 'Danh sách sự cố được chọn không hợp lệ.',
         fault_outcomes: 'Kết quả kiểm tra sự cố không hợp lệ.',
         note: 'Nội dung ghi chú không hợp lệ (từ 1 đến 500 ký tự).',
@@ -398,6 +425,22 @@ function* handleFollowUpWorkOrder(
   }
 }
 
+/** Backend giới hạn page_size ở 200 cho /assets/poles: đọc lần lượt từng trang tới hết. */
+function* fetchAllAssetPoles() {
+  const allPoles: PoleListItem[] = []
+  for (let page = 1; page <= 20; page++) {
+    const res = (yield call(assetAPI.getPoles, {
+      page,
+      page_size: 200,
+    })) as PoleListItemPagedResult
+    const items = res.items ?? []
+    allPoles.push(...items)
+    const total = typeof res.total === 'number' ? res.total : allPoles.length
+    if (items.length === 0 || allPoles.length >= total) break
+  }
+  return allPoles
+}
+
 /**
  * Worker saga nghiệm thu và chuyển Superior
  */
@@ -406,28 +449,244 @@ function* handleVerifyWorkOrder(
     workOrderId: string
     note?: string
     materials_note?: string
+    editedPoleLocations?: Record<string, SetPoleLocationRequest>
   }>
 ) {
-  const { workOrderId, note, materials_note } = action.payload
+  const { workOrderId, note, materials_note, editedPoleLocations } = action.payload
   try {
+    const state: RootState = yield select()
+    const beforePoles: PoleListItem[] = state.assets.poles || []
+    const savedEdits: Record<string, SetPoleLocationRequest> =
+      editedPoleLocations || state.workSchedule.editedGpsByWorkOrder?.[workOrderId] || {}
+    const editEntries = Object.entries(savedEdits).filter(
+      ([poleId, loc]) => Boolean(poleId) && typeof loc?.lat === 'number' && typeof loc?.lng === 'number'
+    )
+
     // 1. Tự động xác nhận ảnh khảo sát cột đèn (nếu có) để Backend kích hoạt chuyển cột thành 'out' và tạo fault 'detected'
     yield call([workScheduleAPI, workScheduleAPI.confirmAllPendingPolePhotos], workOrderId)
 
-    // 2. Nghiệm thu lệnh công tác trên Backend (Inspection -> faults thành confirmed; Repair -> faults thành resolved/verified)
-    yield call(workScheduleAPI.verifyWorkOrder, workOrderId, { note, materials_note })
+    // 1b. Nếu Quản lý đã kéo thả tinh chỉnh tọa độ trong Xem GIS:
+    // - Bước A: Gọi PUT /assets/poles/{id}/location với tọa độ mới của Quản lý trước để Backend kiểm tra nghiêm ngặt hành lang 25m.
+    // - Bước B: Đồng bộ tạm geom_wkt theo tọa độ gốc kỹ sư nộp để hàm verify của Backend nhận diện cột đã được Quản lý xử lý (measured.Unchanged = true), tránh bị kẹt bởi tọa độ gốc sai của kỹ sư.
+    const stagedRollbackPoles: Array<{ poleMeta: PoleListItem; fallbackLoc: SetPoleLocationRequest }> = []
+    if (editEntries.length > 0) {
+      const currentDetail: WorkOrderDetail =
+        state.workSchedule.workOrderDetail?.work_order_id === workOrderId
+          ? state.workSchedule.workOrderDetail
+          : yield call(workScheduleAPI.getWorkOrderDetail, workOrderId)
+
+      let currentAssetPoles: PoleListItem[] = beforePoles
+      const missingAnyMeta = editEntries.some(
+        ([poleId]) => !currentAssetPoles.some((p) => p.pole_id === poleId)
+      )
+      if (currentAssetPoles.length === 0 || missingAnyMeta) {
+        currentAssetPoles = yield* fetchAllAssetPoles()
+      }
+
+      for (const [poleId, loc] of editEntries) {
+        // Kiểm tra validate hành lang 25m của Backend cho tọa độ Quản lý đã tinh chỉnh (nếu vi phạm sẽ báo lỗi và dừng ngay tại đây)
+        yield call(assetAPI.setPoleLocation, poleId, { lat: loc.lat, lng: loc.lng })
+
+        const reportedLoc = (currentDetail?.pole_locations || []).find((p) => p.pole_id === poleId)
+        const poleMeta = currentAssetPoles.find((p) => p.pole_id === poleId)
+        if (
+          reportedLoc &&
+          typeof reportedLoc.lat === 'number' &&
+          typeof reportedLoc.lng === 'number' &&
+          poleMeta
+        ) {
+          yield call(assetAPI.updatePole, poleId, {
+            external_ref: poleMeta.external_ref,
+            segment_id: poleMeta.segment_id,
+            feeder_id: poleMeta.feeder_id,
+            feeder_source: poleMeta.feeder_source,
+            geom_wkt: `POINT(${reportedLoc.lng} ${reportedLoc.lat})`,
+            near_sensitive_poi: poleMeta.near_sensitive_poi,
+            data_source: poleMeta.data_source,
+            note: poleMeta.note,
+          })
+          stagedRollbackPoles.push({ poleMeta, fallbackLoc: loc })
+        }
+      }
+    }
+
+    // 2. Nghiệm thu lệnh công tác trên Backend (nếu bị từ chối do còn cột khác trong phiếu chưa chỉnh, tự động hoàn tác vị trí các cột đã đồng bộ tạm ở bước 1b)
+    let verifiedDetail: WorkOrderDetail
+    try {
+      verifiedDetail = yield call(workScheduleAPI.verifyWorkOrder, workOrderId, {
+        note,
+        materials_note,
+      })
+    } catch (verifyErr: unknown) {
+      for (const item of stagedRollbackPoles) {
+        if (item.poleMeta.pole_id) {
+          try {
+            const origLoc = item.poleMeta.location
+            if (origLoc && typeof origLoc.lat === 'number' && typeof origLoc.lng === 'number') {
+              yield call(assetAPI.updatePole, item.poleMeta.pole_id, {
+                external_ref: item.poleMeta.external_ref,
+                segment_id: item.poleMeta.segment_id,
+                feeder_id: item.poleMeta.feeder_id,
+                feeder_source: item.poleMeta.feeder_source,
+                geom_wkt: `POINT(${origLoc.lng} ${origLoc.lat})`,
+                near_sensitive_poi: item.poleMeta.near_sensitive_poi,
+                data_source: item.poleMeta.data_source,
+                note: item.poleMeta.note,
+              })
+            } else {
+              yield call(assetAPI.setPoleLocation, item.poleMeta.pole_id, {
+                lat: item.fallbackLoc.lat,
+                lng: item.fallbackLoc.lng,
+              })
+            }
+          } catch {
+            // Bỏ qua lỗi phụ khi rollback
+          }
+        }
+      }
+      throw verifyErr
+    }
+
+    // 3. Ghi chính thức tọa độ Quản lý đã tinh chỉnh lên từng cột đèn kèm bản ghi Audit
+    let adjustedCount = 0
+    const failedAdjustments: string[] = []
+    for (const [poleId, loc] of editEntries) {
+      try {
+        yield call(assetAPI.setPoleLocation, poleId, { lat: loc.lat, lng: loc.lng })
+        adjustedCount += 1
+      } catch (locErr: unknown) {
+        const locMsg = extractApiErrorMessage(
+          locErr,
+          `Không thể áp dụng tọa độ tinh chỉnh cho cột ${poleId}`
+        )
+        failedAdjustments.push(`${poleId}: ${locMsg}`)
+      }
+    }
+
+    // 4. Với phiếu cập nhật vị trí cột (pole_gps_update), tự động nối và cập nhật lại hình học tuyến đường (geom_wkt) theo các cột mới
+    const targetSegmentId =
+      verifiedDetail?.segment_id || state.workSchedule.workOrderDetail?.segment_id
+    const isPoleGpsOrder =
+      verifiedDetail?.task_kind === 'pole_gps_update' ||
+      state.workSchedule.workOrderDetail?.task_kind === 'pole_gps_update'
+    if (isPoleGpsOrder && targetSegmentId) {
+      try {
+        const [segDetail, allAfterPoles]: [SegmentDetail, PoleListItem[]] = yield all([
+          call(assetAPI.getSegmentDetail, targetSegmentId),
+          call(fetchAllAssetPoles),
+        ])
+        const previous = orderedPolesOfSegment(beforePoles, targetSegmentId)
+        const after = orderedPolesOfSegment(allAfterPoles, targetSegmentId)
+        const baseLine = parseLineStringWkt(segDetail.geom_wkt)
+        let newCoords: [number, number][] = []
+
+        if (baseLine.length >= 2) {
+          interface RouteNode {
+            id?: string
+            coord: [number, number]
+          }
+          const usedPrevIds = new Set<string>()
+          let nodes: RouteNode[] = baseLine.map((vertex) => {
+            const matchedPrev = previous.find(
+              (p) =>
+                !usedPrevIds.has(p.id) &&
+                calculateDistanceMeters(p.coord, vertex) <= VERTEX_MATCH_METERS
+            )
+            if (matchedPrev) {
+              usedPrevIds.add(matchedPrev.id)
+              return { id: matchedPrev.id, coord: vertex }
+            }
+            return { coord: vertex }
+          })
+
+          after.forEach((pole) => {
+            const existingIdx = nodes.findIndex((n) => n.id === pole.id)
+            if (existingIdx !== -1) {
+              nodes = nodes.filter((_, idx) => idx !== existingIdx)
+            }
+            if (nodes.length === 0) {
+              nodes = [{ id: pole.id, coord: pole.coord }]
+              return
+            }
+            if (nodes.length === 1) {
+              nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+              return
+            }
+            let bestIdx = 0
+            let bestT = 0
+            let bestDist = Infinity
+            for (let i = 0; i < nodes.length - 1; i++) {
+              const proj = projectPointOnSegment(pole.coord, nodes[i].coord, nodes[i + 1].coord)
+              if (proj.dist < bestDist) {
+                bestDist = proj.dist
+                bestIdx = i
+                bestT = proj.t
+              }
+            }
+            const lastEdgeIdx = nodes.length - 2
+            if (bestIdx === 0 && bestT <= 0) {
+              nodes = [{ id: pole.id, coord: pole.coord }, ...nodes]
+            } else if (bestIdx === lastEdgeIdx && bestT >= 1) {
+              nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+            } else {
+              nodes = [
+                ...nodes.slice(0, bestIdx + 1),
+                { id: pole.id, coord: pole.coord },
+                ...nodes.slice(bestIdx + 1),
+              ]
+            }
+          })
+          newCoords = nodes.map((n) => n.coord)
+        } else if (after.length >= 2) {
+          newCoords = orderPolesByChain(after).map((p) => p.coord)
+        }
+
+        if (newCoords.length >= 2) {
+          const newWkt = `LINESTRING(${newCoords.map((c) => `${c[0]} ${c[1]}`).join(', ')})`
+          const newLengthM = calculateRouteLengthMeters(newCoords)
+          if (!isSameLine(newWkt, segDetail.geom_wkt)) {
+            const seg = segDetail.segment
+            yield call(assetAPI.updateSegment, targetSegmentId, {
+              external_ref: seg.external_ref,
+              segment_name: seg.segment_name,
+              road_class: seg.road_class,
+              length_m: newLengthM,
+              geom_wkt: newWkt,
+              data_source: seg.data_source,
+            })
+          }
+        }
+      } catch {
+        // Nếu không cập nhật được hình tuyến phụ thì vẫn giữ kết quả duyệt cột thành công
+      }
+    }
+
+    if (editEntries.length > 0) {
+      yield put(clearEditedGpsLocations(workOrderId))
+    }
+
     yield put(verifyWorkOrderSuccess())
-    if (materials_note) {
+    if (failedAdjustments.length > 0) {
+      toast.warning(
+        `Đã duyệt báo cáo nhưng không thể lưu tọa độ tinh chỉnh cho ${failedAdjustments.length} cột — ${failedAdjustments.join('; ')}`
+      )
+    } else if (materials_note) {
       yield put(closeCaseDetail())
       toast.success('🎉 Đã duyệt nghiệm thu sửa chữa và gửi báo cáo lên Cấp trên thành công!')
+    } else if (adjustedCount > 0) {
+      toast.success(
+        `🎉 Đã duyệt báo cáo GPS và cập nhật tọa độ tinh chỉnh của ${adjustedCount} cột lên bản đồ GIS!`
+      )
     } else {
       toast.success('🎉 Đã duyệt nghiệm thu báo cáo công tác thành công!')
     }
     yield put(fetchWorkOrdersRequest(undefined))
     yield put(fetchWorkOrderDetailRequest(workOrderId))
-    // Đồng bộ lại dữ liệu lỗi, tài sản cột đèn (GPS) và bản đồ GIS
+    // Đồng bộ lại dữ liệu lỗi, tài sản cột đèn (GPS) và bản đồ GIS thật
     yield put(fetchDashboardDataRequest())
     yield put(fetchAssetsRequest())
-  } catch (error: any) {
+    yield put(fetchMapLayersRequest())
+  } catch (error: unknown) {
     const errorMsg = extractApiErrorMessage(error, 'Không thể duyệt nghiệm thu trên máy chủ')
     yield put(verifyWorkOrderFailure(errorMsg))
     toast.error(errorMsg)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   X,
   Video,
@@ -11,19 +11,46 @@ import {
   FileText,
   Map as MapIcon,
   Cpu,
+  RotateCcw,
+  Save,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../../../redux/rootReducer'
-import type { ScheduleCase, SchedulePhase } from '../../../feature/work-schedule/workScheduleSlice'
+import {
+  saveEditedGpsLocations,
+  type ScheduleCase,
+  type SchedulePhase,
+} from '../../../feature/work-schedule/workScheduleSlice'
+import {
+  fetchAssetsRequest,
+  fetchSegmentDetailRequest,
+} from '../../../feature/assets/assetSlice'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import { EvidenceItem, WorkOrderPole, PolePhotoItem, WorkOrderPoleLocation } from '../../../types/workorders/orders'
+import type { SetPoleLocationRequest } from '../../../types/assets/poles'
 import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
 import { FAULT_TYPE_LABELS_VN } from '../../../utils/citizen-report/citizenReviewFormat'
 import { iotAnomalyLabel } from '../../../constants/iot'
+import { SegmentRouteMap, type SegmentPoleItem } from '../../../components/SegmentRouteMap'
+import {
+  extractSegmentCoordinates,
+  parseLineStringWkt,
+  snapPointToPolyline,
+  calculateDistanceMeters,
+  projectPointOnSegment,
+} from '../../../utils/gis-map/routeUtils'
+import {
+  orderPolesByChain,
+  orderedPolesOfSegment,
+  VERTEX_MATCH_METERS,
+  type OrderedPole,
+} from '../../../utils/gis-map/segmentPoleOrder'
 import { EvidenceImage } from './EvidenceImage'
 import { PolePhotoImage } from './PolePhotoImage'
 import { PoleVideoPlayer } from './PoleVideoPlayer'
+
+const BACKEND_CORRIDOR_LIMIT_M = 25
 
 const formatDurationMs = (ms?: number): string => {
   if (ms == null || ms <= 0) return '—'
@@ -66,6 +93,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   onClose,
   onPreviewGis,
 }) => {
+  const dispatch = useDispatch()
   const [activeTab, setActiveTab] = useState<'video' | 'photos' | 'ai' | 'gps'>('video')
   const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [zoomImage, setZoomImage] = useState<ZoomImageTarget | null>(null)
@@ -73,6 +101,10 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const [poles, setPoles] = useState<WorkOrderPole[]>([])
   const [polePhotos, setPolePhotos] = useState<PolePhotoItem[]>([])
   const [decidingPhotoId, setDecidingPhotoId] = useState<string | null>(null)
+
+  // State cho Popup Xem & Tinh chỉnh GIS (Dữ liệu tạm trước khi Duyệt báo cáo)
+  const [isGisPreviewOpen, setIsGisPreviewOpen] = useState(false)
+  const [draftPoleCoords, setDraftPoleCoords] = useState<Record<string, SetPoleLocationRequest>>({})
 
   const handleDecidePolePhoto = async (
     photoId: string | null | undefined,
@@ -115,9 +147,450 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
 
   // Chi tiết lệnh công tác từ Redux store
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
+  const allSegments = useSelector((state: RootState) => state.assets.segments)
+  const allAssetPoles = useSelector((state: RootState) => state.assets.poles)
+  const segmentDetail = useSelector((state: RootState) => state.assets.segmentDetail)
+  const editedGpsByWorkOrder = useSelector((state: RootState) => state.workSchedule.editedGpsByWorkOrder)
 
   // Xác định mã lệnh công tác (hỗ trợ fallback caseItem.code nếu phase.workOrderId trống)
   const targetWorkOrderId = phase?.workOrderId || caseItem?.code
+  const isTargetDetail = Boolean(targetWorkOrderId && workOrderDetail?.work_order_id === targetWorkOrderId)
+  const savedEditedGps = useMemo(
+    () => (targetWorkOrderId ? editedGpsByWorkOrder?.[targetWorkOrderId] || {} : {}),
+    [editedGpsByWorkOrder, targetWorkOrderId]
+  )
+
+  const effectivePoleGpsLocations: WorkOrderPoleLocation[] = useMemo(() => {
+    if (isTargetDetail && workOrderDetail?.pole_locations) {
+      return workOrderDetail.pole_locations
+    }
+    return phase?.report?.poleGpsLocations || []
+  }, [isTargetDetail, workOrderDetail?.pole_locations, phase?.report?.poleGpsLocations])
+
+  // Xác định mã tuyến đường của phiếu cập nhật GPS
+  const targetSegmentId = useMemo(() => {
+    if (isTargetDetail && workOrderDetail?.segment_id) return workOrderDetail.segment_id
+    if (phase?.segmentId) return phase.segmentId
+    const rawSeg = (caseItem?.segment || '').trim()
+    if (rawSeg && rawSeg !== '-' && rawSeg !== '—') {
+      const matchedByCodeOrName = allSegments.find(
+        (s) =>
+          s.segment_id === rawSeg ||
+          s.external_ref === rawSeg ||
+          s.segment_name === rawSeg
+      )
+      if (matchedByCodeOrName?.segment_id) return matchedByCodeOrName.segment_id
+      const matchCode = rawSeg.match(/SEG-[A-Za-z0-9_-]+/i)
+      if (matchCode) return matchCode[0].toUpperCase()
+    }
+    const firstReportedPoleId = effectivePoleGpsLocations[0]?.pole_id
+    if (firstReportedPoleId) {
+      const foundPole =
+        poles.find((p) => p.pole_id === firstReportedPoleId) ||
+        allAssetPoles.find((p) => p.pole_id === firstReportedPoleId)
+      if (foundPole?.segment_id) return foundPole.segment_id
+    }
+    return ''
+  }, [
+    isTargetDetail,
+    workOrderDetail?.segment_id,
+    phase?.segmentId,
+    caseItem?.segment,
+    allSegments,
+    effectivePoleGpsLocations,
+    poles,
+    allAssetPoles,
+  ])
+
+  const matchedSegment = useMemo(
+    () => (targetSegmentId ? allSegments.find((s) => s.segment_id === targetSegmentId) || null : null),
+    [allSegments, targetSegmentId]
+  )
+
+  // Cho phép Quản lý kéo thả tinh chỉnh tọa độ khi phiếu chưa đóng / chưa duyệt
+  const canEditGps = Boolean(
+    phase &&
+      phase.status !== 'ended' &&
+      phase.rawStatus !== 'verified' &&
+      phase.rawStatus !== 'cancelled' &&
+      (!isTargetDetail ||
+        (workOrderDetail?.wo_status !== 'verified' && workOrderDetail?.wo_status !== 'cancelled'))
+  )
+
+  // Đường hình học cố định của tuyến (nếu tuyến đã có hình thật trên hệ thống)
+  const roadPolylineCoords = useMemo<[number, number][]>(() => {
+    if (
+      targetSegmentId &&
+      segmentDetail?.segmentId === targetSegmentId &&
+      typeof segmentDetail.geomWkt === 'string' &&
+      segmentDetail.geomWkt.trim().length > 0
+    ) {
+      return parseLineStringWkt(segmentDetail.geomWkt)
+    }
+    return []
+  }, [targetSegmentId, segmentDetail])
+
+  // Tổng hợp danh sách cột hiển thị trên bản đồ Popup Xem GIS (kết hợp cột trên tuyến & tọa độ đang tinh chỉnh)
+  const previewMapPoles = useMemo<SegmentPoleItem[]>(() => {
+    const mapByPoleId = new Map<string, SegmentPoleItem>()
+
+    // 1. Lấy các cột đã có GPS trên cùng tuyến đường từ danh mục tài sản
+    if (targetSegmentId) {
+      allAssetPoles
+        .filter(
+          (p) =>
+            p.segment_id === targetSegmentId &&
+            p.pole_id &&
+            p.location &&
+            typeof p.location.lat === 'number' &&
+            typeof p.location.lng === 'number' &&
+            Number.isFinite(p.location.lat) &&
+            Number.isFinite(p.location.lng)
+        )
+        .forEach((p) => {
+          const pid = p.pole_id!
+          mapByPoleId.set(pid, {
+            id: pid,
+            code: p.external_ref || pid,
+            coord: [p.location.lng!, p.location.lat!],
+            status: p.active_fixture ? 'normal' : 'unknown',
+            atlas: p.active_fixture?.fixture_type,
+          })
+        })
+    }
+
+    // 2. Ghi đè bằng tọa độ kỹ sư gửi lên (hoặc tọa độ tạm Quản lý đang kéo thả; nếu phiếu đã duyệt thì ưu tiên tọa độ GIS thực tế của cột)
+    effectivePoleGpsLocations.forEach((g) => {
+      if (!g.pole_id) return
+      const draft = draftPoleCoords[g.pole_id]
+      const verifiedPoleLoc = !canEditGps
+        ? poles.find((p) => p.pole_id === g.pole_id)?.location ||
+          allAssetPoles.find((p) => p.pole_id === g.pole_id)?.location
+        : undefined
+      const lat =
+        typeof draft?.lat === 'number'
+          ? draft.lat
+          : typeof verifiedPoleLoc?.lat === 'number' && Number.isFinite(verifiedPoleLoc.lat)
+          ? verifiedPoleLoc.lat
+          : g.lat
+      const lng =
+        typeof draft?.lng === 'number'
+          ? draft.lng
+          : typeof verifiedPoleLoc?.lng === 'number' && Number.isFinite(verifiedPoleLoc.lng)
+          ? verifiedPoleLoc.lng
+          : g.lng
+      if (typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)) {
+        const existing = mapByPoleId.get(g.pole_id)
+        mapByPoleId.set(g.pole_id, {
+          id: g.pole_id,
+          code: existing?.code || g.pole_id,
+          coord: [lng, lat],
+          status: existing?.status || 'normal',
+          atlas: existing?.atlas,
+        })
+      }
+    })
+
+    return Array.from(mapByPoleId.values()).sort((a, b) =>
+      (a.code || a.id).localeCompare(b.code || b.id, undefined, { numeric: true })
+    )
+  }, [targetSegmentId, allAssetPoles, effectivePoleGpsLocations, draftPoleCoords, canEditGps, poles])
+
+  // Kiểm tra các quy tắc Validate của Backend (Tiếng Việt ngắn gọn) theo thời gian thực khi Quản lý kéo thả
+  const poleValidations = useMemo(() => {
+    const result: Record<
+      string,
+      {
+        isModified: boolean
+        movedMeters: number
+        distToRoadMeters: number | null
+        errorVn: string | null
+      }
+    > = {}
+
+    const hasFixedRoadGeometry = Boolean(matchedSegment?.has_geometry && roadPolylineCoords.length >= 2)
+
+    effectivePoleGpsLocations.forEach((g) => {
+      const pid = g.pole_id
+      if (!pid) return
+      const draft = draftPoleCoords[pid]
+      const curLat = typeof draft?.lat === 'number' ? draft.lat : g.lat
+      const curLng = typeof draft?.lng === 'number' ? draft.lng : g.lng
+
+      const isModified = Boolean(
+        draft &&
+          typeof draft.lat === 'number' &&
+          typeof draft.lng === 'number' &&
+          typeof g.lat === 'number' &&
+          typeof g.lng === 'number' &&
+          (Math.abs(draft.lat - g.lat) > 0.0000005 || Math.abs(draft.lng - g.lng) > 0.0000005)
+      )
+
+      const movedMeters =
+        typeof g.lat === 'number' &&
+        typeof g.lng === 'number' &&
+        typeof curLat === 'number' &&
+        typeof curLng === 'number'
+          ? calculateDistanceMeters([g.lng, g.lat], [curLng, curLat])
+          : 0
+
+      let distToRoadMeters: number | null = null
+      let errorVn: string | null = null
+
+      if (
+        typeof curLat !== 'number' ||
+        typeof curLng !== 'number' ||
+        !Number.isFinite(curLat) ||
+        !Number.isFinite(curLng) ||
+        curLat < -90 ||
+        curLat > 90 ||
+        curLng < -180 ||
+        curLng > 180
+      ) {
+        errorVn = `Cột ${pid}: tọa độ không hợp lệ`
+      } else {
+        if (hasFixedRoadGeometry) {
+          const snap = snapPointToPolyline([curLng, curLat], roadPolylineCoords)
+          distToRoadMeters = snap.distMeters
+          if (distToRoadMeters > BACKEND_CORRIDOR_LIMIT_M) {
+            errorVn = `Cột ${pid} cách tuyến ${distToRoadMeters.toLocaleString('vi-VN', {
+              maximumFractionDigits: 1,
+            })} m — vượt quá giới hạn ${BACKEND_CORRIDOR_LIMIT_M} m`
+          }
+        }
+
+        // Kiểm tra trùng vị trí với cột khác trên tuyến (< 0.5m)
+        if (!errorVn) {
+          const collidingPole = previewMapPoles.find(
+            (other) =>
+              other.id !== pid &&
+              calculateDistanceMeters([curLng, curLat], other.coord) < 0.5
+          )
+          if (collidingPole) {
+            errorVn = `Cột ${pid} trùng vị trí với cột ${collidingPole.code || collidingPole.id}`
+          }
+        }
+      }
+
+      result[pid] = {
+        isModified,
+        movedMeters,
+        distToRoadMeters,
+        errorVn,
+      }
+    })
+
+    return result
+  }, [effectivePoleGpsLocations, draftPoleCoords, matchedSegment?.has_geometry, roadPolylineCoords, previewMapPoles])
+
+  // Dựng đường nối lộ trình cho bản đồ Popup Xem GIS (Luôn luôn nối thẳng đường tuyến vào mọi điểm cột được cập nhật và chạy theo khi kéo thả)
+  const previewRouteInfo = useMemo(() => {
+    const previousPoles: OrderedPole[] = targetSegmentId
+      ? orderedPolesOfSegment(allAssetPoles, targetSegmentId)
+      : []
+
+    // Nếu tuyến đã có đường hình học (roadPolylineCoords >= 2 đỉnh), gắn các đỉnh hiện có và nối trực tiếp mọi cột cập nhật vào tuyến
+    if (roadPolylineCoords.length >= 2) {
+      interface RouteNode {
+        id?: string
+        coord: [number, number]
+      }
+
+      // 1. Khởi tạo các đỉnh từ đường tuyến gốc; đỉnh nào trùng vị trí cũ của cột thì gắn poleId của cột đó
+      const usedPrevIds = new Set<string>()
+      let nodes: RouteNode[] = roadPolylineCoords.map((vertex) => {
+        const matchedPrev = previousPoles.find(
+          (p) =>
+            !usedPrevIds.has(p.id) &&
+            calculateDistanceMeters(p.coord, vertex) <= VERTEX_MATCH_METERS
+        )
+        if (matchedPrev) {
+          usedPrevIds.add(matchedPrev.id)
+          return { id: matchedPrev.id, coord: vertex }
+        }
+        return { coord: vertex }
+      })
+
+      // 2. Với mỗi cột hiển thị (đặc biệt là cột kỹ sư gửi lên / Quản lý đang kéo), cập nhật hoặc chèn thẳng vào đường tuyến
+      previewMapPoles.forEach((pole) => {
+        const existingIdx = nodes.findIndex((n) => n.id === pole.id)
+        if (existingIdx !== -1) {
+          // Gỡ đỉnh cũ của cột này ra để đặt lại theo vị trí mới (nếu kéo sang đoạn khác thì thứ tự trên tuyến tự đổi theo)
+          nodes = nodes.filter((_, idx) => idx !== existingIdx)
+        }
+
+        if (nodes.length === 0) {
+          nodes = [{ id: pole.id, coord: pole.coord }]
+          return
+        }
+        if (nodes.length === 1) {
+          nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+          return
+        }
+
+        // Tìm đoạn thẳng gần nhất trên tuyến để nối điểm cột vào (đầu tuyến, cuối tuyến, hoặc chèn vào giữa tuyến)
+        let bestIdx = 0
+        let bestT = 0
+        let bestDist = Infinity
+        for (let i = 0; i < nodes.length - 1; i++) {
+          const proj = projectPointOnSegment(pole.coord, nodes[i].coord, nodes[i + 1].coord)
+          if (proj.dist < bestDist) {
+            bestDist = proj.dist
+            bestIdx = i
+            bestT = proj.t
+          }
+        }
+
+        const lastEdgeIdx = nodes.length - 2
+        if (bestIdx === 0 && bestT <= 0) {
+          nodes = [{ id: pole.id, coord: pole.coord }, ...nodes]
+        } else if (bestIdx === lastEdgeIdx && bestT >= 1) {
+          nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+        } else {
+          nodes = [
+            ...nodes.slice(0, bestIdx + 1),
+            { id: pole.id, coord: pole.coord },
+            ...nodes.slice(bestIdx + 1),
+          ]
+        }
+      })
+
+      const coords = nodes.map((n) => n.coord)
+      if (coords.length >= 2) {
+        return {
+          initialStart: coords[0],
+          initialEnd: coords[coords.length - 1],
+          initialCoords: coords,
+        }
+      }
+    }
+
+    // Nếu tuyến chưa có đường hình học sẵn, tự động sắp chuỗi và nối tất cả các cột hiện có trên bản đồ
+    if (previewMapPoles.length >= 2) {
+      const ordered = orderPolesByChain(
+        previewMapPoles.map((p) => ({ id: p.id, coord: p.coord }))
+      )
+      const coords = ordered.map((item) => item.coord)
+      return {
+        initialStart: coords[0],
+        initialEnd: coords[coords.length - 1],
+        initialCoords: coords,
+      }
+    }
+
+    return extractSegmentCoordinates(matchedSegment || {}, previewMapPoles)
+  }, [
+    targetSegmentId,
+    allAssetPoles,
+    roadPolylineCoords,
+    previewMapPoles,
+    matchedSegment,
+  ])
+
+  const editablePoleIds = useMemo(
+    () =>
+      effectivePoleGpsLocations
+        .map((g) => g.pole_id)
+        .filter((id): id is string => Boolean(id)),
+    [effectivePoleGpsLocations]
+  )
+
+  const invalidPoleIds = useMemo(
+    () => Object.entries(poleValidations).filter(([, v]) => Boolean(v.errorVn)).map(([id]) => id),
+    [poleValidations]
+  )
+
+  const validationErrorMessages = useMemo(
+    () =>
+      Object.values(poleValidations)
+        .map((v) => v.errorVn)
+        .filter((msg): msg is string => Boolean(msg)),
+    [poleValidations]
+  )
+
+  const handleOpenGisPreview = useCallback(() => {
+    if (allSegments.length === 0 || allAssetPoles.length === 0) {
+      dispatch(fetchAssetsRequest())
+    }
+    if (targetSegmentId && segmentDetail?.segmentId !== targetSegmentId) {
+      dispatch(fetchSegmentDetailRequest(targetSegmentId))
+    }
+    setDraftPoleCoords({ ...savedEditedGps })
+    setIsGisPreviewOpen(true)
+    if (onPreviewGis && caseItem) {
+      onPreviewGis({
+        code: caseItem.code,
+        segment: caseItem.segment,
+        poles: effectivePoleGpsLocations,
+      })
+    }
+  }, [
+    allSegments.length,
+    allAssetPoles.length,
+    dispatch,
+    targetSegmentId,
+    segmentDetail?.segmentId,
+    savedEditedGps,
+    onPreviewGis,
+    caseItem,
+    effectivePoleGpsLocations,
+  ])
+
+  const handleDraftPoleDrag = useCallback(
+    (poleId: string, newLng: number, newLat: number) => {
+      if (!canEditGps) return
+      const original = effectivePoleGpsLocations.find((g) => g.pole_id === poleId)
+      setDraftPoleCoords((prev) => {
+        if (
+          original &&
+          typeof original.lat === 'number' &&
+          typeof original.lng === 'number' &&
+          Math.abs(original.lat - newLat) <= 0.0000005 &&
+          Math.abs(original.lng - newLng) <= 0.0000005
+        ) {
+          const next = { ...prev }
+          delete next[poleId]
+          return next
+        }
+        return {
+          ...prev,
+          [poleId]: { lat: newLat, lng: newLng },
+        }
+      })
+    },
+    [canEditGps, effectivePoleGpsLocations]
+  )
+
+  const handleRestoreSinglePoleDraft = useCallback((poleId: string) => {
+    setDraftPoleCoords((prev) => {
+      const next = { ...prev }
+      delete next[poleId]
+      return next
+    })
+  }, [])
+
+  const handleSaveDraftGps = useCallback(() => {
+    if (!targetWorkOrderId) return
+    if (invalidPoleIds.length > 0) {
+      toast.error('Còn vị trí cột đèn vi phạm quy tắc hành lang tuyến đường. Vui lòng kéo chỉnh lại trước khi lưu!')
+      return
+    }
+    dispatch(
+      saveEditedGpsLocations({
+        workOrderId: targetWorkOrderId,
+        locations: draftPoleCoords,
+      })
+    )
+    const editedCount = Object.keys(draftPoleCoords).length
+    if (editedCount > 0) {
+      toast.success(
+        `Đã lưu tạm tọa độ tinh chỉnh của ${editedCount} cột. Khi bấm "Duyệt & Import GIS", tọa độ này sẽ được cập nhật lên Bản đồ GIS thật!`
+      )
+    } else {
+      toast.info('Đã khôi phục toàn bộ tọa độ về dữ liệu gốc của Kỹ sư hiện trường.')
+    }
+    setIsGisPreviewOpen(false)
+  }, [targetWorkOrderId, invalidPoleIds.length, dispatch, draftPoleCoords])
 
   // Tải ảnh bằng chứng nghiệm thu và danh sách cột từ Backend nếu có mã lệnh công tác
   useEffect(() => {
@@ -186,7 +659,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const report = phase.report
 
   // Trích xuất dữ liệu báo cáo thực tế từ workOrderDetail nếu khớp lệnh
-  const isTargetDetail = workOrderDetail?.work_order_id === targetWorkOrderId
   const effectiveReportNote =
     (isTargetDetail && workOrderDetail?.report_note) ||
     report?.summary ||
@@ -201,10 +673,6 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const effectiveUsedMaterials =
     (isTargetDetail && workOrderDetail?.materials_used) ||
     report?.usedMaterialsNote
-  const effectivePoleGpsLocations: WorkOrderPoleLocation[] =
-    isTargetDetail && workOrderDetail?.pole_locations
-      ? workOrderDetail.pole_locations
-      : report?.poleGpsLocations || []
 
   // Phân loại báo cáo IoT (không tuyến, không cột) để hiển thị đúng Mạch & Node thay vì Cột đèn
   const normalizedSeg = (caseItem.segment || '').trim()
@@ -387,24 +855,26 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <p className="text-xs text-slate-700 font-medium leading-relaxed whitespace-pre-line">
                     {effectiveReportNote}
                   </p>
+                  {Object.keys(savedEditedGps).length > 0 && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/90 border border-amber-300 text-[11px] font-bold text-amber-900">
+                      <span>
+                        ✏️ Đã lưu tạm tọa độ tinh chỉnh cho {Object.keys(savedEditedGps).length} cột (chỉ cập nhật lên GIS thật khi bấm Duyệt &amp; Import GIS)
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (onPreviewGis) {
-                      onPreviewGis({
-                        code: caseItem.code,
-                        segment: caseItem.segment,
-                        poles: effectivePoleGpsLocations,
-                      })
-                    } else {
-                      toast.info('Chức năng Xem GIS (popup bản đồ thu nhỏ) đang được kết nối.')
-                    }
-                  }}
+                  onClick={handleOpenGisPreview}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-xs transition cursor-pointer active:scale-95 shrink-0"
                 >
                   <MapIcon className="w-3.5 h-3.5" />
                   <span>Xem GIS</span>
+                  {Object.keys(savedEditedGps).length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black">
+                      {Object.keys(savedEditedGps).length}
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -429,11 +899,61 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                           evidenceMatches.length > 0
                             ? evidenceMatches[evidenceMatches.length - 1]
                             : undefined
+                        const savedEdit = g.pole_id ? savedEditedGps[g.pole_id] : undefined
+                        const isSavedModified = Boolean(
+                          savedEdit &&
+                            typeof savedEdit.lat === 'number' &&
+                            typeof savedEdit.lng === 'number'
+                        )
+                        const verifiedAssetLoc =
+                          !canEditGps && g.pole_id
+                            ? poles.find((p) => p.pole_id === g.pole_id)?.location ||
+                              allAssetPoles.find((p) => p.pole_id === g.pole_id)?.location
+                            : undefined
+                        const isVerifiedModified = Boolean(
+                          !isSavedModified &&
+                            verifiedAssetLoc &&
+                            typeof verifiedAssetLoc.lat === 'number' &&
+                            typeof verifiedAssetLoc.lng === 'number' &&
+                            g.lat != null &&
+                            g.lng != null &&
+                            (Math.abs(verifiedAssetLoc.lat - g.lat) > 0.000001 ||
+                              Math.abs(verifiedAssetLoc.lng - g.lng) > 0.000001)
+                        )
+                        const subLat = isSavedModified
+                          ? savedEdit?.lat
+                          : isVerifiedModified
+                          ? verifiedAssetLoc?.lat
+                          : undefined
+                        const subLng = isSavedModified
+                          ? savedEdit?.lng
+                          : isVerifiedModified
+                          ? verifiedAssetLoc?.lng
+                          : undefined
 
                         return (
-                          <tr key={g.pole_id || idx} className="hover:bg-violet-50/40">
+                          <tr
+                            key={g.pole_id || idx}
+                            className={
+                              isSavedModified
+                                ? 'bg-amber-50/40 hover:bg-amber-50/70'
+                                : 'hover:bg-violet-50/40'
+                            }
+                          >
                             <td className="py-2.5 px-3 font-mono font-black text-slate-900">
-                              {g.pole_id || '-'}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{g.pole_id || '-'}</span>
+                                {isSavedModified && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-sans text-[10px] font-bold">
+                                    Đã chỉnh tạm
+                                  </span>
+                                )}
+                                {isVerifiedModified && (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 font-sans text-[10px] font-bold">
+                                    Đã chỉnh trên GIS
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-2 px-3">
                               {matchedEvidence?.evidence_id ? (
@@ -479,13 +999,55 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                               )}
                             </td>
                             <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
-                              {g.lat != null ? g.lat.toFixed(6) : '-'}
+                              <div>{g.lat != null ? g.lat.toFixed(6) : '-'}</div>
+                              {subLat != null && (
+                                <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-[10.5px] font-extrabold text-indigo-700">
+                                  <span>
+                                    {isSavedModified ? 'Đã chỉnh:' : 'GIS:'} {subLat.toFixed(6)}
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
-                              {g.lng != null ? g.lng.toFixed(6) : '-'}
+                              <div>{g.lng != null ? g.lng.toFixed(6) : '-'}</div>
+                              {subLng != null && (
+                                <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-[10.5px] font-extrabold text-indigo-700">
+                                  <span>
+                                    {isSavedModified ? 'Đã chỉnh:' : 'GIS:'} {subLng.toFixed(6)}
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="py-2.5 px-3 text-[11px] text-slate-500">
-                              {g.captured_at ? new Date(g.captured_at).toLocaleString('vi-VN') : '-'}
+                              <div className="flex items-center justify-between gap-2">
+                                <span>
+                                  {g.captured_at
+                                    ? new Date(g.captured_at).toLocaleString('vi-VN')
+                                    : '-'}
+                                </span>
+                                {isSavedModified && g.pole_id && canEditGps && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!targetWorkOrderId || !g.pole_id) return
+                                      const next = { ...savedEditedGps }
+                                      delete next[g.pole_id]
+                                      dispatch(
+                                        saveEditedGpsLocations({
+                                          workOrderId: targetWorkOrderId,
+                                          locations: next,
+                                        })
+                                      )
+                                      toast.info(`Đã khôi phục tọa độ gốc của kỹ sư cho cột ${g.pole_id}.`)
+                                    }}
+                                    className="px-2 py-1 rounded-md bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                                    title="Khôi phục về tọa độ gốc của kỹ sư"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Gốc</span>
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         )
@@ -1124,6 +1686,273 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Popup Bản Đồ Vệ Tinh Xem Trước & Kéo Thả Tinh Chỉnh Tọa Độ GIS (Dữ Liệu Tạm) */}
+      {isGisPreviewOpen && (
+        <div
+          className="fixed inset-0 z-70 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setIsGisPreviewOpen(false)}
+        >
+          <div
+            className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Popup GIS */}
+            <div className="px-6 py-4 bg-linear-to-r from-indigo-700 via-violet-700 to-indigo-800 text-white flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                  <MapIcon className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs bg-white/20 px-2 py-0.5 rounded-md font-bold">
+                      {targetWorkOrderId || caseItem.code}
+                    </span>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 border border-amber-300/30">
+                      {canEditGps
+                        ? 'Kéo thả ghim cột (✥) để tinh chỉnh tạm'
+                        : 'Phiếu đã nghiệm thu — Chế độ chỉ xem'}
+                    </span>
+                  </div>
+                  <h3 className="font-extrabold text-sm sm:text-base mt-0.5 truncate">
+                    Xem &amp; Tinh chỉnh Tọa độ GIS:{' '}
+                    {matchedSegment?.segment_name || formatSegmentDisplay(caseItem.segment)}
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsGisPreviewOpen(false)}
+                className="w-8 h-8 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center transition cursor-pointer shrink-0"
+                title="Đóng bản đồ xem trước"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            {/* Body Popup GIS */}
+            <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-3.5 custom-scrollbar bg-slate-50/60">
+              {/* Hướng dẫn & Thông số nhanh (Cố định chiều cao, không bao giờ co giãn) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs shrink-0">
+                <div className="p-2.5 rounded-2xl bg-white border border-slate-200 flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">Tuyến đường:</span>
+                  <span className="font-extrabold text-slate-900 truncate ml-2">
+                    {matchedSegment?.external_ref || targetSegmentId || formatSegmentDisplay(caseItem.segment)}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-2xl bg-white border border-slate-200 flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">Số cột kỹ sư gửi:</span>
+                  <span className="font-extrabold text-indigo-700 font-mono">
+                    {effectivePoleGpsLocations.length} cột
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-2xl bg-white border border-slate-200 flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">Hành lang tuyến tối đa:</span>
+                  <span className="font-extrabold text-emerald-700 font-mono">
+                    {matchedSegment?.has_geometry && roadPolylineCoords.length >= 2
+                      ? `≤ ${BACKEND_CORRIDOR_LIMIT_M} m quanh tuyến`
+                      : 'Tuyến chưa có hình (tự nối cột)'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Bản đồ vệ tinh tương tác (Cố định vị trí tuyệt đối để không bao giờ bị giật khung khi kéo thả) */}
+              <div className="relative w-full h-[350px] shrink-0 rounded-2xl overflow-hidden border border-slate-300 shadow-xs bg-slate-900">
+                <SegmentRouteMap
+                  height="350px"
+                  coordinates={previewRouteInfo.initialCoords}
+                  startCoord={previewRouteInfo.initialStart}
+                  endCoord={previewRouteInfo.initialEnd}
+                  poles={previewMapPoles}
+                  communeId={matchedSegment?.commune_id || workOrderDetail?.commune_id}
+                  editablePoleIds={canEditGps ? editablePoleIds : []}
+                  invalidPoleIds={invalidPoleIds}
+                  onPoleLocationChange={handleDraftPoleDrag}
+                />
+
+                {/* Thanh trạng thái kiểm tra hành lang nổi gọn trên đáy bản đồ (pointer-events-none, không làm dịch chuyển khung bản đồ) */}
+                <div className="pointer-events-none absolute bottom-2.5 left-2.5 right-12 z-40 flex items-center">
+                  {validationErrorMessages.length > 0 ? (
+                    <div className="px-3 py-1.5 rounded-xl bg-rose-600/95 text-white text-[11px] font-bold shadow-lg border border-rose-300/60 flex items-center gap-2 backdrop-blur-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-200" />
+                      <span className="truncate">{validationErrorMessages[0]}</span>
+                    </div>
+                  ) : (
+                    <div className="px-3 py-1.5 rounded-xl bg-slate-900/80 text-emerald-300 text-[11px] font-bold shadow-md border border-white/15 flex items-center gap-1.5 backdrop-blur-xs">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                      <span>
+                        {matchedSegment?.has_geometry && roadPolylineCoords.length >= 2
+                          ? `Vị trí cột hợp lệ (cách tuyến ≤ ${BACKEND_CORRIDOR_LIMIT_M} m)`
+                          : 'Kéo thả chấm cột tím (✥) để tinh chỉnh vị trí'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bảng Tọa độ Thời gian thực (Cập nhật tức thì khi Quản lý kéo thả ghim trên bản đồ) */}
+              <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-2xs shrink-0">
+                <div className="px-4 py-2.5 bg-slate-100/80 border-b border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-extrabold text-slate-800">
+                    Bảng tọa độ GPS theo thời gian thực khi kéo thả trên bản đồ
+                  </span>
+                  {canEditGps && Object.keys(draftPoleCoords).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDraftPoleCoords({})}
+                      className="text-[11px] font-bold text-amber-700 hover:text-amber-900 flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Khôi phục tất cả về tọa độ gốc của kỹ sư</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="overflow-x-auto max-h-48">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10.5px] uppercase">
+                        <th className="py-2 px-3 font-extrabold">Mã cột</th>
+                        <th className="py-2 px-3 font-extrabold">Tọa độ Kỹ sư gửi (Gốc)</th>
+                        <th className="py-2 px-3 font-extrabold">Tọa độ trên bản đồ (Hiện tại)</th>
+                        <th className="py-2 px-3 font-extrabold">Độ lệch / Hành lang tuyến</th>
+                        <th className="py-2 px-3 font-extrabold text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {effectivePoleGpsLocations.map((g, idx) => {
+                        const pid = g.pole_id || ''
+                        const draft = pid ? draftPoleCoords[pid] : undefined
+                        const curLat = typeof draft?.lat === 'number' ? draft.lat : g.lat
+                        const curLng = typeof draft?.lng === 'number' ? draft.lng : g.lng
+                        const valInfo = pid ? poleValidations[pid] : undefined
+                        const isMod = Boolean(valInfo?.isModified)
+                        const hasErr = Boolean(valInfo?.errorVn)
+
+                        return (
+                          <tr
+                            key={pid || idx}
+                            className={
+                              hasErr
+                                ? 'bg-rose-50/70'
+                                : isMod
+                                ? 'bg-amber-50/60'
+                                : 'hover:bg-slate-50'
+                            }
+                          >
+                            <td className="py-2 px-3 font-mono font-black text-slate-900">
+                              <div className="flex items-center gap-1.5">
+                                <span>{pid || '-'}</span>
+                                {isMod && !hasErr && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-sans text-[10px] font-bold">
+                                    Đã kéo chỉnh
+                                  </span>
+                                )}
+                                {hasErr && (
+                                  <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300 font-sans text-[10px] font-bold">
+                                    Ngoài hành lang
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 font-mono text-slate-500">
+                              {g.lat != null && g.lng != null
+                                ? `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}`
+                                : '-'}
+                            </td>
+                            <td className="py-2 px-3 font-mono font-extrabold text-indigo-700">
+                              {curLat != null && curLng != null
+                                ? `${curLat.toFixed(6)}, ${curLng.toFixed(6)}`
+                                : '-'}
+                            </td>
+                            <td className="py-2 px-3">
+                              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                <span className="font-semibold text-slate-700">
+                                  Dời:{' '}
+                                  <strong>
+                                    {(valInfo?.movedMeters ?? 0).toLocaleString('vi-VN', {
+                                      maximumFractionDigits: 1,
+                                    })}{' '}
+                                    m
+                                  </strong>
+                                </span>
+                                {valInfo?.distToRoadMeters != null && (
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded font-bold ${
+                                      valInfo.distToRoadMeters > BACKEND_CORRIDOR_LIMIT_M
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    }`}
+                                  >
+                                    Cách tuyến:{' '}
+                                    {valInfo.distToRoadMeters.toLocaleString('vi-VN', {
+                                      maximumFractionDigits: 1,
+                                    })}{' '}
+                                    m / {BACKEND_CORRIDOR_LIMIT_M} m
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              {canEditGps && pid && isMod ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRestoreSinglePoleDraft(pid)}
+                                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                  <span>Khôi phục gốc</span>
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">Tọa độ gốc</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Popup GIS */}
+            <div className="px-6 py-3.5 border-t border-slate-200 bg-white flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="text-[11px] text-slate-600 max-w-xl leading-relaxed">
+                💡 <strong>Lưu ý:</strong> Tọa độ điều chỉnh trên bản đồ này là <strong>dữ liệu tạm</strong>. Chỉ khi bạn bấm{' '}
+                <strong className="text-indigo-700">Lưu tọa độ đã chỉnh</strong> và sau đó bấm{' '}
+                <strong className="text-emerald-700">Duyệt &amp; Import GIS</strong> trên phiếu công tác thì dữ liệu mới được cập nhật lên Bản đồ GIS thật.
+              </div>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsGisPreviewOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Đóng
+                </button>
+                {canEditGps && (
+                  <button
+                    type="button"
+                    disabled={invalidPoleIds.length > 0}
+                    onClick={handleSaveDraftGps}
+                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-extrabold rounded-xl shadow-xs transition ${
+                      invalidPoleIds.length > 0
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer active:scale-95'
+                    }`}
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Lưu tọa độ đã chỉnh</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Xem Phóng To Hình Ảnh (Lightbox Preview) */}
       {zoomImage && (

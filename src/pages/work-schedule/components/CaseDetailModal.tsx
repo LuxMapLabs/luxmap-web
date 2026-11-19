@@ -114,6 +114,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const dispatch = useDispatch()
   // Dữ liệu chi tiết lệnh công tác từ máy chủ
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
+  const editedGpsByWorkOrder = useSelector((state: RootState) => state.workSchedule.editedGpsByWorkOrder)
 
   // Trạng thái cục bộ khi duyệt kiểm tra
   const [isInspectionApprovedLocal, setIsInspectionApprovedLocal] = useState(false)
@@ -1248,6 +1249,20 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                           {currentPhase.status === 'ended' ? 'Đã chốt' : 'Chờ duyệt'}
                         </span>
                       </div>
+
+                      {(() => {
+                        const targetWoId = currentPhase.workOrderId || caseItem.code
+                        const savedEdits = targetWoId ? editedGpsByWorkOrder?.[targetWoId] : undefined
+                        const editedCount = savedEdits ? Object.keys(savedEdits).length : 0
+                        if (editedCount <= 0) return null
+                        return (
+                          <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-2 text-xs text-amber-900">
+                            <span className="font-bold">
+                              ✏️ Đã lưu tạm tọa độ tinh chỉnh của {editedCount} cột trong Xem GIS (sẽ cập nhật lên Bản đồ GIS thật khi bấm Duyệt &amp; Import GIS).
+                            </span>
+                          </div>
+                        )
+                      })()}
 
                       {/* Bản xem trước toàn bộ ảnh hiện trường kỹ sư gửi lên (không giới hạn số lượng) */}
                       {previewEvidence.length > 0 && (
