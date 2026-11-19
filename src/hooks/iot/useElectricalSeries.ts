@@ -6,6 +6,7 @@ import {
   selectElectricalSeries,
   startElectricalSeries,
   stopElectricalSeries,
+  type ElectricalTimeBasis,
   type IotMonitorState,
 } from '../../feature/iot/iotMonitorSlice'
 
@@ -28,6 +29,10 @@ interface Options {
   windowMs?: number
   /** Mặc định true: false thì chỉ tải lần đầu, không hỏi lại định kỳ (mạch đã gỡ node: chỉ xem lịch sử cũ). */
   live?: boolean
+  /** Mặc định `'measured_at'` (giờ đo trên node); `'received_at'` cho Admin xem theo giờ Bridge nhận. */
+  timeBasis?: ElectricalTimeBasis
+  /** Xem theo khoảng ngày cụ thể (ISO UTC): tải tĩnh, không polling. */
+  fromTo?: { from: string; to: string }
 }
 
 const EMPTY_POINTS: ElectricalPoint[] = []
@@ -43,11 +48,13 @@ const EMPTY_POINTS: ElectricalPoint[] = []
  */
 export function useElectricalSeries(
   feederId: string | null | undefined,
-  { initial, maxPoints, windowMs, live = true }: Options
+  { initial, maxPoints, windowMs, live = true, timeBasis, fromTo }: Options
 ) {
   const key = useId()
   const dispatch = useDispatch<AppDispatch>()
   const entry = useSelector((s: { iotMonitor: IotMonitorState }) => selectElectricalSeries(s, key))
+  const fromIso = fromTo?.from
+  const toIso = fromTo?.to
 
   useEffect(() => {
     if (!feederId) return
@@ -59,12 +66,14 @@ export function useElectricalSeries(
         maxPoints,
         windowMs,
         live,
+        timeBasis,
+        fromTo: fromIso && toIso ? { from: fromIso, to: toIso } : undefined,
       })
     )
     return () => {
       dispatch(stopElectricalSeries({ key }))
     }
-  }, [feederId, initial, maxPoints, windowMs, live, dispatch, key])
+  }, [feederId, initial, maxPoints, windowMs, live, timeBasis, fromIso, toIso, dispatch, key])
 
   if (entry) {
     return {

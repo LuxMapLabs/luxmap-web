@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../../redux/rootReducer'
 import { closeImportModal } from '../../feature/assets/assetSlice'
+import { fetchNodesTabRequest, selectNodesTab } from '../../feature/iot/iotMonitorSlice'
 import {
   Boxes,
   Zap,
@@ -33,6 +34,11 @@ export const AssetManagementPage: React.FC = () => {
   const dispatch = useDispatch()
   const [activeCategory, setActiveCategory] = useState<AssetCategory>('segments')
   const isImportModalOpen = useSelector((state: RootState) => Boolean(state.assets.isImportModalOpen))
+  const nodesTab = useSelector(selectNodesTab)
+
+  useEffect(() => {
+    dispatch(fetchNodesTabRequest())
+  }, [dispatch])
   const [selectedFixtureCode, setSelectedFixtureCode] = useState<string>('')
   const [selectedPoleCode, setSelectedPoleCode] = useState<string>('')
   const [selectedCabinetCode, setSelectedCabinetCode] = useState<string>('')
@@ -69,7 +75,6 @@ export const AssetManagementPage: React.FC = () => {
     cabinets,
     segments,
     feeders,
-    iotNodes,
     isLoadingAssets,
     handleAddPole,
     handleAddPoles,
@@ -144,7 +149,7 @@ export const AssetManagementPage: React.FC = () => {
                 key: 'iot_nodes',
                 label: 'Thiết bị IoT',
                 icon: Cpu,
-                count: iotNodes.length,
+                count: nodesTab.nodes.length,
                 isLoading: isLoadingAssets,
                 active: activeCategory === 'iot_nodes',
                 onSelect: () => selectCategory('iot_nodes', { pole: true, fixture: true, cabinet: true }),

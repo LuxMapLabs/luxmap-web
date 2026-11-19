@@ -1,15 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Cpu, Eye, MapPin, Plus, Server } from 'lucide-react'
+import { Cpu, Eye, Loader2, MapPin, Pencil, Plus, Server, Unlink } from 'lucide-react'
 import type { AppDispatch, RootState } from '../../redux/store'
-import { fetchBridgeRequest } from '../../feature/iot/iotBridgeSlice'
+import {
+  detachNodeFeederRequest,
+  fetchBridgeRequest,
+  fetchNodeAssetsRequest,
+  resetNodeDetach,
+} from '../../feature/iot/iotBridgeSlice'
+import type { IotNodeStatus } from '../../types/iot/nodes'
 import type { IotServerStatus } from '../../types/iot/servers'
 import { IOT_GATEWAY_STATUS, IOT_NODE_STATUS, IOT_TONE_CLASS, iotStatusBadge, type IotTone } from '../../constants/iot'
 import { isSystemAdmin } from '../../utils/roleUtils'
+import { feederOnRelayOne } from '../../utils/iot/iotRegistration'
 import { formatRelativeTime } from '../../utils/admin-dashboard/formatters'
 import { IotServerFormModal, type CommuneLoadStatus } from './components/IotServerFormModal'
-import { GatewayRoutesPanel } from './components/GatewayRoutesPanel'
+import { ServerCredentialPanel } from './components/ServerCredentialPanel'
 import { RegisterNodeModal } from './components/RegisterNodeModal'
+import { EditNodeModal } from './components/EditNodeModal'
+import { IotBridgeModal, secondaryButtonClass } from './components/IotBridgeModal'
 import { IotNodeDetailModal } from '../assets/components/iot/components/IotNodeDetailModal'
 
 const SERVER_SHORT_STATUS_LABELS: Record<string, string> = {
@@ -35,7 +44,7 @@ const DOT_TONE_CLASS: Record<IotTone, string> = {
 }
 
 /**
- * Trang IoT Bridge: server, vị trí gateway, tuyến MQTT, secret và node.
+ * Trang IoT Bridge: server, vị trí gateway, key MQTT và node.
  * Quản trị hệ thống tạo / chỉnh; vai trò khác chỉ xem. Mọi nút ghi đi qua
  * `canManage` — không render khi người dùng không phải `system_admin`.
  */
@@ -51,17 +60,35 @@ export const IotBridgeAdminPage: React.FC = () => {
     nodesError,
     communes,
     communesStatus,
+    feeders,
+    nodeDetach,
+    nodeDetachError,
   } = useSelector((state: RootState) => state.iotBridge)
 
   const [formServer, setFormServer] = useState<IotServerStatus | null | undefined>(undefined)
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null)
   const [registering, setRegistering] = useState(false)
+  const [editingNode, setEditingNode] = useState<IotNodeStatus | null>(null)
+  const [detachingNode, setDetachingNode] = useState<{ nodeId: string; feederLabel: string } | null>(null)
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const detachSubmittedRef = useRef(false)
 
   useEffect(() => {
     dispatch(fetchBridgeRequest())
-  }, [dispatch])
+    if (canManage) {
+      dispatch(fetchNodeAssetsRequest())
+    }
+  }, [dispatch, canManage])
+
+  useEffect(() => {
+    if (detachSubmittedRef.current && nodeDetach === 'succeeded') {
+      detachSubmittedRef.current = false
+      setDetachingNode(null)
+      dispatch(resetNodeDetach())
+      dispatch(fetchNodeAssetsRequest())
+    }
+  }, [nodeDetach, dispatch])
 
   // Tự chọn server đầu tiên khi danh sách tải xong và chưa chọn gì; server đang chọn biến mất khỏi danh sách thì chọn lại server đầu
   useEffect(() => {
@@ -275,10 +302,14 @@ export const IotBridgeAdminPage: React.FC = () => {
                     </dl>
                   </div>
 
-                  {/* Bảng tuyến gateway chỉ hiện cho admin */}
+                  {/* Key MQTT của server (chỉ admin) */}
                   {canManage && selectedServer.server_id && (
                     <div className="border-t border-slate-200/80">
-                      <GatewayRoutesPanel key={selectedServer.server_id} serverId={selectedServer.server_id} />
+                      <ServerCredentialPanel
+                        key={selectedServer.server_id}
+                        serverId={selectedServer.server_id}
+                        credentialIssued={selectedServer.credential_issued}
+                      />
                     </div>
                   )}
                 </div>
@@ -373,7 +404,9 @@ export const IotBridgeAdminPage: React.FC = () => {
                     <th className="py-2 pr-3 font-semibold">Server</th>
                     <th className="py-2 pr-3 font-semibold">Trạng thái</th>
                     <th className="py-2 pr-3 font-semibold">Nhận gần nhất</th>
-                    <th className="py-2 text-right font-semibold"></th>
+                    <th className="py-2 text-right font-semibold">
+                      <span className="sr-only">Thao tác</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -393,6 +426,12 @@ export const IotBridgeAdminPage: React.FC = () => {
                     filteredNodes.map((node) => {
                       const badge = iotStatusBadge(IOT_NODE_STATUS, node.status)
                       const isServerSelected = Boolean(selectedServerId && node.server_id === selectedServerId)
+                      const attachedFeeder = feederOnRelayOne(feeders, node.node_id)
+                      const attachedFeederLabel =
+                        attachedFeeder?.external_ref ||
+                        attachedFeeder?.feeder_name ||
+                        attachedFeeder?.feeder_id ||
+                        null
                       return (
                         <tr key={node.node_id || ''} className={`border-b border-slate-100 transition ${isServerSelected ? 'bg-blue-50/50' : ''}`}>
                           <td className="py-2.5 pr-3 font-mono font-bold text-slate-900">{node.node_id}</td>
@@ -426,13 +465,41 @@ export const IotBridgeAdminPage: React.FC = () => {
                           </td>
                           <td className="py-2.5 text-right">
                             {node.node_id && (
-                              <button
-                                type="button"
-                                onClick={() => setDetailNodeId(node.node_id!)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold cursor-pointer text-slate-700 transition focus-visible:ring-2 ring-primary/40 focus:outline-none"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> Chi tiết
-                              </button>
+                              <div className="inline-flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailNodeId(node.node_id!)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold cursor-pointer text-slate-700 transition focus-visible:ring-2 ring-primary/40 focus:outline-none"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Chi tiết
+                                </button>
+                                {canManage && (
+                                  <button
+                                    type="button"
+                                    aria-label={`Sửa node ${node.node_id}`}
+                                    onClick={() => setEditingNode(node)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold cursor-pointer text-slate-700 transition focus-visible:ring-2 ring-primary/40 focus:outline-none"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" /> Sửa
+                                  </button>
+                                )}
+                                {canManage && attachedFeeder && attachedFeederLabel && (
+                                  <button
+                                    type="button"
+                                    aria-label={`Gỡ node ${node.node_id} khỏi mạch`}
+                                    onClick={() => {
+                                      dispatch(resetNodeDetach())
+                                      setDetachingNode({
+                                        nodeId: node.node_id!,
+                                        feederLabel: attachedFeederLabel,
+                                      })
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 font-semibold cursor-pointer text-rose-700 transition focus-visible:ring-2 ring-primary/40 focus:outline-none"
+                                  >
+                                    <Unlink className="w-3.5 h-3.5" /> Gỡ khỏi mạch
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -453,14 +520,81 @@ export const IotBridgeAdminPage: React.FC = () => {
             onClose={() => setRegistering(false)}
             onSaved={() => {
               setRegistering(false)
+              dispatch(fetchNodeAssetsRequest())
             }}
           />
+        )}
+
+        {canManage && editingNode && (
+          <EditNodeModal
+            key={editingNode.node_id || ''}
+            node={editingNode}
+            servers={servers}
+            onClose={() => {
+              setEditingNode(null)
+              dispatch(fetchNodeAssetsRequest())
+            }}
+          />
+        )}
+
+        {canManage && detachingNode && (
+          <IotBridgeModal
+            title="Gỡ node khỏi mạch"
+            onClose={
+              nodeDetach === 'submitting'
+                ? () => {}
+                : () => {
+                    setDetachingNode(null)
+                    dispatch(resetNodeDetach())
+                  }
+            }
+          >
+            {nodeDetachError && (
+              <div
+                role="alert"
+                className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium"
+              >
+                {nodeDetachError}
+              </div>
+            )}
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Gỡ node <span className="font-mono font-bold text-slate-800">{detachingNode.nodeId}</span> khỏi mạch{' '}
+              <span className="font-mono font-bold text-slate-800">{detachingNode.feederLabel}</span>? Node vẫn ở trong
+              tủ và lịch sử được giữ.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={nodeDetach === 'submitting'}
+                onClick={() => {
+                  setDetachingNode(null)
+                  dispatch(resetNodeDetach())
+                }}
+                className={secondaryButtonClass}
+              >
+                Huỷ
+              </button>
+              <button
+                type="button"
+                disabled={nodeDetach === 'submitting'}
+                onClick={() => {
+                  detachSubmittedRef.current = true
+                  dispatch(detachNodeFeederRequest(detachingNode.nodeId))
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition cursor-pointer inline-flex items-center gap-1.5 focus-visible:ring-2 ring-primary/40 focus:outline-none"
+              >
+                {nodeDetach === 'submitting' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Gỡ khỏi mạch
+              </button>
+            </div>
+          </IotBridgeModal>
         )}
 
         {detailNodeId && (
           <IotNodeDetailModal
             key={detailNodeId}
             nodeId={detailNodeId}
+            allowReceivedTime
             onClose={() => setDetailNodeId(null)}
           />
         )}

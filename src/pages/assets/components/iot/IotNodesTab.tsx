@@ -11,6 +11,7 @@ import type { FeederListItem } from '../../../../types/assets/feeders'
 import { IotNodeTable } from './components/IotNodeTable'
 import { IotNodeDetailModal } from './components/IotNodeDetailModal'
 import { TablePagination } from '../common/TablePagination'
+import { feederOnRelayOne } from '../../../../utils/iot/iotRegistration'
 
 export interface IotNodesTabProps {
   cabinets: CabinetListItem[]
@@ -19,7 +20,8 @@ export interface IotNodesTabProps {
 
 /**
  * Tab Thiết bị IoT của Quản lý: danh sách `GET /iot/nodes`, CHỈ XEM. Đăng ký và chỉnh node / server là việc của
- * Quản trị hệ thống ở trang IoT Bridge; Quản lý chỉ xem chi tiết và điều khiển mạch trên bản đồ.
+ * Quản trị hệ thống ở trang IoT Bridge; Quản lý xem chi tiết + lịch sử thông số / sự cố / lệnh ở đây,
+ * còn GIS chỉ có số mới nhất và điều khiển.
  */
 export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders }) => {
   const dispatch = useDispatch<AppDispatch>()
@@ -113,7 +115,31 @@ export const IotNodesTab: React.FC<IotNodesTabProps> = ({ cabinets, feeders }) =
         />
       )}
 
-      {detailNodeId && <IotNodeDetailModal key={detailNodeId} nodeId={detailNodeId} onClose={() => setDetailNodeId(null)} />}
+      {detailNodeId && (() => {
+        const detailNode = nodes.find((n) => n.node_id === detailNodeId) ?? null
+        const detailFeeder = feederOnRelayOne(feeders, detailNodeId)
+        const detailCabinet = detailNode?.cabinet_id
+          ? cabinets.find((c) => c.cabinet_id === detailNode.cabinet_id) ?? null
+          : null
+        return (
+          <IotNodeDetailModal
+            key={detailNodeId}
+            nodeId={detailNodeId}
+            node={detailNode}
+            cabinet={
+              detailCabinet || detailNode?.cabinet_id
+                ? {
+                    name: detailCabinet?.cabinet_name || detailCabinet?.external_ref || null,
+                    code: detailCabinet?.external_ref || detailNode?.cabinet_id || null,
+                  }
+                : null
+            }
+            feederId={detailFeeder?.feeder_id ?? null}
+            feederLabel={detailFeeder?.external_ref || detailFeeder?.feeder_id || null}
+            onClose={() => setDetailNodeId(null)}
+          />
+        )
+      })()}
     </div>
   )
 }

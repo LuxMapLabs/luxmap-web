@@ -2,9 +2,9 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { renderWithSagaStore } from '../utils/sagaStore'
-import iotMonitorReducer from '../../feature/iot/iotMonitorSlice'
+import iotMonitorReducer, { HISTORY_PAGE_SIZE } from '../../feature/iot/iotMonitorSlice'
 import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
-import { IotCommandHistoryModal, HISTORY_PAGE_SIZE } from '../../pages/gis-map/components/IotCommandHistoryModal'
+import { IotCommandHistoryList } from '../../components/IotCommandHistoryList'
 import iotAPI from '../../feature/iot/iotAPI'
 
 vi.mock('../../feature/iot/iotAPI', () => ({ default: { getCommandHistory: vi.fn() } }))
@@ -31,18 +31,13 @@ const item = (
   ...extra,
 })
 
-const feeders = [
-  { feederId: 'FDR-010', label: 'FDR-CAB-TL8-B', name: 'Mạch B - Tỉnh Lộ 8', nodeId: 'NODE-004' },
-  { feederId: 'FDR-011', label: 'FDR-CAB-TL8-C', name: 'Mạch C - Tỉnh Lộ 8', nodeId: 'NODE-005' },
-]
-
-const renderModal = (ui: React.ReactElement) =>
+const renderList = (ui: React.ReactElement) =>
   renderWithSagaStore(ui, {
     reducers: { iotMonitor: iotMonitorReducer },
     sagas: [iotMonitorSaga],
   })
 
-describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () => {
+describe('IotCommandHistoryList (GET /iot/nodes/{nodeId}/command/history)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     api.getCommandHistory.mockReset()
@@ -58,8 +53,8 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
     })
   })
 
-  it('reads the history of the chosen feeder node and shows mode, status, sender and AUTO schedule', async () => {
-    renderModal(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
+  it('reads the history of the node and shows mode, status, sender and AUTO schedule', async () => {
+    renderList(<IotCommandHistoryList nodeId="NODE-004" />)
 
     await waitFor(() => expect(api.getCommandHistory).toHaveBeenCalledWith('NODE-004', { page: 1, page_size: HISTORY_PAGE_SIZE }))
     const rows = await screen.findAllByTestId('iot-command-row')
@@ -74,7 +69,7 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
   })
 
   it('filters by status on the loaded commands', async () => {
-    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    renderList(<IotCommandHistoryList nodeId="NODE-004" />)
     await screen.findAllByTestId('iot-command-row')
 
     const status = screen.getByRole('group', { name: 'Trạng thái' })
@@ -86,65 +81,15 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
     expect(api.getCommandHistory).toHaveBeenCalledTimes(1)
   })
 
-  it('switches feeder using FeederPicker button "Mạch sau"', async () => {
-    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
-    await screen.findAllByTestId('iot-command-row')
-
-    const nextBtn = screen.getByRole('button', { name: 'Mạch sau' })
-    fireEvent.click(nextBtn)
-
-    await waitFor(() =>
-      expect(api.getCommandHistory).toHaveBeenLastCalledWith('NODE-005', { page: 1, page_size: HISTORY_PAGE_SIZE })
-    )
-  })
-
-  it('switches feeder by opening FeederPicker popover and selecting option', async () => {
-    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
-    await screen.findAllByTestId('iot-command-row')
-
-    const pickerBtn = screen.getByRole('button', { name: /Mạch B - Tỉnh Lộ 8/ })
-    expect(pickerBtn).toHaveAttribute('aria-haspopup', 'listbox')
-    fireEvent.click(pickerBtn)
-
-    const option = screen.getByRole('option', { name: /Mạch C - Tỉnh Lộ 8/ })
-    fireEvent.click(option)
-
-    await waitFor(() =>
-      expect(api.getCommandHistory).toHaveBeenLastCalledWith('NODE-005', { page: 1, page_size: HISTORY_PAGE_SIZE })
-    )
-  })
-
-  it('Escape closes picker without calling onClose, second Escape calls onClose', async () => {
-    const onClose = vi.fn()
-    renderModal(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={onClose} />)
-    await screen.findAllByTestId('iot-command-row')
-
-    const pickerBtn = screen.getByRole('button', { name: /Mạch B - Tỉnh Lộ 8/ })
-    fireEvent.click(pickerBtn)
-    expect(screen.getByRole('listbox')).toBeInTheDocument()
-
-    const searchInput = screen.getByRole('combobox')
-    fireEvent.keyDown(searchInput, { key: 'Escape' })
-
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
-    expect(onClose).not.toHaveBeenCalled()
-
-    fireEvent.keyDown(window, { key: 'Escape' })
-    expect(onClose).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows role="alert" with "Không tải được nhật ký lệnh", header "không tải được", disables filters, and retry works', async () => {
+  it('shows role="alert" with "Không tải được nhật ký lệnh", disables filters, and retry works', async () => {
     api.getCommandHistory.mockRejectedValueOnce({
       response: { data: { error: { message: 'Lỗi mạng' } } },
     })
-    renderModal(<IotCommandHistoryModal title="Tủ CAB-009" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
+    renderList(<IotCommandHistoryList nodeId="NODE-004" />)
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Không tải được nhật ký lệnh')
     expect(alert).toHaveTextContent('Lỗi mạng')
-
-    expect(screen.getByText(/không tải được/)).toBeInTheDocument()
-    expect(screen.queryByText(/0 lệnh/)).not.toBeInTheDocument()
 
     const filterGroup = screen.getByRole('group', { name: 'Trạng thái' })
     const buttons = within(filterGroup).getAllByRole('button')
@@ -166,10 +111,9 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
     await waitFor(() => expect(api.getCommandHistory).toHaveBeenCalledTimes(2))
     expect(await screen.findByTestId('iot-command-row')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByText(/1 lệnh/)).toBeInTheDocument()
   })
 
-  it('ignores late-arriving responses from previous feeder after switching to new feeder', async () => {
+  it('ignores late-arriving responses from previous node after switching to new node', async () => {
     let resolveNodeA: (value: unknown) => void = () => {}
     api.getCommandHistory
       .mockImplementationOnce(
@@ -185,16 +129,13 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
         items: [item('cmd-b', 'MANUAL', 'ON', 'success', { node_id: 'NODE-005', feeder_id: 'FDR-011' })],
       })
 
-    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
+    const { rerender } = renderList(<IotCommandHistoryList nodeId="NODE-004" />)
 
-    // While Node A is loading, switch to Node B (FDR-011) via "Mạch sau"
-    const nextBtn = screen.getByRole('button', { name: 'Mạch sau' })
-    fireEvent.click(nextBtn)
+    // While Node A is loading, switch to Node B
+    rerender(<IotCommandHistoryList nodeId="NODE-005" />)
 
     // Node B loads and renders its row
     await waitFor(() => expect(screen.getByText('FDR-011')).toBeInTheDocument())
-    expect(screen.getAllByText('NODE-005').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/1 lệnh/)).toBeInTheDocument()
 
     // Now Node A resolves late
     await act(async () => {
@@ -206,15 +147,12 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
       })
     })
 
-    // Assert: commands of A do not overwrite B, header remains B
+    // Assert: commands of A do not overwrite B
     expect(screen.queryByText('FDR-010')).not.toBeInTheDocument()
     expect(screen.getByText('FDR-011')).toBeInTheDocument()
-    expect(screen.getAllByText('NODE-005').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/1 lệnh/)).toBeInTheDocument()
-    expect(screen.queryByText('NODE-004')).not.toBeInTheDocument()
   })
 
-  it('clears error alert and shows "đang tải…" in header when switching from failed node A to loading node B', async () => {
+  it('clears error alert and shows loading when switching from failed node A to loading node B', async () => {
     let resolveNodeB: (value: unknown) => void = () => {}
     api.getCommandHistory
       .mockRejectedValueOnce({
@@ -227,22 +165,18 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
           }) as never
       )
 
-    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} initialFeederId="FDR-010" onClose={vi.fn()} />)
+    const { rerender } = renderList(<IotCommandHistoryList nodeId="NODE-004" />)
 
     // Node A fails with role="alert"
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Lỗi node A')
-    expect(screen.getByText(/không tải được/)).toBeInTheDocument()
-    expect(screen.getAllByText('NODE-004').length).toBeGreaterThanOrEqual(1)
 
     // Switch to Node B (which is now loading)
-    const nextBtn = screen.getByRole('button', { name: 'Mạch sau' })
-    fireEvent.click(nextBtn)
+    rerender(<IotCommandHistoryList nodeId="NODE-005" />)
 
-    // Immediately while B is loading: no role="alert", header is "đang tải…" for Node B
+    // Immediately while B is loading: no role="alert", shows loading text
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByText(/đang tải…/)).toBeInTheDocument()
-    expect(screen.getAllByText('NODE-005').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Đang tải nhật ký lệnh…')).toBeInTheDocument()
 
     // Cleanup: resolve Node B
     await act(async () => {
@@ -250,19 +184,18 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
         page: 1,
         page_size: HISTORY_PAGE_SIZE,
         total: 1,
-        items: [item('cmd-b', 'MANUAL', 'ON', 'success', { node_id: 'NODE-005' })],
+        items: [item('cmd-b', 'MANUAL', 'ON', 'success', { node_id: 'NODE-005', feeder_id: 'FDR-011' })],
       })
     })
 
-    expect(await screen.findByText(/1 lệnh/)).toBeInTheDocument()
-    expect(screen.getAllByText('NODE-005').length).toBeGreaterThanOrEqual(1)
+    expect(await screen.findByText('FDR-011')).toBeInTheDocument()
   })
 
   it('pages with numbered buttons and Trước / Sau', async () => {
     api.getCommandHistory
       .mockResolvedValueOnce({ page: 1, page_size: HISTORY_PAGE_SIZE, total: 25, items: [item('c25', 'MANUAL', 'OFF', 'success')] })
       .mockResolvedValueOnce({ page: 3, page_size: HISTORY_PAGE_SIZE, total: 25, items: [item('c5', 'MANUAL', 'ON', 'success')] })
-    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    renderList(<IotCommandHistoryList nodeId="NODE-004" />)
     await screen.findAllByTestId('iot-command-row')
 
     const nav = screen.getByRole('navigation', { name: 'Phân trang' })
@@ -283,12 +216,12 @@ describe('IotCommandHistoryModal (GET /iot/nodes/{nodeId}/command/history)', () 
       total: 1,
       items: [{ ...item('c1', 'MANUAL', 'ON', 'success'), status: undefined }],
     })
-    renderModal(<IotCommandHistoryModal title="Tủ" feeders={feeders} onClose={vi.fn()} />)
+    renderList(<IotCommandHistoryList nodeId="NODE-004" />)
     expect(await screen.findByText('Chưa rõ trạng thái')).toBeInTheDocument()
   })
 
-  it('a feeder without a node calls nothing and says so', () => {
-    renderModal(<IotCommandHistoryModal title="Mạch FDR-012" feeders={[]} onClose={vi.fn()} />)
+  it('a null nodeId calls nothing and says so', () => {
+    renderList(<IotCommandHistoryList nodeId={null} />)
     expect(screen.getByText('Mạch chưa gắn node IoT nên chưa có lệnh nào.')).toBeInTheDocument()
     expect(api.getCommandHistory).not.toHaveBeenCalled()
   })

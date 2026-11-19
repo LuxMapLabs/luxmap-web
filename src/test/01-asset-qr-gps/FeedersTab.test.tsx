@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
+import React from 'react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FeedersTab } from '../../pages/assets/components/feeders/FeedersTab'
 import { FeederDetailModal } from '../../pages/assets/components/feeders/components/FeederDetailModal'
@@ -8,14 +9,42 @@ import assetReducer, {
   updateFeederRequest,
   deleteFeederRequest,
 } from '../../feature/assets/assetSlice'
+import iotMonitorReducer from '../../feature/iot/iotMonitorSlice'
+import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
+import iotAPI from '../../feature/iot/iotAPI'
+import { renderWithSagaStore } from '../utils/sagaStore'
 import type { FeederListItem } from '../../types/assets/feeders'
 import type { CabinetListItem } from '../../types/assets/cabinets'
 import type { PoleListItem } from '../../types/assets/poles'
 
 
 vi.mock('../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
+vi.mock('../../feature/iot/iotAPI', () => ({
+  default: {
+    getFeederElectricalHistory: vi.fn(),
+    getFeederElectricalHistoryReceived: vi.fn(),
+    getFeederDiagnosticHistory: vi.fn(),
+    getCommandHistory: vi.fn(),
+  },
+}))
+
+const renderTab = (ui: React.ReactElement, role = 'manager') =>
+  renderWithSagaStore(ui, {
+    role,
+    reducers: { iotMonitor: iotMonitorReducer },
+    sagas: [iotMonitorSaga],
+  })
 
 describe('FeedersTab & Feeder Components Integration Tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(iotAPI.getFeederElectricalHistory).mockResolvedValue({
+      page: 1,
+      page_size: 200,
+      total: 0,
+      items: [],
+    })
+  })
   const mockCabinets: CabinetListItem[] = [
     {
       cabinet_id: 'CAB-001',
@@ -100,7 +129,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
   ]
 
   it('1. Render đầy đủ thanh công cụ tìm kiếm và bảng danh sách mạch điện (không còn KPI cards)', () => {
-    render(
+    renderTab(
       <FeedersTab
         feeders={mockFeeders}
         cabinets={mockCabinets}
@@ -129,7 +158,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
   })
 
   it('2. Lọc danh sách mạch điện theo từ khóa tìm kiếm', () => {
-    render(
+    renderTab(
       <FeedersTab
         feeders={mockFeeders}
         cabinets={mockCabinets}
@@ -150,7 +179,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
 
   it('3. Mở Modal Thêm Mạch Điện và gọi hàm onAddFeeder', () => {
     const handleAdd = vi.fn()
-    render(
+    renderTab(
       <FeedersTab
         feeders={mockFeeders}
         cabinets={mockCabinets}
@@ -239,7 +268,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
 
   it('6. Hiển thị ConfirmDeleteAssetModal khi bấm nút xóa mạch điện thay vì dùng window.confirm', () => {
     const mockDelete = vi.fn()
-    render(
+    renderTab(
       <FeedersTab
         feeders={mockFeeders}
         cabinets={mockCabinets}
@@ -303,5 +332,46 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
     const review = validateImportRow('feeders', csvRow, context, 0)
     expect(review.actionType).toBe('invalid')
     expect(review.errorMsg).toContain('Tủ điện [CAB-NON-EXISTENT] chưa tồn tại trong hệ thống GIS')
+  })
+
+  it('9. Quản lý thấy nút "Xem lịch sử mạch" ở dòng có node và mở dialog Lịch sử mạch; dòng không có node và Cấp giám sát không thấy', async () => {
+    const feedersWithNode: FeederListItem[] = [
+      { ...mockFeeders[0], control: { node_id: 'NODE-001', relay_no: 1 } },
+      mockFeeders[1],
+    ]
+
+    const { unmount } = renderTab(
+      <FeedersTab
+        feeders={feedersWithNode}
+        cabinets={mockCabinets}
+        poles={mockPoles}
+        onAddFeeder={vi.fn()}
+        onUpdateFeeder={vi.fn()}
+        onDeleteFeeder={vi.fn()}
+      />,
+      'manager'
+    )
+
+    // Chỉ có đúng 1 nút Xem lịch sử mạch (dòng có node_id; dòng thứ 2 không có node không hiện)
+    const historyBtns = screen.getAllByRole('button', { name: 'Xem lịch sử mạch' })
+    expect(historyBtns).toHaveLength(1)
+
+    fireEvent.click(historyBtns[0])
+    expect(await screen.findByRole('dialog', { name: 'Lịch sử mạch FDR-CAB-TL8-A' })).toBeInTheDocument()
+    unmount()
+
+    // Cấp giám sát: không hiện nút Xem lịch sử mạch dù dòng có node
+    renderTab(
+      <FeedersTab
+        feeders={feedersWithNode}
+        cabinets={mockCabinets}
+        poles={mockPoles}
+        onAddFeeder={vi.fn()}
+        onUpdateFeeder={vi.fn()}
+        onDeleteFeeder={vi.fn()}
+      />,
+      'superior'
+    )
+    expect(screen.queryByRole('button', { name: 'Xem lịch sử mạch' })).not.toBeInTheDocument()
   })
 })

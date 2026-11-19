@@ -106,6 +106,16 @@ export interface IotMeasurement {
     power_mw?: number
 }
 
+export interface IotNodeSourceDetails {
+    node_id?: string | null
+    server_id?: string | null
+    device_id?: string | null
+    feeder_id?: string | null
+    nominal_voltage?: number
+    nominal_current_ma?: number
+    nominal_power_mw?: number
+}
+
 export interface IotNodeStatus {
     node_id?: string | null
     server_id?: string | null

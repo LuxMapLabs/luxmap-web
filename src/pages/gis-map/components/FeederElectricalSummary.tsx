@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { AppDispatch } from '../../../redux/store'
-import { AlertTriangle, LineChart as LineChartIcon, Radio } from 'lucide-react'
-import { Line, LineChart, ResponsiveContainer, YAxis } from 'recharts'
+import { AlertTriangle, Radio } from 'lucide-react'
 import { useElectricalSeries } from '../../../hooks/iot/useElectricalSeries'
 import { formatMetric } from '../../../utils/iot/electricalSeries'
 import {
@@ -12,19 +11,18 @@ import {
 } from '../../../feature/iot/iotMonitorSlice'
 import { iotAnomalyLabel } from '../../../constants/iot'
 
-/** Số mẫu gần nhất vẽ sparkline trong khung tủ. */
+/** Số mẫu gần nhất tải để lấy số đo mới nhất. */
 export const SPARKLINE_SAMPLES = 30
 
 /**
- * Một dòng trong mạch của khung tủ GIS: node IoT, số điện mới nhất (W / mA / V), sparkline công suất,
- * và nút mở bảng giám sát. Mạch chưa gắn IoT và không có mẫu thì chỉ báo vậy, không hiện nút Biểu đồ.
+ * Khối tóm tắt số đo điện của mạch trong drawer GIS: node IoT, số điện mới nhất (W / mA / V)
+ * và cảnh báo chẩn đoán (chỉ hiển thị số đo/trạng thái).
  */
 export const FeederElectricalSummary: React.FC<{
   feederId: string
   nodeId: string | null
-  onOpenChart?: () => void
-}> = ({ feederId, nodeId, onOpenChart }) => {
-  const { points, latest, loading, error } = useElectricalSeries(feederId, {
+}> = ({ feederId, nodeId }) => {
+  const { latest, loading, error } = useElectricalSeries(feederId, {
     initial: SPARKLINE_SAMPLES,
     maxPoints: SPARKLINE_SAMPLES,
     live: Boolean(nodeId),
@@ -52,8 +50,7 @@ export const FeederElectricalSummary: React.FC<{
 
   return (
     <div className="mt-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1.5" data-testid="feeder-electrical-summary">
-      <div className="flex items-center gap-2">
-      <div className="min-w-0 flex-1 space-y-0.5">
+      <div className="min-w-0 space-y-0.5">
         <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
           <Radio className="w-3 h-3 text-indigo-500 shrink-0" />
           {nodeId ? (
@@ -77,26 +74,6 @@ export const FeederElectricalSummary: React.FC<{
         ) : (
           <p className="text-[10.5px] text-slate-400 italic">Chưa có mẫu điện.</p>
         )}
-      </div>
-      {points.length > 1 && (
-        <div className="w-20 h-8 shrink-0" aria-hidden="true">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={points} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
-              <YAxis hide domain={['dataMin', 'dataMax']} />
-              <Line type="monotone" dataKey="power" stroke="#059669" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-      {onOpenChart && (
-        <button
-          type="button"
-          onClick={onOpenChart}
-          className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer"
-        >
-          <LineChartIcon className="w-3 h-3" /> Biểu đồ
-        </button>
-      )}
       </div>
       {anomalies.length > 0 && (
         <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-[10.5px] text-rose-800 dark:text-rose-200 space-y-0.5">

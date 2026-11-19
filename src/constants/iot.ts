@@ -53,17 +53,13 @@ export const IOT_SENSOR_HEALTH_STATUS: Record<string, IotStatusBadge> = {
   unknown: { label: 'Phần cứng: Chưa có bản tin', tone: 'muted' },
 }
 
-/** 17 mã cảnh báo trong `docs/IOT-DIAGNOSTICS.md` (+ các mã điện cũ tương thích ngược). */
+/** 17 mã cảnh báo trong docs/IOT-DIAGNOSTICS.md của backend. */
 export const IOT_ANOMALY_LABELS: Record<string, string> = {
-  // Mẫu điện và số bóng
+  // Mẫu điện
   telemetry_stale: 'Mẫu điện quá hạn (giây)',
   voltage_loss: 'Mất điện áp khi đèn bật (V)',
   voltage_deviation: 'Điện áp lệch danh định (V)',
   current_drop: 'Sụt dòng điện (>5% so với danh định)',
-  lamp_count_shortfall: 'Thiếu bóng sáng',
-  current_when_off: 'Còn dòng khi lệnh OFF (mA)',
-  current_deviation: 'Dòng điện lệch danh định (mA)',
-  power_deviation: 'Công suất lệch danh định (mW)',
   // DS3231 (Đồng hồ thời gian thực)
   ds3231_unavailable: 'DS3231: Không nhận hoặc không khởi tạo được đồng hồ',
   ds3231_read_failed: 'DS3231: Đọc giờ qua I²C thất bại',

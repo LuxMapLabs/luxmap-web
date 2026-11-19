@@ -17,10 +17,12 @@ import { fetchCabinetTopologyRequest } from '../map/mapSlice'
 import {
   CABINET_IOT_REFRESH_MS,
   COMMAND_MODE_POLL_MS,
+  DIAGNOSTIC_HISTORY_PAGE_SIZE,
   ELECTRICAL_MAX_PAGES,
   ELECTRICAL_POLL_MS,
   HISTORY_PAGE_SIZE,
   clearCommandHistory,
+  clearDiagnosticHistory,
   commandModesLoaded,
   electricalSeriesAbsorb,
   feederElectricalLoaded,
@@ -29,16 +31,23 @@ import {
   fetchCommandHistoryFailure,
   fetchCommandHistoryRequest,
   fetchCommandHistorySuccess,
+  fetchDiagnosticHistoryFailure,
+  fetchDiagnosticHistoryRequest,
+  fetchDiagnosticHistorySuccess,
   fetchDiagnosticsFailure,
   fetchDiagnosticsRequest,
   fetchDiagnosticsSuccess,
   fetchNodeElectricalFailure,
   fetchNodeElectricalRequest,
   fetchNodeElectricalSuccess,
+  fetchNodeSourceFailure,
+  fetchNodeSourceRequest,
+  fetchNodeSourceSuccess,
   fetchNodesTabFailure,
   fetchNodesTabRequest,
   fetchNodesTabSuccess,
   resetCommandHistory,
+  resetDiagnosticHistory,
   sendCommandFailure,
   sendCommandRequest,
   sendCommandSuccess,
@@ -61,10 +70,12 @@ import type {
   IotCommandHistoryItemPagedResult,
   IotDiagnosticResult,
   IotElectricalResult,
+  IotNodeSourceDetails,
   IotNodeStatus,
   IotNodeStatusPagedResult,
 } from '../../types/iot/nodes'
 import type {
+  IotDiagnosticHistoryItemPagedResult,
   IotFeederAverage,
   IotFeederElectricalResult,
   IotFeederHistoryResult,
@@ -218,11 +229,63 @@ function* cabinetStatusManager(): Generator<unknown, void, unknown> {
 // ==========================================
 // B. Chuỗi mẫu điện của mạch (useElectricalSeries)
 // ==========================================
+const RANGE_MAX_PAGES = 200
+
 function* electricalSeriesSession(
   payload: ReturnType<typeof startElectricalSeries>['payload']
 ) {
-  const { key, feederId, initial, windowMs, live = true } = payload
+  const { key, feederId, initial, windowMs, live = true, timeBasis = 'measured_at', fromTo } = payload
   if (!feederId) return
+  const fetchHistory =
+    timeBasis === 'received_at'
+      ? iotAPI.getFeederElectricalHistoryReceived
+      : iotAPI.getFeederElectricalHistory
+
+  if (fromTo) {
+    try {
+      const pageSize = 200
+      let truncated = false
+      for (let page = 1; page <= RANGE_MAX_PAGES; page++) {
+        const result: IotFeederHistoryResult = yield call(fetchHistory, feederId, {
+          page,
+          page_size: pageSize,
+          from: fromTo.from,
+          to: fromTo.to,
+        })
+        const items = result.items || []
+        yield put(electricalSeriesAbsorb({ key, samples: items }))
+        if (page === 1) {
+          yield put(setElectricalSeriesLoading({ key, loading: false }))
+        }
+        if (items.length < pageSize) {
+          break
+        }
+        if (typeof result.total === 'number' && page * pageSize >= result.total) {
+          break
+        }
+        if (page === RANGE_MAX_PAGES && typeof result.total === 'number' && page * pageSize < result.total) {
+          truncated = true
+        }
+      }
+      yield put(
+        setElectricalSeriesBackfilling({
+          key,
+          backfilling: false,
+          error: truncated
+            ? 'Khoảng quá dài, chỉ tải 40.000 khoảng 30 giây gần nhất (≈ 13,9 ngày).'
+            : null,
+        })
+      )
+    } catch (err) {
+      yield put(
+        setElectricalSeriesLoadError({
+          key,
+          error: apiErrorMessage(err, 'Không đọc được lịch sử điện.'),
+        })
+      )
+    }
+    return
+  }
 
   while (true) {
     let loadedOk = false
@@ -230,7 +293,7 @@ function* electricalSeriesSession(
     try {
       for (let page = 1; ; page++) {
         const result: IotFeederHistoryResult = yield call(
-          iotAPI.getFeederElectricalHistory,
+          fetchHistory,
           feederId,
           { page, page_size: initial }
         )
@@ -279,7 +342,7 @@ function* electricalSeriesSession(
         yield delay(ELECTRICAL_POLL_MS)
         try {
           const page: IotFeederHistoryResult = yield call(
-            iotAPI.getFeederElectricalHistory,
+            fetchHistory,
             feederId,
             { page: 1, page_size: 20 }
           )
@@ -391,7 +454,7 @@ function* commandModesManager(): Generator<unknown, void, unknown> {
 }
 
 // ==========================================
-// D. Điện mới nhất của mạch (ElectricalMonitorModal)
+// D. Điện mới nhất của mạch
 // ==========================================
 function* feederElectricalSession({
   key,
@@ -498,6 +561,34 @@ function* watchFetchNodeElectrical() {
 }
 
 // ==========================================
+// F2. Thông tin nguồn đo / hiệu chuẩn của node (IotNodeDetailModal)
+// ==========================================
+function* fetchNodeSourceWorker(
+  action: ReturnType<typeof fetchNodeSourceRequest>
+) {
+  const nodeId = action.payload
+  try {
+    if (typeof iotAPI.getNodeSource !== 'function') {
+      yield put(fetchNodeSourceSuccess({ nodeId, data: null }))
+      return
+    }
+    const data: IotNodeSourceDetails = yield call(iotAPI.getNodeSource, nodeId)
+    yield put(fetchNodeSourceSuccess({ nodeId, data }))
+  } catch (err) {
+    yield put(
+      fetchNodeSourceFailure({
+        nodeId,
+        error: apiErrorMessage(err, 'Không đọc được thông số danh định.'),
+      })
+    )
+  }
+}
+
+function* watchFetchNodeSource() {
+  yield takeEvery(fetchNodeSourceRequest.type, fetchNodeSourceWorker)
+}
+
+// ==========================================
 // G. Tab thiết bị IoT (IotNodesTab)
 // ==========================================
 function* fetchNodesTabWorker() {
@@ -546,7 +637,7 @@ function* watchFetchNodesTab() {
 }
 
 // ==========================================
-// H. Lịch sử lệnh (IotCommandHistoryModal)
+// H. Lịch sử lệnh (IotCommandHistoryList)
 // ==========================================
 function* loadCommandHistoryWorker({
   key,
@@ -661,6 +752,77 @@ function* watchFetchAutoPrefill() {
 }
 
 // ==========================================
+// J. Lịch sử đợt lỗi (chi tiết node ở Tài sản)
+// ==========================================
+function* loadDiagnosticHistoryWorker({
+  key,
+  feederId,
+  page,
+  pageSize = DIAGNOSTIC_HISTORY_PAGE_SIZE,
+  from,
+  to,
+}: {
+  key: string
+  feederId: string
+  page: number
+  pageSize?: number
+  from?: string | null
+  to?: string | null
+}) {
+  try {
+    const result: IotDiagnosticHistoryItemPagedResult = yield call(
+      iotAPI.getFeederDiagnosticHistory,
+      feederId,
+      {
+        page,
+        page_size: pageSize,
+        from: from || undefined,
+        to: to || undefined,
+      }
+    )
+    const items = result.items || []
+    const total = result.total ?? items.length
+    yield put(fetchDiagnosticHistorySuccess({ key, feederId, items, total, page }))
+  } catch (err) {
+    yield put(
+      fetchDiagnosticHistoryFailure({
+        key,
+        feederId,
+        error: apiErrorMessage(err, 'Không đọc được lịch sử sự cố của mạch.'),
+      })
+    )
+  }
+}
+
+function* diagnosticHistoryManager(): Generator<unknown, void, unknown> {
+  const tasks = new Map<string, Task>()
+
+  while (true) {
+    const action = (yield take([
+      resetDiagnosticHistory.type,
+      fetchDiagnosticHistoryRequest.type,
+      clearDiagnosticHistory.type,
+    ])) as
+      | ReturnType<typeof resetDiagnosticHistory>
+      | ReturnType<typeof fetchDiagnosticHistoryRequest>
+      | ReturnType<typeof clearDiagnosticHistory>
+
+    const key = action.payload.key
+    const existing = tasks.get(key)
+    if (existing && existing.isRunning()) {
+      yield cancel(existing)
+      tasks.delete(key)
+    }
+
+    if (action.type === fetchDiagnosticHistoryRequest.type) {
+      const fetchAction = action as ReturnType<typeof fetchDiagnosticHistoryRequest>
+      const task = (yield fork(loadDiagnosticHistoryWorker, fetchAction.payload)) as Task
+      tasks.set(key, task)
+    }
+  }
+}
+
+// ==========================================
 // Root Saga
 // ==========================================
 export default function* iotMonitorSaga() {
@@ -671,9 +833,11 @@ export default function* iotMonitorSaga() {
     fork(feederElectricalManager),
     fork(watchFetchDiagnostics),
     fork(watchFetchNodeElectrical),
+    fork(watchFetchNodeSource),
     fork(watchFetchNodesTab),
     fork(commandHistoryManager),
     fork(watchSendCommand),
     fork(watchFetchAutoPrefill),
+    fork(diagnosticHistoryManager),
   ])
 }

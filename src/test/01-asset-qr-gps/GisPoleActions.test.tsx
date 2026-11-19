@@ -13,6 +13,8 @@ vi.mock('../../feature/iot/iotAPI', () => ({
     sendCommand: vi.fn(),
     getFeederElectricalHistory: vi.fn(() => new Promise(() => {})),
     getCommandHistory: vi.fn(() => Promise.resolve({ items: [] })),
+    getDiagnostics: vi.fn(() => Promise.resolve({})),
+    getElectrical: vi.fn(() => Promise.resolve({})),
     getNodes: vi.fn(() => Promise.resolve({ total: 0, items: [] })),
     getServers: vi.fn(() => Promise.resolve([])),
   },
@@ -431,14 +433,25 @@ describe('Khung mạch điện: Bật / Tắt / AUTO gửi POST /iot/nodes/{node
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('Lịch sử lệnh của mạch đọc GET /iot/nodes/{nodeId}/command/history của node gán cho mạch', async () => {
-    vi.mocked(iotAPI.getCommandHistory).mockResolvedValue({ items: [] })
+  it('Nút Lịch sử của mạch nằm ngoài khối số đo và mở modal Lịch sử mạch ngay trên GIS', async () => {
+    vi.mocked(iotAPI.getFeederElectricalHistory).mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] })
     setup('manager', { selectedPole: null, selectedFeeder: feeder('NODE-004') })
 
-    fireEvent.click(screen.getByRole('button', { name: /Lịch sử lệnh/ }))
+    const historyBtn = screen.getByRole('button', { name: 'Xem lịch sử mạch' })
+    expect(screen.queryByRole('button', { name: /Lịch sử lệnh/ })).not.toBeInTheDocument()
+    const summaryEl = await screen.findByTestId('feeder-electrical-summary')
+    expect(summaryEl).toHaveTextContent('Chưa có mẫu điện.')
+    expect(summaryEl.contains(historyBtn)).toBe(false)
 
-    expect(await screen.findByRole('dialog', { name: 'Nhật ký lệnh điều khiển' })).toBeInTheDocument()
-    await waitFor(() => expect(iotAPI.getCommandHistory).toHaveBeenCalledWith('NODE-004', { page: 1, page_size: 10 }))
+    fireEvent.click(historyBtn)
+    expect(await screen.findByRole('dialog', { name: 'Lịch sử mạch FDR-CAB-TL8-B' })).toBeInTheDocument()
+  })
+
+  it('Cấp giám sát: không hiện nút Xem lịch sử mạch và nút Lịch sử lệnh', () => {
+    setup('superior', { selectedPole: null, selectedFeeder: feeder('NODE-004') })
+
+    expect(screen.queryByRole('button', { name: 'Xem lịch sử mạch' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Lịch sử lệnh/ })).not.toBeInTheDocument()
   })
 
   it('Tắt: huỷ ở hộp xác nhận thì không gửi lệnh', async () => {
@@ -485,7 +498,6 @@ describe('Khung tủ điện: danh sách mạch thu gọn, bấm mới mở chi 
             { feeder_id: 'FDR-003', power_state: 'off' },
           ],
         },
-        onOpenElectricalMonitor: vi.fn(),
       },
       DETAIL,
       {
@@ -523,17 +535,24 @@ describe('Khung tủ điện: danh sách mạch thu gọn, bấm mới mở chi 
     expect(screen.getAllByText('online').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('mất tín hiệu')).toBeInTheDocument()
 
-    // Trước khi bấm, getFeederElectricalHistory KHÔNG được gọi và không thấy nút Biểu đồ
+    // Trước khi bấm, getFeederElectricalHistory KHÔNG được gọi và không thấy nút Xem lịch sử mạch
     expect(iotAPI.getFeederElectricalHistory).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /Biểu đồ/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Xem lịch sử mạch' })).not.toBeInTheDocument()
 
-    // Bấm dòng mạch 1 -> aria-expanded="true" và thấy nút "Biểu đồ" cùng mã mạch FDR-001
+    // Bấm dòng mạch 1 -> aria-expanded="true" và thấy nút "Xem lịch sử mạch" ngoài khối số đo cùng mã mạch FDR-001
     const btn1 = screen.getByRole('button', { name: /Mạch 1 - Lộ 1/ })
     expect(btn1).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(btn1)
 
     expect(btn1).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('button', { name: /Biểu đồ/ })).toBeInTheDocument()
+    const historyBtn = screen.getByRole('button', { name: 'Xem lịch sử mạch' })
+    expect(historyBtn).toBeInTheDocument()
+    const summaryEl = await screen.findByTestId('feeder-electrical-summary')
+    expect(summaryEl.contains(historyBtn)).toBe(false)
+    fireEvent.click(historyBtn)
+    expect(await screen.findByRole('dialog', { name: 'Lịch sử mạch FDR-001' })).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Lịch sử mạch FDR-001' })).not.toBeInTheDocument()
     expect(within(document.getElementById('feeder-detail-FDR-001')!).getByText('FDR-001')).toBeInTheDocument()
 
     // Bấm mạch 2 -> mạch 1 đóng, mạch 2 mở

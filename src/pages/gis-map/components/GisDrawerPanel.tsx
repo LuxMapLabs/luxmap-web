@@ -27,7 +27,10 @@ import cabinetSvg from '../../../assets/icons/cabinet.svg'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState, AppDispatch } from '../../../redux/store'
 import { fetchPoleDetailRequest, clearPoleDetail } from '../../../feature/map/mapSlice'
-import { IotCommandHistoryModal, type CommandHistoryFeeder } from './IotCommandHistoryModal'
+import {
+  FeederHistoryModal,
+  type FeederHistoryTab,
+} from '../../../components/FeederHistoryModal'
 import {
   sendCommandRequest,
   resetCommandSend,
@@ -118,8 +121,6 @@ export interface GisDrawerPanelProps {
   effectivePoles?: PoleFeature[]
   /** Bắt đầu dời vị trí cột đang chọn trên bản đồ (Quản lý). */
   /** Quản lý: bật chế độ lấy hình tuyến theo đường trên bản đồ nền cho tuyến đang mở. */
-  /** Mở bảng giám sát điện (dưới bản đồ) ở mạch này; `nodeId` khi nơi mở đã biết node của mạch. */
-  onOpenElectricalMonitor?: (feederId: string, nodeId?: string | null) => void
 }
 
 const FAULT_TYPE_LABELS: Record<FaultType, string> = {
@@ -172,7 +173,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   selectedFeeder,
   setSelectedFeeder,
   effectivePoles: propsEffectivePoles = [],
-  onOpenElectricalMonitor,
 }) => {
   // Khung cột / mạch điện → khung tuyến của nó. Bấm đường tuyến trên
   // bản đồ thường trúng dây mạch nằm chồng lên, nên đây là lối mở khung tuyến chắc chắn.
@@ -238,11 +238,12 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   const sendingCommand = commandSend.status === 'sending'
   // Đổi giá trị để đọc lại chế độ mạch (lịch sử lệnh) ngay sau khi gửi lệnh
   const [modeRefresh, setModeRefresh] = useState(0)
-  // Nhật ký lệnh (GET /iot/nodes/{nodeId}/command/history): các mạch có node để chọn, mạch mở sẵn
-  const [historyTarget, setHistoryTarget] = useState<{
-    title: string
-    feeders: CommandHistoryFeeder[]
-    initialFeederId?: string | null
+  // Modal lịch sử mạch mở trực tiếp trên GIS (Quản lý)
+  const [feederHistory, setFeederHistory] = useState<{
+    feederId: string
+    feederLabel: string | null
+    nodeId: string | null
+    tab: FeederHistoryTab
   } | null>(null)
 
   const autoReqSeq = useRef(0)
@@ -570,25 +571,16 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     )
   }, [cabinetIotNodes])
 
-  const cabinetNodeStatusMap = useMemo(() => {
-    const map: Record<string, string | null | undefined> = {}
-    for (const n of cabinetIotNodes) {
-      if (n.node_id) {
-        map[n.node_id] = n.status
-      }
-    }
-    return map
-  }, [cabinetIotNodes])
-
   return (
     <>
-      {historyTarget && (
-        <IotCommandHistoryModal
-          title={historyTarget.title}
-          feeders={historyTarget.feeders}
-          initialFeederId={historyTarget.initialFeederId}
-          nodeStatus={cabinetNodeStatusMap}
-          onClose={() => setHistoryTarget(null)}
+      {feederHistory && (
+        <FeederHistoryModal
+          key={`${feederHistory.feederId}-${feederHistory.tab}`}
+          feederId={feederHistory.feederId}
+          feederLabel={feederHistory.feederLabel}
+          nodeId={feederHistory.nodeId}
+          initialTab={feederHistory.tab}
+          onClose={() => setFeederHistory(null)}
         />
       )}
       {commandTarget && (
@@ -1129,39 +1121,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
                     <span className="truncate">Danh sách Mạch điện của Tủ ({cabinetFeeders.length} mạch)</span>
                   </span>
-                  {(() => {
-                    const firstFeeder = cabinetFeeders[0] || (selectedCabinet.feeders || [])[0]
-                    const firstFeederId = firstFeeder?.feeder_id || selectedCabinet.feeder_ids?.[0]
-                    const fName = firstFeeder?.feeder_name || firstFeederId
-                    const cabCode = selectedCabinet.cabinet_code || selectedCabinet.external_ref || selectedCabinet.cabinet_id
-                    return (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setHistoryTarget({
-                            title: `Tủ ${cabCode || ''}`,
-                            feeders: cabinetFeeders.flatMap((f: any) => {
-                              const node = feederNodeId(f.feeder_id, f)
-                              return node && f.feeder_id
-                                ? [{
-                                    feederId: f.feeder_id,
-                                    label: f.external_ref || f.feeder_name || f.feeder_id,
-                                    name: f.feeder_name || '',
-                                    nodeId: node,
-                                  }]
-                                : []
-                            }),
-                            initialFeederId: firstFeederId,
-                          })
-                        }
-                        className="p-1 rounded-md text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition cursor-pointer"
-                        title={`Xem lịch sử lệnh điều khiển (Mạch ${fName || firstFeederId || ''})`}
-                        aria-label="Xem lịch sử lệnh điều khiển"
-                      >
-                        <History className="w-3.5 h-3.5" />
-                      </button>
-                    )
-                  })()}
                 </div>
 
                 <div className="space-y-1.5">
@@ -1304,24 +1263,34 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                         {/* Vùng chi tiết chỉ render khi mở */}
                         {isExpanded && (
                           <div id={`feeder-detail-${fId}`} className="mt-2 pt-2 border-t border-slate-200/80 dark:border-slate-700/60 space-y-2">
-                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10.5px] text-slate-500 dark:text-slate-400">
-                              <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
-                                {fCode}
-                              </span>
-                              <span
-                                className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${feederPowerBadge(
-                                  cabFeeder?.power_state ?? feeder.power_state
-                                )}`}
-                              >
-                                {feederPowerLabel(cabFeeder?.power_state ?? feeder.power_state)}
-                              </span>
-                              <span className="whitespace-nowrap">{poleCount} cột đèn</span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10.5px] text-slate-500 dark:text-slate-400 min-w-0">
+                                <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
+                                  {fCode}
+                                </span>
+                                <span
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${feederPowerBadge(
+                                    cabFeeder?.power_state ?? feeder.power_state
+                                  )}`}
+                                >
+                                  {feederPowerLabel(cabFeeder?.power_state ?? feeder.power_state)}
+                                </span>
+                                <span className="whitespace-nowrap">{poleCount} cột đèn</span>
+                              </div>
+                              {canControlLighting && nodeId && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFeederHistory({ feederId: fId, feederLabel: fCode, nodeId, tab: 'electrical' })}
+                                  title="Xem lịch sử mạch"
+                                  aria-label="Xem lịch sử mạch"
+                                  className="ml-auto shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                                >
+                                  <History className="w-3.5 h-3.5" />
+                                  Lịch sử
+                                </button>
+                              )}
                             </div>
-                            <FeederElectricalSummary
-                              feederId={fId}
-                              nodeId={nodeId}
-                              onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(fId, nodeId) : undefined}
-                            />
+                            <FeederElectricalSummary feederId={fId} nodeId={nodeId} />
                           </div>
                         )}
                       </div>
@@ -1339,12 +1308,29 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 const nodeId = feederNodeId(selId, selectedFeeder)
                 return (
                   <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60">
-                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">Số đo điện của mạch</span>
-                    <FeederElectricalSummary
-                      feederId={selId}
-                      nodeId={nodeId}
-                      onOpenChart={onOpenElectricalMonitor ? () => onOpenElectricalMonitor(selId, nodeId) : undefined}
-                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">Số đo điện của mạch</span>
+                      {canControlLighting && nodeId && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFeederHistory({
+                              feederId: selId,
+                              feederLabel: selectedFeeder.external_ref || selId,
+                              nodeId,
+                              tab: 'electrical',
+                            })
+                          }
+                          title="Xem lịch sử mạch"
+                          aria-label="Xem lịch sử mạch"
+                          className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        >
+                          <History className="w-3.5 h-3.5" />
+                          Lịch sử
+                        </button>
+                      )}
+                    </div>
+                    <FeederElectricalSummary feederId={selId} nodeId={nodeId} />
                   </div>
                 )
               })()}
@@ -1355,29 +1341,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                     <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                     <span>{canControlLighting ? 'Điều khiển nguồn Mạch điện (IoT)' : 'Nguồn Mạch điện'}</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const selId = selectedFeeder.feeder_id || selectedFeeder.external_ref
-                      setHistoryTarget({
-                        title: `Mạch ${selectedFeeder.feeder_name || selId}`,
-                        feeders: selectedFeederNodeId
-                          ? [{
-                              feederId: selId,
-                              label: selectedFeeder.external_ref || selId,
-                              name: selectedFeeder.feeder_name || '',
-                              nodeId: selectedFeederNodeId,
-                            }]
-                          : [],
-                        initialFeederId: selId,
-                      })
-                    }}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition cursor-pointer"
-                    title="Xem nhật ký phát lệnh của mạch này"
-                  >
-                    <History className="w-3 h-3" />
-                    Lịch sử lệnh
-                  </button>
                   {(() => {
                     const selId = selectedFeeder.feeder_id || selectedFeeder.external_ref
                     const assetFeeder = (assetFeeders || []).find((af: any) => af.feeder_id === selId)
