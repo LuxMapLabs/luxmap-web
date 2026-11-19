@@ -11,18 +11,13 @@ export interface ProfileModalProps {
   isOpen: boolean
   onClose: () => void
   user: CurrentUserResponse | null
-  /** Lưu hồ sơ. Chưa truyền (backend chưa có PATCH /auth/me) thì nút Lưu bị khóa. Ảnh đại diện được lưu riêng qua API avatar. */
-  onSave?: (data: { full_name: string; email: string }) => void
-  isSaving?: boolean
 }
 
 // Backend chỉ nhận JPEG, tối đa 1 MB
 const MAX_AVATAR_BYTES = 1024 * 1024
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, user, onSave, isSaving = false }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, user }) => {
   const [isEditing, setIsEditing] = useState(false)
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
   const dispatch = useDispatch()
   const isAvatarSubmitting = useSelector((state: RootState) => state.avatar.isSubmitting)
   const [avatarError, setAvatarError] = useState<string | null>(null)
@@ -32,8 +27,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
   useEffect(() => {
     if (!isOpen) return
     setIsEditing(false)
-    setFullName(user?.full_name || '')
-    setEmail(user?.email || '')
     setAvatarError(null)
   }, [isOpen, user?.user_id, user?.full_name, user?.email])
 
@@ -91,14 +84,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     }
     setAvatarError(null)
     dispatch(uploadAvatarRequest(file))
-  }
-
-  const nameInvalid = fullName.trim().length === 0
-  const canSave = Boolean(onSave) && !nameInvalid && !isSaving
-
-  const handleSave = () => {
-    if (!onSave || nameInvalid) return
-    onSave({ full_name: fullName.trim(), email: email.trim() })
   }
 
   return (
@@ -182,18 +167,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
             <div className="p-6 space-y-4">
               <div>
                 <label htmlFor="profile-full-name" className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Họ và tên <span className="text-rose-500">*</span>
+                  Họ và tên
                 </label>
                 <input
                   id="profile-full-name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  maxLength={100}
-                  className={`w-full h-10 px-3 rounded-xl border text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 ${
-                    nameInvalid ? 'border-rose-300' : 'border-slate-200'
-                  }`}
+                  value={displayName}
+                  readOnly
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600 outline-none cursor-default"
                 />
-                {nameInvalid && <p className="mt-1 text-[11px] text-rose-600">Họ và tên không được để trống.</p>}
               </div>
               <div>
                 <label htmlFor="profile-email" className="text-xs font-semibold text-slate-600 block mb-1.5">
@@ -202,17 +183,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                 <input
                   id="profile-email"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                  value={user.email || 'Chưa cập nhật'}
+                  readOnly
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600 outline-none cursor-default"
                 />
               </div>
-              {!onSave && (
-                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11.5px] text-amber-800">
-                  <Info className="w-4 h-4 shrink-0 mt-px" />
-                  <span>Ảnh đại diện (JPEG, tối đa 1 MB) được lưu ngay khi chọn. Chức năng lưu họ tên và email sẽ dùng được khi hệ thống bổ sung API tương ứng.</span>
-                </div>
-              )}
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11.5px] text-slate-600">
+                <Info className="w-4 h-4 shrink-0 mt-px" />
+                <span>Ảnh đại diện (JPEG, tối đa 1 MB) được lưu ngay khi chọn. Họ tên và email do Quản trị viên quản lý.</span>
+              </div>
             </div>
           ) : (
             <dl className="p-6 space-y-4 text-sm">
@@ -257,24 +236,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
         {/* Hành động */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-end gap-2 shrink-0">
           {isEditing ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="px-4 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!canSave}
-                title={!onSave ? 'Chờ hệ thống bổ sung API lưu hồ sơ' : undefined}
-                className={`px-4 h-9 rounded-xl ${isAdmin ? 'bg-primary hover:bg-primary/90' : 'bg-blue-600 hover:bg-blue-700'} text-white text-xs font-bold disabled:bg-slate-300 disabled:cursor-not-allowed cursor-pointer`}
-              >
-                {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className={`px-5 h-9 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold cursor-pointer`}
+            >
+              Xong
+            </button>
           ) : (
             <>
               <button
