@@ -9,7 +9,7 @@
  * 5. Giữ nguyên data validations và defined names (ds_tuyen_duong, ds_tu_dien, ds_mach_dien, ds_cot_dien).
  * 6. Tuyệt đối không tạo sheet có tên 'IoT'.
  * 7. Sheet 'Không xuất' (nếu có trong tệp xuất) được giữ nguyên toàn bộ nội dung.
- * 8. Sheet 'Hướng dẫn': tệp mẫu xoá bỏ (thay bằng 'Cách điền'); tệp xuất giữ nguyên nguyên vẹn.
+ * 8. Sheet 'Hướng dẫn': tệp mẫu xoá bỏ (thay bằng 'Cách điền'); tệp xuất chỉ định dạng lại, nội dung giữ nguyên.
  */
 
 import type { Borders, DataValidation, Worksheet } from 'exceljs';
@@ -281,6 +281,120 @@ function colNumberToLetter(col: number): string {
     temp = Math.floor((temp - 1) / 26);
   }
   return letter;
+}
+
+function styleGuideSheet(ws: Worksheet): void {
+  ws.properties.tabColor = { argb: NAVY };
+  ws.views = [{ showGridLines: false }];
+
+  ws.getColumn(1).width = 90;
+  for (let c = 2; c <= 5; c++) {
+    ws.getColumn(c).width = 14;
+  }
+
+  // Dòng 1: tiêu đề chính
+  const titleCell = ws.getCell(1, 1);
+  if (titleCell.value !== null && titleCell.value !== undefined && String(titleCell.value).trim() !== '') {
+    titleCell.font = { name: FONT_NAME, size: 16, bold: true, color: { argb: NAVY } };
+    titleCell.alignment = { wrapText: true, vertical: 'middle' };
+    ws.getRow(1).height = 28;
+  }
+
+  // Tìm dòng header của bảng đếm data_source: dòng đầu tiên (>= 2) có ô cột B là chuỗi
+  let tableHeaderRow: number | null = null;
+  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber < 2 || tableHeaderRow !== null) return;
+    const bVal = row.getCell(2).value;
+    if (typeof bVal === 'string' && bVal.trim().length > 0) {
+      tableHeaderRow = rowNumber;
+    }
+  });
+
+  // Định dạng bảng đếm data_source (nếu có) và ghi nhận phạm vi dòng bảng
+  let tableEndRow: number | null = null;
+  if (tableHeaderRow !== null) {
+    const headerRow = ws.getRow(tableHeaderRow);
+    let tableColCount = 5;
+    headerRow.eachCell({ includeEmpty: false }, (_cell, colNumber) => {
+      if (colNumber > tableColCount) tableColCount = colNumber;
+    });
+
+    for (let c = 1; c <= tableColCount; c++) {
+      const cell = ws.getCell(tableHeaderRow, c);
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+      cell.font = { name: FONT_NAME, size: 10, bold: true, color: { argb: WHITE } };
+      cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle' };
+      cell.border = BOX_BORDER;
+    }
+    headerRow.height = 22;
+
+    let dataRowIndex = 0;
+    let r = tableHeaderRow + 1;
+    const maxRow = ws.rowCount;
+    while (r <= maxRow) {
+      let hasData = false;
+      for (let c = 1; c <= tableColCount; c++) {
+        const val = ws.getCell(r, c).value;
+        if (val !== null && val !== undefined && String(val).trim() !== '') {
+          hasData = true;
+          break;
+        }
+      }
+      if (!hasData) break;
+
+      const isEvenDataRow = dataRowIndex % 2 === 1;
+      for (let c = 1; c <= tableColCount; c++) {
+        const cell = ws.getCell(r, c);
+        cell.border = BOX_BORDER;
+        if (isEvenDataRow) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY_SOFT } };
+        }
+        if (c === 1) {
+          cell.font = { name: FONT_NAME, size: 10, bold: true, color: { argb: NAVY } };
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        } else {
+          const val = cell.value;
+          const num = typeof val === 'number' ? val : Number(val);
+          const isNumeric = val !== null && val !== undefined && String(val).trim() !== '' && !Number.isNaN(num);
+          const isZero = isNumeric && num === 0;
+          const isPositive = isNumeric && num > 0;
+          cell.font = {
+            name: FONT_NAME,
+            size: 10,
+            bold: isPositive,
+            color: { argb: isZero ? SLATE : DARK_TEXT },
+          };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
+      }
+      ws.getRow(r).height = 20;
+      tableEndRow = r;
+      dataRowIndex += 1;
+      r += 1;
+    }
+  }
+
+  // Định dạng các dòng văn bản hướng dẫn (từ dòng 2 tới trước dòng header bảng, và sau bảng nếu có)
+  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber < 2) return;
+    if (
+      tableHeaderRow !== null &&
+      rowNumber >= tableHeaderRow &&
+      rowNumber <= (tableEndRow ?? tableHeaderRow)
+    ) {
+      return;
+    }
+
+    const cellA = row.getCell(1);
+    const rawVal = cellA.value;
+    if (rawVal === null || rawVal === undefined) return;
+    const text = String(rawVal);
+    if (text.trim().length === 0) return;
+
+    cellA.font = { name: FONT_NAME, size: 11, color: { argb: DARK_TEXT } };
+    cellA.alignment = { wrapText: true, vertical: 'top' };
+    row.height = Math.max(18, Math.ceil(text.length / 95) * 15);
+  });
 }
 
 function formatNearSensitivePoiColumn(ws: Worksheet): void {
@@ -656,21 +770,30 @@ export async function styleAssetWorkbook(
       if (!exportSpecialWs) continue;
 
       const specialWs = wb.addWorksheet(specialName);
-      specialWs.getColumn(1).width = 100;
-      const maxCols = Math.max(20, exportSpecialWs.columnCount || 0);
-      for (let c = 2; c <= maxCols; c++) {
-        specialWs.getColumn(c).width = 20;
-      }
-
-      exportSpecialWs.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-        row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-          const targetCell = specialWs.getCell(rowNumber, colNumber);
-          targetCell.value = cell.value;
-          if (colNumber === 1) {
-            targetCell.alignment = { wrapText: true, vertical: 'top' };
-          }
+      if (specialName === 'Hướng dẫn') {
+        exportSpecialWs.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+          row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+            specialWs.getCell(rowNumber, colNumber).value = cell.value;
+          });
         });
-      });
+        styleGuideSheet(specialWs);
+      } else {
+        specialWs.getColumn(1).width = 100;
+        const maxCols = Math.max(20, exportSpecialWs.columnCount || 0);
+        for (let c = 2; c <= maxCols; c++) {
+          specialWs.getColumn(c).width = 20;
+        }
+
+        exportSpecialWs.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+          row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+            const targetCell = specialWs.getCell(rowNumber, colNumber);
+            targetCell.value = cell.value;
+            if (colNumber === 1) {
+              targetCell.alignment = { wrapText: true, vertical: 'top' };
+            }
+          });
+        });
+      }
     }
   }
 
