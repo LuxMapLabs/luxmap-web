@@ -20,7 +20,7 @@
     <p>Giao diện web quản lý tài sản và sự cố chiếu sáng. Bảng này bắt đầu ghi nhận từ ngày 20/10/2026; chưa tổng hợp lịch sử toàn dự án.</p>
     <section>
       <h2>Công việc hiện tại</h2>
-      <p>Điều khiển đèn IoT trên chi tiết node cho Manager; chờ ACK và sửa loading khi cấp secret thất bại.</p>
+      <p>Hồ sơ cá nhân: họ tên và email chỉ đọc; giữ nguyên thao tác ảnh đại diện.</p>
       <label for="task-progress">Tiến độ bản sửa mã nguồn: 100%</label>
       <progress id="task-progress" value="100" max="100">100%</progress>
       <p>Lịch sử: hoàn tất ngày 20/10/2026, bản sửa <code>6b7a826</code> đã lên Production tại <a href="https://luxmap.com.vn">luxmap.com.vn</a> qua VPS. Vercel chỉ là bản Preview.</p>
@@ -28,6 +28,14 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>19/11/2026 — Họ tên và email chỉ đọc trong hồ sơ</dt>
+        <dd>Hiển thị trực tiếp dữ liệu người dùng trong ô chỉ đọc; bỏ state, props, kiểm tra và thao tác lưu hồ sơ. Nút “Xong” trở về chế độ xem; thông báo trung tính nêu họ tên và email do Quản trị viên quản lý. Giữ nguyên xử lý ảnh đại diện.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/components/ProfileModal.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>fix(profile): make name and email read-only</code> — nhánh <code>fix/profile-fields-readonly</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>npx tsc --noEmit</code>, <code>npx eslint src/components/ProfileModal.tsx</code> và <code>git diff --check</code> đạt. Đã kiểm tra hai nơi gọi không truyền props lưu; không có test trong src tham chiếu ProfileModal. ⚠️ Chưa kiểm chứng trực tiếp trên trình duyệt.</dd>
         <dt>15/11/2026 — Ảnh dọc trên panel bản đồ</dt>
         <dd>Ảnh cột chụp dọc bị khung rộng (h-44, object-cover) cắt phần giữa nên che bóng đèn ở đầu cột. Ảnh dọc giờ hiện nguyên khung (h-72, object-contain); ảnh ngang giữ nguyên.</dd>
         <dt>File thay đổi</dt>
