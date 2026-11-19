@@ -997,6 +997,21 @@ button:focus-visible {
   .download-trigger:hover .download-arrow,
   .download-trigger:focus-visible .download-arrow { animation: none; }
 }
+/* Nút nhập dữ liệu: mũi tên trượt lên rồi mờ đi, mũi tên mới đi lên từ dưới, khay đứng yên */
+@keyframes arrow-upload {
+  0% { transform: translateY(0); opacity: 1; }
+  40% { transform: translateY(-7px); opacity: 0; }
+  41% { transform: translateY(7px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.upload-trigger:hover .upload-arrow,
+.upload-trigger:focus-visible .upload-arrow {
+  animation: arrow-upload 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .upload-trigger:hover .upload-arrow,
+  .upload-trigger:focus-visible .upload-arrow { animation: none; }
+}
 /* Nút xuất báo cáo: tờ giấy đứng yên, mũi tên bên trong trượt xuống rồi rơi lại từ trên */
 @keyframes arrow-report {
   0% { transform: translateY(0); opacity: 1; }

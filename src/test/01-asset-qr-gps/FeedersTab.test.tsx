@@ -108,7 +108,6 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
         onAddFeeder={vi.fn()}
         onUpdateFeeder={vi.fn()}
         onDeleteFeeder={vi.fn()}
-        onOpenImport={vi.fn()}
       />
     )
 
@@ -119,7 +118,7 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
 
     // Thanh tìm kiếm và nút bấm chuẩn đồng bộ
     expect(screen.getByPlaceholderText(/Tìm theo mã lộ, tên mạch, tên tủ, địa bàn/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Import Dữ Liệu/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Import dữ liệu/i })).toBeNull()
     expect(screen.getByRole('button', { name: /Thêm mạch điện/i })).toBeInTheDocument()
 
     // Bảng dữ liệu
@@ -138,7 +137,6 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
         onAddFeeder={vi.fn()}
         onUpdateFeeder={vi.fn()}
         onDeleteFeeder={vi.fn()}
-        onOpenImport={vi.fn()}
       />
     )
 
@@ -160,7 +158,6 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
         onAddFeeder={handleAdd}
         onUpdateFeeder={vi.fn()}
         onDeleteFeeder={vi.fn()}
-        onOpenImport={vi.fn()}
       />
     )
 
@@ -250,7 +247,6 @@ describe('FeedersTab & Feeder Components Integration Tests', () => {
         onAddFeeder={vi.fn()}
         onUpdateFeeder={vi.fn()}
         onDeleteFeeder={mockDelete}
-        onOpenImport={vi.fn()}
       />
     )
 

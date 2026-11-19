@@ -1,8 +1,8 @@
-import { all, call, put, select, takeLatest } from 'redux-saga/effects'
+import { all, call, put, select, takeLatest, takeLeading } from 'redux-saga/effects'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
 import assetAPI from './assetAPI'
-import type { ImportResult } from '../../types/assets/import'
+import type { WorkbookImportResult } from '../../types/assets/import'
 import type {
   SegmentListItemPagedResult,
   CreateSegmentRequest,
@@ -31,12 +31,22 @@ import type {
   IotNodeCredential,
 } from '../../types/assets/iot-nodes'
 import {
+  styleAssetWorkbook,
+  saveWorkbookFile,
+} from '../../utils/assets/workbookStyler'
+import {
   fetchAssetsRequest,
   fetchAssetsSuccess,
   fetchAssetsFailure,
   importAssetRequest,
   importAssetSuccess,
   importAssetFailure,
+  exportWorkbookRequest,
+  exportWorkbookSuccess,
+  exportWorkbookFailure,
+  downloadTemplateRequest,
+  downloadTemplateSuccess,
+  downloadTemplateFailure,
   createPoleRequest,
   createPolesBulkRequest,
   updatePoleRequest,
@@ -82,6 +92,7 @@ import {
 } from './assetSlice'
 
 const BACKEND_ERROR_TRANSLATIONS: Record<string, string> = {
+  'Upload a .xlsx workbook.': 'Chỉ nhận tệp Excel .xlsx. Vui lòng chọn đúng tệp và nạp lại.',
   'That road segment still has poles, faults or fault clusters pointing at it, so it cannot be deleted.':
     'Tuyến đường này vẫn còn cột đèn, sự cố hoặc cụm sự cố liên kết, không thể xóa.',
   'That cabinet still has feeders or a device pointing at it, so it cannot be deleted.':
@@ -173,48 +184,116 @@ function* handleFetchAssets() {
 }
 
 /**
- * Worker saga nạp file CSV lên Backend API
+ * Worker saga nạp file Excel sổ cái tài sản lên Backend API
  */
 function* handleImportAsset(action: PayloadAction<ImportAssetPayload>) {
-  const { category, file } = action.payload
+  const { file } = action.payload
 
   try {
-    let result: ImportResult
-
-    switch (category) {
-      case 'segments':
-        result = (yield call(assetAPI.importSegments, file)) as ImportResult
-        break
-      case 'cabinets':
-        result = (yield call(assetAPI.importCabinets, file)) as ImportResult
-        break
-      case 'feeders':
-        result = (yield call(assetAPI.importFeeders, file)) as ImportResult
-        break
-      case 'poles':
-      case 'poles_and_fixtures':
-        result = (yield call(assetAPI.importPoles, file)) as ImportResult
-        break
-      case 'fixtures':
-        result = (yield call(assetAPI.importFixtures, file)) as ImportResult
-        break
-      default:
-        throw new Error(`Loại tài sản '${category}' không được hỗ trợ để nạp tệp.`)
-    }
+    const result: WorkbookImportResult = (yield call(
+      assetAPI.importWorkbook,
+      file
+    )) as WorkbookImportResult
 
     yield put(importAssetSuccess(result))
 
-    const inserted = result.inserted ?? 0
-    const updated = result.updated ?? 0
+    if (result.committed) {
+      const totalChanges =
+        (result.segments?.inserted ?? 0) +
+        (result.segments?.updated ?? 0) +
+        (result.cabinets?.inserted ?? 0) +
+        (result.cabinets?.updated ?? 0) +
+        (result.feeders?.inserted ?? 0) +
+        (result.feeders?.updated ?? 0) +
+        (result.poles?.inserted ?? 0) +
+        (result.poles?.updated ?? 0) +
+        (result.fixtures?.inserted ?? 0) +
+        (result.fixtures?.updated ?? 0)
 
-    // Tự động tải lại dữ liệu từ Backend để các bảng cập nhật ngay lập tức
-    if (inserted + updated > 0) {
-      yield put(fetchAssetsRequest())
+      if (totalChanges > 0) {
+        yield put(fetchAssetsRequest())
+      }
     }
   } catch (error: unknown) {
     const errorMsg = getErrorMessage(error, 'Không thể kết nối đến máy chủ Backend để nạp dữ liệu.')
     yield put(importAssetFailure(errorMsg))
     toast.error(`Lỗi nạp dữ liệu: ${errorMsg}`)
+  }
+}
+
+function getLocalISODate(): string {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function* safeGetTemplate() {
+  try {
+    const tpl: ArrayBuffer = (yield call(assetAPI.getTemplateWorkbook)) as ArrayBuffer
+    return tpl
+  } catch (err: unknown) {
+    console.warn('Không lấy được tệp mẫu:', err)
+    return null
+  }
+}
+
+function* styleOrRaw(template: ArrayBuffer, exported?: ArrayBuffer) {
+  try {
+    const styled: ArrayBuffer = (yield call(
+      styleAssetWorkbook,
+      template,
+      exported,
+    )) as ArrayBuffer
+    return styled
+  } catch (err: unknown) {
+    console.error('Không thể tân trang workbook, sử dụng dữ liệu thô:', err)
+    return exported ?? template
+  }
+}
+
+/**
+ * Worker saga xuất file Excel sổ cái tài sản từ Backend API
+ */
+function* handleExportWorkbook() {
+  try {
+    const [exported, template]: [ArrayBuffer, ArrayBuffer | null] = (yield all([
+      call(assetAPI.exportWorkbook),
+      call(safeGetTemplate),
+    ])) as [ArrayBuffer, ArrayBuffer | null]
+
+    const file: ArrayBuffer = template
+      ? yield* styleOrRaw(template, exported)
+      : exported
+    const fileName = `Tai-san-${getLocalISODate()}.xlsx`
+    yield call(saveWorkbookFile, file, fileName)
+    yield put(exportWorkbookSuccess())
+    toast.success(`Đã tải ${fileName}`)
+  } catch (error: unknown) {
+    yield put(exportWorkbookFailure())
+    const status = (error as { response?: { status?: number } })?.response?.status
+    if (status === 413) {
+      toast.error('Có quá nhiều tài sản để xuất trong một tệp. Vui lòng liên hệ quản trị viên.')
+    } else {
+      toast.error('Không xuất được dữ liệu tài sản. Vui lòng thử lại.')
+    }
+  }
+}
+
+/**
+ * Worker saga tải tệp mẫu Excel sổ cái tài sản
+ */
+function* handleDownloadTemplate() {
+  try {
+    const raw: ArrayBuffer = (yield call(assetAPI.getTemplateWorkbook)) as ArrayBuffer
+    const file: ArrayBuffer = yield* styleOrRaw(raw)
+    const fileName = 'Mau-nap-tai-san.xlsx'
+    yield call(saveWorkbookFile, file, fileName)
+    yield put(downloadTemplateSuccess())
+  } catch {
+    yield put(downloadTemplateFailure())
+    toast.error('Không tải được tệp mẫu. Vui lòng thử lại.')
   }
 }
 
@@ -818,6 +897,8 @@ function* handleIssueIotNodeCredential(action: PayloadAction<IssueIotNodeCredent
 export default function* assetSaga() {
   yield takeLatest(fetchAssetsRequest.type, handleFetchAssets)
   yield takeLatest(importAssetRequest.type, handleImportAsset)
+  yield takeLeading(exportWorkbookRequest.type, handleExportWorkbook)
+  yield takeLeading(downloadTemplateRequest.type, handleDownloadTemplate)
   yield takeLatest(createPoleRequest.type, handleCreatePole)
   yield takeLatest(createPolesBulkRequest.type, handleCreatePolesBulk)
   yield takeLatest(updatePoleRequest.type, handleUpdatePole)

@@ -1,375 +1,395 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import {
   UploadCloud,
   X,
   Download,
-  CheckCircle2,
-  AlertCircle,
-  Route,
-  Zap,
-  Boxes,
-  Check,
-  ArrowRight,
+  Loader2,
   RefreshCw,
-  PlusCircle,
-  FileCheck2,
-  Info,
-  Lightbulb,
-  AlertTriangle,
-  ShieldAlert,
-  Bookmark,
+  FileSpreadsheet,
+  AlertCircle,
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from '../../../redux/rootReducer'
 import {
   importAssetRequest,
   resetImportState,
-  type ImportAssetCategory,
+  downloadTemplateRequest,
 } from '../../../feature/assets/assetSlice'
-import type { ImportRowError } from '../../../types/assets/import'
-import type { PoleListItem } from '../../../types/assets/poles'
-import type { ActiveFixture } from '../../../types/assets/fixtures'
-import type { ManagedFixture } from '../../../hooks/assets/useAssetData'
 import {
-  validateImportRow,
-  parsePointWkt,
-  type FieldDiff,
-  type ParsedItemReview,
-} from '../../../validations/assetImport.schema'
-import { formatCommuneDisplayName, getCommuneName } from '../../../utils/assets/communeUtils'
-import { findByIdOrRef } from '../../../utils/assets/findByIdOrRef'
-
-export type { FieldDiff, ParsedItemReview }
-
-interface CategoryConfig {
-  id: ImportAssetCategory
-  label: string
-  title: string
-  icon: React.ReactNode
-  templateFileName: string
-  templateUrl: string
-  description: string
-  /** Danh mục phải có sẵn trên hệ thống trước khi nạp danh mục này */
-  prerequisite: string
-  /** Danh mục nên nạp tiếp theo */
-  nextStep: string | null
-}
-
-const IMPORT_ORDER_HINT = 'Thứ tự nạp đầy đủ: Tuyến đường → Tủ điện → Mạch điện → Cột điện → Bộ đèn.'
-
-const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
-  poles: {
-    id: 'poles' as ImportAssetCategory,
-    label: 'Cột điện',
-    title: 'Cột điện chiếu sáng',
-    icon: <Boxes className="w-5 h-5 text-blue-600" />,
-    templateFileName: 'poles.csv',
-    templateUrl: '/templates/poles.csv',
-    description: 'Nạp danh mục Cột điện. Hệ thống tự động so khớp tọa độ WKT và các thuộc tính cột.',
-    prerequisite: 'Cần có sẵn: Tuyến đường (bắt buộc) và Mạch điện (nếu file có cột feeder_external_ref).',
-    nextStep: 'Bước tiếp theo: nạp Bộ đèn gắn lên các cột vừa nạp.',
-  },
-  fixtures: {
-    id: 'fixtures' as ImportAssetCategory,
-    label: 'Bộ đèn',
-    title: 'Bộ đèn chiếu sáng',
-    icon: <Lightbulb className="w-5 h-5 text-amber-500" />,
-    templateFileName: 'fixtures.csv',
-    templateUrl: '/templates/fixtures.csv',
-    description: 'Nạp danh mục Bộ đèn gắn lên cột. Quản lý công suất (Watt), số lượng bóng trên bộ đèn, nguồn điện, ngày lắp đặt và hạn bảo hành.',
-    prerequisite: 'Cần có sẵn: Cột điện (mã trong cột pole_external_ref phải đã có trên hệ thống).',
-    nextStep: null,
-  },
-  poles_and_fixtures: {
-    id: 'poles_and_fixtures' as ImportAssetCategory,
-    label: 'Cột & Bộ đèn',
-    title: 'Cột và bộ đèn',
-    icon: <Boxes className="w-5 h-5 text-blue-600" />,
-    templateFileName: 'poles.csv',
-    templateUrl: '/templates/poles.csv',
-    description: 'Nạp danh mục Cột đèn & Bộ đèn. Hệ thống tự động phát hiện bản ghi mới, cập nhật thông số và ẩn các bản ghi không thay đổi.',
-    prerequisite: 'Cần có sẵn: Tuyến đường (bắt buộc) và Mạch điện (nếu file có cột feeder_external_ref).',
-    nextStep: null,
-  },
-  feeders: {
-    id: 'feeders' as ImportAssetCategory,
-    label: 'Mạch điện',
-    title: 'Mạch điện xuất tuyến',
-    icon: <Zap className="w-5 h-5 text-amber-500" />,
-    templateFileName: 'feeders.csv',
-    templateUrl: '/templates/feeders.csv',
-    description: 'Nạp danh mục Mạch điện xuất tuyến (Feeder) thuộc các trạm Tủ điện.',
-    prerequisite: 'Cần có sẵn: Tủ điện (mã trong cột cabinet_external_ref).',
-    nextStep: 'Bước tiếp theo: nạp Cột điện (gán cột vào mạch).',
-  },
-  cabinets: {
-    id: 'cabinets' as ImportAssetCategory,
-    label: 'Tủ điện',
-    title: 'Tủ điện',
-    icon: <Zap className="w-5 h-5 text-amber-500" />,
-    templateFileName: 'cabinets.csv',
-    templateUrl: '/templates/cabinets.csv',
-    description: 'Nạp danh mục trạm tủ điện chiếu sáng.',
-    prerequisite: 'Không cần nạp danh mục nào trước.',
-    nextStep: 'Bước tiếp theo: nạp Mạch điện thuộc các tủ vừa nạp.',
-  },
-  segments: {
-    id: 'segments' as ImportAssetCategory,
-    label: 'Tuyến đường chiếu sáng',
-    title: 'Tuyến đường chiếu sáng',
-    icon: <Route className="w-5 h-5 text-indigo-600" />,
-    templateFileName: 'segments.csv',
-    templateUrl: '/templates/segments.csv',
-    description: 'Nạp danh mục các tuyến đường giao thông liên xã, liên thôn và trục không gian chiếu sáng.',
-    prerequisite: 'Không cần nạp danh mục nào trước.',
-    nextStep: 'Bước tiếp theo: nạp Tủ điện, sau đó Mạch điện và Cột điện.',
-  },
-}
+  previewAssetWorkbook,
+  type WorkbookPreview,
+} from '../../../utils/assets/workbookPreview'
+import { translateImportMessage } from '../../../utils/assets/translateImportMessage'
+import type { WorkbookRowError } from '../../../types/assets/import'
 
 interface ImportAssetModalProps {
   isOpen: boolean
   onClose: () => void
-  onImportSuccess: (
-    importedCount: number,
-    newPoles?: PoleListItem[],
-    importedFixtures?: ManagedFixture[]
-  ) => void
-  category?: ImportAssetCategory
+  onImportSuccess: (importedCount: number) => void
 }
 
-// Robust CSV Line parser supporting quotes and commas
-function parseCsvLine(line: string): string[] {
-  const result: string[] = []
-  let current = ''
-  let inQuotes = false
+const ASSET_SHEETS = [
+  'Tuyến đường',
+  'Tủ điện',
+  'Mạch điện',
+  'Cột điện',
+  'Bóng đèn',
+] as const
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"'
-        i++
-      } else {
-        inQuotes = !inQuotes
-      }
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim())
-      current = ''
-    } else {
-      current += char
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+
+const COLUMN_LABELS: Record<string, string> = {
+  external_ref: 'Mã',
+  segment_name: 'Tên tuyến',
+  road_class: 'Cấp đường',
+  length_m: 'Chiều dài (m)',
+  geom_wkt: 'Vị trí / hình (WKT)',
+  cabinet_name: 'Tên tủ',
+  feeder_name: 'Tên mạch',
+  cabinet_external_ref: 'Mã tủ',
+  cabinet_source: 'Liên kết mạch – tủ',
+  segment_external_ref: 'Mã tuyến',
+  feeder_external_ref: 'Mã mạch',
+  feeder_source: 'Liên kết cột – mạch',
+  near_sensitive_poi: 'Gần điểm nhạy cảm',
+  note: 'Ghi chú',
+  pole_external_ref: 'Mã cột',
+  fixture_type: 'Loại đèn',
+  power_source: 'Nguồn điện',
+  lamp_watt: 'Công suất',
+  install_date: 'Ngày lắp',
+  lamp_count: 'Số bóng',
+  removed_date: 'Ngày tháo',
+  warranty_expiry: 'Hết bảo hành',
+}
+
+export interface RowErrorGroup {
+  column: string
+  message: string
+  rows: number[]
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function groupRowErrors(items: WorkbookRowError[]): RowErrorGroup[] {
+  const map = new Map<string, { column: string; message: string; rowsSet: Set<number> }>()
+
+  for (const item of items) {
+    const column = item.column ?? ''
+    const message = item.message ?? ''
+    const key = `${column}:::${message}`
+
+    let entry = map.get(key)
+    if (!entry) {
+      entry = { column, message, rowsSet: new Set<number>() }
+      map.set(key, entry)
+    }
+    if (item.row !== undefined && item.row !== null) {
+      entry.rowsSet.add(item.row)
     }
   }
-  result.push(current.trim())
-  return result.map((s) => s.replace(/^"|"$/g, ''))
+
+  const result: RowErrorGroup[] = []
+  for (const entry of map.values()) {
+    result.push({
+      column: entry.column,
+      message: entry.message,
+      rows: Array.from(entry.rowsSet).sort((a, b) => a - b),
+    })
+  }
+
+  return result
 }
 
-const REQUIRED_HEADERS_BY_CATEGORY: Record<string, string[]> = {
-  poles: ['external_ref', 'segment_external_ref', 'commune_id', 'data_source'],
-  poles_and_fixtures: ['external_ref', 'segment_external_ref', 'commune_id', 'data_source'],
-  fixtures: ['pole_external_ref', 'fixture_type', 'power_source', 'lamp_watt', 'install_date', 'data_source'],
-  cabinets: ['external_ref', 'cabinet_name', 'commune_id', 'geom_wkt', 'data_source'],
+export interface SheetErrorGroup {
+  sheet: string
+  count: number
+  groups: RowErrorGroup[]
+}
 
-  feeders: ['external_ref', 'feeder_name', 'commune_id', 'cabinet_external_ref'],
-  segments: ['external_ref', 'segment_name', 'road_class', 'commune_id', 'data_source'],
+// eslint-disable-next-line react-refresh/only-export-components
+export function groupBySheet(items: WorkbookRowError[]): SheetErrorGroup[] {
+  const map = new Map<string, WorkbookRowError[]>()
+
+  for (const item of items) {
+    const sheet = item.sheet ?? ''
+    const list = map.get(sheet)
+    if (!list) {
+      map.set(sheet, [item])
+    } else {
+      list.push(item)
+    }
+  }
+
+  const result: SheetErrorGroup[] = []
+  for (const [sheet, sheetItems] of map.entries()) {
+    result.push({
+      sheet,
+      count: sheetItems.length,
+      groups: groupRowErrors(sheetItems),
+    })
+  }
+
+  return result
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function formatRowLocation(rows: number[]): string {
+  if (!rows || rows.length === 0) return 'Toàn tệp'
+  if (rows.length === 1 && rows[0] === 1) return 'Tiêu đề'
+
+  const displayed = rows.slice(0, 12).map((r) => (r === 1 ? 'Tiêu đề' : String(r)))
+  const excess = rows.length - 12
+  const excessText = excess > 0 ? ` +${excess}` : ''
+
+  if (rows[0] === 1) {
+    return `${displayed.join(', ')}${excessText}`
+  }
+  return `Dòng ${displayed.join(', ')}${excessText}`
+}
+
+interface IssueListProps {
+  groups: RowErrorGroup[]
+  tone: 'error' | 'warning'
+  forceLocationLabel?: string
+}
+
+export const IssueList: React.FC<IssueListProps> = ({
+  groups,
+  tone,
+  forceLocationLabel,
+}) => {
+  return (
+    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+      {groups.map((group, idx) => {
+        const locationText = forceLocationLabel ?? formatRowLocation(group.rows)
+        const hasColumn = Boolean(group.column)
+        const vnLabel = hasColumn ? COLUMN_LABELS[group.column] : undefined
+
+        return (
+          <div
+            key={`${group.column}-${group.message}-${idx}`}
+            className="py-2 flex flex-col gap-0.5 sm:flex-row sm:gap-0 text-left"
+          >
+            {/* Cột trái: Vị trí dòng */}
+            <div
+              className={`sm:w-24 sm:shrink-0 text-[12px] font-semibold tabular-nums pt-0.5 ${
+                tone === 'error'
+                  ? 'text-rose-700 dark:text-rose-300'
+                  : 'text-amber-700 dark:text-amber-300'
+              }`}
+            >
+              {locationText}
+            </div>
+
+            {/* Cột phải: Nội dung */}
+            <div className="flex-1 min-w-0 space-y-0.5">
+              {hasColumn && (
+                <div className="text-[13px] font-medium text-slate-800 dark:text-slate-200">
+                  {vnLabel ? (
+                    <>
+                      {vnLabel}{' '}
+                      <span className="text-[12px] text-slate-400 dark:text-slate-500 font-normal">
+                        {group.column}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[12px] text-slate-600 dark:text-slate-400 font-normal">
+                      {group.column}
+                    </span>
+                  )}
+                </div>
+              )}
+              <p className="text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                {group.message}
+              </p>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
   isOpen,
   onClose,
   onImportSuccess,
-  category = 'poles',
 }) => {
-  const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.poles
-
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
-  const [fileName, setFileName] = useState<string>('')
+  const [clientError, setClientError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<WorkbookPreview | null>(null)
+  const [isChecking, setIsChecking] = useState(false)
+  const checkCountRef = useRef(0)
 
-  // Parsed Items
-  const [allParsedItems, setAllParsedItems] = useState<ParsedItemReview[]>([])
-  const [totalRowsDetected, setTotalRowsDetected] = useState<number>(0)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [importStage, setImportStage] = useState<number>(1)
-
-  // Redux State - Single Source of Truth trực tiếp từ Backend Redux Store
   const dispatch = useDispatch()
-  const {
-    isImporting,
-    importResult,
-    poles = [],
-    cabinets = [],
-    segments = [],
-    feeders = [],
-  } = useSelector((state: RootState) => state.assets)
+  const { isImporting, importResult, error, isDownloadingTemplate } = useSelector(
+    (state: RootState) => state.assets
+  )
 
-  // Lifecycle hiệu ứng import theo giai đoạn
   useEffect(() => {
-    if (isImporting) {
-      setImportStage(1)
-      const t1 = setTimeout(() => setImportStage(2), 2000)
-      const t2 = setTimeout(() => setImportStage(3), 4500)
-      return () => {
-        clearTimeout(t1)
-        clearTimeout(t2)
-      }
-    } else {
-      setImportStage(1)
+    if (!isOpen) {
+      setSelectedFile(null)
+      setClientError(null)
+      setPreview(null)
+      setIsChecking(false)
+      checkCountRef.current += 1
+      dispatch(resetImportState())
     }
-  }, [isImporting])
+  }, [isOpen, dispatch])
 
-  // Fixtures được trích xuất trực tiếp từ các cột có bóng đèn đang hoạt động
-  const fixtures: ManagedFixture[] = React.useMemo(() => {
-    return poles
-      .filter((p) => p.active_fixture)
-      .map((p) => ({
-        ...(p.active_fixture as ActiveFixture),
-        pole_id: p.pole_id,
-        removed_date: null,
-      }))
-  }, [poles])
+  const translatedImportRows = useMemo(() => {
+    if (!importResult?.rows) return []
+    return importResult.rows.map((r) => ({
+      ...r,
+      message: translateImportMessage(r.message),
+    }))
+  }, [importResult?.rows])
+
+  const translatedImportWarnings = useMemo(() => {
+    if (!importResult?.warnings) return []
+    return importResult.warnings.map((w) => ({
+      ...w,
+      message: translateImportMessage(w.message),
+    }))
+  }, [importResult?.warnings])
+
+  if (!isOpen) return null
 
   const handleCloseModal = () => {
     dispatch(resetImportState())
+    setSelectedFile(null)
+    setClientError(null)
+    setPreview(null)
+    setIsChecking(false)
+    checkCountRef.current += 1
     onClose()
   }
 
+  const handleFileSelection = async (file: File | undefined | null) => {
+    if (!file) return
+    dispatch(resetImportState())
+    checkCountRef.current += 1
+    const currentRun = checkCountRef.current
+
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      setSelectedFile(null)
+      setPreview(null)
+      setIsChecking(false)
+      setClientError('Chỉ nhận tệp Excel .xlsx.')
+      return
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setSelectedFile(null)
+      setPreview(null)
+      setIsChecking(false)
+      setClientError('Tệp vượt quá 10 MB.')
+      return
+    }
+    setClientError(null)
+    setSelectedFile(file)
+    setPreview(null)
+    setIsChecking(true)
+
+    try {
+      const buffer = await file.arrayBuffer()
+      const result = await previewAssetWorkbook(buffer)
+      if (checkCountRef.current === currentRun) {
+        setPreview(result)
+      }
+    } catch {
+      if (checkCountRef.current === currentRun) {
+        setPreview(null)
+        setClientError(
+          'Không đọc được tệp. Mở bằng Excel, lưu lại dạng .xlsx rồi chọn lại.'
+        )
+      }
+    } finally {
+      if (checkCountRef.current === currentRun) {
+        setIsChecking(false)
+      }
+    }
+  }
+
+  const handleExecuteImport = () => {
+    if (!selectedFile) return
+    dispatch(importAssetRequest({ file: selectedFile }))
+  }
+
+  const canImport =
+    Boolean(selectedFile) &&
+    !isChecking &&
+    Boolean(preview) &&
+    (preview?.issues.length ?? 0) === 0 &&
+    (preview?.totalRows ?? 0) > 0 &&
+    !isImporting
+
+  const distinctSheetRows = preview
+    ? new Set(preview.issues.map((i) => `${i.sheet ?? ''}:::${i.row ?? ''}`)).size
+    : 0
+
   const handleCompleteAndClose = () => {
-    if (importResult) {
-      const totalSuccess = (importResult.inserted ?? 0) + (importResult.updated ?? 0)
-      if (totalSuccess > 0) {
-        onImportSuccess(totalSuccess)
+    if (importResult && importResult.committed) {
+      const totalChanges =
+        (importResult.segments?.inserted ?? 0) +
+        (importResult.segments?.updated ?? 0) +
+        (importResult.cabinets?.inserted ?? 0) +
+        (importResult.cabinets?.updated ?? 0) +
+        (importResult.feeders?.inserted ?? 0) +
+        (importResult.feeders?.updated ?? 0) +
+        (importResult.poles?.inserted ?? 0) +
+        (importResult.poles?.updated ?? 0) +
+        (importResult.fixtures?.inserted ?? 0) +
+        (importResult.fixtures?.updated ?? 0)
+
+      if (totalChanges > 0) {
+        onImportSuccess(totalChanges)
       }
     }
     handleCloseModal()
   }
 
-  // Reset state when modal opens or category changes
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedFile(null)
-      setFileName('')
-      setAllParsedItems([])
-      setTotalRowsDetected(0)
-      setErrorMessage(null)
-      dispatch(resetImportState())
+  const insertedSum =
+    (importResult?.segments?.inserted ?? 0) +
+    (importResult?.cabinets?.inserted ?? 0) +
+    (importResult?.feeders?.inserted ?? 0) +
+    (importResult?.poles?.inserted ?? 0) +
+    (importResult?.fixtures?.inserted ?? 0)
+
+  const updatedSum =
+    (importResult?.segments?.updated ?? 0) +
+    (importResult?.cabinets?.updated ?? 0) +
+    (importResult?.feeders?.updated ?? 0) +
+    (importResult?.poles?.updated ?? 0) +
+    (importResult?.fixtures?.updated ?? 0)
+
+  const unchangedSum =
+    (importResult?.segments?.unchanged ?? 0) +
+    (importResult?.cabinets?.unchanged ?? 0) +
+    (importResult?.feeders?.unchanged ?? 0) +
+    (importResult?.poles?.unchanged ?? 0) +
+    (importResult?.fixtures?.unchanged ?? 0)
+
+  const changed = insertedSum + updatedSum
+  const total = changed + unchangedSum
+
+  const getResultCategoryCounts = (sheet: string) => {
+    switch (sheet) {
+      case 'Tuyến đường':
+        return importResult?.segments
+      case 'Tủ điện':
+        return importResult?.cabinets
+      case 'Mạch điện':
+        return importResult?.feeders
+      case 'Cột điện':
+        return importResult?.poles
+      case 'Bóng đèn':
+        return importResult?.fixtures
+      default:
+        return undefined
     }
-  }, [isOpen, category, dispatch])
-
-  if (!isOpen) return null
-
-  // Metric counts
-  const newCount = allParsedItems.filter((i) => i.actionType === 'new').length
-  const updatedCount = allParsedItems.filter((i) => i.actionType === 'updated').length
-  const unchangedCount = allParsedItems.filter((i) => i.actionType === 'unchanged').length
-  const invalidCount = allParsedItems.filter((i) => i.actionType === 'invalid').length
-
-  // Actionable import items (new and updated records)
-  const importableCount = newCount + updatedCount
-  const hasChanges = importableCount > 0
-
-  // CRITICAL REQUIREMENT: Review rows only show NEW, UPDATED, and INVALID items. Unchanged rows are hidden!
-  const reviewRows = allParsedItems.filter((i) => i.actionType !== 'unchanged')
-
-  const processCsvText = (text: string, customName?: string) => {
-    try {
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
-      if (lines.length < 2) {
-        setErrorMessage('Tệp CSV không có dữ liệu (ít nhất cần 1 dòng tiêu đề và 1 dòng dữ liệu)!')
-        return
-      }
-
-      setFileName(customName || 'file_data.csv')
-      setErrorMessage(null)
-      dispatch(resetImportState())
-
-      const headerLine = lines[0]
-      const headers = parseCsvLine(headerLine).map((h) => h.toLowerCase().trim())
-
-      // KIỂM TRA RÀNG BUỘC CỘT TIÊU ĐỀ THEO TỪNG CATEGORY
-      const required = REQUIRED_HEADERS_BY_CATEGORY[category] || []
-      const missing = required.filter((r) => !headers.includes(r))
-      if (category === 'cabinets') {
-        if (!headers.includes('cabinet_name') && !headers.includes('feeder_name')) {
-          missing.push('cabinet_name')
-        }
-      }
-
-      if (missing.length > 0) {
-        setAllParsedItems([])
-        setTotalRowsDetected(0)
-        setErrorMessage(
-          `Tệp CSV không đúng định dạng của danh mục này (Thiếu các cột bắt buộc: ${missing.join(', ')}). Vui lòng kiểm tra lại tab đang chọn hoặc tải tệp mẫu chuẩn.`
-        )
-        return
-      }
-
-      const dataLines = lines.slice(1)
-      setTotalRowsDetected(dataLines.length)
-
-      const parsed: ParsedItemReview[] = []
-
-      dataLines.forEach((line, index) => {
-        const cols = parseCsvLine(line)
-        if (cols.length === 0 || (cols.length === 1 && !cols[0])) return
-
-        const rowObj: Record<string, string> = {}
-        headers.forEach((h, hIdx) => {
-          rowObj[h] = cols[hIdx] !== undefined ? cols[hIdx].trim() : ''
-        })
-
-        const reviewedItem = validateImportRow(
-          category,
-          rowObj,
-          { poles, fixtures, cabinets, segments, feeders },
-          index
-        )
-        parsed.push(reviewedItem)
-      })
-
-      setAllParsedItems(parsed)
-    } catch {
-      setErrorMessage('Đã xảy ra lỗi khi đọc và phân tích tệp dữ liệu. Vui lòng kiểm tra định dạng CSV!')
-    }
-  }
-
-  const handleFileChange = (file: File) => {
-    setSelectedFile(file)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
-      if (text) {
-        processCsvText(text, file.name)
-      }
-    }
-    reader.readAsText(file)
-  }
-
-  // Handle Execute Import via Backend API through Redux-Saga
-  const handleExecuteImport = () => {
-    if (!selectedFile) {
-      setErrorMessage('Vui lòng chọn một tệp dữ liệu CSV trước khi nạp!')
-      return
-    }
-
-    if (invalidCount > 0) {
-      setErrorMessage(`Tệp chứa ${invalidCount} dòng dữ liệu không hợp lệ hoặc thiếu thông tin. Vui lòng kiểm tra lại bảng xem trước!`)
-      return
-    }
-
-    if (allParsedItems.length > 0 && !hasChanges) {
-      setErrorMessage('Tệp CSV không có dữ liệu mới hoặc thông số kỹ thuật nào thay đổi để nạp vào hệ thống!')
-      return
-    }
-
-    setErrorMessage(null)
-    dispatch(
-      importAssetRequest({
-        category: category as ImportAssetCategory,
-        file: selectedFile,
-      })
-    )
   }
 
   return createPortal(
@@ -377,26 +397,58 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
       {/* Backdrop */}
       <div
         onClick={isImporting ? undefined : handleCloseModal}
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity duration-200 animate-in fade-in"
+        className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity duration-200"
       />
 
       {/* Main Modal Window */}
-      <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 z-10 overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-              {config.icon}
+      <div className="relative w-[calc(100%-32px)] max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 overflow-hidden flex flex-col max-h-[85vh]">
+        {/* Duy nhất một input[type=file] cho cả modal */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            handleFileSelection(f)
+            e.target.value = ''
+          }}
+        />
+
+        {/* Header (không cuộn) */}
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+          <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/50 flex items-center justify-center shrink-0">
+              <UploadCloud className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-900 text-base tracking-tight">
-                  Nạp và kiểm tra dữ liệu: {config.title}
-                </h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {config.description}
-              </p>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold text-slate-900 dark:text-white text-base tracking-tight">
+                Nạp tài sản từ Excel
+              </h3>
+              {!selectedFile ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Mỗi loại tài sản nằm ở một sheet riêng trong cùng một tệp.
+                </p>
+              ) : (
+                <div className="flex items-center gap-2 mt-0.5 min-w-0 text-xs">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                    {selectedFile.name}
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400 tabular-nums shrink-0">
+                    {(selectedFile.size / 1024).toFixed(1)} KB
+                  </span>
+                  {!isImporting && importResult?.committed !== true && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="ml-1 font-semibold text-teal-700 dark:text-teal-400 hover:underline cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded"
+                    >
+                      Đổi tệp
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -404,19 +456,18 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
             type="button"
             disabled={isImporting}
             onClick={handleCloseModal}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
             aria-label="Đóng"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="p-6 space-y-5 text-xs text-slate-700 overflow-y-auto flex-1">
-          {/* Màn hình Loading State khi đang gửi dữ liệu lên Backend */}
+        {/* Scrollable Body: duy nhất một vùng cuộn */}
+        <div className="p-6 space-y-5 text-xs text-slate-700 dark:text-slate-300 overflow-y-auto flex-1">
+          {/* Trạng thái G: Đang nạp */}
           {isImporting ? (
-            <div className="py-14 px-6 text-center space-y-5 flex flex-col items-center justify-center animate-in fade-in duration-300">
-              {/* Pulsing Glowing Ring */}
+            <div className="py-14 px-6 text-center space-y-5 flex flex-col items-center justify-center">
               <div className="relative flex items-center justify-center">
                 <div className="absolute w-24 h-24 rounded-full bg-blue-500/20 blur-xl animate-pulse" />
                 <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-slate-800 border-2 border-blue-200 dark:border-blue-500/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-lg relative z-10">
@@ -424,717 +475,626 @@ export const ImportAssetModal: React.FC<ImportAssetModalProps> = ({
                 </div>
               </div>
 
-              {/* Dynamic Status Text */}
               <div className="space-y-2 max-w-md mx-auto">
-                <h4 className="text-base font-bold text-slate-900 dark:text-white tracking-tight transition-all duration-300">
-                  {importStage === 1 && 'Đang phân tích cấu trúc tệp dữ liệu...'}
-                  {importStage === 2 && 'Đang gửi lên máy chủ và kiểm tra ràng buộc không gian...'}
-                  {importStage >= 3 && 'Đang đồng bộ hóa vào Cơ sở dữ liệu...'}
+                <h4 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                  Đang nạp và kiểm tra dữ liệu...
                 </h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  {importStage === 1 && 'Hệ thống đang tiền xử lý các dòng dữ liệu và ánh xạ trường chuẩn hóa.'}
-                  {importStage === 2 && 'Máy chủ đang xác thực tọa độ WKT GIS và quan hệ liên kết dữ liệu.'}
-                  {importStage >= 3 && 'Tiến trình lưu trữ và hoàn tất cập nhật vào hệ cơ sở dữ liệu.'}
-                </p>
-              </div>
-
-              {/* Indeterminate Shimmer Animated Progress Bar */}
-              <div className="w-full max-w-xs h-2 bg-slate-100 rounded-full overflow-hidden relative border border-slate-200">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 rounded-full transition-all duration-500 relative overflow-hidden"
-                  style={{
-                    width: importStage === 1 ? '35%' : importStage === 2 ? '70%' : '95%',
-                  }}
-                >
-                  <div className="absolute inset-0 bg-white/30 animate-[pulse_1.5s_infinite]" />
-                </div>
-              </div>
-
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl max-w-sm text-center">
-                <p className="text-[11px] font-medium text-amber-800">
-                  ⏳ Quá trình này có thể mất vài giây. Vui lòng không đóng trình duyệt hoặc tải lại trang!
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Quá trình này có thể mất vài giây. Vui lòng không đóng trình duyệt hoặc tải lại trang!
                 </p>
               </div>
             </div>
-          ) : (
+          ) : !importResult ? (
+            /* Khi chưa có kết quả từ BE */
             <>
-              {/* Top Action Bar: Direct Static Template Download (Không gọi API) */}
-              {!importResult && (
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl flex items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-xs">
-                  <FileCheck2 className="w-4 h-4 text-blue-600 dark:text-sky-400" />
-                  <span>File mẫu CSV: {config.title}</span>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Tải tệp mẫu định dạng chuẩn UTF-8 (<code className="text-slate-700 dark:text-slate-300 bg-slate-200/60 dark:bg-slate-700 px-1 py-0.5 rounded font-mono text-[10px]">{config.templateFileName}</code>) để điền dữ liệu trước khi nạp.
-                </p>
-              </div>
-
-              <a
-                href={config.templateUrl}
-                download={config.templateFileName}
-                className="px-3.5 py-1.5 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-100 font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer shrink-0"
-                title={`Tải file mẫu ${config.templateFileName}`}
-              >
-                <Download className="w-3.5 h-3.5 text-blue-600 dark:text-sky-400" />
-                <span>Tải file mẫu CSV</span>
-              </a>
-            </div>
-          )}
-
-          {/* Hướng dẫn thứ tự nạp */}
-          {!importResult && (
-            <div className="px-3.5 py-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-[11px] text-blue-900 flex items-start gap-2">
-              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-px" />
-              <div className="space-y-0.5">
-                <div className="font-semibold">{config.prerequisite}</div>
-                <div className="text-blue-800/80">{IMPORT_ORDER_HINT}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Drag & Drop Upload Zone */}
-          {!importResult && (
-            <div
-              onDragOver={(e) => {
-                e.preventDefault()
-                setIsDragOver(true)
-              }}
-              onDragLeave={() => setIsDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault()
-                setIsDragOver(false)
-                const f = e.dataTransfer.files?.[0]
-                if (f) handleFileChange(f)
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 cursor-pointer ${isDragOver
-                  ? 'border-blue-500 bg-blue-50/40 scale-[1.005]'
-                  : selectedFile || fileName
-                    ? 'border-emerald-300 bg-emerald-50/20'
-                    : 'border-slate-300 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20'
-                }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (f) handleFileChange(f)
-                }}
-              />
-
-              <div className="space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mx-auto shadow-2xs">
-                  <UploadCloud className="w-5 h-5" />
-                </div>
-
-                <div>
-                  <div className="font-bold text-slate-900 text-sm">
-                    {fileName ? (
-                      <span className="text-emerald-700 font-bold flex items-center justify-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Đã tải tệp: {fileName}</span>
-                        {totalRowsDetected > 0 && (
-                          <span className="text-xs text-slate-500 font-normal">
-                            ({totalRowsDetected} dòng dữ liệu phát hiện)
-                          </span>
+              {/* Trạng thái A: Chưa chọn tệp */}
+              {!selectedFile ? (
+                <div className="space-y-5 text-left">
+                  <div className="space-y-2">
+                    <div className="flex items-baseline justify-between">
+                      <label className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+                        Tệp Excel
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => dispatch(downloadTemplateRequest())}
+                        disabled={isDownloadingTemplate}
+                        className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-teal-700 dark:text-teal-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded"
+                      >
+                        {isDownloadingTemplate ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Đang tạo tệp mẫu…</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Tải tệp mẫu</span>
+                          </>
                         )}
-                      </span>
-                    ) : (
-                      <span>Kéo thả tệp CSV vào đây, hoặc nhấp để chọn tệp từ máy tính</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {fileName ? (
-                      <span className="text-blue-600 font-medium underline">Nhấp để chọn tệp CSV khác</span>
-                    ) : (
-                      <>Hỗ trợ định dạng CSV: UTF-8, dấu phẩy phân tách</>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {errorMessage && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-medium text-xs flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {/* Review Section */}
-          {allParsedItems.length > 0 && !importResult && (
-            <div className="space-y-4">
-              {/* Metrics Scorecards */}
-              <div className={`grid ${invalidCount > 0 ? 'grid-cols-4' : 'grid-cols-3'} gap-3`}>
-                {/* 1. Mới */}
-                <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-center">
-                  <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider flex items-center justify-center gap-1">
-                    <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Thêm mới</span>
-                  </div>
-                  <div className="text-2xl font-bold text-emerald-700 mt-0.5">{newCount}</div>
-                  <div className="text-[10px] text-emerald-600">Bản ghi chưa có trên GIS</div>
-                </div>
-
-                {/* 2. Cập nhật */}
-                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-center">
-                  <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wider flex items-center justify-center gap-1">
-                    <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Cập nhật</span>
-                  </div>
-                  <div className="text-2xl font-bold text-amber-700 mt-0.5">{updatedCount}</div>
-                  <div className="text-[10px] text-amber-600">Thay đổi thông số kỹ thuật</div>
-                </div>
-
-                {/* 3. Vi phạm ràng buộc (nếu có) */}
-                {invalidCount > 0 && (
-                  <div className="p-3 bg-rose-50/80 border border-rose-200 rounded-xl text-center">
-                    <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wider flex items-center justify-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Dòng lỗi</span>
+                      </button>
                     </div>
-                    <div className="text-2xl font-bold text-rose-700 mt-0.5">{invalidCount}</div>
-                    <div className="text-[10px] text-rose-600">Sai định dạng hoặc thiếu dữ liệu liên quan</div>
+
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        setIsDragOver(true)
+                      }}
+                      onDragLeave={() => setIsDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setIsDragOver(false)
+                        const f = e.dataTransfer.files?.[0]
+                        if (f) handleFileSelection(f)
+                      }}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`rounded-2xl border-2 border-dashed px-5 py-6 transition-all duration-200 cursor-pointer flex items-center gap-4 ${
+                        isDragOver
+                          ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-950/30'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-600 bg-white dark:bg-slate-850'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
+                        <UploadCloud className="w-5 h-5" />
+                      </div>
+
+                      <div className="space-y-0.5 text-left">
+                        <p className="text-[13px] text-slate-700 dark:text-slate-300">
+                          Kéo thả tệp .xlsx vào đây hoặc{' '}
+                          <span className="text-teal-700 dark:text-teal-400 font-semibold">
+                            chọn từ máy
+                          </span>
+                        </p>
+                        <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                          Tối đa 10 MB
+                        </p>
+                      </div>
+                    </div>
+
+                    {(clientError || error) && (
+                      <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-2.5">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                        <span>{clientError || error}</span>
+                      </div>
+                    )}
                   </div>
-                )}
 
-                {/* 4. Không đổi (Đã ẩn) */}
-                <div className="p-3 bg-slate-100/80 border border-slate-200 rounded-xl text-center opacity-85">
-                  <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Không thay đổi</span>
-                  </div>
-                  <div className="text-2xl font-bold text-slate-600 mt-0.5">{unchangedCount}</div>
-                  <div className="text-[10px] text-slate-500">Đã tự động ẩn khỏi bảng</div>
-                </div>
-              </div>
-
-              {/* Requirement Rule Notice */}
-              <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Info className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>
-                    Bảng xem trước chỉ liệt kê <strong>{reviewRows.length} bản ghi</strong> (gồm{' '}
-                    <strong>{newCount} thêm mới</strong>, <strong>{updatedCount} cập nhật</strong>
-                    {invalidCount > 0 && <span className="text-rose-600 font-bold">, {invalidCount} dòng lỗi</span>}
-                    ).{' '}
-                    Có <strong>{unchangedCount} bản ghi trùng khớp 100%</strong> đã được tự động ẩn theo yêu cầu.
-                    {invalidCount > 0 && <> Số dòng trong thông báo lỗi không tính dòng tiêu đề.</>}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {invalidCount > 0 && (
-                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3 text-rose-600" />
-                      {invalidCount} lỗi
-                    </span>
-                  )}
-                  <span className="text-[11px] font-semibold text-blue-700 bg-white border border-blue-200 px-2 py-0.5 rounded-md shrink-0">
-                    Hiển thị {reviewRows.length}/{allParsedItems.length}
-                  </span>
-                </div>
-              </div>
-
-              {/* Review Table (Strictly displaying only reviewRows: NEW & UPDATED) */}
-              {reviewRows.length > 0 ? (
-                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                        <tr>
-                          <th className="py-2.5 px-3 w-28">Tác vụ</th>
-                          <th className="py-2.5 px-3 w-32">
-                            {category === 'fixtures'
-                              ? 'Cột gắn đèn (Pole)'
-                              : category === 'segments'
-                                ? 'Mã tuyến đường'
-                                : category === 'cabinets'
-                                  ? 'Mã tủ điện'
-                                  : 'Mã tài sản'}
-                          </th>
-                          <th className="py-2.5 px-3 w-44">
-                            {category === 'fixtures'
-                              ? 'Tuyến đường & Tủ điện'
-                              : category === 'segments'
-                                ? 'Tên tuyến đường'
-                                : category === 'cabinets'
-                                  ? 'Tên tủ điện'
-                                  : 'Vị trí / Tuyến đường'}
-                          </th>
-                          <th className="py-2.5 px-3 w-36">
-                            {category === 'fixtures'
-                              ? 'Thông số bộ đèn'
-                              : category === 'segments'
-                                ? 'Cấp đường / Chiều dài'
-                                : category === 'cabinets' || category === 'feeders'
-                                  ? 'Khu vực quản lý'
-                                  : 'Tọa độ GIS'}
-                          </th>
-                          <th className="py-2.5 px-3">Chi tiết thay đổi (Cũ ➔ Mới)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {reviewRows.map((item, idx) => (
-                          <tr
-                            key={idx}
-                            className={`transition-colors hover:bg-slate-50/80 ${item.actionType === 'invalid'
-                                ? 'bg-rose-50/30'
-                                : item.actionType === 'new'
-                                  ? 'bg-emerald-50/20'
-                                  : 'bg-amber-50/15'
-                              }`}
-                          >
-                            {/* Action Badge */}
-                            <td className="py-2.5 px-3 align-top">
-                              {item.actionType === 'invalid' ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 whitespace-nowrap">
-                                  <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
-                                  <span>Dòng lỗi</span>
-                                </span>
-                              ) : item.actionType === 'new' ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
-                                  <PlusCircle className="w-3 h-3 text-emerald-600 shrink-0" />
-                                  <span>Thêm mới</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 whitespace-nowrap">
-                                  <RefreshCw className="w-3 h-3 text-amber-600 shrink-0" />
-                                  <span>Cập nhật</span>
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Asset ID */}
-                            <td className="py-2.5 px-3 align-top font-mono font-bold text-slate-900 text-xs">
-                              {item.externalRef}
-                            </td>
-
-                            {/* Location */}
-                            <td className="py-2.5 px-3 align-top">
-                              {(() => {
-                                if (item.actionType === 'invalid') {
-                                  return <span className="text-slate-400">-</span>
-                                }
-                                if (item.category === 'fixtures') {
-                                  const parentPole = poles.find(
-                                    (p) =>
-                                      (p.pole_id && p.pole_id === item.data.pole_id) ||
-                                      (p.external_ref && p.external_ref.toLowerCase() === item.externalRef.toLowerCase())
-                                  )
-                                  const seg = findByIdOrRef(segments, (s) => s.segment_id, parentPole?.segment_id)
-                                  const cab = findByIdOrRef(cabinets, (c) => c.cabinet_id, parentPole?.feeder_id)
-                                  return (
-                                    <>
-                                      <div
-                                        className="truncate max-w-[170px] font-semibold text-slate-800"
-                                        title={seg?.segment_name || 'Cột ' + item.externalRef}
-                                      >
-                                        {seg?.segment_name || `Cột ${item.externalRef}`}
-                                      </div>
-                                      {cab?.cabinet_name ? (
-                                        <div className="text-[10px] text-slate-500 font-mono">
-                                          {cab.cabinet_name}
-                                        </div>
-                                      ) : parentPole?.feeder_id ? (
-                                        <div className="text-[10px] text-slate-500 font-mono">
-                                          Tủ: {parentPole.feeder_id}
-                                        </div>
-                                      ) : null}
-                                    </>
-                                  )
-                                }
-
-                                if (item.category === 'segments') {
-                                  return (
-                                    <>
-                                      <div className="font-semibold text-slate-800 truncate max-w-[170px]" title={item.data.segment_name || ''}>
-                                        {item.data.segment_name || item.externalRef}
-                                      </div>
-                                      {item.data.commune_id && (
-                                        <div className="text-[10px] text-slate-500 font-medium">
-                                          Địa bàn: {formatCommuneDisplayName(item.data.commune_id)}
-                                        </div>
-                                      )}
-                                    </>
-                                  )
-                                }
-                                if (item.category === 'cabinets') {
-                                  return (
-                                    <>
-                                      <div className="font-semibold text-slate-800 truncate max-w-[170px]" title={item.data.cabinet_name || ''}>
-                                        {item.data.cabinet_name || item.externalRef}
-                                      </div>
-                                      {item.data.commune_id && (
-                                        <div className="text-[10px] text-slate-500 font-medium">
-                                          Địa bàn: {formatCommuneDisplayName(item.data.commune_id)}
-                                        </div>
-                                      )}
-                                    </>
-                                  )
-                                }
-
-                                if (item.category === 'feeders') {
-                                  const cab = findByIdOrRef(cabinets, (c) => c.cabinet_id, item.data.cabinet_id)
-                                  return (
-                                    <>
-                                      <div className="font-semibold text-slate-800 dark:text-slate-100">
-                                        ⚡ {cab?.cabinet_name || cab?.cabinet_id || 'Tủ điện'}
-                                      </div>
-                                      <div className="text-[10px] text-slate-500 font-mono">
-                                        Lộ: {item.data.feeder_name || item.externalRef}
-                                      </div>
-                                    </>
-                                  )
-                                }
-
-                                // Poles
-                                const seg = findByIdOrRef(segments, (s) => s.segment_id, item.data.segment_id)
-                                const fdr = findByIdOrRef(feeders, (f) => f.feeder_id, item.data.feeder_id)
-                                const cab =
-                                  fdr?.cabinet?.cabinet_name ||
-                                  findByIdOrRef(cabinets, (c) => c.cabinet_id, item.data.feeder_id)?.cabinet_name
-                                return (
-                                  <>
-                                    <div className="font-medium text-slate-800 truncate max-w-[170px]" title={seg?.segment_name || ''}>
-                                      {seg?.segment_name || (item.data.segment_id ? `Tuyến ${item.data.segment_id}` : 'Chưa gán tuyến')}
-                                    </div>
-                                    {fdr ? (
-                                      <div className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5" title={fdr.feeder_name || fdr.external_ref || ''}>
-                                        <Zap className="w-3 h-3 text-emerald-600 shrink-0" />
-                                        <span className="truncate max-w-[150px]">{fdr.feeder_name || fdr.external_ref}</span>
-                                      </div>
-                                    ) : item.data.feeder_id ? (
-                                      <div className="text-[10px] text-slate-500 font-mono">
-                                        Lộ/Tủ: {cab || item.data.feeder_id}
-                                      </div>
-                                    ) : (
-                                      <div className="text-[9.5px] text-slate-400 italic">Chưa gán mạch</div>
-                                    )}
-                                    {item.data.note && (
-                                      <div className="text-[10px] text-amber-700 font-medium truncate max-w-[170px] flex items-center gap-1 mt-0.5" title={item.data.note}>
-                                        <Bookmark className="w-3 h-3 text-amber-500 shrink-0" />
-                                        <span>{item.data.note}</span>
-                                      </div>
-                                    )}
-                                  </>
-                                )
-                              })()}
-                            </td>
-
-                            {/* Specs */}
-                            <td className="py-2.5 px-3 align-top font-mono text-[10px] text-slate-600">
-                              {(() => {
-                                if (item.actionType === 'invalid') {
-                                  return <span className="text-slate-400">-</span>
-                                }
-                                if (item.category === 'fixtures') {
-                                  const count = item.data.lamp_count || 1
-                                  const totalWatt = item.data.lamp_watt * count
-                                  return (
-                                    <div className="space-y-0.5">
-                                      <div>
-                                        <span className="font-bold text-slate-900">{item.data.lamp_watt} W</span>
-                                        {count > 1 && (
-                                          <span className="text-[9.5px] text-amber-700 font-bold ml-1">
-                                            (x{count} = {totalWatt}W)
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="inline-flex items-center gap-1 text-[9.5px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                                        <span>{count} bóng</span>
-                                      </div>
-                                      <div className="text-[9.5px] text-slate-400">
-                                        Nguồn: {item.data.power_source === 'grid' ? 'Lưới điện' : item.data.power_source}
-                                      </div>
-                                    </div>
-                                  )
-                                }
-                                if (item.category === 'segments') {
-                                  return (
-                                    <div>
-                                      <span className="font-bold text-slate-800">
-                                        {item.data.road_class === 'inter_commune' ? 'Đường liên xã' : 'Đường liên thôn'}
-                                      </span>
-                                      {item.data.length_m ? ` • ${item.data.length_m}m` : ''}
-                                    </div>
-                                  )
-                                }
-                                if (item.category === 'cabinets') {
-                                  return (
-                                    <div>
-                                      <span className="font-bold text-slate-800">Tủ điện</span>
-                                      {item.data.commune_id ? ` • ${getCommuneName(item.data.commune_id)}` : ''}
-                                    </div>
-                                  )
-                                }
-                                if (item.category === 'feeders') {
-                                  return (
-                                    <div>
-                                      <span className="font-bold text-slate-800">
-                                        {item.data.commune_id ? getCommuneName(item.data.commune_id) : '-'}
-                                      </span>
-                                    </div>
-                                  )
-                                }
-                                // Poles
-                                const point = parsePointWkt(item.data.geom_wkt)
-                                return point ? (
-                                  <div className="text-slate-700" title={item.data.geom_wkt ?? undefined}>
-                                    {point.lat.toFixed(5)}, {point.lng.toFixed(5)}
-                                  </div>
-                                ) : (
-                                  <div className="text-[10px] text-slate-400 italic">Chưa có GPS</div>
-                                )
-                              })()}
-                            </td>
-
-                            {/* Diffs / Changes list or Error */}
-                            <td className="py-2.5 px-3 align-top">
-                              {item.actionType === 'invalid' ? (
-                                <div className="text-[11px] text-rose-700 font-medium flex items-center gap-1.5 bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-lg">
-                                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                                  <span>{item.errorMsg}</span>
-                                </div>
-                              ) : item.actionType === 'new' ? (
-                                <div className="text-[11px] text-emerald-700 font-medium">
-                                  {(() => {
-                                    if (item.category === 'fixtures') {
-                                      return `Đèn LED ${item.data.lamp_watt}W • Nguồn: ${item.data.power_source === 'grid' ? 'Lưới điện' : 'Mặt trời'} • Hạn BH: ${item.data.warranty_expiry || 'Chưa có'}`
-                                    }
-                                    if (item.category === 'segments') {
-                                      return `Tuyến: ${item.data.segment_name || item.externalRef} • Dài: ${item.data.length_m ? `${item.data.length_m}m` : '-'} • Cấp: ${item.data.road_class === 'inter_commune' ? 'Liên xã' : 'Liên thôn'}`
-                                    }
-                                    if (item.category === 'cabinets') {
-                                      return `Tủ: ${item.data.cabinet_name || item.externalRef} • ${formatCommuneDisplayName(item.data.commune_id)}`
-                                    }
-                                    if (item.category === 'feeders') {
-                                      return `Mạch: ${item.data.feeder_name || item.externalRef} • Khu vực: ${formatCommuneDisplayName(item.data.commune_id || '')}`
-                                    }
-                                    // Poles
-                                    return `Tạo mới (${item.externalRef})${item.data.note ? ` • Ghi chú: ${item.data.note}` : ''}`
-                                  })()}
-                                </div>
-                              ) : (
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  {item.diffs.map((d, dIdx) => {
-                                    const isPoi = d.label.includes('nhạy cảm') || d.label.includes('POI')
-                                    if (isPoi) {
-                                      return (
-                                        <span
-                                          key={dIdx}
-                                          className="inline-flex items-center gap-1.5 text-[10px] whitespace-nowrap bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-lg shadow-2xs font-medium"
-                                        >
-                                          <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                          <span className="font-semibold">{d.label}:</span>
-                                          <span className="line-through text-slate-400 whitespace-nowrap">{d.oldVal}</span>
-                                          <ArrowRight className="w-2.5 h-2.5 text-amber-600 shrink-0" />
-                                          <span className="font-bold text-amber-800 whitespace-nowrap">{d.newVal}</span>
-                                        </span>
-                                      )
-                                    }
-                                    const isNote = d.label.includes('Ghi chú') || d.label.includes('Atlas')
-                                    if (isNote) {
-                                      return (
-                                        <span
-                                          key={dIdx}
-                                          className="inline-flex items-center gap-1.5 text-[10px] whitespace-nowrap bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-lg shadow-2xs font-medium"
-                                        >
-                                          <Bookmark className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                          <span className="font-semibold">{d.label}:</span>
-                                          <span className="line-through text-slate-400 whitespace-nowrap">{d.oldVal}</span>
-                                          <ArrowRight className="w-2.5 h-2.5 text-amber-600 shrink-0" />
-                                          <span className="font-bold text-amber-800 whitespace-nowrap">{d.newVal}</span>
-                                        </span>
-                                      )
-                                    }
-                                    return (
-                                      <span
-                                        key={dIdx}
-                                        className="inline-flex items-center gap-1 text-[10px] whitespace-nowrap bg-white border border-amber-300 px-2 py-0.5 rounded-md shadow-2xs"
-                                      >
-                                        <span className="font-semibold text-slate-700">{d.label}:</span>
-                                        <span className="line-through text-slate-400 whitespace-nowrap">{d.oldVal}</span>
-                                        <ArrowRight className="w-2.5 h-2.5 text-amber-600 shrink-0" />
-                                        <span className="font-bold text-emerald-700 whitespace-nowrap">{d.newVal}</span>
-                                      </span>
-                                    )
-                                  })}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                    Hệ thống chỉ lưu khi cả tệp hợp lệ. Có lỗi thì không lưu dòng nào.
+                  </p>
                 </div>
               ) : (
-                <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-                  <div className="font-bold text-slate-900 text-sm">
-                    Tất cả dữ liệu trong tệp đều trùng khớp 100%!
-                  </div>
-                  <p className="text-xs text-slate-500 max-w-md mx-auto">
-                    Cả {unchangedCount} bản ghi đều đã có trong hệ thống GIS và không có thông số nào thay đổi,
-                    nên không cần cập nhật thêm.
-                  </p>
+                /* Đã chọn tệp: Trạng thái B, C, D, E, F */
+                <div className="space-y-4 text-left">
+                  {/* Trạng thái B: Đang kiểm tra */}
+                  {isChecking && (
+                    <div className="flex items-center gap-2 text-[13px] text-slate-500 dark:text-slate-400 py-1">
+                      <Loader2 className="w-4 h-4 animate-spin text-teal-600 dark:text-teal-400 shrink-0" />
+                      <span>Đang kiểm tra tệp…</span>
+                    </div>
+                  )}
+
+                  {/* Trạng thái C: Đọc tệp lỗi */}
+                  {!isChecking && clientError && (
+                    <p className="text-[13px] leading-relaxed pl-3 border-l-2 border-rose-500 text-rose-800 dark:text-rose-300">
+                      <span className="font-semibold">{clientError}</span>
+                    </p>
+                  )}
+
+                  {/* Lỗi từ store khi không có preview */}
+                  {!isChecking && !clientError && error && !preview && (
+                    <p className="text-[13px] leading-relaxed pl-3 border-l-2 border-rose-500 text-rose-800 dark:text-rose-300">
+                      <span className="font-semibold">{error}</span>
+                    </p>
+                  )}
+
+                  {/* Trạng thái D, E, F khi đã có preview */}
+                  {!isChecking && !clientError && preview && (
+                    <>
+                      {preview.issues.length > 0 ? (
+                        /* Trạng thái D: Preview có lỗi */
+                        <div className="space-y-4">
+                          <p className="text-[13px] leading-relaxed pl-3 border-l-2 border-rose-500 text-rose-800 dark:text-rose-300">
+                            <span className="font-semibold">
+                              {preview.issues.length} lỗi ở {distinctSheetRows} dòng.
+                            </span>{' '}
+                            Chưa gửi gì lên hệ thống, sửa trong Excel rồi chọn lại tệp.
+                          </p>
+
+                          {/* Lỗi Toàn tệp (nếu có) */}
+                          {(() => {
+                            const globalIssues = preview.issues.filter(
+                              (i) => !i.sheet || !ASSET_SHEETS.includes(i.sheet as (typeof ASSET_SHEETS)[number])
+                            )
+                            if (globalIssues.length === 0) return null
+                            return (
+                              <div className="mb-2">
+                                <IssueList
+                                  groups={groupRowErrors(globalIssues)}
+                                  tone="error"
+                                  forceLocationLabel="Toàn tệp"
+                                />
+                              </div>
+                            )
+                          })()}
+
+                          {/* Bảng sheet có cột Lỗi */}
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b border-slate-200 dark:border-slate-800 text-[12px] font-medium text-slate-500 dark:text-slate-400">
+                                <th scope="col" className="py-2.5 pr-3 text-left font-medium">
+                                  Loại tài sản
+                                </th>
+                                <th scope="col" className="py-2.5 px-3 text-right font-medium w-[88px]">
+                                  Số dòng
+                                </th>
+                                <th scope="col" className="py-2.5 pl-3 pr-0 text-right font-medium w-[88px]">
+                                  Lỗi
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ASSET_SHEETS.map((sheetName) => {
+                                const sheetSummary = preview.sheets.find(
+                                  (s) => s.sheet === sheetName
+                                )
+                                const rowCount = sheetSummary?.rows ?? 0
+                                const sheetIssues = preview.issues.filter(
+                                  (i) => i.sheet === sheetName
+                                )
+
+                                return (
+                                  <React.Fragment key={sheetName}>
+                                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                                      <th
+                                        scope="row"
+                                        className="py-2.5 pr-3 text-[13px] font-semibold text-slate-800 dark:text-slate-200 text-left"
+                                      >
+                                        {sheetName}
+                                      </th>
+                                      <td className="py-2.5 px-3 text-right text-[13px] tabular-nums text-slate-700 dark:text-slate-300 w-[88px]">
+                                        {rowCount > 0 ? (
+                                          rowCount
+                                        ) : (
+                                          <span className="text-slate-400 dark:text-slate-500">-</span>
+                                        )}
+                                      </td>
+                                      <td className="py-2.5 pl-3 pr-0 text-right text-[13px] tabular-nums w-[88px]">
+                                        {sheetIssues.length > 0 ? (
+                                          <span className="font-semibold text-rose-700 dark:text-rose-400">
+                                            {sheetIssues.length}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-400 dark:text-slate-500">-</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                    {sheetIssues.length > 0 && (
+                                      <tr className="border-b border-slate-100 dark:border-slate-800">
+                                        <td colSpan={3} className="pl-4 pr-0 py-2">
+                                          <IssueList
+                                            groups={groupRowErrors(sheetIssues)}
+                                            tone="error"
+                                          />
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : preview.totalRows === 0 ? (
+                        /* Trạng thái E: Preview trống */
+                        <div className="space-y-4">
+                          <div className="text-[13px] leading-relaxed pl-3 border-l-2 border-slate-300 text-slate-600 dark:text-slate-300">
+                            <span className="font-semibold">Tệp chưa có dòng dữ liệu nào.</span> Điền
+                            dữ liệu vào các sheet tài sản của tệp mẫu rồi chọn lại.{' '}
+                            <button
+                              type="button"
+                              onClick={() => dispatch(downloadTemplateRequest())}
+                              disabled={isDownloadingTemplate}
+                              className="font-semibold text-teal-700 dark:text-teal-400 hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isDownloadingTemplate ? 'Đang tạo tệp mẫu…' : 'Tải tệp mẫu'}
+                            </button>
+                          </div>
+
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b border-slate-200 dark:border-slate-800 text-[12px] font-medium text-slate-500 dark:text-slate-400">
+                                <th scope="col" className="py-2.5 pr-3 text-left font-medium">
+                                  Loại tài sản
+                                </th>
+                                <th scope="col" className="py-2.5 pl-3 pr-0 text-right font-medium w-[88px]">
+                                  Số dòng
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ASSET_SHEETS.map((sheetName) => (
+                                <tr
+                                  key={sheetName}
+                                  className="border-b border-slate-100 dark:border-slate-800"
+                                >
+                                  <th
+                                    scope="row"
+                                    className="py-2.5 pr-3 text-[13px] font-semibold text-slate-800 dark:text-slate-200 text-left"
+                                  >
+                                    {sheetName}
+                                  </th>
+                                  <td className="py-2.5 pl-3 pr-0 text-right text-[13px] tabular-nums text-slate-400 dark:text-slate-500 w-[88px]">
+                                    -
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        /* Trạng thái F: Preview sạch */
+                        <div className="space-y-4">
+                          <p className="text-[13px] leading-relaxed pl-3 border-l-2 border-emerald-500 text-emerald-800 dark:text-emerald-300">
+                            <span className="font-semibold">Tệp hợp lệ,</span> {preview.totalRows} dòng
+                            sẵn sàng nạp.
+                          </p>
+
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b border-slate-200 dark:border-slate-800 text-[12px] font-medium text-slate-500 dark:text-slate-400">
+                                <th scope="col" className="py-2.5 pr-3 text-left font-medium">
+                                  Loại tài sản
+                                </th>
+                                <th scope="col" className="py-2.5 pl-3 pr-0 text-right font-medium w-[88px]">
+                                  Số dòng
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ASSET_SHEETS.map((sheetName) => {
+                                const sheetSummary = preview.sheets.find(
+                                  (s) => s.sheet === sheetName
+                                )
+                                const rowCount = sheetSummary?.rows ?? 0
+                                return (
+                                  <tr
+                                    key={sheetName}
+                                    className="border-b border-slate-100 dark:border-slate-800"
+                                  >
+                                    <th
+                                      scope="row"
+                                      className="py-2.5 pr-3 text-[13px] font-semibold text-slate-800 dark:text-slate-200 text-left"
+                                    >
+                                      {sheetName}
+                                    </th>
+                                    <td className="py-2.5 pl-3 pr-0 text-right text-[13px] tabular-nums text-slate-700 dark:text-slate-300 w-[88px]">
+                                      {rowCount > 0 ? (
+                                        rowCount
+                                      ) : (
+                                        <span className="text-slate-400 dark:text-slate-500">-</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                              <tr className="border-t border-slate-200 dark:border-slate-700 font-semibold">
+                                <th
+                                  scope="row"
+                                  className="py-2.5 pr-3 text-[13px] font-semibold text-slate-900 dark:text-white text-left"
+                                >
+                                  Tổng
+                                </th>
+                                <td className="py-2.5 pl-3 pr-0 text-right text-[13px] tabular-nums font-semibold text-slate-900 dark:text-white w-[88px]">
+                                  {preview.totalRows}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                            Hệ thống lưu cả tệp trong một lần. Có lỗi thì không lưu dòng nào.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
+              )}
+            </>
+          ) : importResult.committed === false ? (
+            /* Trạng thái H: BE trả committed === false */
+            <div className="space-y-4 text-left">
+              <p className="text-[13px] leading-relaxed pl-3 border-l-2 border-rose-500 text-rose-800 dark:text-rose-300">
+                <span className="font-semibold">Chưa lưu dữ liệu nào.</span>{' '}
+                {importResult.total_errors ?? translatedImportRows.length} lỗi ở{' '}
+                {importResult.failed ?? 0} dòng, sửa trong Excel rồi chọn lại tệp.
+              </p>
+
+              {/* Lỗi Toàn tệp (nếu có) */}
+              {(() => {
+                const globalRows = translatedImportRows.filter(
+                  (i) => !i.sheet || !ASSET_SHEETS.includes(i.sheet as (typeof ASSET_SHEETS)[number])
+                )
+                if (globalRows.length === 0) return null
+                return (
+                  <div className="mb-2">
+                    <IssueList
+                      groups={groupRowErrors(globalRows)}
+                      tone="error"
+                      forceLocationLabel="Toàn tệp"
+                    />
+                  </div>
+                )
+              })()}
+
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-[12px] font-medium text-slate-500 dark:text-slate-400">
+                    <th scope="col" className="py-2.5 pr-3 text-left font-medium">
+                      Loại tài sản
+                    </th>
+                    <th scope="col" className="py-2.5 px-3 text-right font-medium w-[88px]">
+                      Số dòng
+                    </th>
+                    <th scope="col" className="py-2.5 pl-3 pr-0 text-right font-medium w-[88px]">
+                      Lỗi
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ASSET_SHEETS.map((sheetName) => {
+                    const sheetSummary = preview?.sheets.find((s) => s.sheet === sheetName)
+                    const rowCount = sheetSummary?.rows
+                    const sheetErrors = translatedImportRows.filter(
+                      (i) => i.sheet === sheetName
+                    )
+
+                    return (
+                      <React.Fragment key={sheetName}>
+                        <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th
+                            scope="row"
+                            className="py-2.5 pr-3 text-[13px] font-semibold text-slate-800 dark:text-slate-200 text-left"
+                          >
+                            {sheetName}
+                          </th>
+                          <td className="py-2.5 px-3 text-right text-[13px] tabular-nums text-slate-700 dark:text-slate-300 w-[88px]">
+                            {rowCount !== undefined && rowCount > 0 ? (
+                              rowCount
+                            ) : (
+                              <span className="text-slate-400 dark:text-slate-500">-</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 pl-3 pr-0 text-right text-[13px] tabular-nums w-[88px]">
+                            {sheetErrors.length > 0 ? (
+                              <span className="font-semibold text-rose-700 dark:text-rose-400">
+                                {sheetErrors.length}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 dark:text-slate-500">-</span>
+                            )}
+                          </td>
+                        </tr>
+                        {sheetErrors.length > 0 && (
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            <td colSpan={3} className="pl-4 pr-0 py-2">
+                              <IssueList groups={groupRowErrors(sheetErrors)} tone="error" />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+
+              {importResult.truncated && (
+                <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                  Đang hiện {translatedImportRows.length} lỗi đầu tiên trên tổng{' '}
+                  {importResult.total_errors ?? 0}.
+                </p>
               )}
             </div>
-          )}
-
-          {/* Backend API Import Results Section */}
-          {importResult && (
-            <div className="p-6 text-center space-y-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl animate-in zoom-in-95">
-              <div className="flex items-center justify-between pb-3 border-b border-emerald-200/80">
-                <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Kết quả nạp {config.label}</span>
-                </div>
-                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  Hoàn tất
-                </span>
-              </div>
-
-              {/* 3 Metric Scorecards */}
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3.5 bg-white border border-emerald-200 rounded-xl shadow-2xs">
-                  <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
-                    Thêm mới
-                  </div>
-                  <div className="text-2xl font-black text-emerald-600 mt-1">
-                    {importResult.inserted ?? 0}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">Bản ghi tạo mới</div>
-                </div>
-
-                <div className="p-3.5 bg-white border border-blue-200 rounded-xl shadow-2xs">
-                  <div className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">
-                    Cập nhật
-                  </div>
-                  <div className="text-2xl font-black text-blue-600 mt-1">
-                    {importResult.updated ?? 0}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">Ghi đè thông số</div>
-                </div>
-
-                <div className="p-3.5 bg-white border border-rose-200 rounded-xl shadow-2xs">
-                  <div className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">
-                    Thất bại
-                  </div>
-                  <div className="text-2xl font-black text-rose-600 mt-1">
-                    {importResult.failed ?? 0}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">Dòng bị từ chối</div>
-                </div>
-              </div>
-
-              {/* Error Rows Details from Backend */}
-              {importResult.rows && importResult.rows.length > 0 && (
-                <div className="text-left p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5">
-                  <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-rose-600" />
-                    <span>Các dòng bị từ chối ({importResult.rows.length}) — số dòng không kể dòng tiêu đề:</span>
-                  </div>
-                  <div className="max-h-32 overflow-y-auto space-y-1 text-[11px] pr-2 font-mono">
-                    {importResult.rows.map((err: ImportRowError, idx: number) => (
-                      <div key={idx} className="text-rose-700 font-medium">
-                        • <strong>Dòng {err.row}:</strong> {err.column ? `Cột '${err.column}' — ` : ''}
-                        {err.message}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+          ) : (
+            /* Trạng thái I: BE trả committed === true */
+            <div className="space-y-4 text-left">
+              {total === 0 ? (
+                <p className="text-[13px] leading-relaxed pl-3 border-l-2 border-slate-300 text-slate-600 dark:text-slate-300">
+                  <span className="font-semibold">Tệp chưa có dòng dữ liệu nào.</span> Điền
+                  dữ liệu vào các sheet tài sản của tệp mẫu rồi nạp lại.
+                </p>
+              ) : changed === 0 ? (
+                <p className="text-[13px] leading-relaxed pl-3 border-l-2 border-slate-300 text-slate-600 dark:text-slate-300">
+                  <span className="font-semibold">Không có thay đổi nào.</span> Mọi tài sản
+                  trong tệp đã khớp với dữ liệu trên hệ thống.
+                </p>
+              ) : (
+                <p className="text-[13px] leading-relaxed pl-3 border-l-2 border-emerald-500 text-emerald-800 dark:text-emerald-300">
+                  <span className="font-semibold">Đã lưu vào hệ thống.</span> Thêm mới{' '}
+                  {insertedSum}, cập nhật {updatedSum} tài sản.
+                </p>
               )}
 
-              {config.nextStep && (importResult.failed ?? 0) === 0 && (importResult.inserted ?? 0) + (importResult.updated ?? 0) > 0 && (
-                <div className="text-[11px] text-slate-600 bg-white border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2 justify-center">
-                  <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span>{config.nextStep}</span>
-                </div>
-              )}
+              {/* Cảnh báo Toàn tệp (nếu có) */}
+              {(() => {
+                const globalWarnings = translatedImportWarnings.filter(
+                  (w) => !w.sheet || !ASSET_SHEETS.includes(w.sheet as (typeof ASSET_SHEETS)[number])
+                )
+                if (globalWarnings.length === 0) return null
+                return (
+                  <div className="mb-2">
+                    <IssueList
+                      groups={groupRowErrors(globalWarnings)}
+                      tone="warning"
+                      forceLocationLabel="Toàn tệp"
+                    />
+                  </div>
+                )
+              })()}
 
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleCompleteAndClose}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-xs hover:shadow transition cursor-pointer"
-                >
-                  Hoàn tất và xem danh sách
-                </button>
-              </div>
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-[12px] font-medium text-slate-500 dark:text-slate-400">
+                    <th scope="col" className="py-2.5 pr-3 text-left font-medium">
+                      Loại tài sản
+                    </th>
+                    <th scope="col" className="py-2.5 px-3 text-right font-medium w-[88px]">
+                      Thêm mới
+                    </th>
+                    <th scope="col" className="py-2.5 px-3 text-right font-medium w-[88px]">
+                      Cập nhật
+                    </th>
+                    <th scope="col" className="py-2.5 pl-3 pr-0 text-right font-medium w-[88px]">
+                      Không đổi
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ASSET_SHEETS.map((sheetName) => {
+                    const counts = getResultCategoryCounts(sheetName)
+                    const sheetWarnings = translatedImportWarnings.filter(
+                      (w) => w.sheet === sheetName
+                    )
+
+                    return (
+                      <React.Fragment key={sheetName}>
+                        <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th
+                            scope="row"
+                            className="py-2.5 pr-3 text-[13px] font-semibold text-slate-800 dark:text-slate-200 text-left"
+                          >
+                            {sheetName}
+                          </th>
+                          <td className="py-2.5 px-3 text-right text-[13px] tabular-nums w-[88px]">
+                            <span
+                              className={
+                                (counts?.inserted ?? 0) > 0
+                                  ? 'text-teal-700 dark:text-teal-400 font-semibold'
+                                  : 'text-slate-400 dark:text-slate-500'
+                              }
+                            >
+                              {counts?.inserted ?? 0}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-[13px] tabular-nums w-[88px]">
+                            <span
+                              className={
+                                (counts?.updated ?? 0) > 0
+                                  ? 'text-blue-600 dark:text-blue-400 font-semibold'
+                                  : 'text-slate-400 dark:text-slate-500'
+                              }
+                            >
+                              {counts?.updated ?? 0}
+                            </span>
+                          </td>
+                          <td className="py-2.5 pl-3 pr-0 text-right text-[13px] tabular-nums w-[88px]">
+                            <span
+                              className={
+                                (counts?.unchanged ?? 0) > 0
+                                  ? 'text-slate-700 dark:text-slate-300 font-medium'
+                                  : 'text-slate-400 dark:text-slate-500'
+                              }
+                            >
+                              {counts?.unchanged ?? 0}
+                            </span>
+                          </td>
+                        </tr>
+                        {sheetWarnings.length > 0 && (
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            <td colSpan={4} className="pl-4 pr-0 py-2">
+                              <IssueList
+                                groups={groupRowErrors(sheetWarnings)}
+                                tone="warning"
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-          </>
           )}
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
-          <button
-            type="button"
-            disabled={isImporting}
-            onClick={handleCloseModal}
-            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl text-xs hover:bg-slate-100 cursor-pointer transition shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {importResult || (allParsedItems.length > 0 && !hasChanges) ? 'Đóng' : 'Hủy'}
-          </button>
+        {/* Modal Footer (không cuộn) */}
+        <div
+          className={`px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center shrink-0 ${
+            importResult?.committed === true ? 'justify-end' : 'justify-between'
+          }`}
+        >
+          {importResult?.committed !== true && (
+            <button
+              type="button"
+              disabled={isImporting}
+              onClick={handleCloseModal}
+              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            >
+              {importResult ? 'Đóng' : 'Hủy'}
+            </button>
+          )}
 
           {!importResult && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={!selectedFile || isImporting || (allParsedItems.length > 0 && !hasChanges)}
-                onClick={handleExecuteImport}
-                className={`px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-2xs ${
-                  !selectedFile || (allParsedItems.length > 0 && !hasChanges)
-                    ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed opacity-90'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer active:scale-95 shadow-xs hover:shadow'
-                }`}
-              >
-                {isImporting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Đang gửi dữ liệu...</span>
-                  </>
-                ) : !selectedFile ? (
-                  <>
-                    <UploadCloud className="w-4 h-4" />
-                    <span>Vui lòng chọn tệp CSV</span>
-                  </>
-                ) : allParsedItems.length > 0 && !hasChanges ? (
-                  invalidCount > 0 && importableCount === 0 ? (
-                    <>
-                      <AlertTriangle className="w-4 h-4 text-rose-500" />
-                      <span>Không thể nạp — tất cả dòng đều có lỗi</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>Dữ liệu trùng khớp 100% — không cần nạp</span>
-                    </>
-                  )
-                ) : (
-                  <>
-                    <UploadCloud className="w-4 h-4" />
-                    <span>
-                      {newCount > 0 && updatedCount > 0
-                        ? `Nạp vào hệ thống (${importableCount} bản ghi: ${newCount} mới, ${updatedCount} sửa)`
-                        : newCount > 0
-                          ? `Nạp vào hệ thống (${newCount} bản ghi mới)`
-                          : `Nạp vào hệ thống (${updatedCount} bản ghi cập nhật)`}
-                    </span>
-                  </>
-                )}
-              </button>
-            </div>
+            <>
+              {preview && preview.issues.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-5 py-2.5 bg-linear-to-br from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all shadow-xs hover:shadow cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Chọn tệp khác</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!canImport}
+                  onClick={handleExecuteImport}
+                  className={`px-5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
+                    !canImport
+                      ? 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-90'
+                      : 'bg-linear-to-br from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white cursor-pointer active:scale-95 shadow-xs hover:shadow'
+                  }`}
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>
+                    {canImport
+                      ? `Xác nhận nạp ${preview?.totalRows ?? 0} dòng`
+                      : 'Xác nhận nạp'}
+                  </span>
+                </button>
+              )}
+            </>
+          )}
+
+          {importResult && importResult.committed === false && (
+            <button
+              type="button"
+              onClick={() => {
+                dispatch(resetImportState())
+                setSelectedFile(null)
+                setClientError(null)
+                setPreview(null)
+                setIsChecking(false)
+                checkCountRef.current += 1
+              }}
+              className="px-5 py-2.5 bg-linear-to-br from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all shadow-xs hover:shadow cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Chọn tệp khác</span>
+            </button>
+          )}
+
+          {importResult && importResult.committed === true && (
+            <button
+              type="button"
+              onClick={handleCompleteAndClose}
+              className="px-6 py-2.5 bg-linear-to-br from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all shadow-xs hover:shadow cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            >
+              <span>Xong</span>
+            </button>
           )}
         </div>
       </div>

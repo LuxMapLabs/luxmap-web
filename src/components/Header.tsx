@@ -17,7 +17,7 @@ import {
   SlidersHorizontal,
   Cpu,
 } from 'lucide-react'
-import { openExportModal } from '../feature/assets/assetSlice'
+import { exportWorkbookRequest } from '../feature/assets/assetSlice'
 import type { CurrentUserResponse } from '../types/auth/me'
 import { getRoleName, isAdmin, isManagementAgency, isMaintenanceEngineer, isFieldCrew } from '../utils/roleUtils'
 import { ProfileModal } from './ProfileModal'
@@ -194,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
           {isAssets && (
             <button
               type="button"
-              onClick={() => dispatch(openExportModal())}
+              onClick={() => dispatch(exportWorkbookRequest())}
               className="h-9 px-2.5 lg:px-3 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap bg-slate-100/70 hover:bg-white text-slate-600 hover:text-slate-900 active:scale-95 transition-all duration-200 cursor-pointer border border-slate-200/80 shadow-2xs"
               title="Xuất dữ liệu tài sản ra tệp CSV (Excel)"
               aria-label="Xuất dữ liệu tài sản"

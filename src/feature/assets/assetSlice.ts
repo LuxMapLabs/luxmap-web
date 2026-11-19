@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import type { ImportResult } from '../../types/assets/import'
-import type { ImportAssetCategory } from './assetAPI'
+import type { WorkbookImportResult } from '../../types/assets/import'
 import type { PoleListItem, CreatePoleRequest, UpdatePoleRequest } from '../../types/assets/poles'
 import type { CabinetListItem, CreateCabinetRequest, UpdateCabinetRequest } from '../../types/assets/cabinets'
 import type { SegmentListItem, CreateSegmentRequest, UpdateSegmentRequest } from '../../types/assets/segments'
@@ -41,11 +40,17 @@ export interface AssetState {
 
   // Import State
   isImporting: boolean
-  importResult: ImportResult | null
+  importResult: WorkbookImportResult | null
   error: string | null
 
-  // Export Modal State
-  isExportModalOpen?: boolean
+  // Import Modal State
+  isImportModalOpen?: boolean
+
+  // Export State
+  isExporting?: boolean
+
+  // Template State
+  isDownloadingTemplate?: boolean
 }
 
 const initialState: AssetState = {
@@ -66,11 +71,12 @@ const initialState: AssetState = {
   importResult: null,
   error: null,
 
-  isExportModalOpen: false,
+  isImportModalOpen: false,
+  isExporting: false,
+  isDownloadingTemplate: false,
 }
 
 export interface ImportAssetPayload {
-  category: ImportAssetCategory
   file: File
 }
 
@@ -330,7 +336,7 @@ const assetSlice = createSlice({
       state.importResult = null
       state.error = null
     },
-    importAssetSuccess: (state, action: PayloadAction<ImportResult>) => {
+    importAssetSuccess: (state, action: PayloadAction<WorkbookImportResult>) => {
       state.isImporting = false
       state.importResult = action.payload
       state.error = null
@@ -345,12 +351,34 @@ const assetSlice = createSlice({
       state.error = null
     },
 
-    // --- Export Modal Actions ---
-    openExportModal: (state) => {
-      state.isExportModalOpen = true
+    // --- Import Modal Actions ---
+    openImportModal: (state) => {
+      state.isImportModalOpen = true
     },
-    closeExportModal: (state) => {
-      state.isExportModalOpen = false
+    closeImportModal: (state) => {
+      state.isImportModalOpen = false
+    },
+
+    // --- Export Workbook Actions ---
+    exportWorkbookRequest: (state) => {
+      state.isExporting = true
+    },
+    exportWorkbookSuccess: (state) => {
+      state.isExporting = false
+    },
+    exportWorkbookFailure: (state) => {
+      state.isExporting = false
+    },
+
+    // --- Download Template Actions ---
+    downloadTemplateRequest: (state) => {
+      state.isDownloadingTemplate = true
+    },
+    downloadTemplateSuccess: (state) => {
+      state.isDownloadingTemplate = false
+    },
+    downloadTemplateFailure: (state) => {
+      state.isDownloadingTemplate = false
     },
   },
 })
@@ -394,9 +422,14 @@ export const {
   importAssetSuccess,
   importAssetFailure,
   resetImportState,
-  openExportModal,
-  closeExportModal,
+  openImportModal,
+  closeImportModal,
+  exportWorkbookRequest,
+  exportWorkbookSuccess,
+  exportWorkbookFailure,
+  downloadTemplateRequest,
+  downloadTemplateSuccess,
+  downloadTemplateFailure,
 } = assetSlice.actions
 
-export type { ImportAssetCategory }
 export default assetSlice.reducer

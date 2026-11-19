@@ -572,7 +572,6 @@ describe('Segment modals & asset forms - Field Test Cases Suite', () => {
             onAddSegment={vi.fn()}
             onUpdateSegment={vi.fn()}
             onDeleteSegment={mockDelete}
-            onOpenImport={vi.fn()}
           />
         </Provider>
       )

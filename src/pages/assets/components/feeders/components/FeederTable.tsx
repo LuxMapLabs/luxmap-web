@@ -50,7 +50,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
           Chưa có mạch điện nào
         </h3>
         <p className="text-slate-500 dark:text-slate-400 text-xs max-w-sm mx-auto mb-4">
-          Hệ thống chưa ghi nhận mạch xuất tuyến nào. Bạn có thể thêm mạch mới hoặc nạp dữ liệu từ file CSV.
+          Hệ thống chưa ghi nhận mạch xuất tuyến nào. Bạn có thể thêm mạch mới hoặc nạp dữ liệu từ file Excel.
         </p>
       </div>
     )

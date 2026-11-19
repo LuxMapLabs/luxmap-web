@@ -13,15 +13,17 @@ import {
   ChevronsRight,
   Menu,
   X,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react'
 import type { RootState } from '../redux/rootReducer'
 import { logout } from '../feature/auth/authSlice'
-import { openExportModal } from '../feature/assets/assetSlice'
+import { exportWorkbookRequest, openImportModal } from '../feature/assets/assetSlice'
 import { canAccessTab, isMaintenanceEngineer, isManagementAgency } from '../utils/roleUtils'
 import { SidebarAccount } from '../components/SidebarAccount'
 import { NotificationBell } from '../components/NotificationBell'
 import { DownloadIcon } from '../components/ops/DownloadIcon'
+import { UploadIcon } from '../components/ops/UploadIcon'
 import { useModalEscape } from '../hooks/useModalEscape'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 
@@ -51,6 +53,7 @@ export const ManagerLayout: React.FC = () => {
   const dispatch = useDispatch()
   const location = useLocation()
   const { user } = useSelector((state: RootState) => state.auth)
+  const isExporting = useSelector((state: RootState) => Boolean(state.assets.isExporting))
   const [userCollapsed, setUserCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const isMobile = useMediaQuery('(max-width: 767px)')
@@ -224,15 +227,32 @@ export const ManagerLayout: React.FC = () => {
             <div className="ml-auto flex items-center gap-2.5 shrink-0">
               <div id="ops-topbar-slot" className="flex items-center gap-2.5" />
               {isAssets && (
-                <button
-                  type="button"
-                  onClick={() => dispatch(openExportModal())}
-                  title="Xuất dữ liệu tài sản ra tệp CSV (Excel)"
-                  aria-label="Xuất dữ liệu"
-                  className="download-trigger w-10 h-10 rounded-2xl bg-white shadow-ops hover:shadow-ops-hover hover:-translate-y-0.5 active:scale-95 transition-all duration-200 flex items-center justify-center text-slate-600 hover:text-teal-700 cursor-pointer"
-                >
-                  <DownloadIcon className="w-[18px] h-[18px]" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => dispatch(openImportModal())}
+                    title="Nhập dữ liệu tài sản từ file Excel"
+                    aria-label="Nhập dữ liệu"
+                    className="upload-trigger w-10 h-10 rounded-2xl bg-white shadow-ops hover:shadow-ops-hover hover:-translate-y-0.5 active:scale-95 transition-all duration-200 flex items-center justify-center text-slate-600 hover:text-teal-700 cursor-pointer"
+                  >
+                    <UploadIcon className="w-[18px] h-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dispatch(exportWorkbookRequest())}
+                    disabled={isExporting}
+                    aria-busy={isExporting}
+                    title="Xuất toàn bộ tài sản ra tệp Excel"
+                    aria-label="Xuất dữ liệu"
+                    className="download-trigger w-10 h-10 rounded-2xl bg-white shadow-ops hover:shadow-ops-hover hover:-translate-y-0.5 active:scale-95 transition-all duration-200 flex items-center justify-center text-slate-600 hover:text-teal-700 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                    ) : (
+                      <DownloadIcon className="w-[18px] h-[18px]" />
+                    )}
+                  </button>
+                </>
               )}
               {isMaintenanceEngineer(role) && <NotificationBell />}
             </div>
