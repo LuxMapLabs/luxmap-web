@@ -220,38 +220,11 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   const existingPolesGeoJSONRef = useRef(existingPolesGeoJSON)
   existingPolesGeoJSONRef.current = existingPolesGeoJSON
 
-  // Filter cabinets belonging to or connected with the selected segment
+  // Toàn bộ tủ điện trong địa bàn Manager đang quản lý
   const availableCabinetsOnSegment = useMemo(() => {
     if (!availableCabinets) return []
-    // Cột chưa biết GPS và chưa chọn tuyến: chọn trong tất cả tủ của xã
-    if (!selectedSegmentId) return noGps ? availableCabinets : []
-
-    // 1. Lấy ID các tủ mà các cột trong tuyến này đang cấp nguồn
-    const connectedCabinetIds = new Set<string>()
-    allPoles
-      .filter((p) => p.segment_id === selectedSegmentId)
-      .forEach((p) => {
-        if (p.cabinet_id) connectedCabinetIds.add(p.cabinet_id)
-        if (p.feeder_id) connectedCabinetIds.add(p.feeder_id)
-      })
-
-    existingPolesOnSegment.forEach((p) => {
-      if (p.cabinet_id) connectedCabinetIds.add(p.cabinet_id)
-    })
-
-    // 2. Lọc theo ID kết nối hoặc theo từ khóa tên tuyến
-    const segKeyword = currentSegment?.segment_name?.split(' - ')[1]?.toLowerCase() || ''
-    return availableCabinets.filter((cab) => {
-      if (
-        (cab.cabinet_id && connectedCabinetIds.has(cab.cabinet_id)) ||
-        (cab.external_ref && connectedCabinetIds.has(cab.external_ref))
-      ) {
-        return true
-      }
-      if (segKeyword && cab.cabinet_name?.toLowerCase().includes(segKeyword)) return true
-      return false
-    })
-  }, [availableCabinets, selectedSegmentId, noGps, allPoles, existingPolesOnSegment, currentSegment])
+    return availableCabinets
+  }, [availableCabinets])
 
   const currentCabinet = findByIdOrRef(availableCabinetsOnSegment, (c) => c.cabinet_id, selectedCabinetId)
 
@@ -348,6 +321,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
   rowsRef.current = rows
   const existingPolesOnSegmentRef = useRef(existingPolesOnSegment)
   existingPolesOnSegmentRef.current = existingPolesOnSegment
+  const lastMarkerDragEndRef = useRef(0)
 
   // Handle segment change: reset cabinet selection
   const handleSegmentChange = (newSegmentId: string) => {
@@ -648,6 +622,10 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
     // Click map to add a pole right where it was clicked
     map.on('click', (e) => {
+      // Bỏ qua khi click bắt nguồn từ marker để tránh kéo thả hoặc bấm marker tự thêm cột mới
+      if ((e.originalEvent.target as HTMLElement | null)?.closest('.maplibregl-marker')) return
+      // Bỏ qua click rơi xuống canvas ngay sau khi thả kéo marker
+      if (Date.now() - lastMarkerDragEndRef.current < 300) return
       if (noGpsRef.current) return
       if (!selectedSegmentIdRef.current) return
       if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat, boundaryRef.current)) {
@@ -859,6 +837,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
 
         // Drag end: bật lại kéo bản đồ và ghi vị trí mới vào dòng
         marker.on('dragend', () => {
+          lastMarkerDragEndRef.current = Date.now()
           map.dragPan.enable()
           const raw = marker!.getLngLat()
           if (!isPointInBounds(activeBoundsRef.current, raw.lng, raw.lat, boundaryRef.current)) {
@@ -1162,7 +1141,7 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
               </div>
 
               {/* SECTION 2: DANH SÁCH CỘT ĐÈN */}
-              <div className="space-y-2 flex-1 flex flex-col min-h-0">
+              <div className="space-y-2 shrink-0 flex flex-col">
                 <div className="flex items-center justify-between flex-wrap gap-2 shrink-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-bold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5">
@@ -1191,8 +1170,8 @@ export const AddPoleModal: React.FC<AddPoleModalProps> = ({
                 </div>
 
                 {/* Table Container */}
-                <div className="border border-slate-200 dark:border-slate-700/80 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs flex-1 flex flex-col min-h-0">
-                  <div className="overflow-x-auto overflow-y-auto max-h-[380px] flex-1">
+                <div className="border border-slate-200 dark:border-slate-700/80 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-2xs flex flex-col">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[380px]">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 shadow-2xs">
                         <tr>
