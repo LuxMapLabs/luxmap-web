@@ -328,8 +328,8 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
               </div>
             </div>
 
-            {/* 3 ô KPI nhỏ */}
-            <div className="grid grid-cols-3 gap-2.5 text-xs">
+            {/* 2 ô KPI nhỏ */}
+            <div className="grid grid-cols-2 gap-2.5 text-xs">
               <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
                 <span className="text-slate-500 truncate">Mới nhất</span>
                 <strong className="font-mono text-slate-900 shrink-0">
@@ -341,16 +341,6 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                 <strong className="font-mono text-slate-900 shrink-0">
                   {metricStats
                     ? `${metricStats.avg.toFixed(meta.digits)} (${metricStats.min.toFixed(meta.digits)}–${metricStats.max.toFixed(meta.digits)})`
-                    : '-'}
-                </strong>
-              </div>
-              <div className="px-3 py-1.5 rounded-xl bg-teal-50/70 border border-teal-100 flex items-center justify-between gap-2">
-                <span className="text-teal-700 truncate">Số bóng ước lượng</span>
-                <strong className="font-mono text-teal-800 shrink-0">
-                  {selectedNode?.estimated_lit != null
-                    ? `${selectedNode.estimated_lit} sáng${
-                        selectedNode.estimated_missing ? ` / ${selectedNode.estimated_missing} thiếu` : ''
-                      }`
                     : '-'}
                 </strong>
               </div>

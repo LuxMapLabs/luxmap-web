@@ -44,6 +44,7 @@ export const FAULT_TYPE_LABELS_VN: Record<FaultType, string> = {
   node_offline: 'Mất tín hiệu điều khiển',
   runtime_decline: 'Suy giảm hiệu năng',
   voltage_anomaly: 'Bất thường điện áp',
+  current_anomaly: 'Bất thường dòng điện',
   iot_hardware_fault: 'Lỗi phần cứng IoT',
 }
 
