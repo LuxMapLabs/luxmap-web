@@ -347,7 +347,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
                               Bất thường điện áp
                             </span>
                           ) : isCurrentAnomaly ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-yellow-50 text-yellow-700 border border-yellow-200/60">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200/60">
                               Bất thường dòng điện
                             </span>
                           ) : isIotHardware ? (

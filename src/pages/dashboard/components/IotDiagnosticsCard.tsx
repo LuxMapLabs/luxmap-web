@@ -18,6 +18,8 @@ import type { IotServerStatus } from '../../../types/iot/servers'
 import type { IotFeederAverage } from '../../../types/iot/feeders'
 import {
   IOT_DIAGNOSTIC_STATUS,
+  IOT_ELECTRICAL_STATUS,
+  IOT_NODE_STATUS,
   IOT_TONE_CLASS,
   iotAnomalyLabel,
   iotStatusBadge,
@@ -39,12 +41,51 @@ interface IotDiagnosticsCardProps {
   loading?: boolean
 }
 
-const CHART_GROUPS = [
-  { key: 'normal', name: 'Bình thường', color: '#10b981' },
-  { key: 'anomaly', name: 'Có cảnh báo', color: '#f43f5e' },
-  { key: 'stale', name: 'Mất tín hiệu', color: '#f59e0b' },
-  { key: 'nodata', name: 'Chưa có dữ liệu', color: '#cbd5e1' },
-] as const
+type DonutGroupKey = 'normal' | 'anomaly' | 'stale' | 'nodata'
+
+const CHART_GROUPS: ReadonlyArray<{
+  key: DonutGroupKey
+  name: string
+  color: string
+  bgClass: string
+  borderClass: string
+}> = [
+  {
+    key: 'normal',
+    name: 'Bình thường',
+    color: '#10b981',
+    bgClass: 'bg-emerald-50/70 hover:bg-emerald-50',
+    borderClass: 'border-emerald-200/80',
+  },
+  {
+    key: 'anomaly',
+    name: 'Có cảnh báo',
+    color: '#f43f5e',
+    bgClass: 'bg-rose-50/70 hover:bg-rose-50',
+    borderClass: 'border-rose-200/80',
+  },
+  {
+    key: 'stale',
+    name: 'Dữ liệu quá hạn',
+    color: '#f59e0b',
+    bgClass: 'bg-amber-50/70 hover:bg-amber-50',
+    borderClass: 'border-amber-200/80',
+  },
+  {
+    key: 'nodata',
+    name: 'Chưa có dữ liệu',
+    color: '#94a3b8',
+    bgClass: 'bg-slate-50 hover:bg-slate-100/80',
+    borderClass: 'border-slate-200/80',
+  },
+]
+
+function classifyNodeGroup(item: IotDiagnosticSummaryItem): DonutGroupKey {
+  if (item.diagnostic_status === 'normal') return 'normal'
+  if (item.diagnostic_status === 'anomaly') return 'anomaly'
+  if (item.diagnostic_status === 'stale' || item.connection_status === 'offline') return 'stale'
+  return 'nodata'
+}
 
 export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
   summary,
@@ -55,14 +96,19 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
   iotLastUpdated,
   loading = false,
 }) => {
-  const [hoveredSlice, setHoveredSlice] = useState<number | null>(null)
+  const [hoveredKey, setHoveredKey] = useState<DonutGroupKey | null>(null)
   const [metric, setMetric] = useState<ElectricalMetric>('power')
 
-  // Ưu tiên xếp các node đang lỗi / quá hạn lên đầu để Quản lý thấy ngay
+  // Ưu tiên số 1: Node đã gắn mạch điện (feeder_id) để luôn hiển thị được biểu đồ đường;
+  // sau đó xếp theo mức độ cảnh báo (anomaly -> stale -> normal -> khác)
   const sortedNodes = useMemo(() => {
-    const rank = (st?: string | null) =>
+    const statusRank = (st?: string | null) =>
       st === 'anomaly' ? 0 : st === 'stale' ? 1 : st === 'normal' ? 2 : 3
-    return [...summary].sort((a, b) => rank(a.diagnostic_status) - rank(b.diagnostic_status))
+    return [...summary].sort((a, b) => {
+      const feederDiff = (b.feeder_id ? 1 : 0) - (a.feeder_id ? 1 : 0)
+      if (feederDiff !== 0) return feederDiff
+      return statusRank(a.diagnostic_status) - statusRank(b.diagnostic_status)
+    })
   }, [summary])
 
   const [selectedNodeId, setSelectedNodeId] = useState<string>('')
@@ -72,9 +118,11 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
       setSelectedNodeId('')
       return
     }
-    const stillExists = sortedNodes.some((n) => n.node_id === selectedNodeId)
-    if (!stillExists) {
-      setSelectedNodeId(sortedNodes[0]?.node_id || '')
+    const current = sortedNodes.find((n) => n.node_id === selectedNodeId)
+    const firstWithFeeder = sortedNodes.find((n) => Boolean(n.feeder_id))
+    // Nếu chưa chọn node, hoặc node đang chọn bị mất, hoặc node đang chọn không có feeder trong khi đã có node có feeder
+    if (!current) {
+      setSelectedNodeId((firstWithFeeder || sortedNodes[0])?.node_id || '')
     }
   }, [sortedNodes, selectedNodeId])
 
@@ -83,51 +131,77 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
     [sortedNodes, selectedNodeId]
   )
 
+  // Tải lịch sử điện 30s khi đổi mạch HOẶC mỗi khi polling 30s cập nhật (iotLastUpdated)
   useEffect(() => {
     if (selectedNode?.feeder_id) {
       onSelectFeeder(selectedNode.feeder_id)
     }
-  }, [selectedNode?.feeder_id, onSelectFeeder])
+  }, [selectedNode?.feeder_id, iotLastUpdated, onSelectFeeder])
 
   const donutData = useMemo(() => {
-    const counts = { normal: 0, anomaly: 0, stale: 0, nodata: 0 }
+    const counts: Record<DonutGroupKey, number> = {
+      normal: 0,
+      anomaly: 0,
+      stale: 0,
+      nodata: 0,
+    }
     summary.forEach((item) => {
-      if (item.diagnostic_status === 'normal') counts.normal++
-      else if (item.diagnostic_status === 'anomaly') counts.anomaly++
-      else if (item.diagnostic_status === 'stale') counts.stale++
-      else counts.nodata++
+      counts[classifyNodeGroup(item)]++
     })
     return CHART_GROUPS.map((g) => ({
-      name: g.name,
+      ...g,
       value: counts[g.key],
-      color: g.color,
+      percent: summary.length > 0 ? Math.round((counts[g.key] / summary.length) * 100) : 0,
     }))
   }, [summary])
 
   const activeDonutData = useMemo(() => donutData.filter((d) => d.value > 0), [donutData])
-  const hoveredItem = hoveredSlice !== null ? activeDonutData[hoveredSlice] : undefined
+  const hoveredItem = useMemo(
+    () => (hoveredKey ? donutData.find((d) => d.key === hoveredKey) : undefined),
+    [hoveredKey, donutData]
+  )
+
+  const handleSelectGroup = (groupKey: DonutGroupKey) => {
+    const target =
+      sortedNodes.find((n) => classifyNodeGroup(n) === groupKey && Boolean(n.feeder_id)) ||
+      sortedNodes.find((n) => classifyNodeGroup(n) === groupKey)
+    if (target?.node_id) {
+      setSelectedNodeId(target.node_id)
+    }
+  }
 
   const onlineGateways = useMemo(
     () => servers.filter((s) => s.status === 'online').length,
     [servers]
   )
 
-  const metricField = (avg: IotFeederAverage): number | null => {
-    const v =
-      metric === 'power'
-        ? avg.power_mw_avg
-        : metric === 'current'
-        ? avg.current_ma_avg
-        : avg.voltage_avg
-    return typeof v === 'number' && Number.isFinite(v) ? v : null
-  }
+  // Chỉ sử dụng lịch sử điện khi node đang chọn có gắn feeder_id
+  const activeHistory = useMemo(
+    () => (selectedNode?.feeder_id ? feederHistory : []),
+    [selectedNode?.feeder_id, feederHistory]
+  )
 
   const chartData = useMemo(
     () =>
-      feederHistory.map((item) => {
-        const ts = item.period_start || item.period_end
-        const timeLabel = ts
-          ? new Date(ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      activeHistory.map((item) => {
+        const ts = item.period_end || item.period_start
+        const dateObj = ts ? new Date(ts) : null
+        const validDate = dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj : null
+        const timeLabel = validDate
+          ? validDate.toLocaleTimeString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })
+          : '-'
+        const fullTimeLabel = validDate
+          ? validDate.toLocaleString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              day: '2-digit',
+              month: '2-digit',
+            })
           : '-'
         const val =
           metric === 'power'
@@ -137,19 +211,33 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
             : item.voltage_avg
         return {
           timeLabel,
+          fullTimeLabel,
+          samples: item.sample_count,
           value: typeof val === 'number' && Number.isFinite(val) ? val : null,
         }
       }),
-    [feederHistory, metric]
+    [activeHistory, metric]
   )
 
   const latestVal = useMemo(() => {
-    const last = feederHistory[feederHistory.length - 1]
-    return last ? metricField(last) : null
-  }, [feederHistory, metric])
+    const last = activeHistory[activeHistory.length - 1]
+    if (!last) return null
+    const v =
+      metric === 'power'
+        ? last.power_mw_avg
+        : metric === 'current'
+        ? last.current_ma_avg
+        : last.voltage_avg
+    return typeof v === 'number' && Number.isFinite(v) ? v : null
+  }, [activeHistory, metric])
+
+  const latestSampleTime = useMemo(() => {
+    const last = chartData[chartData.length - 1]
+    return last?.fullTimeLabel && last.fullTimeLabel !== '-' ? last.fullTimeLabel : null
+  }, [chartData])
 
   const metricStats = useMemo(() => {
-    const vals = feederHistory
+    const vals = activeHistory
       .map((item) =>
         metric === 'power'
           ? item.power_mw_avg
@@ -165,13 +253,21 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
       min: Math.min(...vals),
       max: Math.max(...vals),
     }
-  }, [feederHistory, metric])
+  }, [activeHistory, metric])
 
   const meta = ELECTRICAL_METRICS[metric]
   const isAlert =
-    selectedNode?.diagnostic_status === 'anomaly' || selectedNode?.diagnostic_status === 'stale'
+    selectedNode?.diagnostic_status === 'anomaly' ||
+    selectedNode?.diagnostic_status === 'stale' ||
+    selectedNode?.connection_status === 'offline'
   const strokeColor = isAlert ? '#f43f5e' : '#0d9488'
   const nodeBadge = iotStatusBadge(IOT_DIAGNOSTIC_STATUS, selectedNode?.diagnostic_status)
+  const connBadge = selectedNode?.connection_status
+    ? iotStatusBadge(IOT_NODE_STATUS, selectedNode.connection_status)
+    : null
+  const elecBadge = selectedNode?.electrical_status
+    ? iotStatusBadge(IOT_ELECTRICAL_STATUS, selectedNode.electrical_status)
+    : null
   const updatedText = iotLastUpdated
     ? new Date(iotLastUpdated).toLocaleTimeString('vi-VN')
     : '-'
@@ -185,7 +281,7 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
           Giám sát thiết bị IoT
         </span>
       }
-      description="Tình trạng kết nối toàn mạng lưới và biến động thông số điện của Node đang chọn"
+      description="Tình trạng kết nối toàn mạng lưới và biến động thông số điện 30 giây của Node đang chọn"
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {servers.length > 0 && (
@@ -220,27 +316,46 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
           Chưa có thiết bị IoT nào trong phạm vi tuyến đường đang chọn.
         </p>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8 items-center">
-          {/* Cột trái: Donut Chart */}
+        <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr] gap-6 items-center">
+          {/* Cột trái: Donut Chart & Chú thích tương tác không bị cắt chữ */}
           <div className="flex flex-col items-center lg:border-r lg:border-slate-100 lg:pr-6">
             <div className="relative h-44 w-44">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={activeDonutData}
+                    data={
+                      activeDonutData.length > 0
+                        ? activeDonutData
+                        : [{ key: 'nodata', name: 'Chưa có dữ liệu', value: 1, color: '#e2e8f0' }]
+                    }
                     cx="50%"
                     cy="50%"
                     innerRadius={54}
                     outerRadius={76}
-                    paddingAngle={3}
+                    paddingAngle={activeDonutData.length > 1 ? 3 : 0}
                     dataKey="value"
                     stroke="none"
-                    cornerRadius={4}
-                    onMouseEnter={(_, idx) => setHoveredSlice(idx)}
-                    onMouseLeave={() => setHoveredSlice(null)}
+                    cornerRadius={activeDonutData.length > 1 ? 5 : 0}
+                    onMouseEnter={(_, idx) => {
+                      const item = activeDonutData[idx]
+                      if (item) setHoveredKey(item.key)
+                    }}
+                    onMouseLeave={() => setHoveredKey(null)}
+                    onClick={(_, idx) => {
+                      const item = activeDonutData[idx]
+                      if (item) handleSelectGroup(item.key)
+                    }}
                   >
-                    {activeDonutData.map((entry, idx) => (
-                      <Cell key={`iot-donut-${idx}`} fill={entry.color} />
+                    {(activeDonutData.length > 0
+                      ? activeDonutData
+                      : [{ key: 'nodata' as DonutGroupKey, color: '#e2e8f0' }]
+                    ).map((entry, idx) => (
+                      <Cell
+                        key={`iot-donut-${idx}`}
+                        fill={entry.color}
+                        opacity={hoveredKey && hoveredKey !== entry.key ? 0.45 : 1}
+                        className="cursor-pointer transition-opacity duration-150 outline-none"
+                      />
                     ))}
                   </Pie>
                 </PieChart>
@@ -249,30 +364,49 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                 <span className="text-2xl font-extrabold text-slate-800 leading-none tabular-nums">
                   {hoveredItem ? hoveredItem.value : summary.length}
                 </span>
-                <span className="text-[11px] font-medium text-slate-400 mt-1">
-                  {hoveredItem
-                    ? `${hoveredItem.name} (${Math.round((hoveredItem.value / summary.length) * 100)}%)`
-                    : 'Tổng Node IoT'}
+                <span className="text-[11px] font-semibold text-slate-500 mt-1 leading-tight">
+                  {hoveredItem ? hoveredItem.name : 'Tổng Node IoT'}
                 </span>
+                {hoveredItem && (
+                  <span className="text-[10px] font-mono font-bold text-slate-400 mt-0.5">
+                    {hoveredItem.percent}%
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3 text-[11px] w-full max-w-[230px]">
-              {donutData.map((d) => (
-                <div key={d.name} className="flex items-center gap-1.5">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: d.color }}
-                  />
-                  <span className="text-slate-600 truncate">
-                    {d.name}: <strong className="text-slate-900">{d.value}</strong>
-                  </span>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-2 mt-3 text-[11px] w-full">
+              {donutData.map((d) => {
+                const isHovered = hoveredKey === d.key
+                return (
+                  <button
+                    key={d.key}
+                    type="button"
+                    onMouseEnter={() => setHoveredKey(d.key)}
+                    onMouseLeave={() => setHoveredKey(null)}
+                    onClick={() => handleSelectGroup(d.key)}
+                    title={`Bấm để xem node nhóm "${d.name}" (${d.value} node)`}
+                    className={`flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border text-left transition cursor-pointer ${
+                      d.bgClass
+                    } ${d.borderClass} ${isHovered ? 'ring-2 ring-slate-300/80 shadow-2xs' : ''}`}
+                  >
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: d.color }}
+                      />
+                      <span className="text-slate-700 font-medium leading-tight">{d.name}</span>
+                    </span>
+                    <strong className="font-mono text-xs font-extrabold text-slate-900 shrink-0 tabular-nums">
+                      {d.value}
+                    </strong>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          {/* Cột phải: Chọn Node + Biểu đồ đường */}
+          {/* Cột phải: Chọn Node + Biểu đồ đường 30 giây */}
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -285,7 +419,7 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                   {sortedNodes.map((n) => (
                     <option key={n.node_id} value={n.node_id || ''}>
                       {n.node_id}
-                      {n.feeder_id ? ` — ${n.feeder_id}` : ''}
+                      {n.feeder_id ? ` — ${n.feeder_id}` : ' (Chưa gán mạch)'}
                     </option>
                   ))}
                 </select>
@@ -294,6 +428,20 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                 >
                   {nodeBadge.label}
                 </span>
+                {connBadge && (
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[connBadge.tone]}`}
+                  >
+                    {connBadge.label}
+                  </span>
+                )}
+                {elecBadge && (
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${IOT_TONE_CLASS[elecBadge.tone]}`}
+                  >
+                    {elecBadge.label}
+                  </span>
+                )}
                 {selectedNode?.anomaly_codes && selectedNode.anomaly_codes.length > 0 && (
                   <span
                     title={selectedNode.anomaly_codes.map((c) => iotAnomalyLabel(c)).join(' • ')}
@@ -328,10 +476,12 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
               </div>
             </div>
 
-            {/* 2 ô KPI nhỏ */}
-            <div className="grid grid-cols-2 gap-2.5 text-xs">
+            {/* 3 ô KPI nhỏ */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
               <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
-                <span className="text-slate-500 truncate">Mới nhất</span>
+                <span className="text-slate-500 truncate">
+                  Mới nhất{latestSampleTime ? ` (${latestSampleTime})` : ''}
+                </span>
                 <strong className="font-mono text-slate-900 shrink-0">
                   {latestVal != null ? formatMetric(latestVal, metric) : '-'}
                 </strong>
@@ -344,9 +494,15 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                     : '-'}
                 </strong>
               </div>
+              <div className="px-3 py-1.5 rounded-xl bg-teal-50/70 border border-teal-100 flex items-center justify-between gap-2">
+                <span className="text-teal-700 truncate">Sự cố đang mở</span>
+                <strong className="font-mono text-teal-800 shrink-0">
+                  {selectedNode ? `${selectedNode.fault_ids?.length ?? 0} sự cố` : '-'}
+                </strong>
+              </div>
             </div>
 
-            {/* Biểu đồ đường góc cạnh */}
+            {/* Biểu đồ đường 30 giây */}
             <div className="h-52 w-full">
               {!selectedNode?.feeder_id ? (
                 <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">
@@ -362,7 +518,7 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 16, left: 4, bottom: 16 }}>
+                  <AreaChart data={chartData} margin={{ top: 10, right: 16, left: 4, bottom: 18 }}>
                     <defs>
                       <linearGradient id="iotAreaGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={strokeColor} stopOpacity={0.28} />
@@ -376,10 +532,11 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                       tick={{ fontSize: 10, fill: '#94a3b8' }}
                       axisLine={false}
                       tickLine={false}
+                      minTickGap={22}
                       label={{
-                        value: 'Thời gian đo (HH:mm)',
+                        value: 'Thời gian mẫu 30s (HH:mm:ss)',
                         position: 'insideBottom',
-                        offset: -10,
+                        offset: -12,
                         fontSize: 10.5,
                         fill: '#64748b',
                         fontWeight: 600,
@@ -390,6 +547,7 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                       axisLine={false}
                       tickLine={false}
                       width={52}
+                      domain={[0, 'auto']}
                       label={{
                         value: `${meta.label} (${meta.unit})`,
                         angle: -90,
@@ -411,16 +569,23 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                         typeof val === 'number' ? `${val.toFixed(meta.digits)} ${meta.unit}` : '-',
                         meta.label,
                       ]}
-                      labelFormatter={(lbl) => `Mốc ${lbl}`}
+                      labelFormatter={(lbl, payload) => {
+                        const first = payload?.[0]?.payload as
+                          | { fullTimeLabel?: string; samples?: number }
+                          | undefined
+                        const sampleInfo =
+                          first?.samples != null ? ` · ${first.samples} mẫu` : ''
+                        return `Cửa sổ ${first?.fullTimeLabel || lbl}${sampleInfo}`
+                      }}
                     />
                     <Area
-                      type="linear"
+                      type="monotone"
                       dataKey="value"
                       stroke={strokeColor}
                       strokeWidth={2.5}
                       fill="url(#iotAreaGrad)"
                       connectNulls
-                      dot={false}
+                      dot={{ r: 2.5, fill: strokeColor, strokeWidth: 0 }}
                       activeDot={{ r: 5, fill: '#ffffff', stroke: strokeColor, strokeWidth: 2.5 }}
                     />
                   </AreaChart>

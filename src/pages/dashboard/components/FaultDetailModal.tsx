@@ -67,7 +67,7 @@ export const FaultDetailModal: React.FC<FaultDetailModalProps> = ({
       Bất thường điện áp
     </span>
   ) : isCurrentAnomaly ? (
-    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
       Bất thường dòng điện
     </span>
   ) : isIotHardware ? (

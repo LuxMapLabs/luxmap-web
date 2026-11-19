@@ -88,6 +88,24 @@ const getFaultTypeLabel = (type?: string | null) => {
       bg: 'bg-slate-100 text-slate-700 border-slate-200',
     }
   }
+  if (str === 'voltage_anomaly') {
+    return {
+      label: 'Bất thường điện áp',
+      bg: 'bg-orange-50 text-orange-700 border-orange-200/80',
+    }
+  }
+  if (str === 'current_anomaly') {
+    return {
+      label: 'Bất thường dòng điện',
+      bg: 'bg-orange-50 text-orange-700 border-orange-200/80',
+    }
+  }
+  if (str === 'iot_hardware_fault') {
+    return {
+      label: 'Lỗi phần cứng IoT',
+      bg: 'bg-sky-50 text-sky-700 border-sky-200/80',
+    }
+  }
   if (str.includes('segment_outage') || str.includes('outage')) {
     return {
       label: 'Mất điện toàn tuyến',

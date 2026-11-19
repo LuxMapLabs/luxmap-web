@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { X, Calendar, MapPin, User, FileText, Layers, Upload, FileCheck, Trash2 } from 'lucide-react'
+import { X, Calendar, MapPin, User, FileText, Layers, Upload, FileCheck, Trash2, Cpu } from 'lucide-react'
 import { toast } from 'sonner'
 import type { RootState } from '../../../redux/rootReducer'
 import { fetchAssetsRequest } from '../../../feature/assets/assetSlice'
@@ -9,6 +9,7 @@ import type { WorkOrderAssignee } from '../../../types/workorders/orders'
 import { PoleSelector } from './PoleSelector'
 import { FaultSelector } from './FaultSelector'
 import { GpsPoleSelector } from './GpsPoleSelector'
+import { IotFaultSelector } from './IotFaultSelector'
 import { extractSegmentId } from '../../../utils/work-schedule/poleUtils'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 import { LateNightScheduleWarning } from './LateNightScheduleWarning'
@@ -80,12 +81,17 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   onSubmit,
 }) => {
   const dispatch = useDispatch()
-  const { segments: storeSegments, isLoadingAssets, loadAssetsError } = useSelector(
-    (state: RootState) => state.assets
-  )
+  const {
+    segments: storeSegments,
+    cabinets: storeCabinets,
+    isLoadingAssets,
+    loadAssetsError,
+  } = useSelector((state: RootState) => state.assets)
   const segmentNames = useSelector((state: RootState) => state.workSchedule.segmentNames)
 
   const [initPhase, setInitPhase] = useState<TaskKind>(initialPhase || 'survey')
+  const [targetMode, setTargetMode] = useState<'segment' | 'iot_cabinet'>('segment')
+  const [selectedCabinetId, setSelectedCabinetId] = useState<string>('__ALL__')
   const [title, setTitle] = useState(initialTitle || '')
   const [segment, setSegment] = useState('')
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(initialPoleIds || [])
@@ -146,6 +152,8 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       const effectiveDate = defaultDate && defaultDate >= todayStr ? defaultDate : todayStr
       setDate(effectiveDate)
       setInitPhase(initialPhase || 'survey')
+      setTargetMode('segment')
+      setSelectedCabinetId('__ALL__')
       setTitle(initialTitle || '')
       setNotes(initialNotes || '')
       setSelectedPoleIds(initialPoleIds && initialPoleIds.length > 0 ? initialPoleIds : [])
@@ -240,12 +248,18 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   // - Kiểm tra: Bắt buộc phải chọn ít nhất 01 cột có sự cố
   // - Cập nhật vị trí cột: Bắt buộc chọn tuyến, ít nhất 01 cột và ít nhất 01 file PDF QR
   // - Khảo sát: Cho phép tạo bình thường vì đi rà quét tìm lỗi mới trên toàn tuyến
-  const isIotCabinetFault = Boolean(
+  const isPrefilledIotTarget = Boolean(
     initialIotTarget && selectedFaultIds.length > 0 && selectedPoleIds.length === 0
   )
+  const isManualIotMode =
+    !isPrefilledIotTarget &&
+    targetMode === 'iot_cabinet' &&
+    (initPhase === 'inspection' || initPhase === 'repair')
+  const isIotCabinetFault = isPrefilledIotTarget || isManualIotMode
 
   const isSubmitDisabled =
     (!isIotCabinetFault && !segment) ||
+    (isManualIotMode && selectedFaultIds.length === 0) ||
     (initPhase === 'repair' && selectedFaultIds.length === 0) ||
     (initPhase === 'inspection' && !isIotCabinetFault && selectedPoleIds.length === 0) ||
     (initPhase === 'pole_gps_update' &&
@@ -266,6 +280,11 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
 
     if (initPhase === 'repair' && selectedFaultIds.length === 0) {
       toast.warning('Vui lòng chọn ít nhất 01 sự cố cần sửa chữa trên tuyến này!')
+      return
+    }
+
+    if (initPhase === 'inspection' && isManualIotMode && selectedFaultIds.length === 0) {
+      toast.warning('Vui lòng chọn ít nhất 01 sự cố IoT cần kiểm tra!')
       return
     }
 
@@ -298,14 +317,38 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
         effectiveTitle = `Cập nhật vị trí GPS ${selectedPoleIds.length} cột - ${segmentShortName}`
       }
     } else if (initPhase === 'inspection') {
-      if (!effectiveTitle) {
-        effectiveTitle = `Kiểm tra cột ${selectedPoleIds.join(', ')} - ${segmentShortName}`
+      if (isIotCabinetFault) {
+        const iotTargetText = isPrefilledIotTarget
+          ? [initialIotTarget?.nodeId, initialIotTarget?.cabinetId].filter(Boolean).join(' • ')
+          : selectedCabinetId && selectedCabinetId !== '__ALL__'
+            ? `Tủ ${selectedCabinetId}`
+            : ''
+        if (!effectiveTitle) {
+          effectiveTitle = iotTargetText
+            ? `Kiểm tra thiết bị IoT ${iotTargetText}`
+            : 'Kiểm tra thiết bị IoT'
+        }
+      } else {
+        if (!effectiveTitle) {
+          effectiveTitle = `Kiểm tra cột ${selectedPoleIds.join(', ')} - ${segmentShortName}`
+        }
+        if (selectedPoleIds.length > 0) {
+          const poleNote = `[Chỉ định kiểm tra trọng tâm]: ${selectedPoleIds.join(', ')}`
+          effectiveNotes = effectiveNotes ? `${effectiveNotes}\n${poleNote}` : poleNote
+        }
       }
-      const poleNote = `[Chỉ định kiểm tra trọng tâm]: ${selectedPoleIds.join(', ')}`
-      effectiveNotes = effectiveNotes ? `${effectiveNotes}\n${poleNote}` : poleNote
     } else if (initPhase === 'repair') {
       if (!effectiveTitle) {
-        effectiveTitle = `Sửa chữa sự cố trên ${segmentShortName}`
+        if (isIotCabinetFault) {
+          const iotTargetText = [initialIotTarget?.nodeId, initialIotTarget?.cabinetId]
+            .filter(Boolean)
+            .join(' • ')
+          effectiveTitle = iotTargetText
+            ? `Sửa chữa thiết bị IoT ${iotTargetText}`
+            : 'Sửa chữa thiết bị IoT'
+        } else {
+          effectiveTitle = `Sửa chữa sự cố trên ${segmentShortName}`
+        }
       }
     } else {
       if (!effectiveTitle) {
@@ -315,13 +358,13 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
 
     onSubmit({
       title: effectiveTitle,
-      segment,
+      segment: isIotCabinetFault ? '' : segment,
       initPhase,
       assigneeId,
       assigneeName,
       date,
       notes: effectiveNotes,
-      poleIds: selectedPoleIds,
+      poleIds: isIotCabinetFault ? [] : selectedPoleIds,
       faultIds: selectedFaultIds,
       qrPdfRawFiles: initPhase === 'pole_gps_update' ? qrPdfFiles.map((f) => f.rawFile) : undefined,
     })
@@ -423,8 +466,49 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               </div>
             )}
 
+            {/* Bộ chuyển đối tượng xử lý cho Kiểm tra / Sửa chữa: Theo Tuyến hoặc Theo Tủ IoT */}
+            {!isPrefilledIotTarget && (initPhase === 'inspection' || initPhase === 'repair') && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-700">Đối tượng xử lý:</label>
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetMode('segment')
+                      setSelectedFaultIds([])
+                      setSelectedPoleIds([])
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      targetMode === 'segment'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-teal-600" />
+                    Theo Tuyến đường &amp; Cột
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetMode('iot_cabinet')
+                      setSelectedFaultIds([])
+                      setSelectedPoleIds([])
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      targetMode === 'iot_cabinet'
+                        ? 'bg-white text-indigo-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Cpu className="w-3.5 h-3.5 text-indigo-600" />
+                    Theo Tủ điện IoT
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Đối tượng kiểm tra IoT (Tủ điện / Node) hoặc Tuyến đường + Cột */}
-            {isIotCabinetFault && (initPhase === 'inspection' || initPhase === 'repair') ? (
+            {isPrefilledIotTarget && (initPhase === 'inspection' || initPhase === 'repair') ? (
               <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold text-indigo-900 flex items-center gap-1.5">
@@ -459,6 +543,56 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 <p className="text-[11px] text-slate-500">
                   Lệnh công tác sẽ gửi trực tiếp tọa độ GPS của Tủ điện và ghi chú thiết bị xuống app kỹ sư.
                 </p>
+              </div>
+            ) : isManualIotMode ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Cpu className="w-3.5 h-3.5 text-indigo-600" />
+                    Tủ điện IoT:
+                  </label>
+                  <OpsSelect
+                    value={selectedCabinetId}
+                    onChange={(val) => {
+                      setSelectedCabinetId(val)
+                      setSelectedFaultIds([])
+                    }}
+                    icon={<Cpu className="w-3.5 h-3.5" />}
+                    headerLabel="Danh sách tủ điện"
+                    headerBadge={`${storeCabinets.length} tủ`}
+                    ariaLabel="Tủ điện IoT"
+                    className="w-full"
+                    triggerClassName="w-full min-h-[42px] px-3 py-2"
+                    popoverClassName="w-full"
+                    showTriggerBadge={false}
+                    options={[
+                      {
+                        value: '__ALL__',
+                        label: 'Tất cả tủ có sự cố IoT',
+                        nativeLabel: 'Tất cả tủ có sự cố IoT',
+                        dotColor: 'bg-indigo-500',
+                      },
+                      ...storeCabinets
+                        .filter((c) => Boolean(c.cabinet_id))
+                        .map((c) => {
+                          const id = c.cabinet_id as string
+                          const label = c.cabinet_name ? `${c.cabinet_name} (${id})` : id
+                          return {
+                            value: id,
+                            label,
+                            nativeLabel: label,
+                            dotColor: 'bg-indigo-500',
+                          }
+                        }),
+                    ]}
+                  />
+                </div>
+                <IotFaultSelector
+                  cabinetId={selectedCabinetId}
+                  taskKind={initPhase === 'repair' ? 'repair' : 'inspection'}
+                  selectedFaultIds={selectedFaultIds}
+                  onChange={setSelectedFaultIds}
+                />
               </div>
             ) : (
               <>

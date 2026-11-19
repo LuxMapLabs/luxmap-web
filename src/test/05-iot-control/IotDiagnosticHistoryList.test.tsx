@@ -94,7 +94,7 @@ describe('IotDiagnosticHistoryList (GET /iot/feeders/{feederId}/diagnostics/hist
     expect(rows).toHaveLength(3)
 
     // Row 1: current_drop, active, evidence with lệch -7.4%
-    expect(rows[0]).toHaveTextContent('Dòng điện giảm quá 5% so với danh định (mA)')
+    expect(rows[0]).toHaveTextContent('Sụt dòng điện (>5% so với danh định)')
     expect(rows[0]).toHaveTextContent('Đang lỗi')
     expect(rows[0]).toHaveTextContent('lệch -7.4%')
     expect(rows[0]).toHaveTextContent('20 phút')
