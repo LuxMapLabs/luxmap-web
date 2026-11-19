@@ -67,7 +67,6 @@ export const FeederTable: React.FC<FeederTableProps> = ({
               <th className="py-3 px-4">Tủ điện cấp nguồn</th>
               {showCommune && <th className="py-3 px-4">Địa bàn</th>}
               <th className="py-3 px-4 text-center">Số cột đèn</th>
-              <th className="py-3 px-4 text-center">Tuyến cáp (GIS)</th>
               <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -142,19 +141,6 @@ export const FeederTable: React.FC<FeederTableProps> = ({
                     >
                       {feeder.pole_count} cột
                     </span>
-                  </td>
-
-                  {/* Tuyến Cáp GIS */}
-                  <td className="py-3.5 px-4 text-center">
-                    {feeder.has_geometry ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
-                        ✓ Có tuyến cáp
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                        Chưa số hóa cáp
-                      </span>
-                    )}
                   </td>
 
                   {/* Thao Tác */}

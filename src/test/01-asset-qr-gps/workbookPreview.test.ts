@@ -61,7 +61,7 @@ describe('workbookPreview (Task 7a)', { timeout: 30000 }, () => {
         rows: [['CAB-01', 'Tủ điện 1', 'POINT(106.7012 10.7765)']],
       },
       'Mạch điện': {
-        headers: ['external_ref', 'feeder_name', 'cabinet_external_ref', 'cabinet_source', 'geom_wkt'],
+        headers: ['external_ref', 'feeder_name', 'cabinet_external_ref', 'cabinet_source'],
         rows: [],
       },
       'Cột điện': {
@@ -349,6 +349,72 @@ describe('workbookPreview (Task 7a)', { timeout: 30000 }, () => {
     expect(result.totalRows).toBe(1)
     expect(result.issues).toEqual([])
     expect(result.sheets[0]).toEqual({ sheet: 'Tuyến đường', rows: 1 })
+  })
+
+  it('sheet Mạch điện có header thêm cột geom_wkt và có dữ liệu → báo lỗi cột không thuộc sheet này', async () => {
+    const buffer = await createWorkbookBuffer({
+      'Tuyến đường': {
+        headers: ['external_ref', 'segment_name', 'road_class', 'length_m', 'geom_wkt'],
+        rows: [['TUYEN-01', 'Đường ĐX-01', 'inter_commune', 1200, 'LINESTRING(106.7 10.7, 106.8 10.8)']],
+      },
+      'Tủ điện': {
+        headers: ['external_ref', 'cabinet_name', 'geom_wkt'],
+        rows: [['CAB-01', 'Tủ điện 1', 'POINT(106.7012 10.7765)']],
+      },
+      'Mạch điện': {
+        headers: ['external_ref', 'feeder_name', 'cabinet_external_ref', 'cabinet_source', 'geom_wkt'],
+        rows: [['MACH-01', 'Mạch 1 tủ ấp 3', 'CAB-01', 'verified', 'LINESTRING(106.70 10.77, 106.71 10.78)']],
+      },
+      'Cột điện': {
+        headers: ['external_ref', 'segment_external_ref', 'feeder_external_ref', 'feeder_source', 'geom_wkt', 'near_sensitive_poi', 'note'],
+        rows: [['POLE-01', 'TUYEN-01', '', '', 'POINT(106.7015 10.7768)', 'false', '']],
+      },
+      'Bóng đèn': {
+        headers: ['pole_external_ref', 'fixture_type', 'power_source', 'lamp_watt', 'install_date', 'lamp_count', 'removed_date', 'warranty_expiry', 'note'],
+        rows: [['POLE-01', 'led_road_lamp', 'grid', 100, '2024-05-20', 1, '', '', '']],
+      },
+    })
+
+    const result = await previewAssetWorkbook(buffer)
+
+    expect(result.issues).toContainEqual({
+      sheet: 'Mạch điện',
+      row: 1,
+      column: 'geom_wkt',
+      message: 'Cột không thuộc sheet này. Xoá cột hoặc đổi về tên trong tệp mẫu.',
+    })
+  })
+
+  it('sheet Mạch điện có header thêm geom_wkt nhưng cột đó để trống ở mọi dòng → không có issue ở cột geom_wkt', async () => {
+    const buffer = await createWorkbookBuffer({
+      'Tuyến đường': {
+        headers: ['external_ref', 'segment_name', 'road_class', 'length_m', 'geom_wkt'],
+        rows: [['TUYEN-01', 'Đường ĐX-01', 'inter_commune', 1200, 'LINESTRING(106.7 10.7, 106.8 10.8)']],
+      },
+      'Tủ điện': {
+        headers: ['external_ref', 'cabinet_name', 'geom_wkt'],
+        rows: [['CAB-01', 'Tủ điện 1', 'POINT(106.7012 10.7765)']],
+      },
+      'Mạch điện': {
+        headers: ['external_ref', 'feeder_name', 'cabinet_external_ref', 'cabinet_source', 'geom_wkt'],
+        rows: [['MACH-01', 'Mạch 1 tủ ấp 3', 'CAB-01', 'verified', '']],
+      },
+      'Cột điện': {
+        headers: ['external_ref', 'segment_external_ref', 'feeder_external_ref', 'feeder_source', 'geom_wkt', 'near_sensitive_poi', 'note'],
+        rows: [['POLE-01', 'TUYEN-01', '', '', 'POINT(106.7015 10.7768)', 'false', '']],
+      },
+      'Bóng đèn': {
+        headers: ['pole_external_ref', 'fixture_type', 'power_source', 'lamp_watt', 'install_date', 'lamp_count', 'removed_date', 'warranty_expiry', 'note'],
+        rows: [['POLE-01', 'led_road_lamp', 'grid', 100, '2024-05-20', 1, '', '', '']],
+      },
+    })
+
+    const result = await previewAssetWorkbook(buffer)
+
+    const geomIssues = result.issues.filter(
+      (i) => i.sheet === 'Mạch điện' && i.column === 'geom_wkt',
+    )
+    expect(geomIssues).toHaveLength(0)
   })
 
   it('buffer không phải xlsx → reject', async () => {
