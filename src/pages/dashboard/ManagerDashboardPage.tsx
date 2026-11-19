@@ -37,6 +37,8 @@ export const ManagerDashboardPage: React.FC = () => {
     iotSummary,
     iotServers,
     segmentFeederMap,
+    unlocatedPoleSegments,
+    polesCapped,
     includeCalibrationRig,
     selectedFeederHistory,
     selectedFeederHistoryLoading,
@@ -305,6 +307,11 @@ export const ManagerDashboardPage: React.FC = () => {
     [segmentFaults]
   )
 
+  const unlocatedPoleCount = useMemo(() => {
+    if (selectedSegment === 'all') return unlocatedPoleSegments.length
+    return unlocatedPoleSegments.filter((segId) => segId === selectedSegment).length
+  }, [unlocatedPoleSegments, selectedSegment])
+
   const filteredFaults = useMemo(() => {
     let list = segmentFaults
     if (faultTab === 'blackout') {
@@ -371,6 +378,9 @@ export const ManagerDashboardPage: React.FC = () => {
             faults={unassignedFaults}
             segmentNameMap={segmentNameMap}
             onCreateSchedule={handleNavigateToCreateSchedule}
+            unlocatedPoleCount={unlocatedPoleCount}
+            polesCapped={polesCapped}
+            onFixUnlocatedPoles={() => navigate('/assets')}
           />
         </div>
 

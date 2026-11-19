@@ -108,6 +108,17 @@ function* handleFetchDashboardData() {
       items: validWarrantyItems,
     }
 
+    const poleList = poles || []
+    const unlocatedPoleSegments = poleList
+      .filter(
+        (pole) =>
+          !pole.location ||
+          typeof pole.location.lat !== 'number' ||
+          typeof pole.location.lng !== 'number'
+      )
+      .map((pole) => pole.segment_id ?? null)
+    const polesCapped = poleList.length >= 200
+
     yield put(
       fetchDashboardDataSuccess({
         segments: segments || [],
@@ -116,7 +127,9 @@ function* handleFetchDashboardData() {
         fixtureStatusRows: fixtureStatusRes?.rows || [],
         iotSummary: iotSummary || [],
         iotServers: iotServers || [],
-        segmentFeederMap: buildSegmentFeederMap(poles || []),
+        segmentFeederMap: buildSegmentFeederMap(poleList),
+        unlocatedPoleSegments,
+        polesCapped,
       })
     )
   } catch (error: unknown) {
