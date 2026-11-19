@@ -251,7 +251,6 @@ async function createMockExportBuffer(options?: {
     'feeder_name',
     'cabinet_external_ref',
     'cabinet_source',
-    'geom_wkt',
   ];
 
   // 4. Sheet Cột điện
