@@ -1,8 +1,6 @@
 import apiClient from '../../config/apiClient'
 import type {
   IotGatewayCredential,
-  IotGatewayRoute,
-  IotGatewayRouteRequest,
   IotServerStatus,
   RegisterServerRequest,
   RegisteredServer,
@@ -14,11 +12,14 @@ import type {
   IotCommandStatus,
   IotDiagnosticResult,
   IotElectricalResult,
+  IotNodeSourceDetails,
   IotNodeStatusPagedResult,
   RegisterNodeRequest,
   RegisteredNode,
+  UpdateNodeRequest,
 } from '../../types/iot/nodes'
 import type {
+  IotDiagnosticHistoryItemPagedResult,
   IotFeederElectricalResult,
   IotFeederHistoryResult,
 } from '../../types/iot/feeders'
@@ -38,6 +39,14 @@ export const iotAPI = {
   /** GET /api/v1/iot/nodes — node theo xã, phân trang (tối đa 200 mỗi trang). */
   getNodes: async (params?: { page?: number; page_size?: number }): Promise<IotNodeStatusPagedResult> => {
     const response = await apiClient.get<IotNodeStatusPagedResult>('/iot/nodes', { params })
+    return response.data
+  },
+
+  /** GET /api/v1/iot/nodes/{nodeId} — thông tin nguồn đo (chỉ số danh định) của node; 404 khi chưa gán nguồn. */
+  getNodeSource: async (nodeId: string): Promise<IotNodeSourceDetails> => {
+    const response = await apiClient.get<IotNodeSourceDetails>(
+      `/iot/nodes/${encodeURIComponent(nodeId)}`
+    )
     return response.data
   },
 
@@ -61,7 +70,7 @@ export const iotAPI = {
 
   // ---- Admin (ManageSettings): đăng ký server, tuyến gateway, secret MQTT ----
 
-  /** POST /api/v1/iot/servers — `base_url` phải nằm trong allowlist của backend. */
+  /** POST /api/v1/iot/servers — backend tự dùng địa chỉ Bridge cấu hình sẵn, không gửi base_url. */
   registerServer: async (body: RegisterServerRequest): Promise<RegisteredServer> => {
     const response = await apiClient.post<RegisteredServer>('/iot/servers', body)
     return response.data
@@ -72,41 +81,25 @@ export const iotAPI = {
     await apiClient.put(`/iot/servers/${encodeURIComponent(serverId)}/location`, body)
   },
 
-  /** GET /api/v1/iot/servers/{serverId}/gateways/routes — tuyến gateway → thiết bị trên bridge. */
-  getGatewayRoutes: async (serverId: string): Promise<IotGatewayRoute[]> => {
-    const response = await apiClient.get<IotGatewayRoute[]>(`/iot/servers/${encodeURIComponent(serverId)}/gateways/routes`)
-    return response.data
-  },
-
-  /** PUT /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route — 204, gửi lại đúng cặp vẫn 204. */
-  putGatewayRoute: async (serverId: string, gatewayId: string, body: IotGatewayRouteRequest): Promise<void> => {
-    await apiClient.put(
-      `/iot/servers/${encodeURIComponent(serverId)}/gateways/${encodeURIComponent(gatewayId)}/route`,
-      body
-    )
-  },
-
-  /** POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential — cấp key lần đầu; gateway đã có key → 409; muốn xem lại dùng GET. */
-  issueGatewayCredential: async (serverId: string, gatewayId: string): Promise<IotGatewayCredential> => {
+  /** POST /api/v1/iot/servers/{serverId}/credential — cấp key MQTT cho server (200); đã có key → 409. */
+  issueServerCredential: async (serverId: string): Promise<IotGatewayCredential> => {
     const response = await apiClient.post<IotGatewayCredential>(
-      `/iot/servers/${encodeURIComponent(serverId)}/gateways/${encodeURIComponent(gatewayId)}/credential`
+      `/iot/servers/${encodeURIComponent(serverId)}/credential`
     )
     return response.data
   },
 
-  /** GET /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential — xem lại key. 404: chưa có key hoặc đã thu hồi; 409: key cũ chỉ có hash, cần thu hồi rồi cấp mới. */
-  getGatewayCredential: async (serverId: string, gatewayId: string): Promise<IotGatewayCredential> => {
+  /** GET /api/v1/iot/servers/{serverId}/credential — xem lại key MQTT của server (200); chưa cấp/đã thu hồi → 404; chỉ có hash → 409 IOT_CREDENTIAL_NOT_RETRIEVABLE. */
+  getServerCredential: async (serverId: string): Promise<IotGatewayCredential> => {
     const response = await apiClient.get<IotGatewayCredential>(
-      `/iot/servers/${encodeURIComponent(serverId)}/gateways/${encodeURIComponent(gatewayId)}/credential`
+      `/iot/servers/${encodeURIComponent(serverId)}/credential`
     )
     return response.data
   },
 
-  /** DELETE /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential — 204: thu hồi key, gateway đang kết nối bị ngắt. */
-  revokeGatewayCredential: async (serverId: string, gatewayId: string): Promise<void> => {
-    await apiClient.delete(
-      `/iot/servers/${encodeURIComponent(serverId)}/gateways/${encodeURIComponent(gatewayId)}/credential`
-    )
+  /** DELETE /api/v1/iot/servers/{serverId}/credential — 204 (idempotent): thu hồi key MQTT của server và ngắt kết nối. */
+  revokeServerCredential: async (serverId: string): Promise<void> => {
+    await apiClient.delete(`/iot/servers/${encodeURIComponent(serverId)}/credential`)
   },
 
   // ---- Dữ liệu điện và chẩn đoán (mục 5) ----
@@ -122,10 +115,34 @@ export const iotAPI = {
   /** GET /api/v1/iot/feeders/{feederId}/electrical/history — lịch sử điện trung bình 30 giây, mới nhất trước. */
   getFeederElectricalHistory: async (
     feederId: string,
-    params: { page?: number; page_size?: number } = {}
+    params: { page?: number; page_size?: number; from?: string; to?: string } = {}
   ): Promise<IotFeederHistoryResult> => {
     const response = await apiClient.get<IotFeederHistoryResult>(
       `/iot/feeders/${encodeURIComponent(feederId)}/electrical/history`,
+      { params }
+    )
+    return response.data
+  },
+
+  /** GET /api/v1/iot/feeders/{feederId}/electrical/history/received — lịch sử điện trung bình 30 giây theo giờ Bridge nhận (mẫu gửi bù dồn vào lúc tới), mới nhất trước. */
+  getFeederElectricalHistoryReceived: async (
+    feederId: string,
+    params: { page?: number; page_size?: number; from?: string; to?: string } = {}
+  ): Promise<IotFeederHistoryResult> => {
+    const response = await apiClient.get<IotFeederHistoryResult>(
+      `/iot/feeders/${encodeURIComponent(feederId)}/electrical/history/received`,
+      { params }
+    )
+    return response.data
+  },
+
+  /** GET /api/v1/iot/feeders/{feederId}/diagnostics/history — các đợt lỗi của mạch, mới nhất trước; lọc [from, to) theo UTC. */
+  getFeederDiagnosticHistory: async (
+    feederId: string,
+    params: { page?: number; page_size?: number; from?: string; to?: string } = {}
+  ): Promise<IotDiagnosticHistoryItemPagedResult> => {
+    const response = await apiClient.get<IotDiagnosticHistoryItemPagedResult>(
+      `/iot/feeders/${encodeURIComponent(feederId)}/diagnostics/history`,
       { params }
     )
     return response.data
@@ -160,6 +177,22 @@ export const iotAPI = {
   registerNode: async (body: RegisterNodeRequest): Promise<RegisteredNode> => {
     const response = await apiClient.post<RegisteredNode>('/iot/nodes', body)
     return response.data
+  },
+
+  /**
+   * PUT /api/v1/iot/nodes/{nodeId} — cập nhật server, thiết bị, mạch và chỉ số danh định của node.
+   * 204 khi thành công; lỗi 400 / 403 / 404 / 409 / 503.
+   */
+  updateNode: async (nodeId: string, body: UpdateNodeRequest): Promise<void> => {
+    await apiClient.put(`/iot/nodes/${encodeURIComponent(nodeId)}`, body)
+  },
+
+  /**
+   * DELETE /api/v1/iot/nodes/{nodeId}/feeder — gỡ node khỏi mạch hiện tại (không body).
+   * 204 khi thành công (gọi lại vẫn 204); lỗi 403 / 404 / 409 / 503.
+   */
+  detachNodeFeeder: async (nodeId: string): Promise<void> => {
+    await apiClient.delete(`/iot/nodes/${encodeURIComponent(nodeId)}/feeder`)
   },
 }
 

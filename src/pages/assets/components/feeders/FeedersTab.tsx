@@ -1,5 +1,9 @@
 import React, { useState, useMemo } from 'react'
+import { useSelector } from 'react-redux'
+import type { RootState } from '../../../../redux/store'
+import { isManager } from '../../../../utils/roleUtils'
 import { Button } from '../../../../components/Button'
+import { FeederHistoryModal } from '../../../../components/FeederHistoryModal'
 import { Search, Plus } from 'lucide-react'
 import type { FeederListItem, CreateFeederRequest, UpdateFeederRequest } from '../../../../types/assets/feeders'
 import type { CabinetListItem } from '../../../../types/assets/cabinets'
@@ -34,11 +38,15 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
 
+  const userRole = useSelector((state: RootState) => state.auth?.user?.role)
+  const canViewHistory = isManager(userRole)
+
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [detailFeeder, setDetailFeeder] = useState<FeederListItem | null>(null)
   const [editFeeder, setEditFeeder] = useState<FeederListItem | null>(null)
   const [deleteFeederItem, setDeleteFeederItem] = useState<FeederListItem | null>(null)
+  const [historyFeeder, setHistoryFeeder] = useState<FeederListItem | null>(null)
 
   // Filtered Feeders
   const filteredFeeders = useMemo(() => {
@@ -104,6 +112,7 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
         onViewDetail={(feeder) => setDetailFeeder(feeder)}
         onEdit={(feeder) => setEditFeeder(feeder)}
         onDelete={(feeder) => setDeleteFeederItem(feeder)}
+        onViewHistory={canViewHistory ? (feeder) => setHistoryFeeder(feeder) : undefined}
       />
 
       {/* Pagination */}
@@ -161,6 +170,15 @@ export const FeedersTab: React.FC<FeedersTabProps> = ({
           }
         }}
       />
+
+      {historyFeeder?.feeder_id && (
+        <FeederHistoryModal
+          feederId={historyFeeder.feeder_id}
+          feederLabel={historyFeeder.external_ref || historyFeeder.feeder_id}
+          nodeId={historyFeeder.control?.node_id ?? null}
+          onClose={() => setHistoryFeeder(null)}
+        />
+      )}
     </div>
   )
 }

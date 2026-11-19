@@ -7,8 +7,6 @@ import { assetAPI } from '../assets/assetAPI'
 import { apiErrorMessage } from '../../utils/iot/apiError'
 import type {
   IotGatewayCredential,
-  IotGatewayRoute,
-  IotGatewayRouteRequest,
   IotServerStatus,
   RegisterServerRequest,
   ServerLocationRequest,
@@ -17,6 +15,7 @@ import type {
   IotNodeStatusPagedResult,
   RegisterNodeRequest,
   RegisteredNode,
+  UpdateNodeRequest,
 } from '../../types/iot/nodes'
 import type { CommuneItemPagedResult } from '../../types/admin/communes'
 import type { CabinetListItemPagedResult } from '../../types/assets/cabinets'
@@ -29,9 +28,6 @@ import {
   fetchNodesFailure,
   fetchCommunesSuccess,
   fetchCommunesFailure,
-  fetchRoutesRequest,
-  fetchRoutesSuccess,
-  fetchRoutesFailure,
   fetchNodeAssetsRequest,
   fetchNodeAssetsSuccess,
   fetchNodeAssetsFailure,
@@ -39,19 +35,21 @@ import {
   updateServerLocationRequest,
   serverSubmitSuccess,
   serverSubmitFailure,
-  putRouteRequest,
-  routeSubmitSuccess,
-  routeSubmitFailure,
   registerNodeRequest,
   nodeSubmitSuccess,
   nodeSubmitFailure,
-  issueCredentialRequest,
-  viewCredentialRequest,
-  revokeCredentialRequest,
-  credentialSuccess,
-  revokeCredentialSuccess,
-  credentialFailure,
-  type GatewayRef,
+  updateNodeRequest,
+  updateNodeSuccess,
+  updateNodeFailure,
+  detachNodeFeederRequest,
+  detachNodeFeederSuccess,
+  detachNodeFeederFailure,
+  issueServerCredentialRequest,
+  viewServerCredentialRequest,
+  revokeServerCredentialRequest,
+  serverCredentialSuccess,
+  serverCredentialRevoked,
+  serverCredentialFailure,
 } from './iotBridgeSlice'
 
 const PAGE_SIZE_200 = { page: 1, page_size: 200 }
@@ -92,18 +90,7 @@ function* handleFetchBridge() {
   ])
 }
 
-// ---- 2. Fetch Routes worker ----
-function* handleFetchRoutes(action: PayloadAction<string>) {
-  const serverId = action.payload
-  try {
-    const routes: IotGatewayRoute[] = yield call(iotAPI.getGatewayRoutes, serverId)
-    yield put(fetchRoutesSuccess({ serverId, routes }))
-  } catch (err: unknown) {
-    yield put(fetchRoutesFailure({ serverId, error: apiErrorMessage(err, 'Không đọc được tuyến gateway từ bridge.') }))
-  }
-}
-
-// ---- 3. Fetch Node Assets worker ----
+// ---- 2. Fetch Node Assets worker ----
 function* handleFetchNodeAssets() {
   try {
     const [cab, fdr]: [CabinetListItemPagedResult, FeederListItemPagedResult] = yield all([
@@ -146,22 +133,7 @@ function* handleUpdateServerLocation(
   }
 }
 
-// ---- 5. Route Submit worker ----
-function* handlePutRoute(
-  action: PayloadAction<{ serverId: string; gatewayId: string; body: IotGatewayRouteRequest }>
-) {
-  const { serverId, gatewayId, body } = action.payload
-  try {
-    yield call(iotAPI.putGatewayRoute, serverId, gatewayId, body)
-    yield put(routeSubmitSuccess())
-    toast.success(`Đã đăng ký tuyến ${gatewayId} → ${body.device_id || ''}`)
-    yield put(fetchRoutesRequest(serverId))
-  } catch (err: unknown) {
-    yield put(routeSubmitFailure(apiErrorMessage(err, 'Không đăng ký được tuyến MQTT.')))
-  }
-}
-
-// ---- 6. Node Submit worker ----
+// ---- 4. Node Submit worker ----
 function* handleRegisterNode(action: PayloadAction<RegisterNodeRequest>) {
   try {
     const node: RegisteredNode = yield call(iotAPI.registerNode, action.payload)
@@ -173,50 +145,74 @@ function* handleRegisterNode(action: PayloadAction<RegisterNodeRequest>) {
   }
 }
 
-// ---- 7. Gateway Credential workers ----
-function* handleIssueCredential(action: PayloadAction<GatewayRef>) {
-  const { serverId, gatewayId } = action.payload
+function* handleUpdateNode(
+  action: PayloadAction<{ nodeId: string; body: UpdateNodeRequest }>
+) {
+  const { nodeId, body } = action.payload
+  try {
+    yield call(iotAPI.updateNode, nodeId, body)
+    yield put(updateNodeSuccess())
+    toast.success(`Đã cập nhật node ${nodeId}`)
+    yield put(fetchBridgeRequest())
+  } catch (err: unknown) {
+    yield put(updateNodeFailure(apiErrorMessage(err, 'Không cập nhật được node IoT.')))
+  }
+}
+
+function* handleDetachNodeFeeder(action: PayloadAction<string>) {
+  const nodeId = action.payload
+  try {
+    yield call(iotAPI.detachNodeFeeder, nodeId)
+    yield put(detachNodeFeederSuccess())
+    toast.success(`Đã gỡ node ${nodeId} khỏi mạch`)
+    yield put(fetchBridgeRequest())
+  } catch (err: unknown) {
+    yield put(detachNodeFeederFailure(apiErrorMessage(err, 'Không gỡ được node khỏi mạch.')))
+  }
+}
+
+// ---- 5. Key MQTT theo server ----
+function* handleIssueServerCredential(action: PayloadAction<string>) {
+  const serverId = action.payload
   try {
     const credential: IotGatewayCredential = yield call(
-      iotAPI.issueGatewayCredential,
-      serverId,
-      gatewayId
+      iotAPI.issueServerCredential,
+      serverId
     )
-    yield put(credentialSuccess(credential))
-    yield put(fetchRoutesRequest(serverId))
+    yield put(serverCredentialSuccess(credential))
+    yield put(fetchBridgeRequest())
   } catch (err: unknown) {
     const message = apiErrorMessage(err, 'Không cấp được key MQTT.')
-    yield put(credentialFailure(message))
+    yield put(serverCredentialFailure(message))
     toast.error(message)
   }
 }
 
-function* handleViewCredential(action: PayloadAction<GatewayRef>) {
-  const { serverId, gatewayId } = action.payload
+function* handleViewServerCredential(action: PayloadAction<string>) {
+  const serverId = action.payload
   try {
     const credential: IotGatewayCredential = yield call(
-      iotAPI.getGatewayCredential,
-      serverId,
-      gatewayId
+      iotAPI.getServerCredential,
+      serverId
     )
-    yield put(credentialSuccess(credential))
+    yield put(serverCredentialSuccess(credential))
   } catch (err: unknown) {
     const message = apiErrorMessage(err, 'Không xem được key MQTT.')
-    yield put(credentialFailure(message))
+    yield put(serverCredentialFailure(message))
     toast.error(message)
   }
 }
 
-function* handleRevokeCredential(action: PayloadAction<GatewayRef>) {
-  const { serverId, gatewayId } = action.payload
+function* handleRevokeServerCredential(action: PayloadAction<string>) {
+  const serverId = action.payload
   try {
-    yield call(iotAPI.revokeGatewayCredential, serverId, gatewayId)
-    yield put(revokeCredentialSuccess())
-    toast.success(`Đã thu hồi key của ${gatewayId}`)
-    yield put(fetchRoutesRequest(serverId))
+    yield call(iotAPI.revokeServerCredential, serverId)
+    yield put(serverCredentialRevoked())
+    toast.success(`Đã thu hồi key của ${serverId}`)
+    yield put(fetchBridgeRequest())
   } catch (err: unknown) {
     const message = apiErrorMessage(err, 'Không thu hồi được key MQTT.')
-    yield put(credentialFailure(message))
+    yield put(serverCredentialFailure(message))
     toast.error(message)
   }
 }
@@ -226,15 +222,15 @@ function* handleRevokeCredential(action: PayloadAction<GatewayRef>) {
 export function* iotBridgeSaga() {
   yield all([
     takeLatest(fetchBridgeRequest.type, handleFetchBridge),
-    takeLatest(fetchRoutesRequest.type, handleFetchRoutes),
     takeLatest(fetchNodeAssetsRequest.type, handleFetchNodeAssets),
     takeEvery(registerServerRequest.type, handleRegisterServer),
     takeEvery(updateServerLocationRequest.type, handleUpdateServerLocation),
-    takeEvery(putRouteRequest.type, handlePutRoute),
     takeEvery(registerNodeRequest.type, handleRegisterNode),
-    takeEvery(issueCredentialRequest.type, handleIssueCredential),
-    takeEvery(viewCredentialRequest.type, handleViewCredential),
-    takeEvery(revokeCredentialRequest.type, handleRevokeCredential),
+    takeEvery(updateNodeRequest.type, handleUpdateNode),
+    takeEvery(detachNodeFeederRequest.type, handleDetachNodeFeeder),
+    takeEvery(issueServerCredentialRequest.type, handleIssueServerCredential),
+    takeEvery(viewServerCredentialRequest.type, handleViewServerCredential),
+    takeEvery(revokeServerCredentialRequest.type, handleRevokeServerCredential),
   ])
 }
 

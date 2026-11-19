@@ -61,8 +61,6 @@ export const RegisterNodeModal: React.FC<{
   const [feederId, setFeederId] = useState('')
   const [serverId, setServerId] = useState('')
   const [deviceId, setDeviceId] = useState('')
-  const [gatewayId, setGatewayId] = useState('')
-  const [remote, setRemote] = useState(true)
   const [voltage, setVoltage] = useState('')
   const [currentMa, setCurrentMa] = useState('')
   const [powerMw, setPowerMw] = useState('')
@@ -115,8 +113,6 @@ export const RegisterNodeModal: React.FC<{
     if (!communeId) return setLocalError('Chọn xã / phường trước.')
     if (!cabinetId || !feederId || !serverId) return setLocalError('Chọn tủ điện, mạch và server IoT.')
     if (!isValidBridgeId(deviceId.trim())) return setLocalError('Device ID bắt đầu bằng chữ/số, chỉ gồm chữ, số, "-" hoặc "_".')
-    if (gatewayId.trim() && !isValidBridgeId(gatewayId.trim()))
-      return setLocalError('Gateway ID bắt đầu bằng chữ/số, chỉ gồm chữ, số, "-" hoặc "_".')
     if (v === null || c === null || p === null) return setLocalError('Điện áp, dòng, công suất danh định phải là số dương.')
 
     submittedRef.current = true
@@ -231,24 +227,14 @@ export const RegisterNodeModal: React.FC<{
 
           <section className="space-y-4">
             <SectionTitle icon={<Gauge className="w-4 h-4 text-blue-600" />}>Thiết bị và chỉ số danh định</SectionTitle>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Device ID" hint="Trùng DEVICE_ID trong firmware node.">
-                <input
-                  className={`${inputClass} font-mono`}
-                  value={deviceId}
-                  onChange={(e) => setDeviceId(e.target.value)}
-                  placeholder="LUXMAP-P002"
-                />
-              </Field>
-              <Field label="Gateway ID" hint="Tuỳ chọn.">
-                <input
-                  className={`${inputClass} font-mono`}
-                  value={gatewayId}
-                  onChange={(e) => setGatewayId(e.target.value)}
-                  placeholder="LUXMAP-GW002"
-                />
-              </Field>
-            </div>
+            <Field label="Device ID" hint="Trùng DEVICE_ID trong firmware node.">
+              <input
+                className={`${inputClass} font-mono`}
+                value={deviceId}
+                onChange={(e) => setDeviceId(e.target.value)}
+                placeholder="LUXMAP-P002"
+              />
+            </Field>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Điện áp (V)">
                 <input className={inputClass} inputMode="decimal" value={voltage} onChange={(e) => setVoltage(e.target.value)} placeholder="5" />
@@ -269,10 +255,6 @@ export const RegisterNodeModal: React.FC<{
                 Node đăng ký ở đây luôn là thiết bị thật trên testbed của nhóm.
               </span>
             </div>
-            <label className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
-              <input type="checkbox" checked={remote} onChange={(e) => setRemote(e.target.checked)} />
-              Cho phép điều khiển từ xa
-            </label>
           </section>
         </div>
 

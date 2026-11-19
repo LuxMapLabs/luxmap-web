@@ -19,8 +19,6 @@ import {
   AssetModalHeader,
 } from '../../assets/components/common/AssetModal'
 
-const DEFAULT_BASE_URL = 'http://127.0.0.1:5000'
-
 type Coords = { lat: number; lng: number }
 
 const centerOf = (commune?: CommuneItem): Coords | null =>
@@ -55,7 +53,6 @@ export const IotServerFormModal: React.FC<{
 
   const editing = Boolean(server?.server_id)
   const [serverId, setServerId] = useState(server?.server_id || '')
-  const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL)
   const [communeId, setCommuneId] = useState(server?.commune_id || '')
   const [picked, setPicked] = useState<Coords | null>(server?.location ?? null)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -89,7 +86,6 @@ export const IotServerFormModal: React.FC<{
     setLocalError(null)
     if (!editing && !isValidServerId(serverId.trim()))
       return setLocalError('Server ID chỉ gồm chữ, số, "-" hoặc "_" (tối đa 64 ký tự) và không được là "default".')
-    if (!editing && !baseUrl.trim()) return setLocalError('Cần địa chỉ HTTP của IoT Bridge.')
     if (!communeId) return setLocalError('Cần chọn xã/phường.')
     if (!picked) return setLocalError('Hãy bấm lên bản đồ để đặt vị trí gateway.')
 
@@ -165,17 +161,6 @@ export const IotServerFormModal: React.FC<{
                     onChange={(e) => setServerId(e.target.value)}
                     placeholder="iot-server-01"
                   />
-                </Field>
-                <Field
-                  label="Địa chỉ HTTP của bridge"
-                  hint={
-                    <>
-                      Địa chỉ backend gọi tới bridge, phải nằm trong allowlist{' '}
-                      <code className="font-mono text-[10.5px]">IotDiagnostics:AllowedOrigins</code>.
-                    </>
-                  }
-                >
-                  <input className={`${inputClass} font-mono`} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
                 </Field>
               </section>
             )}

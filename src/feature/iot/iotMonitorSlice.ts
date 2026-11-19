@@ -5,9 +5,11 @@ import type {
   IotCommandRequest,
   IotDiagnosticResult,
   IotElectricalResult,
+  IotNodeSourceDetails,
   IotNodeStatus,
 } from '../../types/iot/nodes'
 import type {
+  IotDiagnosticHistoryItem,
   IotFeederAverage,
   IotFeederElectricalResult,
 } from '../../types/iot/feeders'
@@ -36,6 +38,9 @@ export const COMMAND_MODE_POLL_MS = 10_000
 /** Kích thước phân trang lịch sử lệnh. */
 export const HISTORY_PAGE_SIZE = 10
 
+/** Kích thước phân trang lịch sử đợt lỗi của mạch. */
+export const DIAGNOSTIC_HISTORY_PAGE_SIZE = 20
+
 export interface CabinetStatusEntry {
   cabinetId: string
   nodes: IotNodeStatus[]
@@ -44,6 +49,8 @@ export interface CabinetStatusEntry {
   error: string | null
   hasLoaded: boolean
 }
+
+export type ElectricalTimeBasis = 'measured_at' | 'received_at'
 
 export interface ElectricalSeriesEntry {
   feederId: string
@@ -60,6 +67,17 @@ export interface CommandHistoryEntry {
   items: IotCommandHistoryItem[]
   total: number
   page: number
+  loading: boolean
+  error: string | null
+}
+
+export interface DiagnosticHistoryEntry {
+  feederId: string
+  items: IotDiagnosticHistoryItem[]
+  total: number
+  page: number
+  from: string | null
+  to: string | null
   loading: boolean
   error: string | null
 }
@@ -92,6 +110,14 @@ export interface IotMonitorState {
       error: string | null
     }
   >
+  nodeSource: Record<
+    string,
+    {
+      loading: boolean
+      error: string | null
+      data: IotNodeSourceDetails | null
+    }
+  >
   nodesTab: {
     nodes: IotNodeStatus[]
     diagnosticsByNode: Record<string, IotDiagnosticResult>
@@ -99,6 +125,7 @@ export interface IotMonitorState {
     error: string | null
   }
   commandHistory: Record<string, CommandHistoryEntry>
+  diagnosticHistory: Record<string, DiagnosticHistoryEntry>
   commandSend: {
     status: 'idle' | 'sending' | 'succeeded' | 'failed'
   }
@@ -112,6 +139,7 @@ const initialState: IotMonitorState = {
   feederElectrical: {},
   diagnostics: {},
   nodeElectrical: {},
+  nodeSource: {},
   nodesTab: {
     nodes: [],
     diagnosticsByNode: {},
@@ -119,6 +147,7 @@ const initialState: IotMonitorState = {
     error: null,
   },
   commandHistory: {},
+  diagnosticHistory: {},
   commandSend: {
     status: 'idle',
   },
@@ -184,9 +213,11 @@ export const iotMonitorSlice = createSlice({
         maxPoints: number
         windowMs?: number
         live?: boolean
+        timeBasis?: ElectricalTimeBasis
+        fromTo?: { from: string; to: string }
       }>
     ) => {
-      const { key, feederId, maxPoints, windowMs } = action.payload
+      const { key, feederId, maxPoints, windowMs, fromTo } = action.payload
       state.electricalSeries[key] = {
         feederId,
         points: [],
@@ -194,7 +225,7 @@ export const iotMonitorSlice = createSlice({
         backfilling: true,
         error: null,
         maxPoints,
-        windowMs: windowMs ?? null,
+        windowMs: fromTo ? null : (windowMs ?? null),
       }
     },
     stopElectricalSeries: (state, action: PayloadAction<{ key: string }>) => {
@@ -373,6 +404,45 @@ export const iotMonitorSlice = createSlice({
       }
     },
 
+    // F2. Node Source (Hiệu chuẩn / chỉ số danh định)
+    fetchNodeSourceRequest: (state, action: PayloadAction<string>) => {
+      const nodeId = action.payload
+      const entry = state.nodeSource[nodeId]
+      state.nodeSource[nodeId] = {
+        data: entry?.data ?? null,
+        error: null,
+        loading: true,
+      }
+    },
+    fetchNodeSourceSuccess: (
+      state,
+      action: PayloadAction<{
+        nodeId: string
+        data: IotNodeSourceDetails | null
+      }>
+    ) => {
+      const { nodeId, data } = action.payload
+      state.nodeSource[nodeId] = {
+        data,
+        error: null,
+        loading: false,
+      }
+    },
+    fetchNodeSourceFailure: (
+      state,
+      action: PayloadAction<{ nodeId: string; error: string }>
+    ) => {
+      const { nodeId, error } = action.payload
+      state.nodeSource[nodeId] = {
+        data: null,
+        error,
+        loading: false,
+      }
+    },
+    clearNodeSource: (state, action: PayloadAction<string>) => {
+      delete state.nodeSource[action.payload]
+    },
+
     // G. Nodes Tab
     fetchNodesTabRequest: (state) => {
       state.nodesTab.isLoading = true
@@ -523,6 +593,93 @@ export const iotMonitorSlice = createSlice({
     clearAutoPrefill: (state) => {
       state.autoPrefill = null
     },
+
+    // J. Lịch sử đợt lỗi
+    resetDiagnosticHistory: (
+      state,
+      action: PayloadAction<{ key: string; feederId: string }>
+    ) => {
+      const { key, feederId } = action.payload
+      state.diagnosticHistory[key] = {
+        feederId,
+        items: [],
+        total: 0,
+        page: 1,
+        from: null,
+        to: null,
+        loading: false,
+        error: null,
+      }
+    },
+    clearDiagnosticHistory: (state, action: PayloadAction<{ key: string }>) => {
+      delete state.diagnosticHistory[action.payload.key]
+    },
+    fetchDiagnosticHistoryRequest: (
+      state,
+      action: PayloadAction<{
+        key: string
+        feederId: string
+        page: number
+        pageSize?: number
+        from?: string | null
+        to?: string | null
+      }>
+    ) => {
+      const { key, feederId, from = null, to = null } = action.payload
+      const entry = state.diagnosticHistory[key]
+      if (entry) {
+        entry.feederId = feederId
+        entry.loading = true
+        entry.from = from
+        entry.to = to
+      } else {
+        state.diagnosticHistory[key] = {
+          feederId,
+          items: [],
+          total: 0,
+          page: 1,
+          from,
+          to,
+          loading: true,
+          error: null,
+        }
+      }
+    },
+    fetchDiagnosticHistorySuccess: (
+      state,
+      action: PayloadAction<{
+        key: string
+        feederId: string
+        items: IotDiagnosticHistoryItem[]
+        total: number
+        page: number
+      }>
+    ) => {
+      const { key, feederId, items, total, page } = action.payload
+      const entry = state.diagnosticHistory[key]
+      if (entry && entry.feederId === feederId) {
+        entry.items = items
+        entry.total = total
+        entry.page = page
+        entry.loading = false
+        entry.error = null
+      }
+    },
+    fetchDiagnosticHistoryFailure: (
+      state,
+      action: PayloadAction<{
+        key: string
+        feederId: string
+        error: string
+      }>
+    ) => {
+      const { key, feederId, error } = action.payload
+      const entry = state.diagnosticHistory[key]
+      if (entry && entry.feederId === feederId) {
+        entry.loading = false
+        entry.error = error
+      }
+    },
   },
 })
 
@@ -549,6 +706,10 @@ export const {
   fetchNodeElectricalRequest,
   fetchNodeElectricalSuccess,
   fetchNodeElectricalFailure,
+  fetchNodeSourceRequest,
+  fetchNodeSourceSuccess,
+  fetchNodeSourceFailure,
+  clearNodeSource,
   fetchNodesTabRequest,
   fetchNodesTabSuccess,
   fetchNodesTabFailure,
@@ -564,6 +725,11 @@ export const {
   fetchAutoPrefillRequest,
   fetchAutoPrefillSuccess,
   clearAutoPrefill,
+  resetDiagnosticHistory,
+  clearDiagnosticHistory,
+  fetchDiagnosticHistoryRequest,
+  fetchDiagnosticHistorySuccess,
+  fetchDiagnosticHistoryFailure,
 } = iotMonitorSlice.actions
 
 export const EMPTY_COMMAND_MODES: Record<string, IotCommandChoice | null> =
@@ -614,6 +780,14 @@ export const selectNodeElectrical = (
   return state.iotMonitor.nodeElectrical[nodeId]
 }
 
+export const selectNodeSource = (
+  state: { iotMonitor: IotMonitorState },
+  nodeId: string | null | undefined
+): { data: IotNodeSourceDetails | null; error: string | null; loading: boolean } | undefined => {
+  if (!nodeId) return undefined
+  return state.iotMonitor.nodeSource[nodeId]
+}
+
 export const selectNodesTab = (state: { iotMonitor: IotMonitorState }) => {
   return state.iotMonitor.nodesTab
 }
@@ -631,6 +805,13 @@ export const selectCommandSend = (state: { iotMonitor: IotMonitorState }) => {
 
 export const selectAutoPrefill = (state: { iotMonitor: IotMonitorState }) => {
   return state.iotMonitor.autoPrefill
+}
+
+export const selectDiagnosticHistory = (
+  state: { iotMonitor: IotMonitorState },
+  key: string
+): DiagnosticHistoryEntry | undefined => {
+  return state.iotMonitor.diagnosticHistory[key]
 }
 
 export default iotMonitorSlice.reducer

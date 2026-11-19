@@ -1,7 +1,7 @@
 import { useShowCommune } from '../../../../../hooks/useShowCommune'
 import React from 'react'
 import { RowActions } from '../../common/RowActions'
-import { Trash2, Zap, AlertCircle, MapPin, Cable } from 'lucide-react'
+import { Trash2, Zap, AlertCircle, MapPin, Cable, History } from 'lucide-react'
 import type { FeederListItem } from '../../../../../types/assets/feeders'
 import type { CabinetListItem } from '../../../../../types/assets/cabinets'
 import { formatFriendlyCommuneName } from '../../../../../utils/assets/communeUtils'
@@ -16,6 +16,7 @@ export interface FeederTableProps {
   onViewDetail: (feeder: FeederListItem) => void
   onEdit: (feeder: FeederListItem) => void
   onDelete: (feeder: FeederListItem) => void
+  onViewHistory?: (feeder: FeederListItem) => void
 }
 
 export const FeederTable: React.FC<FeederTableProps> = ({
@@ -26,6 +27,7 @@ export const FeederTable: React.FC<FeederTableProps> = ({
   onViewDetail,
   onEdit,
   onDelete,
+  onViewHistory,
 }) => {
   const showCommune = useShowCommune()
   const flashingFeeder = findByIdOrRef(feeders, (f) => f.feeder_id, flashingFeederId)
@@ -145,13 +147,26 @@ export const FeederTable: React.FC<FeederTableProps> = ({
 
                   {/* Thao Tác */}
                   <td className="py-3.5 px-4 text-right">
-                    <RowActions
-                      viewLabel="Xem chi tiết mạch điện"
-                      editLabel="Chỉnh sửa mạch điện"
-                      onView={() => onViewDetail(feeder)}
-                      onEdit={() => onEdit(feeder)}
-                      menuItems={[{ key: 'delete', label: 'Xóa mạch điện', icon: <Trash2 />, danger: true, onClick: () => onDelete(feeder) }]}
-                    />
+                    <div className="flex items-center justify-end gap-1">
+                      {onViewHistory && feeder.control?.node_id && (
+                        <button
+                          type="button"
+                          onClick={() => onViewHistory(feeder)}
+                          title="Xem lịch sử mạch"
+                          aria-label="Xem lịch sử mạch"
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+                      )}
+                      <RowActions
+                        viewLabel="Xem chi tiết mạch điện"
+                        editLabel="Chỉnh sửa mạch điện"
+                        onView={() => onViewDetail(feeder)}
+                        onEdit={() => onEdit(feeder)}
+                        menuItems={[{ key: 'delete', label: 'Xóa mạch điện', icon: <Trash2 />, danger: true, onClick: () => onDelete(feeder) }]}
+                      />
+                    </div>
                   </td>
                 </tr>
               )

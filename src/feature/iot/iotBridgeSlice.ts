@@ -1,8 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type {
   IotGatewayCredential,
-  IotGatewayRoute,
-  IotGatewayRouteRequest,
   IotServerStatus,
   RegisterServerRequest,
   ServerLocationRequest,
@@ -11,6 +9,7 @@ import type {
   IotNodeStatus,
   RegisterNodeRequest,
   RegisteredNode,
+  UpdateNodeRequest,
 } from '../../types/iot/nodes'
 import type { CommuneItem } from '../../types/admin/communes'
 import type { CabinetListItem } from '../../types/assets/cabinets'
@@ -29,29 +28,22 @@ export interface IotBridgeState {
   nodesError: string | null
   communes: CommuneItem[]
   communesStatus: IotLoadStatus
-  routesServerId: string | null
-  routes: IotGatewayRoute[]
-  routesStatus: IotLoadStatus
-  routesError: string | null
   cabinets: CabinetListItem[]
   feeders: FeederListItem[]
   nodeAssetsStatus: IotLoadStatus
   nodeAssetsError: string | null
   serverSubmit: IotSubmitStatus
   serverSubmitError: string | null
-  routeSubmit: IotSubmitStatus
-  routeSubmitError: string | null
   nodeSubmit: IotSubmitStatus
   nodeSubmitError: string | null
   registeredNode: RegisteredNode | null
+  nodeEdit: IotSubmitStatus
+  nodeEditError: string | null
+  nodeDetach: IotSubmitStatus
+  nodeDetachError: string | null
   credential: IotGatewayCredential | null
-  credentialBusy: { gatewayId: string; action: IotCredentialAction } | null
+  serverCredentialBusy: IotCredentialAction | null
   credentialError: string | null
-}
-
-export interface GatewayRef {
-  serverId: string
-  gatewayId: string
 }
 
 const initialState: IotBridgeState = {
@@ -63,23 +55,21 @@ const initialState: IotBridgeState = {
   nodesError: null,
   communes: [],
   communesStatus: 'idle',
-  routesServerId: null,
-  routes: [],
-  routesStatus: 'idle',
-  routesError: null,
   cabinets: [],
   feeders: [],
   nodeAssetsStatus: 'idle',
   nodeAssetsError: null,
   serverSubmit: 'idle',
   serverSubmitError: null,
-  routeSubmit: 'idle',
-  routeSubmitError: null,
   nodeSubmit: 'idle',
   nodeSubmitError: null,
   registeredNode: null,
+  nodeEdit: 'idle',
+  nodeEditError: null,
+  nodeDetach: 'idle',
+  nodeDetachError: null,
   credential: null,
-  credentialBusy: null,
+  serverCredentialBusy: null,
   credentialError: null,
 }
 
@@ -121,42 +111,7 @@ const iotBridgeSlice = createSlice({
       state.communesStatus = 'error'
     },
 
-    // ---- 2. Gateway routes ----
-    fetchRoutesRequest: (state, action: PayloadAction<string>) => {
-      if (state.routesServerId !== action.payload) {
-        state.routesServerId = action.payload
-        state.routes = []
-      }
-      state.routesStatus = 'loading'
-      state.routesError = null
-    },
-    fetchRoutesSuccess: (
-      state,
-      action: PayloadAction<{ serverId: string; routes: IotGatewayRoute[] }>
-    ) => {
-      if (state.routesServerId === action.payload.serverId) {
-        state.routesStatus = 'ready'
-        state.routes = action.payload.routes
-        state.routesError = null
-      }
-    },
-    fetchRoutesFailure: (
-      state,
-      action: PayloadAction<{ serverId: string; error: string }>
-    ) => {
-      if (state.routesServerId === action.payload.serverId) {
-        state.routesStatus = 'error'
-        state.routesError = action.payload.error
-      }
-    },
-    clearRoutes: (state) => {
-      state.routesServerId = null
-      state.routes = []
-      state.routesStatus = 'idle'
-      state.routesError = null
-    },
-
-    // ---- 3. Node assets (cabinets + feeders) ----
+    // ---- 2. Node assets (cabinets + feeders) ----
     fetchNodeAssetsRequest: (state) => {
       state.nodeAssetsStatus = 'loading'
       state.nodeAssetsError = null
@@ -200,28 +155,7 @@ const iotBridgeSlice = createSlice({
       state.serverSubmitError = null
     },
 
-    // ---- 5. Route submit ----
-    putRouteRequest: (
-      state,
-      _action: PayloadAction<{ serverId: string; gatewayId: string; body: IotGatewayRouteRequest }>
-    ) => {
-      state.routeSubmit = 'submitting'
-      state.routeSubmitError = null
-    },
-    routeSubmitSuccess: (state) => {
-      state.routeSubmit = 'succeeded'
-      state.routeSubmitError = null
-    },
-    routeSubmitFailure: (state, action: PayloadAction<string>) => {
-      state.routeSubmit = 'failed'
-      state.routeSubmitError = action.payload
-    },
-    resetRouteSubmit: (state) => {
-      state.routeSubmit = 'idle'
-      state.routeSubmitError = null
-    },
-
-    // ---- 6. Node submit ----
+    // ---- 4. Node submit ----
     registerNodeRequest: (state, _action: PayloadAction<RegisterNodeRequest>) => {
       state.nodeSubmit = 'submitting'
       state.nodeSubmitError = null
@@ -242,35 +176,73 @@ const iotBridgeSlice = createSlice({
       state.registeredNode = null
     },
 
-    // ---- 7. Gateway credentials ----
-    issueCredentialRequest: (state, action: PayloadAction<GatewayRef>) => {
-      state.credentialBusy = { gatewayId: action.payload.gatewayId, action: 'issue' }
-      state.credentialError = null
+    // ---- 6b. Node edit & detach feeder ----
+    updateNodeRequest: (
+      state,
+      _action: PayloadAction<{ nodeId: string; body: UpdateNodeRequest }>
+    ) => {
+      state.nodeEdit = 'submitting'
+      state.nodeEditError = null
     },
-    viewCredentialRequest: (state, action: PayloadAction<GatewayRef>) => {
-      state.credentialBusy = { gatewayId: action.payload.gatewayId, action: 'view' }
-      state.credentialError = null
+    updateNodeSuccess: (state) => {
+      state.nodeEdit = 'succeeded'
+      state.nodeEditError = null
     },
-    revokeCredentialRequest: (state, action: PayloadAction<GatewayRef>) => {
-      state.credentialBusy = { gatewayId: action.payload.gatewayId, action: 'revoke' }
-      state.credentialError = null
+    updateNodeFailure: (state, action: PayloadAction<string>) => {
+      state.nodeEdit = 'failed'
+      state.nodeEditError = action.payload
     },
-    credentialSuccess: (state, action: PayloadAction<IotGatewayCredential>) => {
-      state.credential = action.payload
-      state.credentialBusy = null
-      state.credentialError = null
+    resetNodeEdit: (state) => {
+      state.nodeEdit = 'idle'
+      state.nodeEditError = null
     },
-    revokeCredentialSuccess: (state) => {
-      state.credentialBusy = null
-      state.credentialError = null
+    detachNodeFeederRequest: (state, _action: PayloadAction<string>) => {
+      state.nodeDetach = 'submitting'
+      state.nodeDetachError = null
     },
-    credentialFailure: (state, action: PayloadAction<string>) => {
-      state.credentialBusy = null
-      state.credentialError = action.payload
+    detachNodeFeederSuccess: (state) => {
+      state.nodeDetach = 'succeeded'
+      state.nodeDetachError = null
     },
+    detachNodeFeederFailure: (state, action: PayloadAction<string>) => {
+      state.nodeDetach = 'failed'
+      state.nodeDetachError = action.payload
+    },
+    resetNodeDetach: (state) => {
+      state.nodeDetach = 'idle'
+      state.nodeDetachError = null
+    },
+
+    // ---- 5. Key MQTT theo server ----
     clearCredential: (state) => {
       state.credential = null
       state.credentialError = null
+    },
+    issueServerCredentialRequest: (state, _action: PayloadAction<string>) => {
+      state.serverCredentialBusy = 'issue'
+      state.credentialError = null
+    },
+    viewServerCredentialRequest: (state, _action: PayloadAction<string>) => {
+      state.serverCredentialBusy = 'view'
+      state.credentialError = null
+    },
+    revokeServerCredentialRequest: (state, _action: PayloadAction<string>) => {
+      state.serverCredentialBusy = 'revoke'
+      state.credentialError = null
+    },
+    serverCredentialSuccess: (state, action: PayloadAction<IotGatewayCredential>) => {
+      state.credential = action.payload
+      state.serverCredentialBusy = null
+      state.credentialError = null
+    },
+    serverCredentialRevoked: (state) => {
+      state.credential = null
+      state.serverCredentialBusy = null
+      state.credentialError = null
+    },
+    serverCredentialFailure: (state, action: PayloadAction<string>) => {
+      state.serverCredentialBusy = null
+      state.credentialError = action.payload
     },
   },
 })
@@ -283,10 +255,6 @@ export const {
   fetchNodesFailure,
   fetchCommunesSuccess,
   fetchCommunesFailure,
-  fetchRoutesRequest,
-  fetchRoutesSuccess,
-  fetchRoutesFailure,
-  clearRoutes,
   fetchNodeAssetsRequest,
   fetchNodeAssetsSuccess,
   fetchNodeAssetsFailure,
@@ -295,21 +263,25 @@ export const {
   serverSubmitSuccess,
   serverSubmitFailure,
   resetServerSubmit,
-  putRouteRequest,
-  routeSubmitSuccess,
-  routeSubmitFailure,
-  resetRouteSubmit,
   registerNodeRequest,
   nodeSubmitSuccess,
   nodeSubmitFailure,
   resetNodeSubmit,
-  issueCredentialRequest,
-  viewCredentialRequest,
-  revokeCredentialRequest,
-  credentialSuccess,
-  revokeCredentialSuccess,
-  credentialFailure,
+  updateNodeRequest,
+  updateNodeSuccess,
+  updateNodeFailure,
+  resetNodeEdit,
+  detachNodeFeederRequest,
+  detachNodeFeederSuccess,
+  detachNodeFeederFailure,
+  resetNodeDetach,
   clearCredential,
+  issueServerCredentialRequest,
+  viewServerCredentialRequest,
+  revokeServerCredentialRequest,
+  serverCredentialSuccess,
+  serverCredentialRevoked,
+  serverCredentialFailure,
 } = iotBridgeSlice.actions
 
 export default iotBridgeSlice.reducer

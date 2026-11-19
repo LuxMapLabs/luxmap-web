@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { waitFor } from '@testing-library/react'
 import iotBridgeReducer, {
   fetchBridgeRequest,
-  fetchRoutesRequest,
-  issueCredentialRequest,
-  viewCredentialRequest,
   registerNodeRequest,
+  updateNodeRequest,
+  detachNodeFeederRequest,
+  issueServerCredentialRequest,
+  viewServerCredentialRequest,
+  revokeServerCredentialRequest,
 } from '../../feature/iot/iotBridgeSlice'
 import iotBridgeSaga from '../../feature/iot/iotBridgeSaga'
 import iotAPI from '../../feature/iot/iotAPI'
@@ -17,14 +19,14 @@ vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
     getServers: vi.fn(),
     getNodes: vi.fn(),
-    getGatewayRoutes: vi.fn(),
-    putGatewayRoute: vi.fn(),
-    issueGatewayCredential: vi.fn(),
-    getGatewayCredential: vi.fn(),
-    revokeGatewayCredential: vi.fn(),
+    issueServerCredential: vi.fn(),
+    getServerCredential: vi.fn(),
+    revokeServerCredential: vi.fn(),
     registerServer: vi.fn(),
     updateServerLocation: vi.fn(),
     registerNode: vi.fn(),
+    updateNode: vi.fn(),
+    detachNodeFeeder: vi.fn(),
   },
 }))
 
@@ -88,145 +90,12 @@ describe('iotBridgeSaga integration tests', () => {
     })
   })
 
-  it("fetchRoutesRequest: when fetching 'A' then 'B', and A resolves after B, state only keeps routes of B", async () => {
-    let resolveA: (val: unknown) => void = () => {}
-    const promiseA = new Promise((resolve) => {
-      resolveA = resolve
-    })
-
-    let resolveB: (val: unknown) => void = () => {}
-    const promiseB = new Promise((resolve) => {
-      resolveB = resolve
-    })
-
-    api.getGatewayRoutes.mockImplementation((serverId: string) => {
-      if (serverId === 'A') return promiseA as never
-      if (serverId === 'B') return promiseB as never
-      return Promise.resolve([])
-    })
-
-    const store = makeSagaStore({
-      reducers: { iotBridge: iotBridgeReducer },
-      sagas: [iotBridgeSaga],
-    })
-
-    store.dispatch(fetchRoutesRequest('A'))
-    store.dispatch(fetchRoutesRequest('B'))
-
-    // B resolves first with route B
-    resolveB([{ gateway_id: 'GW-B', device_ids: ['DEV-B'] }])
-
-    await waitFor(() => {
-      const state = store.getState().iotBridge
-      expect(state.routesServerId).toBe('B')
-      expect(state.routesStatus).toBe('ready')
-      expect(state.routes).toEqual([{ gateway_id: 'GW-B', device_ids: ['DEV-B'] }])
-    })
-
-    // Then A resolves late with route A
-    resolveA([{ gateway_id: 'GW-A', device_ids: ['DEV-A'] }])
-
-    // Wait a tick and verify state still retains B
-    await new Promise((r) => setTimeout(r, 50))
-    const state = store.getState().iotBridge
-    expect(state.routesServerId).toBe('B')
-    expect(state.routes).toEqual([{ gateway_id: 'GW-B', device_ids: ['DEV-B'] }])
-  })
-
-  it('fetchRoutesRequest: refetching the same server keeps existing routes while loading', async () => {
-    let resolveReload: (val: unknown) => void = () => {}
-    const reloadPromise = new Promise((resolve) => {
-      resolveReload = resolve
-    })
-
-    api.getGatewayRoutes
-      .mockResolvedValueOnce([{ gateway_id: 'GW-INIT', device_ids: ['DEV-1'] }])
-      .mockImplementationOnce(() => reloadPromise as never)
-
-    const store = makeSagaStore({
-      reducers: { iotBridge: iotBridgeReducer },
-      sagas: [iotBridgeSaga],
-    })
-
-    // First fetch resolves
-    store.dispatch(fetchRoutesRequest('SRV-1'))
-    await waitFor(() => {
-      expect(store.getState().iotBridge.routesStatus).toBe('ready')
-      expect(store.getState().iotBridge.routes).toHaveLength(1)
-    })
-
-    // Refetch same server
-    store.dispatch(fetchRoutesRequest('SRV-1'))
-    const stateDuringReload = store.getState().iotBridge
-    expect(stateDuringReload.routesStatus).toBe('loading')
-    // routes cũ vẫn còn, không bị xóa về []
-    expect(stateDuringReload.routes).toEqual([{ gateway_id: 'GW-INIT', device_ids: ['DEV-1'] }])
-
-    // Resolve reload
-    resolveReload([{ gateway_id: 'GW-UPDATED', device_ids: ['DEV-2'] }])
-    await waitFor(() => {
-      expect(store.getState().iotBridge.routesStatus).toBe('ready')
-      expect(store.getState().iotBridge.routes).toEqual([{ gateway_id: 'GW-UPDATED', device_ids: ['DEV-2'] }])
-    })
-  })
-
-  it('takes every credential action: issue key for GW1 then view key for GW2 concurrently, both resolve without cancellation', async () => {
-    let resolveGW1: (val: unknown) => void = () => {}
-    const promiseGW1 = new Promise((resolve) => {
-      resolveGW1 = resolve
-    })
-
-    api.issueGatewayCredential.mockImplementation(() => promiseGW1 as never)
-    api.getGatewayCredential.mockResolvedValue({
-      client_id: 'GW2',
-      username: 'GW2',
-      password: 'pass-gw2',
-      node_ids: [],
-    })
-    api.getGatewayRoutes.mockResolvedValue([])
-
-    const store = makeSagaStore({
-      reducers: { iotBridge: iotBridgeReducer },
-      sagas: [iotBridgeSaga],
-    })
-
-    // Dispatch issue key cho GW1 (resolve chậm)
-    store.dispatch(issueCredentialRequest({ serverId: 'SRV-1', gatewayId: 'GW1' }))
-
-    // Dispatch view key cho GW2 (resolve ngay)
-    store.dispatch(viewCredentialRequest({ serverId: 'SRV-1', gatewayId: 'GW2' }))
-
-    await waitFor(() => {
-      // GW2 view credential hoàn thành và cập nhật store
-      expect(store.getState().iotBridge.credential).toEqual({
-        client_id: 'GW2',
-        username: 'GW2',
-        password: 'pass-gw2',
-        node_ids: [],
-      })
-    })
-
-    // Resolve GW1
-    resolveGW1({
-      client_id: 'GW1',
-      username: 'GW1',
-      password: 'pass-gw1',
-      node_ids: [],
-    })
-
-    await waitFor(() => {
-      // Cả 2 action đều được gọi (takeEvery không hủy tác vụ)
-      expect(api.issueGatewayCredential).toHaveBeenCalledWith('SRV-1', 'GW1')
-      expect(api.getGatewayCredential).toHaveBeenCalledWith('SRV-1', 'GW2')
-    })
-  })
-
   it('registerNodeRequest: saves registeredNode and triggers fetchBridgeRequest (refetching servers and nodes)', async () => {
     const registered = {
       node_id: 'NODE-NEW',
       server_id: 'SRV-1',
       device_id: 'DEV-NEW',
-      gateway_id: 'GW-NEW',
+      feeder_id: 'FDR-1',
     }
     api.registerNode.mockResolvedValue(registered)
     api.getServers.mockResolvedValue([])
@@ -256,6 +125,209 @@ describe('iotBridgeSaga integration tests', () => {
       expect(state.registeredNode).toEqual(registered)
       expect(api.getServers).toHaveBeenCalled()
       expect(api.getNodes).toHaveBeenCalled()
+    })
+  })
+
+  it('updateNodeRequest: calls updateNode, sets succeeded, and triggers fetchBridgeRequest', async () => {
+    api.updateNode.mockResolvedValue(undefined)
+    const body = {
+      server_id: 'SRV-1',
+      device_id: 'DEV-001',
+      feeder_id: 'FDR-002',
+      nominal_voltage: 5,
+      nominal_current_ma: 100,
+      nominal_power_mw: 500,
+    }
+
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(updateNodeRequest({ nodeId: 'NODE-001', body }))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.nodeEdit).toBe('succeeded')
+      expect(state.nodeEditError).toBeNull()
+      expect(api.updateNode).toHaveBeenCalledWith('NODE-001', body)
+      expect(api.getServers).toHaveBeenCalled()
+      expect(api.getNodes).toHaveBeenCalled()
+    })
+  })
+
+  it('updateNodeRequest: sets failed with error message when API rejects', async () => {
+    api.updateNode.mockRejectedValue({
+      response: { data: { error: { message: 'Mạch đã có node khác.' } } },
+    })
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(
+      updateNodeRequest({
+        nodeId: 'NODE-001',
+        body: {
+          server_id: 'SRV-1',
+          device_id: 'DEV-001',
+          feeder_id: 'FDR-002',
+          nominal_voltage: 5,
+          nominal_current_ma: 100,
+          nominal_power_mw: 500,
+        },
+      })
+    )
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.nodeEdit).toBe('failed')
+      expect(state.nodeEditError).toBe('Mạch đã có node khác.')
+    })
+  })
+
+  it('detachNodeFeederRequest: calls detachNodeFeeder, sets succeeded, and triggers fetchBridgeRequest', async () => {
+    api.detachNodeFeeder.mockResolvedValue(undefined)
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(detachNodeFeederRequest('NODE-001'))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.nodeDetach).toBe('succeeded')
+      expect(state.nodeDetachError).toBeNull()
+      expect(api.detachNodeFeeder).toHaveBeenCalledWith('NODE-001')
+      expect(api.getServers).toHaveBeenCalled()
+      expect(api.getNodes).toHaveBeenCalled()
+    })
+  })
+
+  it('detachNodeFeederRequest: sets failed with error message when API rejects', async () => {
+    api.detachNodeFeeder.mockRejectedValue({
+      response: { data: { error: { message: 'Không tìm thấy node.' } } },
+    })
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(detachNodeFeederRequest('NODE-404'))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.nodeDetach).toBe('failed')
+      expect(state.nodeDetachError).toBe('Không tìm thấy node.')
+    })
+  })
+
+  it('issueServerCredentialRequest: calls issueServerCredential, saves credential and refetches bridge', async () => {
+    const cred = {
+      server_id: 'SRV-1',
+      client_id: 'SRV-1',
+      username: 'SRV-1',
+      password: 'secret-password',
+      node_ids: ['NODE-1'],
+    }
+    api.issueServerCredential.mockResolvedValue(cred)
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(issueServerCredentialRequest('SRV-1'))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.serverCredentialBusy).toBeNull()
+      expect(state.credential).toEqual(cred)
+      expect(state.credentialError).toBeNull()
+      expect(api.issueServerCredential).toHaveBeenCalledWith('SRV-1')
+      expect(api.getServers).toHaveBeenCalled()
+    })
+  })
+
+  it('issueServerCredentialRequest: sets credentialError on failure', async () => {
+    api.issueServerCredential.mockRejectedValue({
+      response: { data: { error: { message: 'Server đã có key.' } } },
+    })
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(issueServerCredentialRequest('SRV-1'))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.serverCredentialBusy).toBeNull()
+      expect(state.credentialError).toBe('Server đã có key.')
+    })
+  })
+
+  it('viewServerCredentialRequest: calls getServerCredential and saves credential (or sets error on failure)', async () => {
+    const cred = {
+      server_id: 'SRV-1',
+      client_id: 'SRV-1',
+      username: 'SRV-1',
+      password: 'viewed-password',
+      node_ids: [],
+    }
+    api.getServerCredential.mockResolvedValueOnce(cred)
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(viewServerCredentialRequest('SRV-1'))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.serverCredentialBusy).toBeNull()
+      expect(state.credential).toEqual(cred)
+      expect(api.getServerCredential).toHaveBeenCalledWith('SRV-1')
+    })
+
+    api.getServerCredential.mockRejectedValueOnce({
+      response: { data: { error: { message: 'Chưa cấp key.' } } },
+    })
+    store.dispatch(viewServerCredentialRequest('SRV-1'))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.serverCredentialBusy).toBeNull()
+      expect(state.credentialError).toBe('Chưa cấp key.')
+    })
+  })
+
+  it('revokeServerCredentialRequest: calls revokeServerCredential, clears credential and refetches bridge (or sets error on failure)', async () => {
+    api.revokeServerCredential.mockResolvedValueOnce(undefined)
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(revokeServerCredentialRequest('SRV-1'))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.serverCredentialBusy).toBeNull()
+      expect(state.credential).toBeNull()
+      expect(api.revokeServerCredential).toHaveBeenCalledWith('SRV-1')
+      expect(api.getServers).toHaveBeenCalled()
+    })
+
+    api.revokeServerCredential.mockRejectedValueOnce({
+      response: { data: { error: { message: 'Lỗi thu hồi key.' } } },
+    })
+    store.dispatch(revokeServerCredentialRequest('SRV-1'))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.serverCredentialBusy).toBeNull()
+      expect(state.credentialError).toBe('Lỗi thu hồi key.')
     })
   })
 })
