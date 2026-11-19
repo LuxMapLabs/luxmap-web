@@ -26,7 +26,6 @@ import { isRoadShape } from '../../utils/gis-map/segmentRoadShape'
 import { calculateDistanceMeters } from '../../utils/gis-map/routeUtils'
 import type { CreateFixtureRequest } from '../../types/assets/fixtures'
 import type {
-  IotNodeItemPagedResult,
   CreateIotNodeRequest,
   IotNodeCredential,
 } from '../../types/assets/iot-nodes'
@@ -151,18 +150,16 @@ function getErrorMessage(error: unknown, fallback: string): string {
  */
 function* handleFetchAssets() {
   try {
-    const [segmentsRes, cabinetsRes, feedersRes, polesRes, iotNodesRes]: [
+    const [segmentsRes, cabinetsRes, feedersRes, polesRes]: [
       SegmentListItemPagedResult,
       CabinetListItemPagedResult,
       FeederListItemPagedResult,
       PoleListItemPagedResult,
-      IotNodeItemPagedResult,
     ] = yield all([
       call(assetAPI.getSegments, { page_size: 1000 }),
       call(assetAPI.getCabinets, { page_size: 1000 }),
       call(assetAPI.getFeeders, { page_size: 1000 }),
       call(assetAPI.getPoles, { page_size: 1000 }),
-      call(assetAPI.getIotNodes, { page_size: 1000 }),
     ])
 
     yield put(
@@ -171,7 +168,6 @@ function* handleFetchAssets() {
         cabinets: cabinetsRes.items ?? [],
         feeders: feedersRes.items ?? [],
         poles: polesRes.items ?? [],
-        iotNodes: iotNodesRes.items ?? [],
       })
     )
   } catch (error: unknown) {
