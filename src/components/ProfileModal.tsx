@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Shield, Mail, MapPin, Globe, X, Camera, Pencil, User as UserIcon, Info, Trash2, Loader2 } from 'lucide-react'
+import { Shield, Mail, MapPin, Globe, X, Camera, AtSign, User as UserIcon, Trash2, Loader2 } from 'lucide-react'
 import type { CurrentUserResponse } from '../types/auth/me'
 import type { RootState } from '../redux/rootReducer'
 import { uploadAvatarRequest, removeAvatarRequest } from '../feature/avatar/avatarSlice'
@@ -13,34 +13,30 @@ export interface ProfileModalProps {
   user: CurrentUserResponse | null
 }
 
-// Backend chỉ nhận JPEG, tối đa 1 MB
+// Backend nhận JPEG hoặc PNG (lưu lại thành JPEG), tối đa 1 MB
 const MAX_AVATAR_BYTES = 1024 * 1024
+const AVATAR_TYPES = ['image/jpeg', 'image/png']
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, user }) => {
-  const [isEditing, setIsEditing] = useState(false)
   const dispatch = useDispatch()
   const isAvatarSubmitting = useSelector((state: RootState) => state.avatar.isSubmitting)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Đặt lại form mỗi lần mở / đổi người dùng
+  // Xoá lỗi ảnh cũ mỗi lần mở / đổi người dùng
   useEffect(() => {
     if (!isOpen) return
-    setIsEditing(false)
     setAvatarError(null)
-  }, [isOpen, user?.user_id, user?.full_name, user?.email])
+  }, [isOpen, user?.user_id])
 
-  // Escape: thoát chế độ sửa trước, rồi mới đóng hộp thoại
   useEffect(() => {
     if (!isOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      if (isEditing) setIsEditing(false)
-      else onClose()
+      if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [isOpen, isEditing, onClose])
+  }, [isOpen, onClose])
 
   if (!isOpen || !user) return null
 
@@ -74,8 +70,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (file.type !== 'image/jpeg') {
-      setAvatarError('Chỉ chấp nhận ảnh JPEG (.jpg).')
+    if (!AVATAR_TYPES.includes(file.type)) {
+      setAvatarError('Chỉ chấp nhận ảnh JPEG hoặc PNG.')
       return
     }
     if (file.size > MAX_AVATAR_BYTES) {
@@ -107,7 +103,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
         </button>
 
         <div className="overflow-y-auto">
-          {/* Danh tính */}
+          {/* Danh tính + ảnh đại diện (lưu ngay khi chọn) */}
           <div className="px-6 pt-8 pb-5 flex flex-col items-center text-center border-b border-slate-100">
             <div className="relative">
               <UserAvatar
@@ -121,147 +117,98 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   <Loader2 className="w-6 h-6 animate-spin text-slate-600" />
                 </div>
               )}
-              {isEditing && (
-                <>
-                  <button
-                    type="button"
-                    disabled={isAvatarSubmitting}
-                    onClick={() => fileRef.current?.click()}
-                    className="disabled:opacity-50 absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center border-2 border-white hover:bg-slate-700 transition cursor-pointer"
-                    title="Đổi ảnh đại diện"
-                    aria-label="Đổi ảnh đại diện"
-                  >
-                    <Camera className="w-4 h-4" />
-                  </button>
-                  <input ref={fileRef} type="file" accept="image/jpeg" onChange={handlePickAvatar} className="hidden" />
-                </>
-              )}
+              <button
+                type="button"
+                disabled={isAvatarSubmitting}
+                onClick={() => fileRef.current?.click()}
+                className="disabled:opacity-50 absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center border-2 border-white hover:bg-slate-700 transition cursor-pointer"
+                title="Đổi ảnh đại diện"
+                aria-label="Đổi ảnh đại diện"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png" onChange={handlePickAvatar} className="hidden" />
             </div>
-            {isEditing && user.avatar_url && (
+            {avatarError ? (
+              <p className="mt-2 text-[11px] text-rose-600 font-medium">{avatarError}</p>
+            ) : (
+              <p className="mt-2 text-[11px] text-slate-400">JPEG hoặc PNG, tối đa 1 MB</p>
+            )}
+            {user.avatar_url && (
               <button
                 type="button"
                 disabled={isAvatarSubmitting}
                 onClick={() => dispatch(removeAvatarRequest())}
-                className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
+                className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
               >
                 <Trash2 className="w-3 h-3" />
                 Gỡ ảnh đại diện
               </button>
             )}
-            {avatarError && <p className="mt-2 text-[11px] text-rose-600 font-medium">{avatarError}</p>}
 
-            {!isEditing && (
-              <>
-                <h3 className="mt-3 text-lg font-bold text-slate-900 break-words max-w-full">{displayName}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">@{user.username || user.user_id}</p>
-                <span className={`mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${badgeColor}`}>
-                  <Shield className="w-3 h-3" />
-                  {roleName}
-                </span>
-              </>
-            )}
+            <h3 className="mt-3 text-lg font-bold text-slate-900 break-words max-w-full">{displayName}</h3>
+            <p className="text-xs text-slate-400 mt-0.5">@{user.username || user.user_id}</p>
+            <span className={`mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${badgeColor}`}>
+              <Shield className="w-3 h-3" />
+              {roleName}
+            </span>
           </div>
 
-          {/* Nội dung */}
-          {isEditing ? (
-            <div className="p-6 space-y-4">
-              <div>
-                <label htmlFor="profile-full-name" className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Họ và tên
-                </label>
-                <input
-                  id="profile-full-name"
-                  value={displayName}
-                  readOnly
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600 outline-none cursor-default"
-                />
-              </div>
-              <div>
-                <label htmlFor="profile-email" className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Email công vụ
-                </label>
-                <input
-                  id="profile-email"
-                  type="email"
-                  value={user.email || 'Chưa cập nhật'}
-                  readOnly
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600 outline-none cursor-default"
-                />
-              </div>
-              <div className="flex items-start gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11.5px] text-slate-600">
-                <Info className="w-4 h-4 shrink-0 mt-px" />
-                <span>Ảnh đại diện (JPEG, tối đa 1 MB) được lưu ngay khi chọn. Họ tên và email do Quản trị viên quản lý.</span>
+          {/* Thông tin tài khoản — chỉ xem; họ tên và email do Quản trị viên quản lý */}
+          <dl className="p-6 space-y-4 text-sm">
+            <div className="flex items-start gap-3">
+              <UserIcon className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <dt className="text-[11px] text-slate-400 font-medium">Họ và tên</dt>
+                <dd className="font-semibold text-slate-900 break-words">{user.full_name || 'Chưa cập nhật'}</dd>
               </div>
             </div>
-          ) : (
-            <dl className="p-6 space-y-4 text-sm">
-              <div className="flex items-start gap-3">
-                <Mail className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <dt className="text-[11px] text-slate-400 font-medium">Email công vụ</dt>
-                  <dd className="font-semibold text-slate-900 break-all">{user.email || 'Chưa cập nhật'}</dd>
-                </div>
+            <div className="flex items-start gap-3">
+              <Mail className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <dt className="text-[11px] text-slate-400 font-medium">Email công vụ</dt>
+                <dd className="font-semibold text-slate-900 break-all">{user.email || 'Chưa cập nhật'}</dd>
               </div>
-              <div className="flex items-start gap-3">
-                <UserIcon className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <dt className="text-[11px] text-slate-400 font-medium">Tên đăng nhập</dt>
-                  <dd className="font-semibold text-slate-900">{user.username || '-'}</dd>
-                </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <AtSign className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <dt className="text-[11px] text-slate-400 font-medium">Tên đăng nhập</dt>
+                <dd className="font-semibold text-slate-900">{user.username || '-'}</dd>
               </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <dt className="text-[11px] text-slate-400 font-medium">
-                    {hasAllCommunes || communeLabels.length > 1 ? 'Địa bàn quản lý' : 'Xã phụ trách'}
-                  </dt>
-                  <dd className="font-semibold text-slate-900">
-                    {hasAllCommunes ? (
-                      <span className="inline-flex items-center gap-1.5 text-primary">
-                        <Globe className="w-3.5 h-3.5" />
-                        Toàn bộ địa bàn
-                      </span>
-                    ) : communeLabels.length > 0 ? (
-                      communeLabels.join(', ')
-                    ) : (
-                      <span className="text-slate-400 italic text-xs font-normal">Chưa được phân công. Liên hệ Quản trị viên.</span>
-                    )}
-                  </dd>
-                </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <MapPin className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <dt className="text-[11px] text-slate-400 font-medium">
+                  {hasAllCommunes || communeLabels.length > 1 ? 'Địa bàn quản lý' : 'Xã phụ trách'}
+                </dt>
+                <dd className="font-semibold text-slate-900">
+                  {hasAllCommunes ? (
+                    <span className="inline-flex items-center gap-1.5 text-primary">
+                      <Globe className="w-3.5 h-3.5" />
+                      Toàn bộ địa bàn
+                    </span>
+                  ) : communeLabels.length > 0 ? (
+                    communeLabels.join(', ')
+                  ) : (
+                    <span className="text-slate-400 italic text-xs font-normal">Chưa được phân công. Liên hệ Quản trị viên.</span>
+                  )}
+                </dd>
               </div>
-            </dl>
-          )}
+            </div>
+          </dl>
         </div>
 
         {/* Hành động */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-end gap-2 shrink-0">
-          {isEditing ? (
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              className={`px-5 h-9 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold cursor-pointer`}
-            >
-              Xong
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-1.5 px-4 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Chỉnh sửa hồ sơ
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className={`px-5 h-9 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold cursor-pointer`}
-              >
-                Đóng
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className={`px-5 h-9 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold cursor-pointer`}
+          >
+            Đóng
+          </button>
         </div>
       </div>
     </div>
