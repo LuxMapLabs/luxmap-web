@@ -460,7 +460,7 @@ describe('styleAssetWorkbook', { timeout: 30000 }, () => {
     // Sheet Hướng dẫn và Không xuất
     const wsHd = wbExport.getWorksheet('Hướng dẫn');
     expect(wsHd?.getCell('A1').value).toBe('LUXMAP · MẪU NẠP TÀI SẢN CHIẾU SÁNG');
-    expect(wsHd?.getColumn(1).width).toBe(100);
+    expect(wsHd?.getColumn(1).width).toBe(90);
 
     const cellKhongXuat = wbExport.getWorksheet('Không xuất')?.getCell('B2');
     expect(cellKhongXuat?.value).toBe(9999);

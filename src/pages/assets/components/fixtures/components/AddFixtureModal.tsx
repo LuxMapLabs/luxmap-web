@@ -383,17 +383,6 @@ export const AddFixtureModal: React.FC<AddFixtureModalProps> = ({
                 </select>
               </div>
               <div>
-                <label htmlFor="add-fixture-power" className={LABEL_CLASS}>Nguồn điện</label>
-                <select
-                  id="add-fixture-power"
-                  value={config.power_source}
-                  onChange={(e) => updateConfig('power_source', e.target.value as PowerSource)}
-                  className={FIELD_CLASS}
-                >
-                  <option value="grid">Điện lưới (Grid)</option>
-                </select>
-              </div>
-              <div>
                 <label htmlFor="add-fixture-install" className={LABEL_CLASS}>Ngày lắp</label>
                 <input
                   id="add-fixture-install"

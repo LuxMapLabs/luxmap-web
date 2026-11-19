@@ -21,6 +21,10 @@ export interface DashboardState {
   iotServers: IotServerStatus[]
   /** Ánh xạ segment_id -> danh sách feeder_id thuộc tuyến */
   segmentFeederMap: Record<string, string[]>
+  /** Danh sách segment_id của từng cột chưa có toạ độ GPS */
+  unlocatedPoleSegments: (string | null)[]
+  /** True khi danh sách cột tải về chạm giới hạn page_size 200 */
+  polesCapped: boolean
   /** Kèm dữ liệu bộ thử (calibration_rig) trong danh sách sự cố */
   includeCalibrationRig: boolean
   /** Lịch sử điện 30s của mạch đang chọn trên biểu đồ IoT */
@@ -47,6 +51,8 @@ const initialState: DashboardState = {
   iotSummary: [],
   iotServers: [],
   segmentFeederMap: {},
+  unlocatedPoleSegments: [],
+  polesCapped: false,
   includeCalibrationRig: false,
   selectedFeederHistory: [],
   selectedFeederHistoryLoading: false,
@@ -62,6 +68,8 @@ export interface FetchDashboardSuccessPayload {
   iotSummary: IotDiagnosticSummaryItem[]
   iotServers: IotServerStatus[]
   segmentFeederMap: Record<string, string[]>
+  unlocatedPoleSegments: (string | null)[]
+  polesCapped: boolean
 }
 
 export interface FetchDashboardIotSuccessPayload {
@@ -89,6 +97,8 @@ const dashboardSlice = createSlice({
       state.iotSummary = action.payload.iotSummary
       state.iotServers = action.payload.iotServers
       state.segmentFeederMap = action.payload.segmentFeederMap
+      state.unlocatedPoleSegments = action.payload.unlocatedPoleSegments
+      state.polesCapped = action.payload.polesCapped
       const nowIso = new Date().toISOString()
       state.iotLastUpdated = nowIso
       state.lastUpdated = nowIso
