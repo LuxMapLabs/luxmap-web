@@ -2,8 +2,18 @@
  * Auto-generated Types for: iot/nodes
  * Sinh tự động từ endpoint Backend
  */
-import type { DataSource, FeederPowerState, IotCommandHistoryStatus } from '../common/enums'
+import type { FeederPowerState, IotCommandHistoryStatus } from '../common/enums'
 import type { IotLocation } from './servers'
+
+export interface ElectricalWindowAssessment {
+    status?: string | null
+    samples?: number
+    required_samples?: number
+    voltage_avg?: number
+    current_ma_avg?: number
+    power_mw_avg?: number
+    current_evaluation_available?: boolean
+}
 
 export interface IotAnomaly {
     code?: string | null
@@ -67,7 +77,7 @@ export interface IotDiagnosticResult {
     electrical_status?: 'fresh' | 'stale' | 'no_data'
     last_seen_at?: string | null
     last_command_ack_at?: string | null
-    lamp_count?: LampCountEstimate
+    electrical_window?: ElectricalWindowAssessment
     measured_at?: string | null
     measurement_key?: string | null
     sensor_health_key?: string | null
@@ -121,57 +131,14 @@ export interface IotSensorHealth {
     received_at?: string | null
 }
 
-export interface LampCountEstimate {
-    status?: string | null
-    samples?: number
-    required_samples?: number
-    required_votes?: number
-    estimated_lit?: number
-    estimated_missing?: number
-    votes?: Record<string, number>
-    ambiguous_samples?: number
-    outside_range_samples?: number
-    median_current_ma?: number
-    threshold_counts?: LampCountThresholdCounts
-}
-
-export interface LampCountThresholdCounts {
-    above_65_ma?: number
-    at_or_below_52_5_ma?: number
-    at_or_above_50_ma?: number
-    at_or_above_45_ma?: number
-}
-
-export interface NodeProfile {
-    server_id?: string | null
-    device_id?: string | null
-    feeder_id?: string | null
-    nominal_voltage?: number
-    nominal_current_ma?: number
-    nominal_power_mw?: number
-    voltage_tolerance_percent?: number
-    current_tolerance_percent?: number
-    power_tolerance_percent?: number
-    off_current_limit_ma?: number
-    max_silence_seconds?: number
-    use_ten_lamp_calibration?: boolean
-    installed_lamp_count?: number
-    lamp_count_calibration?: string | null
-}
-
 export interface RegisterNodeRequest {
     server_id: string | null
     cabinet_id: string | null
     feeder_id: string | null
     device_id: string | null
-    data_source: DataSource
-    supports_remote_control?: boolean
     nominal_voltage: number
     nominal_current_ma: number
     nominal_power_mw: number
-    gateway_id?: string | null
-    lamp_count_calibration?: string | null
-    installed_lamp_count?: number
 }
 
 export interface RegisteredNode {
@@ -179,6 +146,14 @@ export interface RegisteredNode {
     server_id?: string | null
     device_id?: string | null
     feeder_id?: string | null
-    gateway_id?: string | null
+}
+
+export interface UpdateNodeRequest {
+    server_id: string | null
+    device_id: string | null
+    feeder_id: string | null
+    nominal_voltage: number
+    nominal_current_ma: number
+    nominal_power_mw: number
 }
 

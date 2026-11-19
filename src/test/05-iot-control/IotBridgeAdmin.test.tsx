@@ -152,7 +152,6 @@ describe('IotServerFormModal', () => {
     await waitFor(() =>
       expect(api.registerServer).toHaveBeenCalledWith({
         server_id: 'iot-server-01',
-        base_url: 'http://127.0.0.1:5000',
         commune_id: 'COM-001',
         location: { lat: 10.97, lng: 106.5 },
       })

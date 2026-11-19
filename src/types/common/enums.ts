@@ -21,7 +21,7 @@ export type EvidenceKind = 'before' | 'after' | 'observation'
 
 export type FaultStatus = 'detected' | 'confirmed' | 'rejected' | 'in_progress' | 'resolved' | 'verified'
 
-export type FaultType = 'lamp_out' | 'lamp_dim' | 'segment_outage' | 'node_offline' | 'runtime_decline' | 'voltage_anomaly' | 'iot_hardware_fault'
+export type FaultType = 'lamp_out' | 'lamp_dim' | 'segment_outage' | 'node_offline' | 'runtime_decline' | 'voltage_anomaly' | 'current_anomaly' | 'iot_hardware_fault'
 
 export type FeederControlMode = 'on' | 'off' | 'auto'
 

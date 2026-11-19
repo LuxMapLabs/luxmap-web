@@ -129,6 +129,7 @@ const FAULT_TYPE_LABELS: Record<FaultType, string> = {
   node_offline: 'Cảm biến IoT mất tín hiệu',
   runtime_decline: 'Suy giảm thời gian chiếu sáng',
   voltage_anomaly: 'Bất thường điện áp',
+  current_anomaly: 'Bất thường dòng điện',
   iot_hardware_fault: 'Lỗi phần cứng IoT',
 }
 

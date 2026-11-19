@@ -18,13 +18,22 @@ export const IOT_GATEWAY_STATUS: Record<string, IotStatusBadge> = {
   unconfigured: { label: 'Chưa cấu hình', tone: 'muted' },
 }
 
-/** `GET /iot/nodes` → `items[].status` của node (theo độ mới của mẫu điện). */
+/** `GET /iot/nodes` → `items[].status`, `diagnostics.connection_status` (liên lạc thực tế của node). */
 export const IOT_NODE_STATUS: Record<string, IotStatusBadge> = {
   online: { label: 'Node online', tone: 'ok' },
   offline: { label: 'Node mất tín hiệu', tone: 'bad' },
   no_data: { label: 'Chưa có dữ liệu', tone: 'warn' },
   source_unavailable: { label: 'Không đọc được nguồn', tone: 'warn' },
   unconfigured: { label: 'Chưa gán nguồn đo', tone: 'muted' },
+}
+
+/** `GET /iot/nodes`, `/electrical`, `/diagnostics`, `/diagnostics/summary` → `electrical_status` (độ mới mẫu điện). */
+export const IOT_ELECTRICAL_STATUS: Record<string, IotStatusBadge> = {
+  fresh: { label: 'Mẫu điện mới', tone: 'ok' },
+  stale: { label: 'Mẫu điện quá hạn', tone: 'warn' },
+  no_data: { label: 'Chưa có mẫu điện', tone: 'muted' },
+  source_unavailable: { label: 'Không đọc được nguồn', tone: 'warn' },
+  unconfigured: { label: 'Chưa cấu hình nguồn', tone: 'muted' },
 }
 
 /** `GET /iot/nodes/{nodeId}/diagnostics` & `GET /iot/diagnostics/summary` → trạng thái chẩn đoán. */
@@ -50,6 +59,7 @@ export const IOT_ANOMALY_LABELS: Record<string, string> = {
   telemetry_stale: 'Mẫu điện quá hạn (giây)',
   voltage_loss: 'Mất điện áp khi đèn bật (V)',
   voltage_deviation: 'Điện áp lệch danh định (V)',
+  current_drop: 'Sụt dòng điện (>5% so với danh định)',
   lamp_count_shortfall: 'Thiếu bóng sáng',
   current_when_off: 'Còn dòng khi lệnh OFF (mA)',
   current_deviation: 'Dòng điện lệch danh định (mA)',

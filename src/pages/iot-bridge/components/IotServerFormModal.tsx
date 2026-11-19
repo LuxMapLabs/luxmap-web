@@ -105,7 +105,6 @@ export const IotServerFormModal: React.FC<{
       dispatch(
         registerServerRequest({
           server_id: serverId.trim(),
-          base_url: baseUrl.trim(),
           commune_id: communeId,
           location: picked,
         })

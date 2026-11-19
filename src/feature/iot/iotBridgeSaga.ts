@@ -166,7 +166,7 @@ function* handleRegisterNode(action: PayloadAction<RegisterNodeRequest>) {
   try {
     const node: RegisteredNode = yield call(iotAPI.registerNode, action.payload)
     yield put(nodeSubmitSuccess(node))
-    toast.success(`Đã đăng ký ${node.node_id || ''} (gateway ${node.gateway_id || ''})`)
+    toast.success(`Đã đăng ký ${node.node_id || ''} (server ${node.server_id || ''})`)
     yield put(fetchBridgeRequest())
   } catch (err: unknown) {
     yield put(nodeSubmitFailure(apiErrorMessage(err, 'Không đăng ký được node IoT.')))

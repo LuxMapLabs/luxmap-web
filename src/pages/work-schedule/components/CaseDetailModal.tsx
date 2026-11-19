@@ -889,17 +889,49 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 </>
               )}
 
-              {/* Thẻ thông tin cơ bản của bước (Bố cục 2x2 như cũ để hiển thị trọn vẹn tuyến đường) */}
+              {/* Thẻ thông tin cơ bản của bước (Bố cục 2x2: Tuyến đường hoặc Tủ điện khi là phiếu IoT) */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-slate-400" />
-                    Tuyến đường thực hiện
-                  </div>
-                  <div className="text-xs font-bold text-slate-800 mt-1">
-                    {formatSegmentDisplay(caseItem.segment)}
-                  </div>
-                </div>
+                {(() => {
+                  const normalizedSeg = (caseItem.segment || '').trim()
+                  const hasSegment = Boolean(
+                    normalizedSeg && normalizedSeg !== '-' && normalizedSeg !== '—'
+                  )
+                  const detailFaults =
+                    workOrderDetail && workOrderDetail.work_order_id === currentPhase.workOrderId
+                      ? workOrderDetail.faults || []
+                      : []
+                  const iotCabinets = Array.from(
+                    new Set(
+                      detailFaults
+                        .map((f) => f.cabinet_id)
+                        .filter((v): v is string => Boolean(v))
+                    )
+                  )
+                  return (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                        {hasSegment ? (
+                          <>
+                            <MapPin className="w-3 h-3 text-slate-400" />
+                            Tuyến đường thực hiện
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-3 h-3 text-indigo-500" />
+                            Tủ điện thực hiện
+                          </>
+                        )}
+                      </div>
+                      <div className="text-xs font-bold text-slate-800 mt-1 font-mono">
+                        {hasSegment
+                          ? formatSegmentDisplay(caseItem.segment)
+                          : iotCabinets.length > 0
+                            ? iotCabinets.join(', ')
+                            : '-'}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
@@ -996,16 +1028,38 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   ])
                 )
                 const displayPoles = effectivePoles
-                const isIotCase = displayPoles.length === 0 && !caseItem.segment
+                const normalizedSeg = (caseItem.segment || '').trim()
+                const hasSegment = Boolean(
+                  normalizedSeg && normalizedSeg !== '-' && normalizedSeg !== '—'
+                )
+                const isIotCase = displayPoles.length === 0 && !hasSegment
 
                 if (isIotCase) {
-                  const firstLoc = detail?.faults?.[0]?.location
+                  const detailFaults =
+                    detail && detail.work_order_id === currentPhase.workOrderId
+                      ? detail.faults || []
+                      : []
+                  const iotFeeders = Array.from(
+                    new Set(
+                      detailFaults
+                        .map((f) => f.feeder_id)
+                        .filter((v): v is string => Boolean(v))
+                    )
+                  )
+                  const iotNodes = Array.from(
+                    new Set(
+                      detailFaults
+                        .map((f) => f.origin_node_id)
+                        .filter((v): v is string => Boolean(v))
+                    )
+                  )
+                  const firstLoc = detailFaults[0]?.location
                   return (
-                    <div className="p-3.5 bg-indigo-50/70 border border-indigo-200/90 rounded-2xl flex flex-col gap-1.5 text-xs">
+                    <div className="p-3.5 bg-indigo-50/70 border border-indigo-200/90 rounded-2xl flex flex-col gap-2 text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-black text-indigo-950 flex items-center gap-1.5">
                           <Zap className="w-3.5 h-3.5 text-indigo-600" />
-                          Vị trí Tủ điện &amp; Thiết bị IoT cần tác nghiệp
+                          Mạch &amp; Node IoT cần tác nghiệp
                         </span>
                         {firstLoc && firstLoc.lat != null && firstLoc.lng != null && (
                           <span className="font-mono text-[10.5px] font-semibold text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
@@ -1013,7 +1067,24 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                           </span>
                         )}
                       </div>
-                      <p className="font-semibold text-slate-800">{caseItem.title}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="px-2.5 py-2 rounded-xl bg-white border border-indigo-100">
+                          <span className="block text-[10px] font-semibold text-slate-400">
+                            Mạch điện (Feeder)
+                          </span>
+                          <span className="font-mono font-bold text-indigo-950">
+                            {iotFeeders.length > 0 ? iotFeeders.join(', ') : '-'}
+                          </span>
+                        </div>
+                        <div className="px-2.5 py-2 rounded-xl bg-white border border-indigo-100">
+                          <span className="block text-[10px] font-semibold text-slate-400">
+                            Thiết bị Node IoT
+                          </span>
+                          <span className="font-mono font-bold text-indigo-950">
+                            {iotNodes.length > 0 ? iotNodes.join(', ') : '-'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   )
                 }
