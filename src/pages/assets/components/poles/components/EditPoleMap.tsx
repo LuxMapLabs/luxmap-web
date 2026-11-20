@@ -20,22 +20,204 @@ import {
   isPointInBounds,
   OUTSIDE_MANAGED_AREA_MESSAGE,
 } from '../../../../../utils/gis-map/mapUtils'
+import {
+  calculateDistanceMeters,
+  snapPointToPolyline,
+} from '../../../../../utils/gis-map/routeUtils'
+
+export interface ClampToCorridorResult {
+  point: [number, number]
+  clamped: boolean
+  distMeters: number
+}
+
+/**
+ * Kẹp một điểm [lng, lat] vào trong hành lang `meters` mét quanh đường `line`.
+ * Nếu `line` có < 2 điểm hoặc `meters` không hợp lệ thì không giới hạn.
+ */
+export function clampToCorridor(
+  point: [number, number],
+  line: [number, number][] | undefined,
+  meters: number
+): ClampToCorridorResult {
+  if (!line || line.length < 2 || !Number.isFinite(meters) || meters <= 0) {
+    return { point, clamped: false, distMeters: 0 }
+  }
+  const { snappedPoint, distMeters } = snapPointToPolyline(point, line)
+  if (distMeters <= meters) {
+    return { point, clamped: false, distMeters }
+  }
+
+  const round6 = (v: number) => Number(v.toFixed(6))
+  const projectAt = (targetMeters: number): [number, number] => {
+    const ratio = Math.max(0, targetMeters) / distMeters
+    return [
+      round6(snappedPoint[0] + (point[0] - snappedPoint[0]) * ratio),
+      round6(snappedPoint[1] + (point[1] - snappedPoint[1]) * ratio),
+    ]
+  }
+
+  let clampedPoint = projectAt(meters)
+  // Làm tròn 6 chữ số thập phân có thể nhích thêm ~0.05 m; lùi nhẹ nếu vừa vượt mép
+  if (snapPointToPolyline(clampedPoint, line).distMeters > meters) {
+    clampedPoint = projectAt(meters - 0.1)
+  }
+
+  return {
+    point: clampedPoint,
+    clamped: true,
+    distMeters,
+  }
+}
+
+export type LngLat = [number, number]
+
+export interface RouteLineDiff {
+  removed: LngLat[][]
+  added: LngLat[][]
+}
+
+const SAME_VERTEX_TOLERANCE_M = 0.5
+const EDGE_MATCH_TOLERANCE_M = 1
+const REMOVED_COLOR = '#dc2626'
+const ADDED_COLOR = '#16a34a'
+
+function collectUncoveredEdges(source: LngLat[], target: LngLat[]): LngLat[][] {
+  const result: LngLat[][] = []
+  let current: LngLat[] = []
+
+  const isEdgeCovered = (a: LngLat, b: LngLat): boolean => {
+    const mid: LngLat = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+    return (
+      snapPointToPolyline(a, target).distMeters <= EDGE_MATCH_TOLERANCE_M &&
+      snapPointToPolyline(b, target).distMeters <= EDGE_MATCH_TOLERANCE_M &&
+      snapPointToPolyline(mid, target).distMeters <= EDGE_MATCH_TOLERANCE_M
+    )
+  }
+
+  for (let i = 0; i < source.length - 1; i++) {
+    const a = source[i]
+    const b = source[i + 1]
+    if (!isEdgeCovered(a, b)) {
+      if (current.length === 0) {
+        current = [a, b]
+      } else {
+        current.push(b)
+      }
+    } else if (current.length > 0) {
+      result.push(current)
+      current = []
+    }
+  }
+
+  if (current.length > 0) {
+    result.push(current)
+  }
+  return result
+}
+
+/**
+ * So sánh hình học giữa tuyến đang lưu (`saved`) và tuyến xem trước (`preview`).
+ * Mỗi cạnh được coi là giữ nguyên nếu 2 đầu mút và trung điểm đều nằm cách tuyến kia <= 1 m;
+ * các cạnh không khớp liên tiếp được gộp thành polyline trong `removed` / `added`.
+ */
+export function diffRouteLines(saved: LngLat[], preview: LngLat[]): RouteLineDiff {
+  if (saved.length < 2 && preview.length < 2) {
+    return { removed: [], added: [] }
+  }
+  if (saved.length < 2) {
+    return { removed: [], added: [preview] }
+  }
+  if (preview.length < 2) {
+    return { removed: [saved], added: [] }
+  }
+
+  return {
+    removed: collectUncoveredEdges(saved, preview),
+    added: collectUncoveredEdges(preview, saved),
+  }
+}
+
+/**
+ * Tạo cặp nhánh bỏ (từ điểm gần nhất trên tuyến tới cột cũ) và nhánh thêm (tới chấm đích)
+ * cho tuyến hình thật (khi tuyến xanh đứng yên).
+ */
+export function spurLines(
+  origin: LngLat | undefined,
+  dot: LngLat,
+  line: LngLat[]
+): RouteLineDiff {
+  if (!origin || line.length < 2) {
+    return { removed: [], added: [] }
+  }
+  const originSnap = snapPointToPolyline(origin, line)
+  const dotSnap = snapPointToPolyline(dot, line)
+
+  return {
+    removed:
+      originSnap.distMeters >= SAME_VERTEX_TOLERANCE_M ? [[originSnap.snappedPoint, origin]] : [],
+    added: [[dotSnap.snappedPoint, dot]],
+  }
+}
 
 export interface EditPoleMapProps {
   lat: number
   lng: number
-  /** Hình tuyến xem trước (dựng từ các cột của tuyến + vị trí cột đang sửa); chỉ để vẽ, không ép cột bám theo. */
+  /** Hình tuyến xem trước (nét đứt cam) sau khi dời cột. */
   segmentCoords: [number, number][]
+  /** Hình tuyến đang lưu (nét liền xanh, đứng yên khi kéo). */
+  savedSegmentCoords?: [number, number][]
+  /** Loại nét đứt xem trước: 'link' (tuyến hình thật, chỉ nối cột cũ -> đích) hoặc 'route' (tuyến nối cột). */
+  previewKind?: 'link' | 'route'
+  /** Đường làm mốc đo hành lang tối đa quanh tuyến. */
+  corridorLine?: [number, number][]
+  /** Bán kính hành lang tối đa (m); bỏ trống nếu không giới hạn. */
+  corridorMeters?: number
+  /** Vị trí gốc đã lưu của cột [lng, lat]. */
+  originCoord?: [number, number]
   otherPolesGeoJSON: FeatureCollection
   currentCabinet?: CabinetListItem | null
   onChangeCoords: (coords: { lat: number; lng: number }) => void
   communeId?: string | null
 }
 
+function hasMovedFromOrigin(
+  origin: [number, number] | undefined,
+  lng: number,
+  lat: number
+): boolean {
+  if (!origin || !Number.isFinite(lng) || !Number.isFinite(lat) || lng === 0 || lat === 0) {
+    return false
+  }
+  return calculateDistanceMeters(origin, [lng, lat]) > 0.5
+}
+
+function buildPreviewDiffData(
+  kind: 'link' | 'route',
+  origin: [number, number] | undefined,
+  lng: number,
+  lat: number,
+  saved: [number, number][],
+  preview: [number, number][]
+): RouteLineDiff {
+  if (!hasMovedFromOrigin(origin, lng, lat)) {
+    return { removed: [], added: [] }
+  }
+  if (kind === 'link') {
+    return spurLines(origin, [lng, lat], saved)
+  }
+  return diffRouteLines(saved, preview)
+}
+
 export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   lat,
   lng,
   segmentCoords,
+  savedSegmentCoords,
+  previewKind = 'route',
+  corridorLine,
+  corridorMeters,
+  originCoord,
   otherPolesGeoJSON,
   currentCabinet,
   onChangeCoords,
@@ -44,6 +226,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const currentPoleMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const originMarkerRef = useRef<maplibregl.Marker | null>(null)
   const isUserInteractingRef = useRef<boolean>(false)
   const cabinetMarkerRef = useRef<maplibregl.Marker | null>(null)
   const existingPolePopupRef = useRef<maplibregl.Popup | null>(null)
@@ -69,6 +252,25 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
 
   const segmentCoordsRef = useRef(segmentCoords)
   segmentCoordsRef.current = segmentCoords
+
+  const resolvedSavedCoords = savedSegmentCoords ?? segmentCoords
+  const savedSegmentCoordsRef = useRef(resolvedSavedCoords)
+  savedSegmentCoordsRef.current = resolvedSavedCoords
+
+  const previewKindRef = useRef(previewKind)
+  previewKindRef.current = previewKind
+
+  const corridorLineRef = useRef(corridorLine)
+  corridorLineRef.current = corridorLine
+
+  const corridorMetersRef = useRef(corridorMeters)
+  corridorMetersRef.current = corridorMeters
+
+  const originCoordRef = useRef(originCoord)
+  originCoordRef.current = originCoord
+
+  const coordsRef = useRef<[number, number]>([lng, lat])
+  coordsRef.current = [lng, lat]
 
   const otherPolesGeoJSONRef = useRef(otherPolesGeoJSON)
   otherPolesGeoJSONRef.current = otherPolesGeoJSON
@@ -157,16 +359,35 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     currentPoleMarkerRef.current = marker
 
     let lastValidPos = marker.getLngLat()
+    let corridorToastShown = false
     marker.on('dragstart', () => {
       lastValidPos = marker.getLngLat()
+      corridorToastShown = false
     })
     const handleMarkerDrag = () => {
       isUserInteractingRef.current = true
       const pos = marker.getLngLat()
       if (!isPointInBounds(activeBoundsRef.current, pos.lng, pos.lat, boundaryRef.current)) return
+
+      let targetLng = Number(pos.lng.toFixed(6))
+      let targetLat = Number(pos.lat.toFixed(6))
+      const limit = corridorMetersRef.current
+      if (limit && limit > 0 && corridorLineRef.current && corridorLineRef.current.length >= 2) {
+        const res = clampToCorridor([pos.lng, pos.lat], corridorLineRef.current, limit)
+        if (res.clamped) {
+          targetLng = res.point[0]
+          targetLat = res.point[1]
+          marker.setLngLat([targetLng, targetLat])
+          if (!corridorToastShown) {
+            corridorToastShown = true
+            toast.warning(`Cột không thể cách tuyến quá ${limit} m`, { closeButton: true })
+          }
+        }
+      }
+
       onChangeCoordsRef.current({
-        lng: Number(pos.lng.toFixed(6)),
-        lat: Number(pos.lat.toFixed(6)),
+        lng: targetLng,
+        lat: targetLat,
       })
     }
 
@@ -185,14 +406,22 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       handleMarkerDrag()
     })
 
-    // Click bản đồ để dời vị trí ghim (cột đặt tự do, không bám tim đường)
+    // Click bản đồ để dời vị trí ghim (có kẹp hành lang quanh tuyến nếu tuyến có hình)
     map.on('click', (e: maplibregl.MapMouseEvent) => {
       if (!isPointInBounds(activeBoundsRef.current, e.lngLat.lng, e.lngLat.lat, boundaryRef.current)) {
         toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
         return
       }
       isUserInteractingRef.current = true
-      const newPos: [number, number] = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))]
+      let newPos: [number, number] = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))]
+      const limit = corridorMetersRef.current
+      if (limit && limit > 0 && corridorLineRef.current && corridorLineRef.current.length >= 2) {
+        const res = clampToCorridor([e.lngLat.lng, e.lngLat.lat], corridorLineRef.current, limit)
+        if (res.clamped) {
+          newPos = res.point
+          toast.warning(`Cột không thể cách tuyến quá ${limit} m`, { closeButton: true })
+        }
+      }
       marker.setLngLat(newPos)
       onChangeCoordsRef.current({ lng: newPos[0], lat: newPos[1] })
     })
@@ -204,7 +433,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         map.resize()
       }, 150)
 
-      // 1. Source & layer vẽ tuyến đường
+      // 1. Source & layer vẽ tuyến đường hiện tại (nét liền xanh, đứng yên)
       if (!map.getSource('edit-segment-route')) {
         map.addSource('edit-segment-route', {
           type: 'geojson',
@@ -213,7 +442,7 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
             properties: {},
             geometry: {
               type: 'LineString',
-              coordinates: segmentCoordsRef.current,
+              coordinates: savedSegmentCoordsRef.current,
             },
           },
         })
@@ -236,6 +465,81 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
           paint: {
             'line-color': '#38bdf8',
             'line-width': 4.5,
+            'line-opacity': 0.95,
+          },
+        })
+      }
+
+      // 1b. Source & layer vẽ đoạn bị bỏ (đỏ nét đứt) và đoạn thêm / đoạn dời cột (cam nét đứt)
+      const initialDiff = buildPreviewDiffData(
+        previewKindRef.current,
+        originCoordRef.current,
+        coordsRef.current[0],
+        coordsRef.current[1],
+        savedSegmentCoordsRef.current,
+        segmentCoordsRef.current
+      )
+
+      if (!map.getSource('edit-segment-route-removed')) {
+        const isLink = previewKindRef.current === 'link'
+        map.addSource('edit-segment-route-removed', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'MultiLineString',
+              coordinates: initialDiff.removed,
+            },
+          },
+        })
+
+        map.addLayer({
+          id: 'edit-segment-route-removed',
+          type: 'line',
+          source: 'edit-segment-route-removed',
+          paint: {
+            'line-color': REMOVED_COLOR,
+            'line-width': isLink ? 3 : 4,
+            'line-dasharray': [2, 2],
+            'line-opacity': 0.95,
+          },
+        })
+      }
+
+      if (!map.getSource('edit-segment-route-preview')) {
+        map.addSource('edit-segment-route-preview', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'MultiLineString',
+              coordinates: initialDiff.added,
+            },
+          },
+        })
+
+        map.addLayer({
+          id: 'edit-segment-route-preview-casing',
+          type: 'line',
+          source: 'edit-segment-route-preview',
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 5.5,
+            'line-dasharray': [2, 2],
+            'line-opacity': 0.6,
+          },
+        })
+
+        map.addLayer({
+          id: 'edit-segment-route-preview',
+          type: 'line',
+          source: 'edit-segment-route-preview',
+          paint: {
+            'line-color': ADDED_COLOR,
+            'line-width': 3.5,
+            'line-dasharray': [2, 2],
             'line-opacity': 0.95,
           },
         })
@@ -346,6 +650,10 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         currentPoleMarkerRef.current.remove()
         currentPoleMarkerRef.current = null
       }
+      if (originMarkerRef.current) {
+        originMarkerRef.current.remove()
+        originMarkerRef.current = null
+      }
       if (cabinetMarkerRef.current) {
         cabinetMarkerRef.current.remove()
         cabinetMarkerRef.current = null
@@ -415,12 +723,12 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
     }
   }, [lng, lat])
 
-  // 1. Vẽ lại đường xem trước mỗi khi nó đổi (đổi tuyến, kéo cột, nhập tay tọa độ)
+  // 1. Vẽ lại tuyến hiện tại (nét liền xanh) mỗi khi đổi tuyến / tải hình tuyến
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    const updateRouteLayer = () => {
+    const updateSavedRouteLayer = () => {
       const routeSource = map.getSource('edit-segment-route') as maplibregl.GeoJSONSource | undefined
       if (routeSource) {
         routeSource.setData({
@@ -428,20 +736,110 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
           properties: {},
           geometry: {
             type: 'LineString',
-            coordinates: segmentCoords,
+            coordinates: resolvedSavedCoords,
+          },
+        })
+      }
+    }
+
+    if (map.getSource('edit-segment-route') || map.isStyleLoaded()) {
+      updateSavedRouteLayer()
+    } else {
+      map.once('load', updateSavedRouteLayer)
+    }
+  }, [resolvedSavedCoords])
+
+  // 1b. Vẽ đoạn bị bỏ (đỏ nét đứt) và đoạn thêm / đoạn dời cột (cam nét đứt) khi chấm đích rời vị trí gốc > 0.5 m
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const updatePreviewRouteLayers = () => {
+      const diff = buildPreviewDiffData(
+        previewKind,
+        originCoord,
+        lng,
+        lat,
+        resolvedSavedCoords,
+        segmentCoords
+      )
+
+      const removedSource = map.getSource('edit-segment-route-removed') as
+        | maplibregl.GeoJSONSource
+        | undefined
+      if (removedSource) {
+        removedSource.setData({
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'MultiLineString',
+            coordinates: diff.removed,
           },
         })
       }
 
-      // Giữ camera tập trung vào vị trí cột đang sửa, không zoom out theo tuyến
+      const previewSource = map.getSource('edit-segment-route-preview') as
+        | maplibregl.GeoJSONSource
+        | undefined
+      if (previewSource) {
+        previewSource.setData({
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'MultiLineString',
+            coordinates: diff.added,
+          },
+        })
+      }
+
+      if (map.getLayer('edit-segment-route-removed')) {
+        map.setPaintProperty(
+          'edit-segment-route-removed',
+          'line-width',
+          previewKind === 'link' ? 3 : 4
+        )
+      }
     }
 
-    if (map.getSource('edit-segment-route') || map.isStyleLoaded()) {
-      updateRouteLayer()
+    if (map.getSource('edit-segment-route-preview') || map.isStyleLoaded()) {
+      updatePreviewRouteLayers()
     } else {
-      map.once('load', updateRouteLayer)
+      map.once('load', updatePreviewRouteLayers)
     }
-  }, [segmentCoords])
+  }, [previewKind, segmentCoords, resolvedSavedCoords, originCoord, lng, lat])
+
+  // 1c. Marker cột cũ cố định tại vị trí gốc (chấm trắng viền cam); ẩn khi chấm đích trùng gốc
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (originMarkerRef.current) {
+      originMarkerRef.current.remove()
+      originMarkerRef.current = null
+    }
+
+    if (originCoord && hasMovedFromOrigin(originCoord, lng, lat)) {
+      const originEl = document.createElement('div')
+      originEl.className = 'edit-pole-origin-marker select-none pointer-events-none'
+      originEl.innerHTML = `
+        <div style="
+          width: 11px;
+          height: 11px;
+          background: #ffffff;
+          border: 2.5px solid #f97316;
+          border-radius: 50%;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.45);
+        "></div>
+      `
+      originMarkerRef.current = new maplibregl.Marker({
+        element: originEl,
+        draggable: false,
+        anchor: 'center',
+      })
+        .setLngLat(originCoord)
+        .addTo(map)
+    }
+  }, [originCoord, lng, lat])
 
   // 2. Cập nhật Other Poles layer khi danh sách cột khác thay đổi (tuyệt đối KHÔNG gọi fitBounds)
   useEffect(() => {
@@ -509,8 +907,12 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
       {/* Map overlay legend */}
       <CollapsibleMapLegend title="Bản Đồ Ngữ Cảnh Tuyến" icon={<Layers className="w-3.5 h-3.5 text-amber-700" />}>
         <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-white border-2 border-orange-500"></span>
+          <span>Cột cũ (vị trí hiện tại)</span>
+        </div>
+        <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-orange-500 ring-2 ring-white"></span>
-          <span>Cột đang sửa (kéo hoặc click để đặt vị trí)</span>
+          <span>Chấm đích (kéo hoặc click)</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-yellow-300 ring-1 ring-slate-900"></span>
@@ -518,7 +920,15 @@ export const EditPoleMap: React.FC<EditPoleMapProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="w-4 h-1 bg-sky-400 rounded-full"></span>
-          <span>Hình tuyến (xem trước)</span>
+          <span>Tuyến hiện tại</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-4 border-t-2 border-dashed" style={{ borderColor: REMOVED_COLOR }}></span>
+          <span>Đoạn sẽ bỏ</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-4 border-t-2 border-dashed" style={{ borderColor: ADDED_COLOR }}></span>
+          <span>Đoạn sẽ thêm</span>
         </div>
         {currentCabinet && (
           <div className="flex items-center gap-2">

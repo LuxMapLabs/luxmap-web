@@ -141,17 +141,54 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
     !segmentId || (segmentDetail?.segmentId === segmentId && segmentDetail.isSettled)
   const storedGeomWkt = isSegmentDetailReady && segmentId ? (segmentDetail?.geomWkt ?? null) : null
 
-  // Đường xem trước, với cột này ở vị trí đang chọn. Tuyến có hình thật (theo con đường) thì giữ nguyên hình;
-  // tuyến chưa có hình hoặc là đường nối cột thì đường chạy theo cột (điểm uốn đã đặt được giữ), cập nhật khi lưu.
+  // Đường xem trước (với cột ở vị trí đang chọn) và đường đang lưu (với cột ở vị trí cũ).
+  // Tuyến có hình thật (theo con đường) thì giữ nguyên hình; tuyến chưa có hình hoặc là đường nối cột
+  // thì đường chạy theo cột (điểm uốn đã đặt được giữ), cập nhật khi lưu.
   const segmentLine = useMemo(() => {
-    if (!segmentId) return { roadShape: false, line: [] as [number, number][] }
+    if (!segmentId) {
+      return {
+        roadShape: false,
+        line: [] as [number, number][],
+        savedLine: [] as [number, number][],
+      }
+    }
     const poleId = pole.pole_id
     const previous = orderedPolesOfSegment(allPoles, segmentId)
+    const saved = segmentLineAfter(previous, storedGeomWkt, previous)
     const current = orderedPolesOfSegment(allPoles, segmentId, poleId)
     if (hasPosition && poleId) current.push({ id: poleId, coord: [lng, lat] })
-    return segmentLineAfter(previous, storedGeomWkt, current)
+    const preview = segmentLineAfter(previous, storedGeomWkt, current)
+    return {
+      roadShape: preview.roadShape,
+      line: preview.line,
+      savedLine: saved.line,
+    }
   }, [allPoles, segmentId, pole.pole_id, hasPosition, lng, lat, storedGeomWkt])
   const segmentCoords = segmentLine.line
+  const savedSegmentCoords = segmentLine.savedLine
+
+  // Đường làm mốc đo hành lang 25 m: ưu tiên hình tuyến đang lưu, không có thì dùng tuyến nối cột hiện tại
+  const corridorLine = useMemo<[number, number][]>(() => {
+    const stored = storedGeomWkt ? parseLineStringWkt(storedGeomWkt) : []
+    if (stored.length >= 2) return stored
+    return savedSegmentCoords.length >= 2 ? savedSegmentCoords : []
+  }, [storedGeomWkt, savedSegmentCoords])
+
+  // Vị trí gốc đã lưu của cột (nếu có)
+  const originCoord = useMemo<[number, number] | undefined>(() => {
+    if (
+      pole.location &&
+      typeof pole.location.lng === 'number' &&
+      typeof pole.location.lat === 'number' &&
+      Number.isFinite(pole.location.lng) &&
+      Number.isFinite(pole.location.lat) &&
+      pole.location.lng !== 0 &&
+      pole.location.lat !== 0
+    ) {
+      return [pole.location.lng, pole.location.lat]
+    }
+    return undefined
+  }, [pole.location])
 
   // Hình thật không chạy theo cột, và backend không đo khi sửa cột: web tự đo cột tới hình
   const offRoadDistance = (coord: [number, number]): number | null =>
@@ -636,9 +673,9 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
                     </p>
                   )}
                   <p className="text-[11px] text-slate-400 italic">
-                    {segmentLine.roadShape
-                      ? `💡 Nhập tay tọa độ hoặc kéo ghim màu cam / click trực tiếp trên bản đồ để định vị lại. Tuyến đã có hình theo con đường nên hình giữ nguyên; cột phải nằm trong ${ROUTE_CORRIDOR_M} m quanh tuyến.`
-                      : '💡 Nhập tay tọa độ hoặc kéo ghim màu cam / click trực tiếp trên bản đồ để định vị lại. Đường tuyến sẽ chạy theo vị trí cột.'}
+                    💡 Nhập tay tọa độ hoặc kéo ghim cam / click bản đồ để định vị lại. Hình tuyến
+                    nét đứt là bản xem trước sau khi đổi; cột phải nằm trong {ROUTE_CORRIDOR_M} m
+                    quanh tuyến.
                   </p>
                 </div>
               </>
@@ -652,6 +689,11 @@ const EditPoleModalInner: React.FC<EditPoleModalProps & { pole: PoleListItem }> 
               lat={lat}
               lng={lng}
               segmentCoords={segmentCoords}
+              savedSegmentCoords={savedSegmentCoords}
+              previewKind={segmentLine.roadShape ? 'link' : 'route'}
+              corridorLine={corridorLine}
+              corridorMeters={ROUTE_CORRIDOR_M}
+              originCoord={originCoord}
               otherPolesGeoJSON={otherPolesGeoJSON}
               communeId={pole.commune_id}
               currentCabinet={currentCabinet}
