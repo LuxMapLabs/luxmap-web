@@ -2,10 +2,6 @@
  * Auto-generated Types for: iot/servers
  * Sinh tự động từ endpoint Backend
  */
-export interface GatewayMigrationRequest {
-    legacy_gateway_id?: string | null
-}
-
 export interface IotGatewayCredential {
     client_id?: string | null
     username?: string | null

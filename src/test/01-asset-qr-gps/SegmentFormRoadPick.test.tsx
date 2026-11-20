@@ -289,19 +289,15 @@ const openEdit = (poles: PoleListItem[], geomWkt: string) => {
 
 const save = () => fireEvent.click(screen.getByRole('button', { name: /Lưu Thay Đổi/i }))
 
-describe('Sửa tuyến: lấy (lại) hình theo đường ngay trong form', () => {
+describe('Sửa tuyến: bỏ nút vẽ hình (allowDraw=false), chỉnh hình bằng kéo thả', () => {
   const own1 = pole('POLE-0001', 106.8, 10.8, 'SEG-009')
   const own2 = pole('POLE-0004', 106.802, 10.8, 'SEG-009')
 
-  it('tuyến nháp nối cột: lấy hình theo đường thì gửi hình mới thay cho đường nối cột', () => {
-    const onSave = openEdit([own1, own2], 'LINESTRING(106.8 10.8, 106.802 10.8)')
-    layHinh()
-    save()
-
-    expect(onSave).toHaveBeenCalledTimes(1)
-    const [updated] = onSave.mock.calls[0]
-    expect(parseLineStringWkt(updated.geom_wkt)[0]).toEqual([106.7998, 10.80009])
-    expect(updated.length_m).toBe(calculateRouteLengthMeters(parseLineStringWkt(updated.geom_wkt)))
+  it('tuyến nháp nối cột: không hiện nút vẽ hình tuyến trên bản đồ', () => {
+    openEdit([own1, own2], 'LINESTRING(106.8 10.8, 106.802 10.8)')
+    expect(
+      screen.queryByRole('button', { name: /Vẽ (lại )?hình tuyến trên bản đồ/ })
+    ).not.toBeInTheDocument()
   })
 
   it('hình nháp nối cột: kéo chấm giữa hai cột thì hình thành hình kéo thả, không còn chạy theo cột', () => {
@@ -319,39 +315,13 @@ describe('Sửa tuyến: lấy (lại) hình theo đường ngay trong form', ()
     ])
   })
 
-  it('hình mới: cột cũ của tuyến nằm xa cũng chặn lưu (cả tuyến phải nằm trong 25 m)', () => {
-    const ownFar = pole('POLE-0003', 106.801, 10.8005, 'SEG-009')
-    const onSave = openEdit([own1, ownFar], 'LINESTRING(106.8 10.8, 106.801 10.8005)')
-    layHinh()
-
-    expect(screen.getByRole('alert')).toHaveTextContent(/POLE-0003/)
-    save()
-    expect(onSave).not.toHaveBeenCalled()
-  })
-
-  it('tuyến có hình theo đường: "Lấy lại hình" thay hình đang lưu', () => {
+  it('tuyến có hình theo đường: không hiện nút "Vẽ lại hình tuyến trên bản đồ"', () => {
     const stored = 'LINESTRING(106.7995 10.80009, 106.8005 10.80009, 106.8015 10.80009, 106.8025 10.80009)'
-    const onSave = openEdit([own1, own2], stored)
+    openEdit([own1, own2], stored)
     expect(screen.getByText(/Tuyến đã có hình theo con đường/)).toBeInTheDocument()
-    layHinh()
-    expect(screen.queryByText(/Tuyến đã có hình theo con đường/)).not.toBeInTheDocument()
-    save()
-
-    const [updated] = onSave.mock.calls[0]
-    expect(updated.geom_wkt).not.toBe(stored)
-    expect(parseLineStringWkt(updated.geom_wkt)[0]).toEqual([106.7998, 10.80009])
-  })
-
-  it('huỷ lấy hình giữa chừng: hình đang lưu giữ nguyên', () => {
-    const stored = 'LINESTRING(106.7995 10.80009, 106.8005 10.80009, 106.8015 10.80009, 106.8025 10.80009)'
-    const onSave = openEdit([own1, own2], stored)
-    fireEvent.click(screen.getByRole('button', { name: 'Vẽ lại hình tuyến trên bản đồ' }))
-    bamDuong(106.7998, 10.8001)
-    bamDuong(106.8022, 10.8001)
-    fireEvent.click(screen.getByRole('button', { name: 'Huỷ lấy hình' }))
-    save()
-
-    expect(onSave.mock.calls[0][0].geom_wkt).toBe(stored)
+    expect(
+      screen.queryByRole('button', { name: /Vẽ (lại )?hình tuyến trên bản đồ/ })
+    ).not.toBeInTheDocument()
   })
 })
 
@@ -413,15 +383,16 @@ describe('Uốn hình bằng kéo thả', () => {
   })
 
   it('đã kéo rồi bấm "Lấy lại hình" xong huỷ: trả về hình vừa kéo', () => {
-    const onSave = openEdit([own1, own2], stored)
+    const onAdd = openAdd([NEAR_1])
+    layHinh()
     fake.drop = [106.8, 10.8001]
     fireEvent.click(screen.getByRole('button', { name: 'kéo chấm giữa đầu tiên' }))
     fireEvent.click(screen.getByRole('button', { name: 'Vẽ lại hình tuyến trên bản đồ' }))
     bamDuong(106.7998, 10.8001)
     fireEvent.click(screen.getByRole('button', { name: 'Huỷ lấy hình' }))
-    save()
+    create()
 
-    expect(parseLineStringWkt(onSave.mock.calls[0][0].geom_wkt)[1]).toEqual([106.8, 10.8001])
+    expect(parseLineStringWkt(onAdd.mock.calls[0][0].geom_wkt)[1]).toEqual([106.8, 10.8001])
   })
 
   it('Hình nháp nối cột: kéo chấm giữa hai cột thêm điểm uốn vào hình', () => {

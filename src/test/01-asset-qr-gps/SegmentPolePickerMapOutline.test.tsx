@@ -12,6 +12,12 @@ const maps = vi.hoisted(() => [] as Array<{
   emit: (event: string) => void
 }>)
 
+const markers = vi.hoisted(() => [] as Array<{
+  element?: HTMLElement
+  lngLat?: [number, number]
+  removed?: boolean
+}>)
+
 vi.mock('maplibre-gl', () => {
   class MockMap {
     sources: Record<string, { data: unknown; setData: (d: unknown) => void }> = {}
@@ -59,7 +65,15 @@ vi.mock('maplibre-gl', () => {
     }
   }
   class MockMarker {
-    setLngLat() {
+    element?: HTMLElement
+    lngLat?: [number, number]
+    removed = false
+    constructor(opts?: { element?: HTMLElement }) {
+      this.element = opts?.element
+      markers.push(this)
+    }
+    setLngLat(coord: [number, number]) {
+      this.lngLat = coord
       return this
     }
     addTo() {
@@ -68,9 +82,11 @@ vi.mock('maplibre-gl', () => {
     on() {
       return this
     }
-    remove() {}
+    remove() {
+      this.removed = true
+    }
     getLngLat() {
-      return { lng: 0, lat: 0 }
+      return { lng: this.lngLat?.[0] ?? 0, lat: this.lngLat?.[1] ?? 0 }
     }
   }
   const lib = { Map: MockMap, Marker: MockMarker, NavigationControl: class {} }
@@ -106,6 +122,7 @@ const renderMap = (communeBbox: typeof BBOX | null) => {
 
 beforeEach(() => {
   maps.length = 0
+  markers.length = 0
 })
 
 describe('Bản đồ trong form tuyến: viền khung xã', () => {
@@ -129,5 +146,33 @@ describe('Bản đồ trong form tuyến: viền khung xã', () => {
   it('không biết khung xã thì không vẽ gì', () => {
     const map = renderMap(null)
     expect(map.sources['pick-commune-outline'].data).toEqual({ type: 'FeatureCollection', features: [] })
+  })
+
+  it('tuyến có đỉnh trùng cột và đỉnh uốn: chỉ đỉnh uốn có handle data-handle="vertex"', () => {
+    const store = configureStore({ reducer: rootReducer })
+    const p1 = { id: 'POLE-1', coord: [106.8, 10.8] as [number, number] }
+    const p2 = { id: 'POLE-2', coord: [106.802, 10.8] as [number, number] }
+    const bendCoord: [number, number] = [106.801, 10.8005]
+    const fixedLine: [number, number][] = [p1.coord, bendCoord, p2.coord]
+
+    render(
+      <Provider store={store}>
+        <SegmentPolePickerMap
+          poles={[p1, p2]}
+          selected={[p1, p2]}
+          fixedLine={fixedLine}
+          onTogglePole={vi.fn()}
+          onEditLine={vi.fn()}
+        />
+      </Provider>
+    )
+    const map = maps[maps.length - 1]
+    act(() => map.emit('load'))
+
+    const activeVertexHandles = markers.filter(
+      (m) => !m.removed && m.element?.dataset.handle === 'vertex'
+    )
+    expect(activeVertexHandles).toHaveLength(1)
+    expect(activeVertexHandles[0].lngLat).toEqual(bendCoord)
   })
 })

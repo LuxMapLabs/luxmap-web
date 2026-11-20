@@ -13,7 +13,13 @@ import {
   getCommuneBboxInfo,
   toBoundaryGeoJSON,
 } from '../utils/gis-map/mapUtils'
-import { isBend, polesOf, type OrderedPole } from '../utils/gis-map/segmentPoleOrder'
+import {
+  VERTEX_MATCH_METERS,
+  isBend,
+  polesOf,
+  type OrderedPole,
+} from '../utils/gis-map/segmentPoleOrder'
+import { calculateDistanceMeters } from '../utils/gis-map/routeUtils'
 import { MIN_ROAD_ZOOM } from '../utils/gis-map/segmentReshape'
 import { edgeMidpoints, insertVertex, moveVertex, removeVertex } from '../utils/gis-map/lineEdit'
 import { hideRoadHint, queryBaseMapRoadLines, showRoadHint } from '../hooks/gis-map/useSegmentReshapeMode'
@@ -342,7 +348,10 @@ export const SegmentPolePickerMap: React.FC<SegmentPolePickerMapProps> = ({
     const stop = (el: HTMLElement) => el.addEventListener('click', (ev) => ev.stopPropagation())
 
     if (editable) {
+      const selectedPoles = polesOf(chosen)
       line.forEach((coord, index) => {
+        // Đỉnh nằm trên cột đang chọn không tạo chấm trắng kéo thả (chỉ điểm uốn mới kéo được)
+        if (selectedPoles.some((p) => calculateDistanceMeters(p.coord, coord) <= VERTEX_MATCH_METERS)) return
         const el = createVertexHandle()
         stop(el)
         el.addEventListener('dblclick', (ev) => {
