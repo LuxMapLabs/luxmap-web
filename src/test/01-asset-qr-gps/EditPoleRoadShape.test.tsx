@@ -506,4 +506,47 @@ describe('spliceRouteAroundPole - chỉ thay đoạn giữa hai cột kề', () 
 
     expect(spliced).toEqual([V1, newBetween12, V2, V3, V4])
   })
+
+  it('(j) tuyến có đỉnh trùng cột P1..P4 và 2 điểm uốn ở hai bên P2: kéo P2 ~15 m (vẫn giữa P1 và P3) -> giữ đủ 2 điểm uốn, chỉ thay đỉnh P2', () => {
+    const bend12: [number, number] = [106.8005, 10.80008]
+    const bend23: [number, number] = [106.8015, 10.80008]
+    const lineWithBends: [number, number][] = [V0, bend12, V1, bend23, V2, V3]
+    const poles4 = [
+      { id: 'P1', coord: V0 },
+      { id: 'P2', coord: V1 },
+      { id: 'P3', coord: V2 },
+      { id: 'P4', coord: V3 },
+    ]
+    const newP2: [number, number] = [106.801, 10.800135] // ~15 m về phía bắc V1
+    const spliced = spliceRouteAroundPole(lineWithBends, poles4, 'P2', newP2)
+
+    expect(spliced).toEqual([V0, bend12, newP2, bend23, V2, V3])
+    expect(spliced).toHaveLength(lineWithBends.length)
+
+    // diffRouteLines chỉ báo removed là 2 cạnh sát P2 cũ (bend12 -> V1 -> bend23), không chạm đoạn P3-P4 (V2..V3)
+    const diff = diffRouteLines(lineWithBends, spliced!)
+    expect(diff.removed).toEqual([[bend12, V1, bend23]])
+    expect(diff.added).toEqual([[bend12, newP2, bend23]])
+    const twoAdjacentEdgesLen =
+      calculateDistanceMeters(bend12, V1) + calculateDistanceMeters(V1, bend23)
+    expect(calculateRouteLengthMeters(diff.removed[0])).toBeLessThanOrEqual(
+      Math.ceil(twoAdjacentEdgesLen) + 1
+    )
+    expect(diff.removed.flat()).not.toContainEqual(V2)
+    expect(diff.removed.flat()).not.toContainEqual(V3)
+  })
+
+  it('(k) cột đầu tuyến có đỉnh trùng cột và điểm uốn ngay sau: kéo nhẹ cột đầu chỉ thay đỉnh đầu, giữ nguyên điểm uốn', () => {
+    const bend01: [number, number] = [106.8005, 10.80008]
+    const lineWithBend: [number, number][] = [V0, bend01, V1, V2]
+    const poles3 = [
+      { id: 'P1', coord: V0 },
+      { id: 'P2', coord: V1 },
+      { id: 'P3', coord: V2 },
+    ]
+    const newP1: [number, number] = [106.8001, 10.80012]
+    const spliced = spliceRouteAroundPole(lineWithBend, poles3, 'P1', newP1)
+
+    expect(spliced).toEqual([newP1, bend01, V1, V2])
+  })
 })

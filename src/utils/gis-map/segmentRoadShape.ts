@@ -136,8 +136,11 @@ const alongLineExtended = (coord: LngLat, base: LngLat[], totalLen: number): {
 }
 
 /**
- * Thay duy nhất đoạn tuyến nằm giữa hai cột kề MỚI (xác định theo vị trí mới `newCoord`) của cột `poleId`
- * bằng 2 đoạn đi qua `newCoord`, giữ nguyên toàn bộ các đỉnh / khúc uốn nằm ngoài khoảng hai cột kề mới.
+ * Cập nhật hình tuyến khi dời cột `poleId` tới `newCoord`:
+ * - Nếu tuyến có đỉnh trùng cột đang dời (<= VERTEX_MATCH_METERS) và chấm đích chưa vượt qua cột kề:
+ *   chỉ thay đỉnh đó bằng `newCoord`, giữ nguyên mọi đỉnh và điểm uốn khác trên tuyến.
+ * - Ngược lại (tuyến hình thật không có đỉnh trùng cột, hoặc kéo vượt qua cột kề):
+ *   thay đoạn tuyến nằm giữa hai cột kề MỚI bằng 2 đoạn đi qua `newCoord`, giữ nguyên phần ngoài.
  * Trả `null` nếu tuyến < 2 đỉnh, không tìm thấy `poleId` trong `poles`, hoặc không cắt được.
  */
 export const spliceRouteAroundPole = (
@@ -150,8 +153,15 @@ export const spliceRouteAroundPole = (
   const oldPole = poles.find((p) => p.id === poleId)
   if (!oldPole) return null
 
+  const ownIdxSet = new Set<number>()
+  line.forEach((v, i) => {
+    if (calculateDistanceMeters(v, oldPole.coord) <= VERTEX_MATCH_METERS) {
+      ownIdxSet.add(i)
+    }
+  })
+
   // Bỏ đỉnh của chính cột đang dời trên tuyến nối cột (tuyến hình thật không có đỉnh trùng cột nên giữ nguyên)
-  const base = line.filter((v) => calculateDistanceMeters(v, oldPole.coord) > VERTEX_MATCH_METERS)
+  const base = line.filter((_, i) => !ownIdxSet.has(i))
   if (base.length < 2) return null
 
   const vertexAlong: number[] = [0]
@@ -181,6 +191,36 @@ export const spliceRouteAroundPole = (
       prev = item
     } else if (!next) {
       next = item
+    }
+  }
+
+  // Nhánh giữ điểm uốn: có đỉnh của chính cột trên tuyến và không kéo vượt qua cột kề
+  if (ownIdxSet.size > 0) {
+    const oldOrdered = orderPolesAlongLine(poles, line)
+    const oldIdx = oldOrdered.findIndex((p) => p.id === poleId)
+    const oldPrevId = oldIdx > 0 ? oldOrdered[oldIdx - 1].id : null
+    const oldNextId =
+      oldIdx !== -1 && oldIdx < oldOrdered.length - 1 ? oldOrdered[oldIdx + 1].id : null
+
+    if ((prev?.pole.id ?? null) === oldPrevId && (next?.pole.id ?? null) === oldNextId) {
+      const firstOwnIdx = Math.min(...ownIdxSet)
+      const replaced: LngLat[] = []
+      const pushReplaced = (pt: LngLat) => {
+        if (
+          replaced.length === 0 ||
+          calculateDistanceMeters(replaced[replaced.length - 1], pt) >= 0.5
+        ) {
+          replaced.push(pt)
+        }
+      }
+      for (let i = 0; i < line.length; i++) {
+        if (i === firstOwnIdx) {
+          pushReplaced(newCoord)
+        } else if (!ownIdxSet.has(i)) {
+          pushReplaced(line[i])
+        }
+      }
+      if (replaced.length >= 2) return replaced
     }
   }
 
