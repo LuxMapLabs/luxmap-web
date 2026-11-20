@@ -22,8 +22,12 @@ import {
   orderedPolesOfSegment,
   reconcileRoute,
 } from '../../utils/gis-map/segmentPoleOrder'
-import { isRoadShape } from '../../utils/gis-map/segmentRoadShape'
-import { calculateDistanceMeters } from '../../utils/gis-map/routeUtils'
+import { isRoadShape, spliceRouteAroundPole } from '../../utils/gis-map/segmentRoadShape'
+import {
+  calculateDistanceMeters,
+  calculateRouteLengthMeters,
+  parseLineStringWkt,
+} from '../../utils/gis-map/routeUtils'
 import type { CreateFixtureRequest } from '../../types/assets/fixtures'
 import type {
   CreateIotNodeRequest,
@@ -314,15 +318,26 @@ function* fetchAllPoles() {
   }
 }
 
+interface SegmentSpliceTarget {
+  poleId: string
+  coord: [number, number]
+  segmentId: string
+}
+
 /**
- * Sau khi cột được tạo / dời / đổi tuyến, tuyến chưa có hình hoặc đang là đường nối cột (bản nháp) được dựng lại
- * từ các cột của nó (giữ điểm uốn đã có). Tuyến có hình thật (theo con đường) thì giữ nguyên: không bao giờ
- * ghi đè bằng đường nối cột (`isRoadShape`). Backend không tự vẽ lại. Cột đã lưu rồi thì lỗi ở đây không hoàn tác được,
- * chỉ báo để người dùng mở "Sửa tuyến" lưu lại. Trả về true nếu có tuyến không cập nhật được.
+ * Sau khi cột được tạo / dời / đổi tuyến, cập nhật lại hình các tuyến bị ảnh hưởng.
+ * - Khi có `splice` (dời cột tại chỗ trên cùng tuyến đã có hình >= 2 đỉnh): chỉ thay đoạn giữa hai cột kề
+ *   bằng `spliceRouteAroundPole`, giữ nguyên các phần tuyến còn lại.
+ * - Các trường hợp khác: tuyến có hình thật (`isRoadShape`) giữ nguyên; tuyến chưa có hình hoặc bản nháp nối cột
+ *   được dựng lại từ các cột (giữ điểm uốn đã có). Backend không tự vẽ lại; lỗi chỉ cảnh báo để mở "Sửa tuyến" lưu lại.
  *
  * `before`: danh sách cột trước khi lưu (vị trí cũ, để nhận ra đỉnh nào của đường cũ là cột nào).
  */
-function* syncSegmentGeometries(segmentIds: string[], before: PoleListItem[]) {
+function* syncSegmentGeometries(
+  segmentIds: string[],
+  before: PoleListItem[],
+  splice?: SegmentSpliceTarget
+) {
   let failed = false
   const ids = [...new Set(segmentIds.filter(Boolean))]
   if (ids.length === 0) return failed
@@ -338,6 +353,28 @@ function* syncSegmentGeometries(segmentIds: string[], before: PoleListItem[]) {
     try {
       const detail = (yield call(assetAPI.getSegmentDetail, segmentId)) as SegmentDetail
       const previous = orderedPolesOfSegment(before, segmentId)
+
+      if (splice && segmentId === splice.segmentId && detail.geom_wkt) {
+        const storedLine = parseLineStringWkt(detail.geom_wkt)
+        if (storedLine.length >= 2 && previous.some((p) => p.id === splice.poleId)) {
+          const spliced = spliceRouteAroundPole(storedLine, previous, splice.poleId, splice.coord)
+          if (spliced) {
+            const geomWkt = `LINESTRING(${spliced.map(([lng, lat]) => `${lng} ${lat}`).join(', ')})`
+            if (isSameLine(geomWkt, detail.geom_wkt)) continue
+            const seg = detail.segment
+            yield call(assetAPI.updateSegment, segmentId, {
+              external_ref: seg.external_ref,
+              segment_name: seg.segment_name,
+              road_class: seg.road_class,
+              length_m: calculateRouteLengthMeters(spliced),
+              geom_wkt: geomWkt,
+              data_source: seg.data_source,
+            })
+            continue
+          }
+        }
+      }
+
       if (isRoadShape(previous, detail.geom_wkt)) continue
       const route = reconcileRoute(
         previous,
@@ -379,7 +416,7 @@ const warnSegmentNotSynced = () =>
     'Cột đã lưu nhưng hình tuyến chưa cập nhật. Mở "Sửa tuyến" và lưu lại để vẽ lại đường.'
   )
 
-function* handleCreatePole(action: PayloadAction<CreatePolePayload>) {
+export function* handleCreatePole(action: PayloadAction<CreatePolePayload>) {
   try {
     const { pole, fixture } = action.payload
     const before: PoleListItem[] = yield select((state: RootState) => state.assets.poles)
@@ -459,7 +496,11 @@ export function* handleUpdatePole(action: PayloadAction<UpdatePolePayload>) {
       old?.location && old.segment_id ? old.segment_id : '',
       data.segment_id && data.geom_wkt ? data.segment_id : '',
     ]
-    const failed: boolean = yield* syncSegmentGeometries(affected, before)
+    const splice: SegmentSpliceTarget | undefined =
+      moved && to && data.segment_id
+        ? { poleId, coord: to, segmentId: data.segment_id }
+        : undefined
+    const failed: boolean = yield* syncSegmentGeometries(affected, before, splice)
     if (failed) warnSegmentNotSynced()
 
     yield put(mutationSuccess())

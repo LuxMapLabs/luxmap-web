@@ -12,8 +12,13 @@ import {
   type EditPoleMapProps,
 } from '../../pages/assets/components/poles/components/EditPoleMap'
 import { fetchSegmentDetailSuccess } from '../../feature/assets/assetSlice'
-import { calculateDistanceMeters, snapPointToPolyline } from '../../utils/gis-map/routeUtils'
+import {
+  calculateDistanceMeters,
+  calculateRouteLengthMeters,
+  snapPointToPolyline,
+} from '../../utils/gis-map/routeUtils'
 import { ROUTE_CORRIDOR_M } from '../../utils/gis-map/poleMove'
+import { spliceRouteAroundPole } from '../../utils/gis-map/segmentRoadShape'
 import type { PoleListItem } from '../../types/assets/poles'
 import type { SegmentListItem } from '../../types/assets/segments'
 
@@ -97,15 +102,13 @@ const setLat = (value: string) => {
 const save = () => fireEvent.click(screen.getByRole('button', { name: /Lưu thay đổi/i }))
 
 describe('Sửa cột trên tuyến đã có hình theo con đường', () => {
-  it('dời cột ra xa hình quá 25 m: cảnh báo ngay và chặn lưu', () => {
+  it('dời cột ra xa hình quá 25 m: chặn lưu theo hình tuyến đang lưu', () => {
     const onSave = open(pole('POLE-0002', 106.801), ROAD)
 
     setLat('10.8005')
-    expect(screen.getByRole('alert')).toHaveTextContent(/Cột cách hình tuyến 45,\d m, quá 25 m/)
-
     save()
     expect(onSave).not.toHaveBeenCalled()
-    expect(screen.getByText(/1 cột nằm cách hình tuyến quá 25 m \(POLE-0002\)/)).toBeInTheDocument()
+    expect(screen.getByText(/cách hình tuyến đang lưu \d+ m, quá 25 m/)).toBeInTheDocument()
   })
 
   it('dời cột một chút, vẫn sát hình: lưu được', () => {
@@ -119,15 +122,14 @@ describe('Sửa cột trên tuyến đã có hình theo con đường', () => {
     expect(onSave.mock.calls[0][0].location.lat).toBeCloseTo(10.80005, 6)
   })
 
-  it('cột vốn đã nằm xa mà không dời: chỉ cảnh báo, vẫn lưu được các thông tin khác', () => {
+  it('cột vốn đã nằm xa mà không dời: vẫn lưu được các thông tin khác', () => {
     const onSave = open(pole('POLE-0002', 106.801, 10.8005), ROAD)
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/quá 25 m/)
     save()
     expect(onSave).toHaveBeenCalledTimes(1)
   })
 
-  it('tuyến hình thật: truyền previewKind="link", originCoord và giữ nguyên tuyến xanh khi dời cột', () => {
+  it('tuyến hình thật: truyền previewKind="route", giữ nguyên tuyến xanh lưu và chỉ thay đoạn giữa hai cột kề', () => {
     mapPropsHolder.current = null
     open(pole('POLE-0002', 106.801, 10.8), ROAD)
 
@@ -136,9 +138,16 @@ describe('Sửa cột trên tuyến đã có hình theo con đường', () => {
 
     setLat('10.80005')
     const propsAfter = getLatestMapProps()
-    expect(propsAfter?.previewKind).toBe('link')
+    expect(propsAfter?.previewKind).toBe('route')
     expect(propsAfter?.originCoord).toEqual([106.801, 10.8])
     expect(propsAfter?.savedSegmentCoords).toEqual(savedBefore)
+    expect(propsAfter?.segmentCoords).not.toEqual(savedBefore)
+    // Giữ nguyên các đỉnh ngoài khoảng cột kề (đầu và cuối tuyến ROAD)
+    expect(propsAfter?.segmentCoords[0]).toEqual([106.7995, 10.80009])
+    expect(propsAfter?.segmentCoords[propsAfter.segmentCoords.length - 1]).toEqual([
+      106.8025, 10.80009,
+    ])
+    expect(propsAfter?.segmentCoords).toContainEqual([106.801, 10.80005])
   })
 })
 
@@ -303,6 +312,43 @@ describe('diffRouteLines - tách đoạn sẽ bỏ và đoạn sẽ thêm', () =
     expect(allDiffVertices).not.toContainEqual(A)
     expect(allDiffVertices).not.toContainEqual(E)
   })
+
+  it('điểm cắt A, B rơi giữa các cạnh dài: removed chỉ gồm đúng đoạn A..B (không lấn phần còn giữ), bắt đầu/kết thúc tại A và B', () => {
+    const P0: [number, number] = [106.8, 10.8]
+    const P1: [number, number] = [106.801, 10.8] // ~109 m
+    const P2: [number, number] = [106.802, 10.8] // ~109 m
+    const P3: [number, number] = [106.803, 10.8] // ~109 m
+    const savedLong: [number, number][] = [P0, P1, P2, P3]
+
+    // Cắt giữa cạnh P0->P1 tại cutA và giữa cạnh P2->P3 tại cutB, thay bằng đường đi lệch
+    const cutA: [number, number] = [106.8005, 10.8]
+    const detour: [number, number] = [106.8015, 10.80015]
+    const cutB: [number, number] = [106.8025, 10.8]
+    const previewSpliced: [number, number][] = [P0, cutA, detour, cutB, P3]
+
+    const diff = diffRouteLines(savedLong, previewSpliced)
+    expect(diff.removed).toHaveLength(1)
+    expect(diff.added).toHaveLength(1)
+
+    const removedLine = diff.removed[0]
+    const addedLine = diff.added[0]
+
+    // Bắt đầu và kết thúc đúng tại A và B (< 1 m)
+    expect(calculateDistanceMeters(removedLine[0], cutA)).toBeLessThan(1)
+    expect(calculateDistanceMeters(removedLine[removedLine.length - 1], cutB)).toBeLessThan(1)
+    expect(calculateDistanceMeters(addedLine[0], cutA)).toBeLessThan(1)
+    expect(calculateDistanceMeters(addedLine[addedLine.length - 1], cutB)).toBeLessThan(1)
+
+    // Độ dài removed xấp xỉ khoảng cách A-B dọc tuyến (không chứa 2 nửa P0..cutA và cutB..P3)
+    const expectedLen = calculateDistanceMeters(cutA, cutB)
+    expect(Math.abs(calculateRouteLengthMeters(removedLine) - expectedLen)).toBeLessThan(3)
+    expect(removedLine).not.toContainEqual(P0)
+    expect(removedLine).not.toContainEqual(P3)
+    expect(addedLine).toEqual([cutA, detour, cutB])
+
+    // Hai tuyến giống hệt không sinh đoạn rác
+    expect(diffRouteLines(savedLong, savedLong)).toEqual({ removed: [], added: [] })
+  })
 })
 
 describe('spurLines - nhánh bỏ / nhánh thêm cho tuyến hình thật', () => {
@@ -334,5 +380,130 @@ describe('spurLines - nhánh bỏ / nhánh thêm cho tuyến hình thật', () =
     expect(spurLines([106.801, 10.80005], dot, [])).toEqual({ removed: [], added: [] })
     expect(spurLines([106.801, 10.80005], dot, [[106.8, 10.8]])).toEqual({ removed: [], added: [] })
     expect(spurLines(undefined, dot, roadLine)).toEqual({ removed: [], added: [] })
+  })
+})
+
+describe('spliceRouteAroundPole - chỉ thay đoạn giữa hai cột kề', () => {
+  const V0: [number, number] = [106.8, 10.8]
+  const V1: [number, number] = [106.801, 10.8]
+  const V2: [number, number] = [106.802, 10.8]
+  const V3: [number, number] = [106.803, 10.8]
+  const V4: [number, number] = [106.804, 10.8]
+
+  const poles5 = [
+    { id: 'P0', coord: V0 },
+    { id: 'P1', coord: V1 },
+    { id: 'P2', coord: V2 },
+    { id: 'P3', coord: V3 },
+    { id: 'P4', coord: V4 },
+  ]
+
+  it('(a) cột giữa: chỉ đoạn giữa hai cột kề thay, các đỉnh xa hơn giữ nguyên', () => {
+    const newCoord: [number, number] = [106.802, 10.80015]
+    const res = spliceRouteAroundPole([V0, V1, V2, V3, V4], poles5, 'P2', newCoord)
+    expect(res).toEqual([V0, V1, newCoord, V3, V4])
+  })
+
+  it('(b) cột ở đầu (không có prev): thay đoạn từ đầu tới cột kế, phần sau giữ nguyên', () => {
+    const newCoord: [number, number] = [106.8, 10.8001]
+    const res = spliceRouteAroundPole([V0, V1, V2, V3, V4], poles5, 'P0', newCoord)
+    expect(res).toEqual([newCoord, V1, V2, V3, V4])
+  })
+
+  it('(c) cột ở cuối (không có next): thay đoạn từ cột trước tới cuối, phần trước giữ nguyên', () => {
+    const newCoord: [number, number] = [106.804, 10.8001]
+    const res = spliceRouteAroundPole([V0, V1, V2, V3, V4], poles5, 'P4', newCoord)
+    expect(res).toEqual([V0, V1, V2, V3, newCoord])
+  })
+
+  it('(d) poleId không tồn tại trong poles -> trả null', () => {
+    expect(spliceRouteAroundPole([V0, V1, V2], poles5, 'UNKNOWN', [106.801, 10.8001])).toBeNull()
+  })
+
+  it('(e) tuyến hình thật có đỉnh uốn ngoài đoạn bị thay vẫn còn trong kết quả', () => {
+    const bendBefore: [number, number] = [106.8005, 10.8002]
+    const bendAfter: [number, number] = [106.8035, 10.8002]
+    const roadWithBends: [number, number][] = [V0, bendBefore, V1, V2, V3, bendAfter, V4]
+    // Cột đứng lệch lề đường một chút (phía nam ~5 m)
+    const roadPoles = [
+      { id: 'P1', coord: [106.801, 10.79995] as [number, number] },
+      { id: 'P2', coord: [106.802, 10.79995] as [number, number] },
+      { id: 'P3', coord: [106.803, 10.79995] as [number, number] },
+    ]
+    const newCoord: [number, number] = [106.802, 10.80012]
+    const res = spliceRouteAroundPole(roadWithBends, roadPoles, 'P2', newCoord)
+
+    expect(res).not.toBeNull()
+    expect(res).toContainEqual(V0)
+    expect(res).toContainEqual(bendBefore)
+    expect(res).toContainEqual(newCoord)
+    expect(res).toContainEqual(bendAfter)
+    expect(res).toContainEqual(V4)
+    // Điểm nối là hình chiếu của P1/P3 trên tuyến (V1/V3), không nối thẳng vào tọa độ cột lệch lề
+    expect(res).not.toContainEqual(roadPoles[0].coord)
+    expect(res).not.toContainEqual(roadPoles[2].coord)
+  })
+
+  it('(f) tuyến hình thật 5 cột: kéo P3 vượt qua P4 (nằm giữa P4 và P5) -> chỉ thay đoạn giữa P4 và P5, giữ nguyên chỗ cũ P2..P4, không đi ngược', () => {
+    const RStart: [number, number] = [106.7995, 10.8]
+    const REnd: [number, number] = [106.8045, 10.8]
+    const road5: [number, number][] = [RStart, V0, V1, V2, V3, V4, REnd]
+    // 5 cột P1..P5 đứng lệch lề phía nam ~5 m đối diện V0..V4
+    const polesRoad5 = [
+      { id: 'P1', coord: [106.8, 10.79995] as [number, number] },
+      { id: 'P2', coord: [106.801, 10.79995] as [number, number] },
+      { id: 'P3', coord: [106.802, 10.79995] as [number, number] },
+      { id: 'P4', coord: [106.803, 10.79995] as [number, number] },
+      { id: 'P5', coord: [106.804, 10.79995] as [number, number] },
+    ]
+    // Kéo P3 sang giữa P4 (106.803) và P5 (106.804), cách tuyến ~15 m về phía bắc
+    const newBetween45: [number, number] = [106.8035, 10.800135]
+    const spliced = spliceRouteAroundPole(road5, polesRoad5, 'P3', newBetween45)
+
+    expect(spliced).not.toBeNull()
+    expect(spliced).toEqual([RStart, V0, V1, V2, V3, newBetween45, V4, REnd])
+
+    // Vị trí dọc tuyến gốc của các đỉnh trong kết quả tăng đều (không đi ngược)
+    const alongList = spliced!.map((pt) => snapPointToPolyline(pt, road5).accumulatedDist)
+    for (let i = 1; i < alongList.length; i++) {
+      expect(alongList[i]).toBeGreaterThanOrEqual(alongList[i - 1] - 0.5)
+    }
+
+    // diffRouteLines chỉ báo removed nằm giữa P4 (V3) và P5 (V4), không có đoạn nào ở chỗ cũ P2..P4 (V1..V3)
+    const diff = diffRouteLines(road5, spliced!)
+    expect(diff.removed).toEqual([[V3, V4]])
+    expect(diff.added).toEqual([[V3, newBetween45, V4]])
+  })
+
+  it('(g) tuyến hình thật 5 cột: kéo P3 ngược về giữa P1 và P2 -> chỉ thay đoạn giữa P1 và P2, giữ nguyên P2..P5', () => {
+    const RStart: [number, number] = [106.7995, 10.8]
+    const REnd: [number, number] = [106.8045, 10.8]
+    const road5: [number, number][] = [RStart, V0, V1, V2, V3, V4, REnd]
+    const polesRoad5 = [
+      { id: 'P1', coord: [106.8, 10.79995] as [number, number] },
+      { id: 'P2', coord: [106.801, 10.79995] as [number, number] },
+      { id: 'P3', coord: [106.802, 10.79995] as [number, number] },
+      { id: 'P4', coord: [106.803, 10.79995] as [number, number] },
+      { id: 'P5', coord: [106.804, 10.79995] as [number, number] },
+    ]
+    const newBetween12: [number, number] = [106.8005, 10.800135]
+    const spliced = spliceRouteAroundPole(road5, polesRoad5, 'P3', newBetween12)
+
+    expect(spliced).toEqual([RStart, V0, newBetween12, V1, V2, V3, V4, REnd])
+  })
+
+  it('(h) tuyến nối cột (đỉnh trùng cột): kéo P2 (ở V2) sang giữa P3 (V3) và P4 (V4) -> bỏ đỉnh cũ V2, chèn newCoord giữa V3 và V4', () => {
+    const newBetween34: [number, number] = [106.8035, 10.800135]
+    const spliced = spliceRouteAroundPole([V0, V1, V2, V3, V4], poles5, 'P2', newBetween34)
+
+    expect(spliced).toEqual([V0, V1, V3, newBetween34, V4])
+    expect(spliced).not.toContainEqual(V2)
+  })
+
+  it('(i) cột đầu tuyến (P0) kéo vượt qua cột thứ hai (P1): prev mới là P1, next là P2', () => {
+    const newBetween12: [number, number] = [106.8015, 10.800135]
+    const spliced = spliceRouteAroundPole([V0, V1, V2, V3, V4], poles5, 'P0', newBetween12)
+
+    expect(spliced).toEqual([V1, newBetween12, V2, V3, V4])
   })
 })

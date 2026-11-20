@@ -8,6 +8,7 @@ vi.mock('sonner', () => ({
 
 vi.mock('../../feature/assets/assetAPI', () => ({
   default: {
+    createPole: vi.fn(),
     updatePole: vi.fn(),
     setPoleLocation: vi.fn(),
     getPoles: vi.fn(),
@@ -18,8 +19,9 @@ vi.mock('../../feature/assets/assetAPI', () => ({
 
 import { toast } from 'sonner'
 import assetAPI from '../../feature/assets/assetAPI'
-import { handleUpdatePole } from '../../feature/assets/assetSaga'
+import { handleCreatePole, handleUpdatePole } from '../../feature/assets/assetSaga'
 import {
+  createPoleRequest,
   updatePoleRequest,
   mutationSuccess,
   mutationFailure,
@@ -82,6 +84,9 @@ const run = async () => {
 }
 
 beforeEach(() => {
+  vi.mocked(assetAPI.createPole)
+    .mockReset()
+    .mockResolvedValue(undefined as never)
   vi.mocked(assetAPI.updatePole)
     .mockReset()
     .mockResolvedValue(undefined as never)
@@ -97,7 +102,7 @@ beforeEach(() => {
 })
 
 describe('Sửa cột ở tab tài sản: hình tuyến đi theo cột hay giữ nguyên', () => {
-  it('tuyến đã có hình theo con đường: không gửi lại hình tuyến', async () => {
+  it('tuyến đã có hình theo con đường: dời cột cùng tuyến chỉ thay đoạn giữa hai cột kề, giữ nguyên các đỉnh ngoài', async () => {
     vi.mocked(assetAPI.getSegmentDetail).mockResolvedValue(
       detail(
         'LINESTRING(106.7995 10.80009, 106.8005 10.80009, 106.8015 10.80009, 106.8025 10.80009)'
@@ -107,9 +112,63 @@ describe('Sửa cột ở tab tài sản: hình tuyến đi theo cột hay giữ
     const types = await run()
 
     expect(assetAPI.updatePole).toHaveBeenCalledTimes(1)
-    expect(assetAPI.updateSegment).not.toHaveBeenCalled()
+    expect(assetAPI.updateSegment).toHaveBeenCalledTimes(1)
+    const [id, body] = vi.mocked(assetAPI.updateSegment).mock.calls[0]
+    expect(id).toBe('SEG-003')
+    expect(body.geom_wkt).toContain('106.7995 10.80009')
+    expect(body.geom_wkt).toContain('106.801 10.80005')
+    expect(body.geom_wkt).toContain('106.8025 10.80009')
     expect(toast.warning).not.toHaveBeenCalled()
     expect(types).toEqual([mutationSuccess.type, fetchAssetsRequest.type])
+  })
+
+  it('đổi sang tuyến khác: tuyến hình thật vẫn giữ nguyên theo hành vi gốc (không gọi updateSegment)', async () => {
+    vi.mocked(assetAPI.getSegmentDetail).mockResolvedValue(
+      detail(
+        'LINESTRING(106.7995 10.80009, 106.8005 10.80009, 106.8015 10.80009, 106.8025 10.80009)'
+      ) as never
+    )
+
+    await runWith(
+      updatePoleRequest({
+        poleId: 'POLE-0002',
+        data: {
+          external_ref: 'POLE-0002',
+          segment_id: 'SEG-009',
+          geom_wkt: 'POINT(106.801 10.80005)',
+        } as never,
+      })
+    )
+
+    expect(assetAPI.updatePole).toHaveBeenCalledTimes(1)
+    expect(assetAPI.updateSegment).not.toHaveBeenCalled()
+  })
+
+  it('tạo cột mới trên tuyến có hình theo con đường: vẫn giữ nguyên hình thật, không gọi updateSegment', async () => {
+    vi.mocked(assetAPI.getSegmentDetail).mockResolvedValue(
+      detail(
+        'LINESTRING(106.7995 10.80009, 106.8005 10.80009, 106.8015 10.80009, 106.8025 10.8025)'
+      ) as never
+    )
+
+    const dispatched: Action[] = []
+    await runSaga(
+      {
+        dispatch: (a: Action) => dispatched.push(a),
+        getState: () => ({ assets: { poles: before } }),
+      },
+      handleCreatePole,
+      createPoleRequest({
+        pole: {
+          external_ref: 'POLE-NEW',
+          segment_id: 'SEG-003',
+          geom_wkt: 'POINT(106.8015 10.80005)',
+        } as never,
+      })
+    ).toPromise()
+
+    expect(assetAPI.createPole).toHaveBeenCalledTimes(1)
+    expect(assetAPI.updateSegment).not.toHaveBeenCalled()
   })
 
   it('tuyến chỉ là bản nháp nối cột: dựng lại đường qua vị trí mới của cột', async () => {
