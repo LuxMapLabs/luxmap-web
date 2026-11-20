@@ -64,8 +64,8 @@ export const offRoadShapeMessage = (labels: string[]): string => {
   const shown = labels.slice(0, 5).join(', ') + (labels.length > 5 ? '…' : '')
   return (
     `${labels.length} cột nằm cách hình tuyến quá ${ROUTE_CORRIDOR_M} m (${shown}). ` +
-    'Tuyến đã có hình theo con đường nên hình không chạy theo cột. Đặt cột sát đường hơn, hoặc lấy lại hình tuyến ở ' +
-    'form "Sửa tuyến" (Quản lý tài sản, nút "Vẽ lại hình tuyến trên bản đồ").'
+    'Tuyến đã có hình theo con đường nên hình không chạy theo cột. Đặt cột sát đường hơn, hoặc uốn lại hình tuyến ở ' +
+    'form "Sửa tuyến" (Quản lý tài sản) bằng cách kéo chấm trắng trên bản đồ.'
   )
 }
 
