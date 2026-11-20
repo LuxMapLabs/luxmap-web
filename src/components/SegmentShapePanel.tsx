@@ -23,6 +23,8 @@ interface SegmentShapePanelProps {
   /** Vẽ tay: bấm từng điểm dọc đường trên ảnh vệ tinh, nối thẳng (đường không có trên bản đồ nền). */
   freehand?: boolean
   onFreehandChange?: (freehand: boolean) => void
+  /** Cho phép bấm nút vẽ (lại) hình tuyến trên bản đồ; mặc định true. */
+  allowDraw?: boolean
 }
 
 const meters = (m: number) => `${m.toLocaleString('vi-VN')} m`
@@ -32,7 +34,6 @@ const button =
 
 /**
  * Lấy hình tuyến trong form tuyến. Quản lý không vẽ: bấm điểm đầu, điểm cuối trên con đường, máy bám theo đường.
- * Đường không có trên bản đồ nền thì chỉ chọn cột, máy tự nối thành hình nháp.
  */
 export const SegmentShapePanel: React.FC<SegmentShapePanelProps> = ({
   kind,
@@ -49,6 +50,7 @@ export const SegmentShapePanel: React.FC<SegmentShapePanelProps> = ({
   warning = null,
   freehand = false,
   onFreehandChange,
+  allowDraw = true,
 }) => (
   <div className="space-y-2" aria-label="Hình tuyến">
     <div className="flex items-center justify-between">
@@ -64,7 +66,7 @@ export const SegmentShapePanel: React.FC<SegmentShapePanelProps> = ({
       </span>
     </div>
 
-    {picking ? (
+    {allowDraw && picking ? (
       <div className="p-3 rounded-xl border border-orange-200 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950/30 text-orange-900 dark:text-orange-200 space-y-2">
         {onFreehandChange && (
           <div className="flex gap-1.5" role="group" aria-label="Cách lấy hình">
@@ -141,16 +143,18 @@ export const SegmentShapePanel: React.FC<SegmentShapePanelProps> = ({
       </div>
     ) : (
       <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 space-y-2">
-        <button
-          type="button"
-          onClick={onStart}
-          className={`${button} bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-300 flex items-center gap-1`}
-        >
-          <MapPinned className="w-3.5 h-3.5" />
-          {kind === 'road'
-            ? 'Vẽ lại hình tuyến trên bản đồ'
-            : 'Vẽ hình tuyến trên bản đồ'}
-        </button>
+        {allowDraw && (
+          <button
+            type="button"
+            onClick={onStart}
+            className={`${button} bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-300 flex items-center gap-1`}
+          >
+            <MapPinned className="w-3.5 h-3.5" />
+            {kind === 'road'
+              ? 'Vẽ lại hình tuyến trên bản đồ'
+              : 'Vẽ hình tuyến trên bản đồ'}
+          </button>
+        )}
         {kind === 'draft' && (
           <p className="text-[10px] text-slate-500 dark:text-slate-400">
             Kéo chấm mờ giữa hai cột để uốn hình: hình thôi chạy theo cột và thành hình kéo thả (cột
@@ -163,16 +167,15 @@ export const SegmentShapePanel: React.FC<SegmentShapePanelProps> = ({
             xoá chỗ uốn.
           </p>
         )}
-        {kind !== 'road' && (
+        {kind === 'road' && !allowDraw && (
           <p className="text-[10px] text-slate-500 dark:text-slate-400">
-            Đường không có trên bản đồ nền: chỉ cần chọn các cột của tuyến trên bản đồ (ít nhất 2
-            cột có GPS), máy tự nối thành hình nháp. Tuyến chưa có hình vẫn lưu được.
+            Thêm cột ở đầu/cuối thì hình tự nối dài tới cột; bỏ cột đầu/cuối thì phần hình thừa tự cắt.
           </p>
         )}
       </div>
     )}
 
-    {warning && !picking && (
+    {warning && (!picking || !allowDraw) && (
       <p
         role="status"
         className="flex gap-1.5 p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 font-semibold"

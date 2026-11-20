@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Route, CheckCircle2, AlertTriangle } from 'lucide-react'
 import {
@@ -13,7 +13,13 @@ import {
   SegmentNoGpsPolePicker,
   noGpsPolesFor,
 } from '../../../../../components/SegmentNoGpsPolePicker'
-import { insertVertex } from '../../../../../utils/gis-map/lineEdit'
+import {
+  clipLineBetween,
+  extendLine,
+  insertVertex,
+  type LngLat,
+} from '../../../../../utils/gis-map/lineEdit'
+import { ROUTE_CORRIDOR_M } from '../../../../../utils/gis-map/poleMove'
 import { SegmentShapePanel } from '../../../../../components/SegmentShapePanel'
 import { useSegmentRoadPick } from '../../../../../hooks/assets/useSegmentRoadPick'
 import { lineToWkt } from '../../../../../utils/gis-map/roadRouting'
@@ -28,8 +34,10 @@ import {
   orderPolesAlongLine,
 } from '../../../../../utils/gis-map/segmentPoleOrder'
 import {
+  calculateDistanceMeters,
   calculateRouteLengthMeters,
   parseLineStringWkt,
+  snapPointToPolyline,
 } from '../../../../../utils/gis-map/routeUtils'
 import {
   isRoadShape,
@@ -60,6 +68,9 @@ interface EditSegmentModalContentProps {
   onClose: () => void
   onSave: (updated: SegmentListItem, poleIds: string[]) => void
 }
+
+const sameLine = (a: ReadonlyArray<LngLat>, b: ReadonlyArray<LngLat>): boolean =>
+  a.length === b.length && a.every((p, i) => p[0] === b[i][0] && p[1] === b[i][1])
 
 const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
   segment,
@@ -97,6 +108,10 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
     () => (initial.roadShape ? parseLineStringWkt(geomWkt) : []),
     [initial.roadShape, geomWkt]
   )
+  const [editedLine, setEditedLine] = useState<LngLat[] | null>(() =>
+    initial.roadShape ? storedLine : null
+  )
+  const prevPoleIdsRef = useRef<string[]>(initial.ordered.map((p) => p.id))
 
   const [segmentName, setSegmentName] = useState(segment.segment_name || '')
   const [roadClass, setRoadClass] = useState<RoadClass>(
@@ -142,20 +157,82 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
     [candidates]
   )
 
+  const syncLineToPoles = (nextPolesCoords: typeof poles) => {
+    const prevIds = prevPoleIdsRef.current
+    const currIds = nextPolesCoords.map((p) => p.id)
+    const samePoles =
+      prevIds.length === currIds.length && prevIds.every((id, i) => id === currIds[i])
+    if (samePoles) return
+
+    const currIdSet = new Set(currIds)
+    const hasRemovedPole = prevIds.some((id) => !currIdSet.has(id))
+    prevPoleIdsRef.current = currIds
+
+    if (!editedLine || editedLine.length < 2) return
+
+    let nextLine = editedLine
+    const initialIds = new Set(initial.ordered.map((p) => p.id))
+
+    for (const p of nextPolesCoords) {
+      if (initialIds.has(p.id)) continue
+      const snap = snapPointToPolyline(p.coord, nextLine)
+      if (snap.distMeters <= ROUTE_CORRIDOR_M) continue
+      const atStart =
+        snap.segmentIndex === 0 &&
+        calculateDistanceMeters(snap.snappedPoint, nextLine[0]) <= 0.5
+      const atEnd =
+        snap.segmentIndex === nextLine.length - 2 &&
+        calculateDistanceMeters(snap.snappedPoint, nextLine[nextLine.length - 1]) <= 0.5
+      if (atStart || atEnd) {
+        nextLine = extendLine(nextLine, p.coord).line
+      }
+    }
+
+    if (hasRemovedPole && nextPolesCoords.length >= 2) {
+      const dists = nextPolesCoords.map(
+        (p) => snapPointToPolyline(p.coord, nextLine).accumulatedDist
+      )
+      const min = Math.min(...dists)
+      const max = Math.max(...dists)
+      let totalLen = 0
+      for (let i = 1; i < nextLine.length; i++) {
+        totalLen += calculateDistanceMeters(nextLine[i - 1], nextLine[i])
+      }
+      if (min > 0.5 || max < totalLen - 0.5) {
+        nextLine = clipLineBetween(nextLine, min, max)
+      }
+    }
+
+    if (!sameLine(nextLine, editedLine)) {
+      setEditedLine(nextLine)
+    }
+  }
+
+  useEffect(() => {
+    syncLineToPoles(poles)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poles])
+
   // Lấy (lại) hình theo đường ngay trong form: bấm trên bản đồ nền
   const roadPick = useSegmentRoadPick()
   const newRoadLine = roadPick.line
-  const roadLine = newRoadLine ?? (initial.roadShape ? storedLine : null)
+  const roadLine = newRoadLine ?? editedLine
+
+  const editedLineChanged = Boolean(
+    initial.roadShape && editedLine && !sameLine(editedLine, storedLine)
+  )
 
   // Hình mới lấy: gửi hình đó và chiều dài đo trên nó. Hình thật đang lưu: gửi lại đúng hình và chiều dài đang lưu.
   // Còn lại: đủ 2 cột có GPS thì có hình nháp nối cột và chiều dài đo được
   const route = newRoadLine
     ? { geomWkt: lineToWkt(newRoadLine), lengthM: calculateRouteLengthMeters(newRoadLine) }
-    : initial.roadShape && geomWkt
-      ? { geomWkt, lengthM: segment.length_m || calculateRouteLengthMeters(storedLine) }
-      : geometry && poles.length >= 2
-        ? geometry
-        : null
+    : editedLineChanged && editedLine
+      ? { geomWkt: lineToWkt(editedLine), lengthM: calculateRouteLengthMeters(editedLine) }
+      : initial.roadShape && geomWkt
+        ? { geomWkt, lengthM: segment.length_m || calculateRouteLengthMeters(storedLine) }
+        : geometry && poles.length >= 2
+          ? geometry
+          : null
   const shapeKind = roadLine ? 'road' : route ? 'draft' : 'none'
   const detourWarning = useMemo(
     () => (newRoadLine && !roadPick.picking ? roadShapeDetourMessage(newRoadLine, poles) : null),
@@ -329,6 +406,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
               suggestedCount={suggestedIds.length}
               onAddSuggested={() => addMany(suggestedIds)}
               warning={detourWarning}
+              allowDraw={false}
             />
 
             {candidates.length > 0 && (
@@ -353,7 +431,7 @@ const EditSegmentModalContent: React.FC<EditSegmentModalContentProps> = ({
                 <span>
                   Tuyến đã có hình theo con đường (nét xanh trên bản đồ) nên lưu ở đây giữ nguyên
                   hình, không nối lại theo cột. Cột chọn vào tuyến phải nằm trong 25 m quanh hình.
-                  Muốn đổi hình: kéo chấm trắng trên bản đồ để uốn, hoặc bấm "Vẽ lại hình tuyếntrên bản đồ" ở trên.
+                  Muốn đổi hình: kéo chấm trắng trên bản đồ để uốn, kéo chấm mờ để thêm chỗ uốn. Thêm hoặc bỏ cột ở đầu/cuối thì hình tự nối dài hoặc cắt theo.
                 </span>
               </div>
             )}

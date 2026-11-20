@@ -6,6 +6,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import { EditSegmentModal } from '../../pages/assets/components/segments/components/EditSegmentModal'
 import assetReducer, { fetchSegmentDetailSuccess } from '../../feature/assets/assetSlice'
 import mapReducer from '../../feature/map/mapSlice'
+import { parseLineStringWkt } from '../../utils/gis-map/routeUtils'
 import type { SegmentListItem } from '../../types/assets/segments'
 import type { PoleListItem } from '../../types/assets/poles'
 import type { PickablePole } from '../../components/SegmentPolePickerMap'
@@ -132,6 +133,53 @@ describe('Sửa tuyến đã có hình theo con đường', () => {
 
     expect(onSave).toHaveBeenCalledTimes(1)
     expect(onSave.mock.calls[0][0].geom_wkt).toBe(ROAD)
+  })
+
+  it('không còn nút "Vẽ lại hình tuyến trên bản đồ" ở form Sửa tuyến', () => {
+    open(own, ROAD)
+
+    expect(
+      screen.queryByRole('button', { name: /Vẽ (lại )?hình tuyến trên bản đồ/ })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(
+        /Thêm cột ở đầu\/cuối thì hình tự nối dài tới cột; bỏ cột đầu\/cuối thì phần hình thừa tự cắt/
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('bỏ cột cuối: onSave nhận geom_wkt ngắn hơn, đầu mút cuối nằm tại cột cuối mới', () => {
+    const own3 = [
+      ...own,
+      pole('POLE-0003', 106.802, 10.8, 'SEG-003'),
+    ]
+    const onSave = open(own3, ROAD)
+
+    fireEvent.click(screen.getByRole('button', { name: 'chọn POLE-0003' }))
+    save()
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const [updated, poleIds] = onSave.mock.calls[0]
+    expect(poleIds).toEqual(['POLE-0001', 'POLE-0002'])
+    expect(updated.length_m).toBeLessThan(segment.length_m as number)
+    const newLine = parseLineStringWkt(updated.geom_wkt)
+    expect(newLine[newLine.length - 1]).toEqual([106.801, 10.80009])
+  })
+
+  it('thêm cột ngoài cuối (cách hình > 25 m về phía kéo dài): geom_wkt dài thêm tới cột đó', () => {
+    const farEndPole = pole('POLE-0004', 106.8035, 10.8, null)
+    const onSave = open([...own, farEndPole], ROAD)
+
+    fireEvent.click(screen.getByRole('button', { name: 'chọn POLE-0004' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    save()
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const [updated, poleIds] = onSave.mock.calls[0]
+    expect(poleIds).toContain('POLE-0004')
+    const newLine = parseLineStringWkt(updated.geom_wkt)
+    expect(newLine[newLine.length - 1]).toEqual([106.8035, 10.8])
+    expect(newLine.length).toBe(5)
   })
 })
 
