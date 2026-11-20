@@ -22,6 +22,7 @@ import {
 } from '../../../../../utils/gis-map/mapUtils'
 import {
   calculateDistanceMeters,
+  projectPointOnSegment,
   snapPointToPolyline,
 } from '../../../../../utils/gis-map/routeUtils'
 
@@ -82,6 +83,31 @@ const EDGE_MATCH_TOLERANCE_M = 1
 const REMOVED_COLOR = '#dc2626'
 const ADDED_COLOR = '#16a34a'
 
+function splitEdgeByTargetVertices(a: LngLat, b: LngLat, target: LngLat[]): LngLat[] {
+  const cuts: { t: number; point: LngLat }[] = []
+  for (const v of target) {
+    const proj = projectPointOnSegment(v, a, b)
+    if (proj.dist <= EDGE_MATCH_TOLERANCE_M && proj.t > 0 && proj.t < 1) {
+      cuts.push({ t: proj.t, point: proj.point })
+    }
+  }
+  if (cuts.length === 0) return [a, b]
+
+  cuts.sort((x, y) => x.t - y.t)
+
+  const points: LngLat[] = [a]
+  for (const cut of cuts) {
+    if (
+      calculateDistanceMeters(points[points.length - 1], cut.point) >= SAME_VERTEX_TOLERANCE_M &&
+      calculateDistanceMeters(cut.point, b) >= SAME_VERTEX_TOLERANCE_M
+    ) {
+      points.push(cut.point)
+    }
+  }
+  points.push(b)
+  return points
+}
+
 function collectUncoveredEdges(source: LngLat[], target: LngLat[]): LngLat[][] {
   const result: LngLat[][] = []
   let current: LngLat[] = []
@@ -96,17 +122,20 @@ function collectUncoveredEdges(source: LngLat[], target: LngLat[]): LngLat[][] {
   }
 
   for (let i = 0; i < source.length - 1; i++) {
-    const a = source[i]
-    const b = source[i + 1]
-    if (!isEdgeCovered(a, b)) {
-      if (current.length === 0) {
-        current = [a, b]
-      } else {
-        current.push(b)
+    const subPoints = splitEdgeByTargetVertices(source[i], source[i + 1], target)
+    for (let j = 0; j < subPoints.length - 1; j++) {
+      const a = subPoints[j]
+      const b = subPoints[j + 1]
+      if (!isEdgeCovered(a, b)) {
+        if (current.length === 0) {
+          current = [a, b]
+        } else {
+          current.push(b)
+        }
+      } else if (current.length > 0) {
+        result.push(current)
+        current = []
       }
-    } else if (current.length > 0) {
-      result.push(current)
-      current = []
     }
   }
 
