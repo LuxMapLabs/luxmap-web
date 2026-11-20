@@ -309,6 +309,15 @@ async function run() {
             }
         }
 
+        // Bỏ qua các nhóm endpoint không có schema nào (tránh sinh file types rỗng)
+        for (const [fileKey, sSet] of Object.entries(fileTargetSchemas)) {
+            if (fileKey === 'auth/web') continue
+            if (!Array.from(sSet).some((n) => schemas[n])) {
+                delete fileTargetSchemas[fileKey]
+                console.log(`  ⏭️  Bỏ qua nhóm không có schema: ${fileKey}`)
+            }
+        }
+
         console.log(`  ✓ Đã lọc bỏ ${skippedMobileCount} API Mobile`)
         console.log(`  ✓ Đã giữ lại ${acceptedWebCount} API Web / Dùng chung`)
 
