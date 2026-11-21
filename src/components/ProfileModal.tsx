@@ -5,6 +5,7 @@ import type { CurrentUserResponse } from '../types/auth/me'
 import type { RootState } from '../redux/rootReducer'
 import { uploadAvatarRequest, removeAvatarRequest } from '../feature/avatar/avatarSlice'
 import { UserAvatar } from './UserAvatar'
+import { ConfirmModal } from '../pages/iot-bridge/components/IotBridgeModal'
 import { convertToJpeg } from '../utils/imageUtils'
 import { getRoleName, isAdmin as checkIsAdmin, isManagementAgency, isMaintenanceEngineer, isFieldCrew } from '../utils/roleUtils'
 
@@ -25,8 +26,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
   const isAvatarSubmitting = useSelector((state: RootState) => state.avatar.isSubmitting)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [isPreparing, setIsPreparing] = useState(false)
+  const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false)
   const isAvatarBusy = isPreparing || isAvatarSubmitting
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setIsRemoveConfirmOpen(false)
+  }, [isOpen, user?.user_id])
+
+  useEffect(() => {
+    // The saga clears isSubmitting after either success or its existing error toast.
+    if (!isAvatarSubmitting) setIsRemoveConfirmOpen(false)
+  }, [isAvatarSubmitting])
 
   // Xoá lỗi ảnh cũ mỗi lần mở / đổi người dùng
   useEffect(() => {
@@ -37,11 +48,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
   useEffect(() => {
     if (!isOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !isRemoveConfirmOpen) onClose()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, isRemoveConfirmOpen])
 
   if (!isOpen || !user) return null
 
@@ -151,7 +162,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
               <button
                 type="button"
                 disabled={isAvatarBusy}
-                onClick={() => dispatch(removeAvatarRequest())}
+                onClick={() => setIsRemoveConfirmOpen(true)}
                 className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
               >
                 <Trash2 className="w-3 h-3" />
@@ -231,6 +242,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
           </button>
         </div>
       </div>
+      {isRemoveConfirmOpen && (
+        <ConfirmModal
+          title="Gỡ ảnh đại diện?"
+          message="Ảnh đại diện sẽ được gỡ và thay bằng chữ viết tắt tên. Bạn có thể tải ảnh mới bất cứ lúc nào."
+          confirmLabel="Gỡ ảnh"
+          tone="danger"
+          busy={isAvatarSubmitting}
+          onConfirm={() => {
+            if (!isAvatarSubmitting) dispatch(removeAvatarRequest())
+          }}
+          onCancel={() => setIsRemoveConfirmOpen(false)}
+        />
+      )}
     </div>
   )
 }
