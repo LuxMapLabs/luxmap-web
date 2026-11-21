@@ -524,7 +524,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['!', ['within', VN_ARCHIPELAGO_MASK]],
+      filter: ['all', ['==', ['get', 'iso_a2'], 'VN'], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
     },
     {
       id: 'Town labels',
@@ -547,7 +547,7 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['!', ['within', VN_ARCHIPELAGO_MASK]],
+      filter: ['all', ['==', ['get', 'iso_a2'], 'VN'], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
     },
     {
       id: 'City labels',
@@ -570,7 +570,12 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-color': 'hsl(0, 0%, 0%)',
         'text-halo-width': 1,
       },
-      filter: ['all', ['!=', ['get', 'capital'], 20], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
+      filter: [
+        'all',
+        ['==', ['get', 'iso_a2'], 'VN'],
+        ['!=', ['get', 'capital'], 20],
+        ['!', ['within', VN_ARCHIPELAGO_MASK]],
+      ],
     },
     {
       id: 'State labels',
@@ -596,7 +601,12 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
         'text-halo-width': 1,
         'text-opacity': 1,
       },
-      filter: ['all', ['==', ['get', 'admin_level'], 30], ['!', ['within', VN_ARCHIPELAGO_MASK]]],
+      filter: [
+        'all',
+        ['==', ['get', 'iso_a2'], 'VN'],
+        ['==', ['get', 'admin_level'], 30],
+        ['!', ['within', VN_ARCHIPELAGO_MASK]],
+      ],
     },
     {
       id: 'Capital city labels',
