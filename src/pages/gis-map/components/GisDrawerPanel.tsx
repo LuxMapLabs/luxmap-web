@@ -335,9 +335,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       ? poleDetail.open_faults.length
       : selectedPole?.properties?.open_fault_count || 0
 
-  const isUnderRepair =
-    effectiveFixtureStatus === 'dim' ||
-    (openFaultCount > 0 && effectiveFixtureStatus !== 'out')
+  const isUnderRepair = openFaultCount > 0 && effectiveFixtureStatus !== 'out'
   const isFaulted = effectiveFixtureStatus === 'out'
   const isUnknown = effectiveFixtureStatus === 'unknown'
 
@@ -397,7 +395,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   // Accordion state: auto-open if pole has issue, otherwise collapsed
   const hasIssue =
     selectedPole?.properties?.fixture_status === 'out' ||
-    selectedPole?.properties?.fixture_status === 'dim' ||
     openFaults.length > 0 ||
     (selectedPole?.properties?.open_fault_count || 0) > 0
 

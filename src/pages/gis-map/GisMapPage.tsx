@@ -81,7 +81,6 @@ export interface SegmentInfo {
 export interface GisStats {
   total: number
   normal: number
-  dim: number
   out: number
   unknown: number
 }
@@ -227,17 +226,16 @@ export const GisMapPage: React.FC = () => {
   // Thống kê nhanh trạng thái chiếu sáng (đồng bộ thời gian thực theo cascade)
   const stats: GisStats = useMemo(() => {
     let normal = 0
-    let dim = 0
     let out = 0
     let unknown = 0
     effectivePoles.forEach((f: PoleFeature) => {
       const s = f.properties?.fixture_status
-      if (s === 'normal') normal++
-      else if (s === 'dim') dim++
+      // Đèn chỉ còn bình thường / hỏng: dữ liệu cũ `dim` tính là bình thường
+      if (s === 'normal' || s === 'dim') normal++
       else if (s === 'out') out++
       else unknown++
     })
-    return { total: effectivePoles.length, normal, dim, out, unknown }
+    return { total: effectivePoles.length, normal, out, unknown }
   }, [effectivePoles])
 
   // Chi tiết tuyến đường đang chọn; đang mở mạch điện thì là tuyến của mạch đó (không rơi về tuyến đầu danh sách)

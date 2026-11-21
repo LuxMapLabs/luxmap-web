@@ -3,15 +3,18 @@
  * - `fixture_status`: lần quan sát đã công bố gần nhất (sweep / ảnh cột) — normal | dim | out | unknown.
  * - `power_state` của mạch cấp cho cột: rơ-le node IoT báo — on | off | unknown.
  *
- * Chỉ cột `normal` mới đổi theo mạch: mạch `off` → đèn đang tắt, mạch `on` → đèn đang bật,
- * mạch chưa rõ → giữ "bình thường". `dim`, `out`, `unknown` luôn theo `fixture_status`, mạch thế nào cũng vậy.
- * Đây là trạng thái HIỂN THỊ: thống kê / bộ lọc vẫn đếm theo `fixture_status`.
+ * Đèn trên GIS chỉ còn bình thường hoặc hỏng; `dim` (dữ liệu cũ) coi như bình thường.
+ * Chỉ cột bình thường mới đổi theo mạch: mạch `off` → đèn đang tắt, mạch `on` → đèn đang bật,
+ * mạch chưa rõ → giữ "bình thường". `out`, `unknown` luôn theo `fixture_status`, mạch thế nào cũng vậy.
+ * Đây là trạng thái HIỂN THỊ: thống kê / bộ lọc cũng gộp `dim` vào bình thường.
  */
-export type PoleLampState = 'on' | 'off' | 'normal' | 'dim' | 'out' | 'unknown'
+export type PoleLampState = 'on' | 'off' | 'normal' | 'out' | 'unknown'
 
 export function poleLampState(fixtureStatus?: string | null, powerState?: string | null): PoleLampState {
-  if (fixtureStatus === 'normal') return powerState === 'on' ? 'on' : powerState === 'off' ? 'off' : 'normal'
-  if (fixtureStatus === 'dim' || fixtureStatus === 'out') return fixtureStatus
+  if (fixtureStatus === 'normal' || fixtureStatus === 'dim') {
+    return powerState === 'on' ? 'on' : powerState === 'off' ? 'off' : 'normal'
+  }
+  if (fixtureStatus === 'out') return 'out'
   return 'unknown'
 }
 
@@ -40,13 +43,6 @@ export const POLE_LAMP_UI: Record<PoleLampState, LampStateUi> = {
     badge: 'bg-white text-slate-600 border-slate-300 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-600',
     dot: 'bg-white border border-slate-400',
     sphere: { highlight: '#ffffff', body: '#f1f5f9', deep: '#cbd5e1', shadow: '#64748b', glow: 'rgba(148, 163, 184, 0.25)' },
-  },
-  dim: {
-    label: 'Đèn mờ',
-    short: 'Mờ',
-    badge: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800',
-    dot: 'bg-amber-500',
-    sphere: { highlight: '#fef08a', body: '#f59e0b', deep: '#b45309', shadow: '#451a03', glow: 'rgba(245, 158, 11, 0.4)' },
   },
   out: {
     label: 'Hỏng',
