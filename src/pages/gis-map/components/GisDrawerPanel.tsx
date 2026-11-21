@@ -347,7 +347,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     ? 'unknown'
     : 'normal'
 
-  // Fetch real pole detail via Redux Saga (GET /api/v1/map/poles/{pole_id})
+  // Fetch real pole detail via Redux Saga (GET /api/v1/map/poles/{pole_id});
+  // tải lại khi trạng thái đèn của cột trên bản đồ đổi (chi tiết cột được ưu tiên hơn dữ liệu bản đồ nên không được để cũ)
+  const liveFixtureStatus = selectedPole?.properties?.fixture_status
   React.useEffect(() => {
     if (!poleId) {
       dispatch(clearPoleDetail())
@@ -355,7 +357,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     }
 
     dispatch(fetchPoleDetailRequest(poleId))
-  }, [dispatch, poleId])
+  }, [dispatch, poleId, liveFixtureStatus])
 
   // Real open faults from poleDetail
   const openFaults = poleDetail?.open_faults || []

@@ -200,14 +200,15 @@ export const GisMapPage: React.FC = () => {
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false)
 
   // 3. Trạng thái đối tượng được chọn & mở Panel bên phải
-  const [selectedPole, setSelectedPole] = useState<PoleFeature | null>(null)
+  const [pickedPole, setSelectedPole] = useState<PoleFeature | null>(null)
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null)
-  const [selectedCabinet, setSelectedCabinet] = useState<any | null>(null)
+  const [pickedCabinet, setSelectedCabinet] = useState<any | null>(null)
   const [selectedFeeder, setSelectedFeeder] = useState<any | null>(null)
 
   // 4. Hook quản lý logic điện học cascade & danh mục phân tuyến
   const {
     cabinets,
+    allCabinets,
     effectivePoles,
     segmentsList,
     segmentInfoMap,
@@ -222,6 +223,20 @@ export const GisMapPage: React.FC = () => {
     searchQuery: appliedSearchQuery,
     searchInput: searchInput,
   })
+
+  // Cột / tủ đang chọn luôn là bản mới nhất trong store (trạng thái đổi sau khi làm mới thì drawer đổi theo),
+  // chỉ giữ bản lúc bấm chọn khi không còn tìm thấy trong dữ liệu (vd. đang bị lọc ẩn)
+  const selectedPole = useMemo(() => {
+    const id = pickedPole?.properties?.pole_id
+    if (!pickedPole || !id) return pickedPole
+    return effectivePoles.find((f: PoleFeature) => f.properties?.pole_id === id) ?? pickedPole
+  }, [pickedPole, effectivePoles])
+  const selectedCabinet = useMemo(() => {
+    const id = pickedCabinet?.cabinet_id
+    if (!pickedCabinet || !id) return pickedCabinet
+    const live = allCabinets.find((c: any) => c.properties?.cabinet_id === id)
+    return live?.properties ?? pickedCabinet
+  }, [pickedCabinet, allCabinets])
 
   // Thống kê nhanh trạng thái chiếu sáng (đồng bộ thời gian thực theo cascade)
   const stats: GisStats = useMemo(() => {
