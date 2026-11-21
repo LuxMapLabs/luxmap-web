@@ -19,6 +19,7 @@ import { UserAvatar } from '../../../components/UserAvatar'
 
 export interface UserTableProps {
   users: UserAccountItem[]
+  currentUserId?: string | null
   isLoading?: boolean
   invitingUserId?: string | null
   onEdit: (user: UserAccountItem) => void
@@ -28,6 +29,7 @@ export interface UserTableProps {
 
 export const UserTable: React.FC<UserTableProps> = ({
   users,
+  currentUserId,
   isLoading = false,
   invitingUserId,
   onEdit,
@@ -156,6 +158,7 @@ export const UserTable: React.FC<UserTableProps> = ({
               </tr>
             ) : (
               users.map((user) => {
+                const isSelf = Boolean(currentUserId && user.user_id === currentUserId)
                 const isLocked = user.status === 'locked'
                 const roleBadge = getUserRoleBadge(user.role)
                 const initials = getInitials(user.full_name, user.username)
@@ -181,8 +184,13 @@ export const UserTable: React.FC<UserTableProps> = ({
                           className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[11px] font-mono tracking-tight shrink-0 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700 shadow-2xs"
                         />
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-900 dark:text-white truncate">
-                            {user.full_name || user.username}
+                          <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <span className="truncate">{user.full_name || user.username}</span>
+                            {isSelf && (
+                              <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-medium border border-slate-200/60 dark:border-slate-700/60">
+                                Bạn
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate">
                             @{user.username} {user.email ? `• ${user.email}` : ''}
@@ -283,13 +291,15 @@ export const UserTable: React.FC<UserTableProps> = ({
                         {/* High-Risk Lock/Unlock Button */}
                         <button
                           type="button"
+                          disabled={isSelf}
+                          aria-label={isSelf ? 'Không thể khoá tài khoản của chính bạn' : undefined}
                           onClick={() => onToggleLock(user)}
-                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95 ${
+                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
                             isLocked
                               ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300'
                               : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-100 hover:border-rose-300 text-rose-600 dark:text-rose-400'
                           }`}
-                          title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản (Thao tác bảo mật)'}
+                          title={isSelf ? 'Không thể khoá tài khoản của chính bạn' : isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản (Thao tác bảo mật)'}
                         >
                           {isLocked ? (
                             <Unlock className="w-3.5 h-3.5" />

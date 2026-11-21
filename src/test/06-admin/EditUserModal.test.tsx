@@ -66,8 +66,36 @@ describe('EditUserModal', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('disables own role and commune controls while saving a name change directly', () => {
+    const { onSubmit } = renderModal({ isSelf: true })
+    expect(screen.getByRole('combobox')).toBeDisabled()
+    expect(screen.getByRole('combobox')).toHaveAccessibleDescription('Không thể đổi vai trò của chính bạn')
+    for (const radio of screen.getAllByRole('radio')) expect(radio).toBeDisabled()
+    fireEvent.click(screen.getByRole('radio', { name: 'Xã Bình Minh' }))
+    changeName('  Nguyễn Văn B  ')
+    save()
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('user-1', {
+      full_name: 'Nguyễn Văn B', email: 'a@gmail.com', role: 'manager', commune_ids: ['commune-1'],
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps own email editable and submits directly', () => {
+    const { onSubmit } = renderModal({ isSelf: true, user: { ...user, role: 'system_admin' } })
+    expect(screen.getByRole('combobox')).toBeDisabled()
+    expect(screen.getByText('Không thể đổi vai trò của chính bạn')).toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('nguyenvana@gmail.com'), { target: { value: 'b@gmail.com' } })
+    save()
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('user-1', {
+      full_name: 'Nguyễn Văn A', email: 'b@gmail.com', role: 'system_admin',
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('confirms role changes with human labels before sending the existing payload', () => {
-    const { onSubmit } = renderModal()
+    const { onSubmit } = renderModal({ isSelf: false })
+    expect(screen.getByRole('combobox')).toBeEnabled()
+    expect(screen.queryByText('Không thể đổi vai trò của chính bạn')).not.toBeInTheDocument()
     changeRole()
     save()
     expect(within(popup()).getByText('Quản lý')).toBeInTheDocument()
