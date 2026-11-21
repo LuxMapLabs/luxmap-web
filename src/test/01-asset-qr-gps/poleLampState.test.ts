@@ -11,8 +11,13 @@ describe('poleLampState', () => {
     expect(poleLampState('normal', undefined)).toBe('normal')
   })
 
-  it.each(['on', 'off', 'unknown', undefined])('dim / out / unknown ignore power_state %s', (power) => {
-    expect(poleLampState('dim', power)).toBe('dim')
+  it('dữ liệu cũ dim được coi như bình thường (đèn chỉ còn bình thường / hỏng)', () => {
+    expect(poleLampState('dim', 'off')).toBe('off')
+    expect(poleLampState('dim', 'on')).toBe('on')
+    expect(poleLampState('dim', undefined)).toBe('normal')
+  })
+
+  it.each(['on', 'off', 'unknown', undefined])('out / unknown ignore power_state %s', (power) => {
     expect(poleLampState('out', power)).toBe('out')
     expect(poleLampState('unknown', power)).toBe('unknown')
   })

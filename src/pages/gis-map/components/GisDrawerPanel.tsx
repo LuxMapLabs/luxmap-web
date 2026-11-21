@@ -335,9 +335,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
       ? poleDetail.open_faults.length
       : selectedPole?.properties?.open_fault_count || 0
 
-  const isUnderRepair =
-    effectiveFixtureStatus === 'dim' ||
-    (openFaultCount > 0 && effectiveFixtureStatus !== 'out')
+  const isUnderRepair = openFaultCount > 0 && effectiveFixtureStatus !== 'out'
   const isFaulted = effectiveFixtureStatus === 'out'
   const isUnknown = effectiveFixtureStatus === 'unknown'
 
@@ -349,7 +347,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     ? 'unknown'
     : 'normal'
 
-  // Fetch real pole detail via Redux Saga (GET /api/v1/map/poles/{pole_id})
+  // Fetch real pole detail via Redux Saga (GET /api/v1/map/poles/{pole_id});
+  // tải lại khi trạng thái đèn của cột trên bản đồ đổi (chi tiết cột được ưu tiên hơn dữ liệu bản đồ nên không được để cũ)
+  const liveFixtureStatus = selectedPole?.properties?.fixture_status
   React.useEffect(() => {
     if (!poleId) {
       dispatch(clearPoleDetail())
@@ -357,7 +357,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     }
 
     dispatch(fetchPoleDetailRequest(poleId))
-  }, [dispatch, poleId])
+  }, [dispatch, poleId, liveFixtureStatus])
 
   // Real open faults from poleDetail
   const openFaults = poleDetail?.open_faults || []
@@ -397,7 +397,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
   // Accordion state: auto-open if pole has issue, otherwise collapsed
   const hasIssue =
     selectedPole?.properties?.fixture_status === 'out' ||
-    selectedPole?.properties?.fixture_status === 'dim' ||
     openFaults.length > 0 ||
     (selectedPole?.properties?.open_fault_count || 0) > 0
 

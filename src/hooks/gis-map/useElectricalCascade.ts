@@ -12,9 +12,13 @@ import {
   type SearchResultItem,
 } from '../../utils/gis-map/gisSearchUtils'
 import { fetchMapLayersRequest } from '../../feature/map/mapSlice'
-import { fetchAssetsRequest } from '../../feature/assets/assetSlice'
+import { fetchAssetsRequest, refreshFeedersRequest } from '../../feature/assets/assetSlice'
 import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
 import { toBboxParam } from '../../utils/gis-map/mapUtils'
+
+/** Chu kỳ làm mới ngầm trên GIS: mạch (power_state, nhẹ) nhanh, lớp bản đồ (trạng thái đèn, nặng hơn) thưa hơn. */
+export const GIS_FEEDER_REFRESH_MS = 5_000
+export const GIS_MAP_REFRESH_MS = 15_000
 
 interface UseElectricalCascadeProps {
   statusFilter: string
@@ -50,6 +54,21 @@ export function useElectricalCascade({
   useEffect(() => {
     dispatch(fetchMapLayersRequest())
   }, [dispatch, boundsKey])
+
+  // Giữ màu chấm cột / mạch đúng với trạng thái mới: làm mới nền định kỳ khi tab đang mở (không bật loading, không chớp map)
+  useEffect(() => {
+    const visible = () => document.visibilityState === 'visible'
+    const feederTimer = window.setInterval(() => {
+      if (visible()) dispatch(refreshFeedersRequest())
+    }, GIS_FEEDER_REFRESH_MS)
+    const mapTimer = window.setInterval(() => {
+      if (visible()) dispatch(fetchMapLayersRequest())
+    }, GIS_MAP_REFRESH_MS)
+    return () => {
+      window.clearInterval(feederTimer)
+      window.clearInterval(mapTimer)
+    }
+  }, [dispatch])
 
   // Tự động nạp dữ liệu kiểm kê tài sản (assets) và danh mục tuyến đường để đảm bảo luôn có đủ tuyến cho cả Manager & Superior
   useEffect(() => {
@@ -251,7 +270,9 @@ export function useElectricalCascade({
         return false
       }
 
-      if (statusFilter !== 'all' && p.fixture_status !== statusFilter) {
+      // Đèn chỉ còn bình thường / hỏng: dữ liệu cũ `dim` lọc như bình thường
+      const lampStatus = p.fixture_status === 'dim' ? 'normal' : p.fixture_status
+      if (statusFilter !== 'all' && lampStatus !== statusFilter) {
         return false
       }
 

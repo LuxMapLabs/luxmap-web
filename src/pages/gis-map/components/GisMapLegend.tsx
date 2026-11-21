@@ -6,7 +6,6 @@ import { FEEDER_LINE_UI, POLE_LAMP_UI, type FeederLineStatus, type PoleLampState
 const LEGEND_POLES: { status: PoleLampState; label: string }[] = [
   { status: 'normal', label: 'Bình thường' },
   { status: 'off', label: POLE_LAMP_UI.off.label },
-  { status: 'dim', label: POLE_LAMP_UI.dim.label },
   { status: 'out', label: POLE_LAMP_UI.out.label },
   { status: 'unknown', label: POLE_LAMP_UI.unknown.label },
 ]

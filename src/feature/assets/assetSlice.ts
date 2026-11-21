@@ -170,6 +170,11 @@ const assetSlice = createSlice({
       state.iotNodes = action.payload.iotNodes || []
       state.loadAssetsError = null
     },
+    // Làm mới riêng danh sách mạch (power_state) cho GIS: không bật cờ loading, lỗi thì bỏ qua
+    refreshFeedersRequest: () => {},
+    refreshFeedersSuccess: (state, action: PayloadAction<FeederListItem[]>) => {
+      state.feeders = action.payload
+    },
     fetchAssetsFailure: (state, action: PayloadAction<string>) => {
       state.isLoadingAssets = false
       state.loadAssetsError = action.payload
@@ -386,6 +391,8 @@ const assetSlice = createSlice({
 export const {
   fetchAssetsRequest,
   fetchAssetsSuccess,
+  refreshFeedersRequest,
+  refreshFeedersSuccess,
   fetchAssetsFailure,
   createPoleRequest,
   createPolesBulkRequest,
