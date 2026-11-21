@@ -28,6 +28,14 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>21/11/2026 — Hồ sơ: thêm dòng "Chức vụ"</dt>
+        <dd>Danh sách thông tin trong hộp hồ sơ có dòng "Chức vụ" ngay dưới "Họ và tên", hiện tên vai trò (ví dụ "Quản lý") lấy từ <code>role</code> sẵn có của <code>/auth/me</code>. Không có trường mới ở backend.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/components/ProfileModal.tsx</code>; <code>src/test/00-common/ProfileModal.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(profile): show the role as a "Chức vụ" row</code> — nhánh <code>feat/profile-role-row</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>vitest</code> 757/757 (1 test mới), <code>tsc</code>, build, eslint (0 lỗi); phá thử đổi nhãn → test đỏ. ⚠️ Chưa xem trên trình duyệt thật.</dd>
         <dt>19/11/2026 — Ảnh đại diện: thu nhỏ trên trình duyệt trước khi gửi</dt>
         <dd>Người dùng chọn ảnh JPEG/PNG dung lượng bao nhiêu cũng được: <code>convertToJpeg</code> (thêm tham số <code>maxEdge</code> + hàm <code>fitWithin</code>) thu về cạnh dài 1024 px, nền trắng, JPEG 0.85 rồi mới upload. Giới hạn backend (1 MB, 16 triệu pixel) giữ nguyên. Chú thích dưới avatar thành "Ảnh JPEG hoặc PNG"; có spinner khi đang xử lý; ảnh không đọc được hoặc vẫn quá 1 MB sau khi thu nhỏ → báo lỗi.</dd>
         <dt>File thay đổi</dt>
