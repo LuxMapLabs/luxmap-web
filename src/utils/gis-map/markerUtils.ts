@@ -102,6 +102,23 @@ export function registerSvgIcon(map: maplibregl.Map, id: string, svg: string, si
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
 }
 
+/**
+ * Chữ ký của một marker cột: đổi chữ ký thì mới phải dựng lại marker đó (đổi trạng thái, vị trí, chọn/bỏ chọn...).
+ * Cùng chữ ký thì giữ nguyên marker cũ, tránh xoá và tạo lại hàng loạt chấm mỗi lần dữ liệu làm mới.
+ */
+export function poleMarkerSignature(
+  feature: PoleFeature,
+  flags: { isSelected: boolean; isManagedBySelectedCabinet: boolean; isOtherCabinetSelected: boolean }
+): string {
+  return JSON.stringify([
+    feature.geometry?.coordinates,
+    feature.properties,
+    flags.isSelected,
+    flags.isManagedBySelectedCabinet,
+    flags.isOtherCabinetSelected,
+  ])
+}
+
 interface CreatePoleMarkerParams {
   feature: PoleFeature
   isSelected: boolean

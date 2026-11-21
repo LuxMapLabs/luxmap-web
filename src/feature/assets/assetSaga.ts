@@ -41,6 +41,8 @@ import {
   fetchAssetsRequest,
   fetchAssetsSuccess,
   fetchAssetsFailure,
+  refreshFeedersRequest,
+  refreshFeedersSuccess,
   importAssetRequest,
   importAssetSuccess,
   importAssetFailure,
@@ -180,6 +182,16 @@ function* handleFetchAssets() {
       'Không thể tải dữ liệu danh mục tài sản từ máy chủ Backend.'
     )
     yield put(fetchAssetsFailure(errorMsg))
+  }
+}
+
+/** Làm mới riêng danh sách mạch (power_state) cho GIS; lỗi mạng thì giữ dữ liệu cũ, không báo. */
+export function* handleRefreshFeeders() {
+  try {
+    const res: FeederListItemPagedResult = yield call(assetAPI.getFeeders, { page_size: 1000 })
+    yield put(refreshFeedersSuccess(res.items ?? []))
+  } catch {
+    // giữ nguyên dữ liệu hiện có
   }
 }
 
@@ -933,6 +945,7 @@ function* handleIssueIotNodeCredential(action: PayloadAction<IssueIotNodeCredent
 
 export default function* assetSaga() {
   yield takeLatest(fetchAssetsRequest.type, handleFetchAssets)
+  yield takeLatest(refreshFeedersRequest.type, handleRefreshFeeders)
   yield takeLatest(importAssetRequest.type, handleImportAsset)
   yield takeLeading(exportWorkbookRequest.type, handleExportWorkbook)
   yield takeLeading(downloadTemplateRequest.type, handleDownloadTemplate)

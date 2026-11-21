@@ -4,6 +4,7 @@ import type { PoleFeature } from '../../pages/gis-map/GisMapPage'
 import {
   createPoleMarkerElement,
   createCabinetMarkerElement,
+  poleMarkerSignature,
 } from '../../utils/gis-map/markerUtils'
 import {
   getPoleTooltipHtml,
@@ -44,8 +45,9 @@ export function useGisMarkers({
   onSelectPole,
   onSelectCabinet,
 }: UseGisMarkersProps) {
-  const poleMarkersRef = useRef<maplibregl.Marker[]>([])
-  const cabinetMarkersRef = useRef<maplibregl.Marker[]>([])
+  // Khoá = pole_id (hoặc toạ độ nếu thiếu): chỉ dựng lại marker có chữ ký đổi
+  const poleMarkersRef = useRef<Map<string, { marker: maplibregl.Marker; signature: string }>>(new Map())
+  const cabinetMarkersRef = useRef<Map<string, { marker: maplibregl.Marker; signature: string }>>(new Map())
   const lastShowPolesAndLinesRef = useRef<boolean | null>(null)
 
   // Level of Detail (LOD) visibility based on Zoom level
@@ -57,7 +59,7 @@ export function useGisMarkers({
     map.getContainer().classList.toggle(ZOOM_OUT_CLASS, zoom < SELECTED_FULL_SIZE_ZOOM)
 
     // 1. Pole Markers
-    poleMarkersRef.current.forEach((m) => {
+    poleMarkersRef.current.forEach(({ marker: m }) => {
       const wrap = m.getElement()?.firstElementChild as HTMLElement | null
       if (wrap) {
         wrap.classList.toggle('gis-marker-visible', showPolesAndLines)
@@ -66,7 +68,7 @@ export function useGisMarkers({
     })
 
     // 2. Cabinet Markers
-    cabinetMarkersRef.current.forEach((marker) => {
+    cabinetMarkersRef.current.forEach(({ marker }) => {
       const wrap = marker.getElement()?.firstElementChild as HTMLElement | null
       if (wrap) {
         wrap.classList.toggle('gis-marker-visible', showCabinets)
@@ -116,8 +118,8 @@ export function useGisMarkers({
   useEffect(() => {
     if (!map || !isMapLoaded) return
 
-    poleMarkersRef.current.forEach((m) => m.remove())
-    poleMarkersRef.current = []
+    const existing = poleMarkersRef.current
+    const next = new Map<string, { marker: maplibregl.Marker; signature: string }>()
 
     const cabinetCoordKeys = new Set(
       cabinets.map((c: any) => {
@@ -139,6 +141,20 @@ export function useGisMarkers({
 
       // Không vẽ marker cột đèn bên dưới tủ điện khi trùng vị trí để tránh đè layer
       if (cabinetCoordKeys.has(coordKey) && !isSelected) {
+        return
+      }
+
+      const key = f.properties?.pole_id || coordKey
+      const signature = poleMarkerSignature(f, {
+        isSelected: Boolean(isSelected),
+        isManagedBySelectedCabinet,
+        isOtherCabinetSelected,
+      })
+      const old = existing.get(key)
+      if (old && old.signature === signature) {
+        // Không có gì đổi: giữ marker cũ, không đụng tới DOM
+        next.set(key, old)
+        existing.delete(key)
         return
       }
 
@@ -171,9 +187,18 @@ export function useGisMarkers({
         },
       })
 
+      // Marker cũ của cùng cột (nếu có) được thay bằng bản mới
+      if (old) {
+        old.marker.remove()
+        existing.delete(key)
+      }
       const marker = new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map)
-      poleMarkersRef.current.push(marker)
+      next.set(key, { marker, signature })
     })
+
+    // Marker còn sót lại là cột đã bị lọc / xoá / trùng vị trí với tủ
+    existing.forEach(({ marker }) => marker.remove())
+    poleMarkersRef.current = next
 
     updateZoomVisibility()
   }, [map, isMapLoaded, filteredFeatures, selectedPole, selectedCabinet, cabinets, onSelectPole, updateZoomVisibility])
@@ -182,13 +207,24 @@ export function useGisMarkers({
   useEffect(() => {
     if (!map || !isMapLoaded) return
 
-    cabinetMarkersRef.current.forEach((m) => m.remove())
-    cabinetMarkersRef.current = []
+    const existing = cabinetMarkersRef.current
+    const next = new Map<string, { marker: maplibregl.Marker; signature: string }>()
 
-    cabinets.forEach((cab) => {
+    cabinets.forEach((cab, idx) => {
       const p = cab.properties || {}
       const coords = cab.geometry.coordinates as [number, number]
       const isSelected = selectedCabinet && selectedCabinet.cabinet_id === p.cabinet_id
+
+      // Giống marker cột: dữ liệu làm mới mà tủ này không đổi thì giữ nguyên marker
+      const key = p.cabinet_id || `idx-${idx}`
+      const signature = JSON.stringify([coords, p, Boolean(isSelected)])
+      const old = existing.get(key)
+      existing.delete(key)
+      if (old && old.signature === signature) {
+        next.set(key, old)
+        return
+      }
+      old?.marker.remove()
 
       const el = createCabinetMarkerElement({
         cabinet: cab,
@@ -222,8 +258,11 @@ export function useGisMarkers({
       })
 
       const marker = new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map)
-      cabinetMarkersRef.current.push(marker)
+      next.set(key, { marker, signature })
     })
+
+    existing.forEach(({ marker }) => marker.remove())
+    cabinetMarkersRef.current = next
 
     updateZoomVisibility()
   }, [map, isMapLoaded, cabinets, selectedCabinet, onSelectCabinet, updateZoomVisibility])
@@ -231,8 +270,10 @@ export function useGisMarkers({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      poleMarkersRef.current.forEach((m) => m.remove())
-      cabinetMarkersRef.current.forEach((m) => m.remove())
+      poleMarkersRef.current.forEach(({ marker }) => marker.remove())
+      poleMarkersRef.current = new Map()
+      cabinetMarkersRef.current.forEach(({ marker }) => marker.remove())
+      cabinetMarkersRef.current = new Map()
     }
   }, [])
 }

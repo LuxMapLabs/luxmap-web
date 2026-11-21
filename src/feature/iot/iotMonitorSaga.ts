@@ -13,7 +13,8 @@ import {
 } from 'redux-saga/effects'
 import { toast } from 'sonner'
 import iotAPI from './iotAPI'
-import { fetchCabinetTopologyRequest } from '../map/mapSlice'
+import { fetchCabinetTopologyRequest, fetchMapLayersRequest } from '../map/mapSlice'
+import { refreshFeedersRequest } from '../assets/assetSlice'
 import {
   CABINET_IOT_REFRESH_MS,
   COMMAND_MODE_POLL_MS,
@@ -701,6 +702,17 @@ function* commandHistoryManager(): Generator<unknown, void, unknown> {
 // ==========================================
 // I. Gửi lệnh Bật / Tắt / AUTO (GisDrawerPanel)
 // ==========================================
+/** Node xác nhận rơ-le chậm vài giây: làm mới power_state của mạch (màu đường + chấm cột trên GIS) ở các mốc này. */
+export const COMMAND_REFRESH_DELAYS_MS = [3000, 8000]
+
+export function* refreshAfterCommand() {
+  for (const ms of COMMAND_REFRESH_DELAYS_MS) {
+    yield delay(ms)
+    yield put(refreshFeedersRequest())
+    yield put(fetchMapLayersRequest())
+  }
+}
+
 function* sendCommandWorker(action: ReturnType<typeof sendCommandRequest>) {
   const { feederId, nodeId, mode, body, cabinetId } = action.payload
   try {
@@ -711,6 +723,7 @@ function* sendCommandWorker(action: ReturnType<typeof sendCommandRequest>) {
       yield put(fetchCabinetTopologyRequest(cabinetId))
     }
     yield put(sendCommandSuccess())
+    yield fork(refreshAfterCommand)
   } catch (err) {
     toast.error(
       apiErrorMessage(err, `Không gửi được lệnh tới IoT bridge (mạch ${feederId}).`)
