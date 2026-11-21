@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 
@@ -14,6 +14,7 @@ import rootReducer from '../../redux/rootReducer'
 import { ProfileModal } from '../../components/ProfileModal'
 import { convertToJpeg, fitWithin } from '../../utils/imageUtils'
 import type { CurrentUserResponse } from '../../types/auth/me'
+import { avatarSubmitDone, removeAvatarRequest } from '../../feature/avatar/avatarSlice'
 
 const user = {
   user_id: 'U-1',
@@ -26,18 +27,22 @@ const user = {
   avatar_url: null,
 } as unknown as CurrentUserResponse
 
-const renderModal = () => {
+const renderModal = (profileUser = user) => {
   const store = configureStore({
     reducer: rootReducer,
     middleware: (getDefault) => getDefault({ serializableCheck: false }),
   })
-  const view = render(
+  const onClose = vi.fn()
+  const modal = (isOpen: boolean, currentUser = profileUser) => (
     <Provider store={store}>
-      <ProfileModal isOpen onClose={vi.fn()} user={user} />
+      <ProfileModal isOpen={isOpen} onClose={onClose} user={currentUser} />
     </Provider>
   )
+  // Spy before the first render: handlers from that render capture store.dispatch.
+  const dispatch = vi.spyOn(store, 'dispatch')
+  const view = render(modal(true))
   const input = view.container.querySelector('input[type="file"]') as HTMLInputElement
-  return { store, input }
+  return { store, input, dispatch, onClose, rerender: (isOpen: boolean, currentUser = profileUser) => view.rerender(modal(isOpen, currentUser)) }
 }
 
 const pick = (input: HTMLInputElement, file: File) => fireEvent.change(input, { target: { files: [file] } })
@@ -67,6 +72,71 @@ describe('ProfileModal', () => {
     const { input } = renderModal()
     expect(screen.getByRole('button', { name: 'Đổi ảnh đại diện' })).toBeInTheDocument()
     expect(input).toHaveAttribute('accept', 'image/jpeg,image/png')
+  })
+
+  it('asks for confirmation before dispatching avatar removal', () => {
+    const { dispatch } = renderModal({ ...user, avatar_url: '/api/v1/auth/me/avatar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ ảnh đại diện' }))
+    expect(screen.getByRole('dialog', { name: 'Gỡ ảnh đại diện?' })).toBeInTheDocument()
+    expect(dispatch).not.toHaveBeenCalledWith(removeAvatarRequest())
+  })
+
+  it('dispatches removal once and prevents further submission or dismissal while busy', () => {
+    const { dispatch, onClose } = renderModal({ ...user, avatar_url: '/api/v1/auth/me/avatar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ ảnh đại diện' }))
+    const confirm = screen.getByRole('button', { name: 'Gỡ ảnh' })
+    fireEvent.click(confirm)
+    expect(dispatch.mock.calls.filter(([action]) => removeAvatarRequest.match(action))).toHaveLength(1)
+    expect(confirm).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Huỷ' })).toBeDisabled()
+    fireEvent.click(confirm)
+    fireEvent.keyDown(confirm, { key: 'Escape' })
+    expect(dispatch.mock.calls.filter(([action]) => removeAvatarRequest.match(action))).toHaveLength(1)
+    expect(screen.getByRole('dialog', { name: 'Gỡ ảnh đại diện?' })).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('cancels without dispatching removal', () => {
+    const { dispatch } = renderModal({ ...user, avatar_url: '/api/v1/auth/me/avatar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ ảnh đại diện' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Huỷ' }))
+    expect(screen.queryByRole('dialog', { name: 'Gỡ ảnh đại diện?' })).not.toBeInTheDocument()
+    expect(dispatch).not.toHaveBeenCalledWith(removeAvatarRequest())
+  })
+
+  it('closes only the confirmation on Escape, keeping the profile open', () => {
+    const { onClose, dispatch } = renderModal({ ...user, avatar_url: '/api/v1/auth/me/avatar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ ảnh đại diện' }))
+    // Start on a dialog button so the event bubbles through document before window.
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Gỡ ảnh' }), { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Gỡ ảnh đại diện?' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Hồ sơ cá nhân' })).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(dispatch).not.toHaveBeenCalledWith(removeAvatarRequest())
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([true, false])('closes the confirmation when removal finishes (success: %s)', (success) => {
+    const { store, rerender } = renderModal({ ...user, avatar_url: '/api/v1/auth/me/avatar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ ảnh đại diện' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ ảnh' }))
+    if (success) rerender(true, { ...user, avatar_url: null })
+    act(() => { store.dispatch(avatarSubmitDone()) })
+    expect(screen.queryByRole('dialog', { name: 'Gỡ ảnh đại diện?' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Hồ sơ cá nhân' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Gỡ ảnh đại diện' }) !== null).toBe(!success)
+  })
+
+  it('resets confirmation when the profile closes or the user changes', () => {
+    const { rerender } = renderModal({ ...user, avatar_url: '/api/v1/auth/me/avatar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ ảnh đại diện' }))
+    rerender(false)
+    rerender(true)
+    expect(screen.queryByRole('dialog', { name: 'Gỡ ảnh đại diện?' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Gỡ ảnh đại diện' }))
+    rerender(true, { ...user, user_id: 'U-2', avatar_url: '/api/v1/auth/me/avatar' })
+    expect(screen.queryByRole('dialog', { name: 'Gỡ ảnh đại diện?' })).not.toBeInTheDocument()
   })
 
   it('refuses formats other than JPEG and PNG without converting', () => {
