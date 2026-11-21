@@ -381,7 +381,7 @@ export const VN_SPECIAL_ZONE_LABELS: FeatureCollection<Point, { label: string }>
 }
 
 export const SATELLITE_RASTER_PAINT = {
-  'raster-opacity': 0.8,
+  'raster-opacity': 1,
   'raster-brightness-min': 0.04,
   'raster-brightness-max': 1,
   'raster-contrast': 0.3,
@@ -390,8 +390,11 @@ export const SATELLITE_RASTER_PAINT = {
   'raster-fade-duration': 100,
 } as const
 
-// Nền xanh nhạt đặt dưới ảnh vệ tinh (ảnh trong 80%) để bù sắc vàng của ảnh MapTiler.
-export const SATELLITE_WHITE_BALANCE_COLOR = '#a9c3e8'
+// Nền tối đặt dưới ảnh vệ tinh: chỗ ô chưa tải xong chỉ tối nhẹ, không chớp xanh sáng như trước.
+export const SATELLITE_WHITE_BALANCE_COLOR = '#1f2937'
+
+export const SATELLITE_TILE_URL = `https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}?key=${MAPTILER_KEY}`
+export const SATELLITE_TILE_SIZE = 512
 
 /**
  * Bản đồ vệ tinh MapTiler Hybrid có lớp cân bằng trắng khử vàng và nhãn quần đảo Hoàng Sa - Trường Sa (Việt Nam).
@@ -413,8 +416,8 @@ export const GOOGLE_HYBRID_STYLE: StyleSpecification = Object.freeze({
     },
     satellite: {
       type: 'raster',
-      tiles: [`https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}?key=${MAPTILER_KEY}`],
-      tileSize: 512,
+      tiles: [SATELLITE_TILE_URL],
+      tileSize: SATELLITE_TILE_SIZE,
       maxzoom: 22,
       attribution:
         '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
