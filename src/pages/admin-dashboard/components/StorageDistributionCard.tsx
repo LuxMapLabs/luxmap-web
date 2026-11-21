@@ -4,6 +4,9 @@ import type { StorageSummary } from '../../../types/admin/system'
 import { formatBytes } from '../../../utils/admin-dashboard/formatters'
 import { useCountUp } from '../../../hooks/useCountUp'
 
+const formatShare = (ratio: number): string =>
+  ratio > 0 && ratio < 0.01 ? '<1%' : `${Math.round(ratio * 100)}%`
+
 interface StorageDistributionCardProps {
   storage?: StorageSummary
 }
@@ -18,9 +21,25 @@ export const StorageDistributionCard: React.FC<StorageDistributionCardProps> = (
   const dbBytes = storage?.database_bytes ?? 0
   const s3Bytes = (storage?.buckets || []).reduce((acc, b) => acc + (b.bytes ?? 0), 0)
 
+  const luxMapBytes = dbBytes + s3Bytes
+  const otherBytes = Math.max(0, diskUsed - luxMapBytes)
   const hasData = diskTotal > 0
-  const [freeValue, ...freeUnit] = formatBytes(diskFree, 1).split(' ')
-  const animatedFree = useCountUp(parseFloat(freeValue) || 0)
+  const [usedValue, usedUnit] = formatBytes(diskUsed, 1).split(' ')
+  const animatedUsed = useCountUp(parseFloat(usedValue) || 0)
+  const freeShare = disk?.free_ratio == null ? '-' : formatShare(disk.free_ratio)
+  const breakdown = [
+    {
+      name: 'Dữ liệu LuxMap',
+      bytes: luxMapBytes,
+      detail: `PostgreSQL ${formatBytes(dbBytes, 1)} · Ảnh MinIO ${formatBytes(s3Bytes, 1)}`,
+    },
+    {
+      name: 'Hệ thống & khác',
+      bytes: otherBytes,
+      detail: 'Hệ điều hành, Docker, log…',
+    },
+    { name: 'Trống', bytes: diskFree },
+  ]
 
   const donutData = [
     { name: 'Đã dùng', value: diskUsed, fill: disk?.low ? '#d64545' : 'var(--color-secondary)' },
@@ -44,24 +63,27 @@ export const StorageDistributionCard: React.FC<StorageDistributionCardProps> = (
           <div className="mt-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="admin-display text-5xl font-semibold leading-none text-slate-900 dark:text-white">
-                {animatedFree.toFixed(1)}
+                {Number(animatedUsed.toFixed(1))}{' '}
                 <span className="ml-1.5 text-xl font-medium text-slate-500 dark:text-slate-400">
-                  {freeUnit.join(' ')}
+                  {usedUnit}
                 </span>
               </div>
               <p className="mt-2 text-[13px] text-slate-500 dark:text-slate-400">
-                còn trống trên {formatBytes(diskTotal, 0)}
+                đã dùng trên {formatBytes(diskTotal, 1)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Còn trống {freeShare}
               </p>
             </div>
 
-            <div className="relative h-40 w-40 shrink-0" role="img" aria-label={`Đã dùng ${usedRatio}% dung lượng ổ cứng`}>
+            <div className="relative h-32 w-32 shrink-0" role="img" aria-label={`Đã dùng ${usedRatio}% dung lượng ổ cứng`}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={donutData}
                     dataKey="value"
-                    innerRadius={54}
-                    outerRadius={72}
+                    innerRadius={44}
+                    outerRadius={58}
                     startAngle={90}
                     endAngle={-270}
                     paddingAngle={2}
@@ -82,25 +104,21 @@ export const StorageDistributionCard: React.FC<StorageDistributionCardProps> = (
             </div>
           </div>
 
-          <dl className="mt-auto grid grid-cols-3 gap-3 pt-5 text-xs text-slate-500 dark:text-slate-400">
-            <div>
-              <dt>Trống</dt>
-              <dd className="mt-0.5 text-[15px] font-semibold text-slate-900 dark:text-white">
-                {formatBytes(diskFree, 0)}
-              </dd>
-            </div>
-            <div>
-              <dt>PostgreSQL</dt>
-              <dd className="mt-0.5 text-[15px] font-semibold text-slate-900 dark:text-white">
-                {formatBytes(dbBytes, 0)}
-              </dd>
-            </div>
-            <div>
-              <dt>MinIO S3</dt>
-              <dd className="mt-0.5 text-[15px] font-semibold text-slate-900 dark:text-white">
-                {formatBytes(s3Bytes, 0)}
-              </dd>
-            </div>
+          <dl className="mt-4 space-y-3 border-t border-slate-200/60 pt-4 text-xs text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
+            {breakdown.map((item) => (
+              <div key={item.name} className="flex items-start justify-between gap-3">
+                <dt className="min-w-0">
+                  <span className="font-medium text-slate-700 dark:text-slate-200">{item.name}</span>
+                  {item.detail && <span className="mt-1 block text-[11px]">{item.detail}</span>}
+                </dt>
+                <dd className="shrink-0 text-right">
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {formatBytes(item.bytes, 1)}
+                  </span>
+                  <span className="mt-0.5 block">{formatShare(item.bytes / diskTotal)}</span>
+                </dd>
+              </div>
+            ))}
           </dl>
         </>
       ) : (
