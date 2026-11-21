@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useSelector } from 'react-redux'
 import { X, Save, Shield, Mail, User, MapPin, Globe } from 'lucide-react'
@@ -6,6 +6,7 @@ import type { RootState } from '../../../redux/rootReducer'
 import type { UserAccountItem, UpdateUserRequest } from '../../../types/admin/users'
 import type { UserRole } from '../../../types/common/enums'
 import { USER_ROLE_LABELS } from '../../../constants/enums'
+import { ConfirmModal } from '../../iot-bridge/components/IotBridgeModal'
 import { UserAvatar } from '../../../components/UserAvatar'
 
 export interface EditUserModalProps {
@@ -28,22 +29,30 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('field_engineer')
   const [selectedCommune, setSelectedCommune] = useState<string>('')
+  const [confirmPayload, setConfirmPayload] = useState<UpdateUserRequest | null>(null)
+  const wasSubmitting = useRef(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const initialRole = (user?.role as UserRole) || 'field_engineer'
+  const initialCommune =
+    initialRole === 'system_admin'
+      ? ''
+      : (user?.commune_ids || []).find((id) => Boolean(id) && id !== '*' && id !== 'all') || ''
 
   useEffect(() => {
+    setConfirmPayload(null)
     if (user) {
       setEmail(user.email || '')
       setFullName(user.full_name || '')
-      const userRole = (user.role as UserRole) || 'field_engineer'
-      setRole(userRole)
-      const initialCommune =
-        userRole === 'system_admin'
-          ? ''
-          : (user.commune_ids || []).find((id) => Boolean(id) && id !== '*' && id !== 'all') || ''
+      setRole(initialRole)
       setSelectedCommune(initialCommune)
       setErrors({})
     }
-  }, [user])
+  }, [user, isOpen, initialRole, initialCommune])
+
+  useEffect(() => {
+    if (wasSubmitting.current && !isSubmitting) setConfirmPayload(null)
+    wasSubmitting.current = isSubmitting
+  }, [isSubmitting])
 
   if (!isOpen || !user) return null
 
@@ -85,17 +94,55 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     return Object.keys(newErrors).length === 0
   }
 
+  const effectiveCommune = role === 'system_admin' ? '' : selectedCommune
+  const roleChanged = role !== initialRole
+  const communeChanged = effectiveCommune !== initialCommune
+  const nameChanged = fullName.trim() !== (user.full_name || '').trim()
+  const emailChanged = email.trim() !== (user.email || '').trim()
+  const hasChanges = roleChanged || communeChanged || nameChanged || emailChanged
+  const communeLabel = (id: string, userRole: string) =>
+    userRole === 'system_admin'
+      ? 'Phạm vi toàn hệ thống'
+      : communes.find((c) => c.commune_id === id)?.name || id || '-'
+  const changes = [
+    ...(nameChanged ? [{
+      label: 'Họ và tên',
+      old: (user.full_name || '').trim() || '-',
+      next: fullName.trim() || '-',
+    }] : []),
+    ...(emailChanged ? [{
+      label: 'Email',
+      old: (user.email || '').trim() || '-',
+      next: email.trim() || '-',
+    }] : []),
+    ...(roleChanged ? [{
+      label: 'Vai trò',
+      old: USER_ROLE_LABELS[initialRole] || '-',
+      next: USER_ROLE_LABELS[role] || '-',
+    }] : []),
+    ...(communeChanged ? [{
+      label: 'Địa bàn',
+      old: communeLabel(initialCommune, initialRole),
+      next: communeLabel(effectiveCommune, role),
+    }] : []),
+  ]
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validate() || !user.user_id) return
+    if (isSubmitting || confirmPayload || !hasChanges || !validate() || !user.user_id) return
 
-    onSubmit(user.user_id, {
+    const payload: UpdateUserRequest = {
       email: email.trim(),
       full_name: fullName.trim(),
       role,
       // system_admin bao quát mọi địa bàn: backend yêu cầu không gửi commune_ids (ACCT-1)
       ...(role === 'system_admin' ? {} : { commune_ids: [selectedCommune] }),
-    })
+    }
+    if (roleChanged || communeChanged) {
+      setConfirmPayload(payload)
+    } else {
+      onSubmit(user.user_id, payload)
+    }
   }
 
   const selectedCommuneObj = communes.find((c) => c.commune_id === selectedCommune)
@@ -126,6 +173,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            disabled={isSubmitting}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -312,7 +360,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !hasChanges}
               className="px-5 py-2 rounded-xl bg-primary hover:bg-primary active:scale-95 text-white font-bold shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
               {isSubmitting ? (
@@ -330,6 +378,42 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
         </form>
       </div>
+      {confirmPayload && (
+        <ConfirmModal
+          title="Xác nhận thay đổi quyền?"
+          message={`${communeChanged ? 'Phạm vi dữ liệu tài khoản được phép xem sẽ thay đổi theo địa bàn mới. ' : ''}Quyền mới có hiệu lực khi người dùng đăng nhập lại hoặc trong tối đa 60 phút. Phiên đăng nhập hiện tại không bị thu hồi ngay.`}
+          confirmLabel="Xác nhận"
+          tone="primary"
+          busy={isSubmitting}
+          onCancel={() => setConfirmPayload(null)}
+          onConfirm={() => {
+            if (!isSubmitting && user.user_id) onSubmit(user.user_id, confirmPayload)
+          }}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left text-slate-700 dark:text-slate-300">
+              <thead>
+                <tr>
+                  <th scope="col">Thông tin</th>
+                  <th scope="col">Trước</th>
+                  <th scope="col" aria-label="Thay đổi" />
+                  <th scope="col">Sau</th>
+                </tr>
+              </thead>
+              <tbody>
+                {changes.map((change) => (
+                  <tr key={change.label} className="border-t border-slate-200">
+                    <th scope="row" className="py-2 pr-2">{change.label}</th>
+                    <td className="py-2 break-words">{change.old}</td>
+                    <td className="px-2">→</td>
+                    <td className="py-2 break-words">{change.next}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ConfirmModal>
+      )}
     </div>,
     document.body
   )
