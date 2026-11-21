@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Shield, Mail, MapPin, Globe, X, Camera, AtSign, User as UserIcon, Trash2, Loader2 } from 'lucide-react'
+import { Shield, Mail, MapPin, Globe, X, Camera, AtSign, User as UserIcon, Trash2, Loader2, Briefcase } from 'lucide-react'
 import type { CurrentUserResponse } from '../types/auth/me'
 import type { RootState } from '../redux/rootReducer'
 import { uploadAvatarRequest, removeAvatarRequest } from '../feature/avatar/avatarSlice'
@@ -174,6 +174,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
               <div className="min-w-0">
                 <dt className="text-[11px] text-slate-400 font-medium">Họ và tên</dt>
                 <dd className="font-semibold text-slate-900 break-words">{user.full_name || 'Chưa cập nhật'}</dd>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Briefcase className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <dt className="text-[11px] text-slate-400 font-medium">Chức vụ</dt>
+                <dd className="font-semibold text-slate-900">{roleName || '-'}</dd>
               </div>
             </div>
             <div className="flex items-start gap-3">

@@ -57,6 +57,12 @@ describe('ProfileModal', () => {
     expect(screen.queryByText('Chỉnh sửa hồ sơ')).not.toBeInTheDocument()
   })
 
+  it('lists the role as a "Chức vụ" row next to the name', () => {
+    renderModal()
+    const term = screen.getByText('Chức vụ')
+    expect(term.nextElementSibling).toHaveTextContent(/^Quản lý$/)
+  })
+
   it('offers the avatar picker straight away, accepting JPEG and PNG', () => {
     const { input } = renderModal()
     expect(screen.getByRole('button', { name: 'Đổi ảnh đại diện' })).toBeInTheDocument()
