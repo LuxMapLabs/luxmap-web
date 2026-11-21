@@ -20,7 +20,7 @@
     <p>Giao diện web quản lý tài sản và sự cố chiếu sáng. Bảng này bắt đầu ghi nhận từ ngày 20/10/2026; chưa tổng hợp lịch sử toàn dự án.</p>
     <section>
       <h2>Công việc hiện tại</h2>
-      <p>Hồ sơ cá nhân: một màn xem duy nhất, đổi ảnh đại diện (JPEG/PNG) ngay tại đó; họ tên và email chỉ đọc.</p>
+      <p>Quản trị tài khoản: xác nhận thay đổi vai trò/địa bàn với bảng giá trị trước → sau; giữ biểu mẫu khi cập nhật lỗi.</p>
       <label for="task-progress">Tiến độ bản sửa mã nguồn: 100%</label>
       <progress id="task-progress" value="100" max="100">100%</progress>
       <p>Lịch sử: hoàn tất ngày 20/10/2026, bản sửa <code>6b7a826</code> đã lên Production tại <a href="https://luxmap.com.vn">luxmap.com.vn</a> qua VPS. Vercel chỉ là bản Preview.</p>
@@ -28,6 +28,14 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>21/11/2026 — Xác nhận thay đổi quyền tài khoản</dt>
+        <dd>Khoá lưu khi không có thay đổi thực tế; xác nhận vai trò/địa bàn bằng bảng trước → sau (kèm họ tên/email nếu đổi). Chỉ sửa họ tên/email thì lưu trực tiếp. Nêu thời gian hiệu lực tối đa 60 phút, không thu hồi phiên ngay; chỉ nêu hậu quả địa bàn khi địa bàn đổi. Huỷ/Esc giữ lại chỉnh sửa. Khi gửi thì khoá nút; popup đóng khi xong, biểu mẫu chỉ đóng khi thành công.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/users/components/EditUserModal.tsx</code>; <code>src/pages/users/UserManagementPage.tsx</code>; <code>src/pages/iot-bridge/components/IotBridgeModal.tsx</code>; <code>src/test/06-admin/EditUserModal.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(users): confirm role and commune changes before saving</code> — nhánh <code>feat/edit-user-confirm-changes</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ Test mục tiêu 63/63; toàn bộ 794/794 (74 file); 18 test mới gồm luồng thành công/lỗi với Redux; TypeScript, lint (0 lỗi, 34 cảnh báo có sẵn), build đạt; phá thử bỏ popup / luôn coi là có thay đổi / đóng form ngay khi gửi → test đỏ. ⚠️ Chưa kiểm tra thủ công trên trình duyệt hoặc gửi PATCH thật.</dd>
         <dt>21/11/2026 — Hồ sơ: hỏi xác nhận trước khi gỡ ảnh đại diện</dt>
         <dd>Bấm "Gỡ ảnh đại diện" giờ mở popup xác nhận (<code>ConfirmModal</code> sẵn có, tông đỏ) thay vì gỡ ngay; chỉ khi bấm "Gỡ ảnh" mới dispatch <code>removeAvatarRequest</code>. Khi đang gỡ thì khoá nút, không bấm được hai lần; popup tự đóng khi xong (thành công hay lỗi). Esc trong popup chỉ đóng popup, không đóng cả hộp hồ sơ.</dd>
         <dt>File thay đổi</dt>

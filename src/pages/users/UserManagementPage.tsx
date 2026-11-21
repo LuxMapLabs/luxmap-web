@@ -44,6 +44,7 @@ export const AdminManagementPage: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   // Modal tạo mới chỉ đóng khi request xong và thành công (thất bại thì giữ lại để người dùng sửa)
   const [isCreatePending, setIsCreatePending] = useState(false)
+  const [isEditPending, setIsEditPending] = useState(false)
   const [editingUser, setEditingUser] = useState<UserAccountItem | null>(null)
   const [lockingUser, setLockingUser] = useState<UserAccountItem | null>(null)
 
@@ -104,9 +105,16 @@ export const AdminManagementPage: React.FC = () => {
     setIsCreatePending(true)
   }
 
+  useEffect(() => {
+    if (isEditPending && !isSubmitting) {
+      setIsEditPending(false)
+      if (!actionError) setEditingUser(null)
+    }
+  }, [isEditPending, isSubmitting, actionError])
+
   const handleEditSubmit = (id: string, payload: UpdateUserRequest) => {
     dispatch(updateUserRequest({ id, data: payload }))
-    setEditingUser(null)
+    setIsEditPending(true)
   }
 
   const handleConfirmToggleLock = () => {
