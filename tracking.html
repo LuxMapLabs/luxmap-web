@@ -28,6 +28,14 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>21/11/2026 — Quản trị tài khoản: hiện tài khoản đang đăng nhập</dt>
+        <dd>Bỏ bộ lọc ẩn tài khoản đang đăng nhập (có từ <code>e404283</code>, 23/10). Dòng của chính mình nằm đúng thứ tự server trả, có nhãn "Bạn"; nhận diện chỉ theo <code>user_id</code>. Nút khoá trên dòng đó bị vô hiệu ("Không thể khoá tài khoản của chính bạn"); sửa chính mình thì khoá vai trò và địa bàn, vẫn sửa được họ tên / email. Backend vốn đã chặn tự khoá (409) và hạ quyền admin cuối cùng (409).</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/users/UserManagementPage.tsx</code>; <code>src/pages/users/components/UserTable.tsx</code>; <code>src/pages/users/components/EditUserModal.tsx</code>; <code>src/test/06-admin/UserManagementPage.test.tsx</code>; <code>src/test/06-admin/EditUserModal.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(users): show the signed-in account in the user list</code> — nhánh <code>feat/users-show-self-row</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>vitest</code> 807/807 (13 test mới), <code>tsc</code>, build, eslint (0 lỗi); phá thử ẩn lại dòng của mình / mở nút khoá / mở ô vai trò → test đỏ. ⚠️ Chưa xem trên trình duyệt thật. Còn lại (chưa làm): ô tìm kiếm chỉ lọc trong trang đang xem.</dd>
         <dt>21/11/2026 — Tổng quan quản trị: làm rõ thẻ "Bộ nhớ máy chủ"</dt>
         <dd>Số lớn và vòng tròn cùng nói về dung lượng <em>đã dùng</em> ("29.7 GB đã dùng trên 38 GB", 78%), kèm "Còn trống x%" lấy từ <code>free_ratio</code> để nhãn An toàn / Sắp đầy có ngữ cảnh. Hàng dưới thành bảng phân bổ cộng đủ toàn ổ: Dữ liệu LuxMap (PostgreSQL · ảnh MinIO), Hệ thống &amp; khác (đã dùng − LuxMap, chặn ở 0), Trống — số trống chỉ hiện một lần; phần nhỏ hơn 1% ghi "&lt;1%". Không ghi cứng ngưỡng 15% (API chưa trả ngưỡng). Bỏ khoảng trắng giữa thẻ.</dd>
         <dt>File thay đổi</dt>

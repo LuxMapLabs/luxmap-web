@@ -13,6 +13,7 @@ export interface EditUserModalProps {
   isOpen: boolean
   user: UserAccountItem | null
   isSubmitting?: boolean
+  isSelf?: boolean
   onClose: () => void
   onSubmit: (id: string, payload: UpdateUserRequest) => void
 }
@@ -21,6 +22,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   isOpen,
   user,
   isSubmitting = false,
+  isSelf = false,
   onClose,
   onSubmit,
 }) => {
@@ -248,9 +250,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             <div className="relative">
               <Shield className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
+                disabled={isSelf}
+                aria-describedby={isSelf ? 'self-role-hint' : undefined}
                 value={role}
                 onChange={(e) => handleRoleChange(e.target.value as UserRole)}
-                className="w-full pl-9 pr-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition cursor-pointer"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {Object.entries(USER_ROLE_LABELS).map(([k, label]) => (
                   <option key={k} value={k} className="dark:bg-slate-900">
@@ -259,6 +263,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 ))}
               </select>
             </div>
+            {isSelf && (
+              <p id="self-role-hint" className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                Không thể đổi vai trò của chính bạn
+              </p>
+            )}
           </div>
 
           {/* Commune Scope */}
@@ -317,9 +326,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                         key={code}
                         type="button"
                         role="radio"
+                        disabled={isSelf}
                         aria-checked={isSelected}
                         onClick={() => handleSelectCommune(code)}
-                        className={`px-2.5 py-2 rounded-xl text-left flex items-center justify-between gap-2 transition cursor-pointer text-[11px] ${
+                        className={`px-2.5 py-2 rounded-xl text-left flex items-center justify-between gap-2 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-[11px] ${
                           isSelected
                             ? 'bg-secondary/10 dark:bg-primary text-primary dark:text-secondary/50 font-semibold border border-secondary/50 dark:border-primary shadow-2xs'
                             : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/80'
