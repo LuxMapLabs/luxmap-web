@@ -6,6 +6,7 @@ vi.mock('../../feature/iot/iotAPI', () => ({
     getNodes: vi.fn(() => Promise.resolve({ total: 0, items: [] })),
     getServers: vi.fn(() => Promise.resolve([])),
     getFeederElectricalHistory: vi.fn(() => new Promise(() => {})),
+    getCommand: vi.fn(() => Promise.resolve({})),
     getCommandHistory: vi.fn(() => Promise.resolve({ items: [] })),
   },
 }))

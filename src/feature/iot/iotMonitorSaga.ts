@@ -69,6 +69,7 @@ import {
 } from './iotMonitorSlice'
 import type {
   IotCommandHistoryItemPagedResult,
+  IotCommandStatus,
   IotDiagnosticResult,
   IotElectricalResult,
   IotNodeSourceDetails,
@@ -85,8 +86,8 @@ import type { IotServerStatus } from '../../types/iot/servers'
 import { apiErrorMessage } from '../../utils/iot/apiError'
 import { toElectricalPoint } from '../../utils/iot/electricalSeries'
 import {
+  currentChoice,
   latestSuccessAutoSchedule,
-  latestSuccessChoice,
   type IotCommandChoice,
 } from '../../utils/iot/iotCommand'
 
@@ -396,12 +397,11 @@ function* loadCommandModesOnce(key: string, ids: string[]) {
     ids.map((id) =>
       call(function* () {
         try {
-          const page: IotCommandHistoryItemPagedResult = yield call(
-            iotAPI.getCommandHistory,
-            id,
-            { page: 1, page_size: 20 }
+          const status: IotCommandStatus = yield call(
+            iotAPI.getCommand,
+            id
           )
-          return [id, latestSuccessChoice(page.items)] as const
+          return [id, currentChoice(status)] as const
         } catch {
           return [id, null] as const
         }

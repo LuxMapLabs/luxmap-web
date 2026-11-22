@@ -67,11 +67,19 @@ describe('FeederCommandDialog', () => {
 
   it('AUTO: shows the schedule in 24-hour HH:mm and sends it', () => {
     const { onSend } = renderDialog({ mode: 'auto', initial: { day_start: '05:30', night_start: '18:15' } })
-    expect(screen.getByRole('dialog', { name: 'Lịch AUTO mạch FDR-010' })).toHaveTextContent('Chạy AUTO theo lịch')
+    expect(screen.getByRole('dialog', { name: 'Lịch AUTO mạch FDR-010' })).toHaveTextContent('Chạy AUTO')
+    const group = screen.getByRole('group', { name: 'Kiểu AUTO' })
+    expect(group).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Theo lịch/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Cả ngày/ })).toHaveAttribute('aria-pressed', 'false')
+
     expect(screen.getByLabelText('Bắt đầu ban đêm')).toHaveValue('18:15')
     fireEvent.change(screen.getByLabelText('Bắt đầu ban ngày'), { target: { value: '06:00' } })
     fireEvent.click(screen.getByRole('button', { name: 'Gửi AUTO' }))
-    expect(onSend).toHaveBeenCalledWith({ day_start: '06:00', night_start: '18:15' })
+    expect(onSend).toHaveBeenCalledWith({
+      type: 'scheduled',
+      schedule: { day_start: '06:00', night_start: '18:15' },
+    })
   })
 
   it('AUTO: refuses a time that is not HH:mm', () => {
@@ -80,5 +88,23 @@ describe('FeederCommandDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Gửi AUTO' }))
     expect(screen.getByText('Lịch AUTO cần hai giờ khác nhau theo định dạng HH:mm.')).toBeInTheDocument()
     expect(onSend).not.toHaveBeenCalled()
+  })
+
+  it('AUTO: switching to "Cả ngày" hides time inputs, clears error, and sends full_time without schedule', () => {
+    const { onSend } = renderDialog({ mode: 'auto' })
+    fireEvent.change(screen.getByLabelText('Bắt đầu ban ngày'), { target: { value: 'invalid' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi AUTO' }))
+    expect(screen.getByText('Lịch AUTO cần hai giờ khác nhau theo định dạng HH:mm.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Cả ngày/ }))
+    expect(screen.getByRole('button', { name: /Cả ngày/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Theo lịch/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByLabelText('Bắt đầu ban ngày')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Bắt đầu ban đêm')).not.toBeInTheDocument()
+    expect(screen.queryByText('Lịch AUTO cần hai giờ khác nhau theo định dạng HH:mm.')).not.toBeInTheDocument()
+    expect(screen.getByText('Theo cảm biến ánh sáng, không theo giờ')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi AUTO' }))
+    expect(onSend).toHaveBeenCalledWith({ type: 'full_time' })
   })
 })

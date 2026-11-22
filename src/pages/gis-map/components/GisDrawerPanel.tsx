@@ -39,7 +39,7 @@ import {
   selectCommandSend,
   selectAutoPrefill,
 } from '../../../feature/iot/iotMonitorSlice'
-import { commandBody } from '../../../utils/iot/iotCommand'
+import { autoBody, commandBody, type IotAutoType } from '../../../utils/iot/iotCommand'
 import { toast } from 'sonner'
 import type { FaultType, Severity, FaultStatus, FeederControlMode } from '../../../types/common/enums'
 import type { PoleMapOpenFault } from '../../../types/map/poles'
@@ -288,10 +288,10 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
     feederId: string,
     nodeId: string,
     mode: FeederControlMode,
-    schedule?: { day_start: string; night_start: string }
+    auto?: { type: IotAutoType; schedule?: { day_start: string; night_start: string } }
   ) => {
     commandSentRef.current = true
-    const body = schedule ? { ...commandBody('auto'), auto_schedule: schedule } : commandBody(mode)
+    const body = auto ? autoBody(auto.type, auto.schedule) : commandBody(mode)
     dispatch(
       sendCommandRequest({
         feederId,
@@ -586,7 +586,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
         <FeederCommandDialog
           target={commandTarget}
           sending={sendingCommand}
-          onSend={(schedule) => sendFeederCommand(commandTarget.feederId, commandTarget.nodeId, commandTarget.mode, schedule)}
+          onSend={(auto) => sendFeederCommand(commandTarget.feederId, commandTarget.nodeId, commandTarget.mode, auto)}
           onClose={() => setCommandTarget(null)}
         />
       )}
@@ -1067,9 +1067,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
-                    {/* Dòng Gateway */}
+                    {/* Dòng Trạm IoT */}
                     <div className="flex items-start gap-2">
-                      <span className="text-slate-500 dark:text-slate-400 shrink-0 w-16 font-medium">Gateway</span>
+                      <span className="text-slate-500 dark:text-slate-400 shrink-0 w-16 font-medium">Trạm IoT</span>
                       <div className="flex-1 space-y-1 min-w-0">
                         {cabinetIotServers.length > 0 ? (
                           cabinetIotServers.map((server) => {

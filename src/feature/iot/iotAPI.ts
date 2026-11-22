@@ -50,6 +50,12 @@ export const iotAPI = {
     return response.data
   },
 
+  /** GET /api/v1/iot/nodes/{nodeId}/command — trạng thái lệnh điều khiển hiện tại của node. */
+  getCommand: async (nodeId: string): Promise<IotCommandStatus> => {
+    const response = await apiClient.get<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`)
+    return response.data
+  },
+
   /** POST /api/v1/iot/nodes/{nodeId}/command — 202: bridge đã nhận lệnh, node CHƯA xác nhận. */
   sendCommand: async (nodeId: string, body: IotCommandRequest): Promise<IotCommandStatus> => {
     const response = await apiClient.post<IotCommandStatus>(`/iot/nodes/${encodeURIComponent(nodeId)}/command`, body)

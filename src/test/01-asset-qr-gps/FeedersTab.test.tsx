@@ -24,6 +24,7 @@ vi.mock('../../feature/iot/iotAPI', () => ({
     getFeederElectricalHistory: vi.fn(),
     getFeederElectricalHistoryReceived: vi.fn(),
     getFeederDiagnosticHistory: vi.fn(),
+    getCommand: vi.fn(),
     getCommandHistory: vi.fn(),
   },
 }))
