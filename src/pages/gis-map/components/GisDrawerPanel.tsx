@@ -1067,9 +1067,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-400">
-                    {/* Dòng Gateway */}
+                    {/* Dòng Trạm IoT */}
                     <div className="flex items-start gap-2">
-                      <span className="text-slate-500 dark:text-slate-400 shrink-0 w-16 font-medium">Gateway</span>
+                      <span className="text-slate-500 dark:text-slate-400 shrink-0 w-16 font-medium">Trạm IoT</span>
                       <div className="flex-1 space-y-1 min-w-0">
                         {cabinetIotServers.length > 0 ? (
                           cabinetIotServers.map((server) => {
