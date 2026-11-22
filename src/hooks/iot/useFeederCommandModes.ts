@@ -9,12 +9,12 @@ import {
   type IotMonitorState,
 } from '../../feature/iot/iotMonitorSlice'
 
-/** Chu kỳ đọc lại lịch sử lệnh: lệnh vừa gửi còn pending, node ACK thì mới thành success. */
+/** Chu kỳ đọc lại trạng thái lệnh hiện tại của node từ GET /iot/nodes/{nodeId}/command. */
 export { COMMAND_MODE_POLL_MS } from '../../feature/iot/iotMonitorSlice'
 
 /**
- * Chế độ Bật / Tắt / AUTO đang chạy của từng node, theo lệnh `success` mới nhất ở
- * GET /iot/nodes/{nodeId}/command/history. Node lỗi hoặc chưa có lệnh success → null.
+ * Chế độ Bật / Tắt / AUTO đang chạy của từng node, đọc từ
+ * GET /iot/nodes/{nodeId}/command. Node lỗi hoặc chưa có mode → null.
  * `refreshKey` đổi (vd. sau khi gửi lệnh) thì đọc lại ngay.
  */
 export function useFeederCommandModes(nodeIds: string[], refreshKey = 0): Record<string, IotCommandChoice | null> {

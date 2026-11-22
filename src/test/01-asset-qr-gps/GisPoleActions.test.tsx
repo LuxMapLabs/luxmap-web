@@ -10,6 +10,7 @@ import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
     getPoleControl: vi.fn(() => Promise.resolve(null)),
+    getCommand: vi.fn(() => Promise.resolve({})),
     sendCommand: vi.fn(),
     getFeederElectricalHistory: vi.fn(() => new Promise(() => {})),
     getCommandHistory: vi.fn(() => Promise.resolve({ items: [] })),
@@ -343,9 +344,11 @@ describe('Khung cột trên Bản đồ GIS: sửa thông tin cột và gắn b�
   })
 
   it('khung cột không có thẻ IoT: không gọi API IoT nào, IoT chỉ xem ở tủ điện', async () => {
+    vi.mocked(iotAPI.getCommand).mockClear()
     vi.mocked(iotAPI.getCommandHistory).mockClear()
     setup('manager')
     await act(async () => {})
+    expect(iotAPI.getCommand).not.toHaveBeenCalled()
     expect(iotAPI.getCommandHistory).not.toHaveBeenCalled()
     expect(screen.queryByText(/qua IoT/)).not.toBeInTheDocument()
   })
@@ -404,7 +407,26 @@ describe('Khung mạch điện: Bật / Tắt / AUTO gửi POST /iot/nodes/{node
       expect(iotAPI.sendCommand).toHaveBeenLastCalledWith('NODE-004', {
         mode: 'AUTO',
         command: null,
+        auto_type: 'scheduled',
         auto_schedule: { day_start: '05:45', night_start: '17:50' },
+      })
+    )
+  })
+
+  it('gửi lệnh AUTO kiểu Cả ngày (full_time) không kèm auto_schedule', async () => {
+    vi.mocked(iotAPI.sendCommand).mockReset().mockResolvedValue({ node_id: 'NODE-004', command_id: 'c2' })
+    vi.mocked(iotAPI.getCommandHistory).mockResolvedValue({ items: [] })
+    setup('manager', { selectedPole: null, selectedFeeder: feeder('NODE-004') })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Auto' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Lịch AUTO mạch FDR-010' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cả ngày/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Gửi AUTO' }))
+    await waitFor(() =>
+      expect(iotAPI.sendCommand).toHaveBeenCalledWith('NODE-004', {
+        mode: 'AUTO',
+        command: null,
+        auto_type: 'full_time',
       })
     )
   })
@@ -417,17 +439,15 @@ describe('Khung mạch điện: Bật / Tắt / AUTO gửi POST /iot/nodes/{node
     expect(iotAPI.sendCommand).not.toHaveBeenCalled()
   })
 
-  it('nút đang sáng là chế độ của lệnh success mới nhất (lệnh pending mới hơn không tính)', async () => {
-    vi.mocked(iotAPI.getCommandHistory).mockResolvedValue({
-      items: [
-        { command_id: 'c2', mode: 'MANUAL', command: 'ON', status: 'pending' },
-        { command_id: 'c1', mode: 'MANUAL', command: 'OFF', status: 'success' },
-      ],
+  it('nút đang sáng là chế độ lấy từ GET /iot/nodes/{nodeId}/command', async () => {
+    vi.mocked(iotAPI.getCommand).mockResolvedValue({
+      mode: 'MANUAL',
+      command: 'OFF',
     })
     setup('manager', { selectedPole: null, selectedFeeder: feeder('NODE-004') })
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Tắt' })).toHaveAttribute('aria-pressed', 'true'))
-    expect(iotAPI.getCommandHistory).toHaveBeenCalledWith('NODE-004', { page: 1, page_size: 20 })
+    expect(iotAPI.getCommand).toHaveBeenCalledWith('NODE-004')
     expect(screen.getByRole('button', { name: 'Bật' })).toHaveAttribute('aria-pressed', 'false')
     // control_mode cũ trong dữ liệu tài sản (auto) không còn quyết nút nào sáng
     expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'false')

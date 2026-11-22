@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { commandBody, currentChoice, isClock } from '../../utils/iot/iotCommand'
+import { autoBody, autoTypeOf, commandBody, currentChoice, isClock } from '../../utils/iot/iotCommand'
 import { IOT_GATEWAY_STATUS, IOT_NODE_STATUS, iotStatusBadge } from '../../constants/iot'
 
 describe('iotCommand', () => {
@@ -7,6 +7,41 @@ describe('iotCommand', () => {
     expect(commandBody('on')).toEqual({ mode: 'MANUAL', command: 'ON' })
     expect(commandBody('off')).toEqual({ mode: 'MANUAL', command: 'OFF' })
     expect(commandBody('auto')).toEqual({ mode: 'AUTO', command: null })
+  })
+
+  it('builds AUTO command body for scheduled and full_time', () => {
+    expect(autoBody('scheduled', { day_start: '06:00', night_start: '18:00' })).toEqual({
+      mode: 'AUTO',
+      command: null,
+      auto_type: 'scheduled',
+      auto_schedule: { day_start: '06:00', night_start: '18:00' },
+    })
+    expect(autoBody('scheduled')).toEqual({
+      mode: 'AUTO',
+      command: null,
+      auto_type: 'scheduled',
+    })
+    expect('auto_schedule' in autoBody('scheduled')).toBe(false)
+
+    const fullTimeBody = autoBody('full_time', { day_start: '06:00', night_start: '18:00' })
+    expect(fullTimeBody).toEqual({
+      mode: 'AUTO',
+      command: null,
+      auto_type: 'full_time',
+    })
+    expect('auto_schedule' in fullTimeBody).toBe(false)
+  })
+
+  it('extracts autoTypeOf from command status', () => {
+    expect(autoTypeOf({ mode: 'AUTO', auto_type: 'full_time' })).toBe('full_time')
+    expect(autoTypeOf({ mode: 'AUTO', auto_type: 'scheduled' })).toBe('scheduled')
+    expect(autoTypeOf({ mode: 'AUTO', auto_type: null })).toBe('scheduled')
+    expect(autoTypeOf({ mode: 'AUTO' })).toBe('scheduled')
+    expect(autoTypeOf({ mode: 'auto', auto_type: 'full_time' })).toBe('full_time')
+    expect(autoTypeOf({ mode: 'auto' })).toBe('scheduled')
+    expect(autoTypeOf({ mode: 'MANUAL', auto_type: 'full_time' })).toBeNull()
+    expect(autoTypeOf(null)).toBeNull()
+    expect(autoTypeOf(undefined)).toBeNull()
   })
 
   it('reads the current command back', () => {

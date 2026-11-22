@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Clock, Loader2, Moon, Sun, X } from 'lucide-react'
 import type { FeederControlMode } from '../../../types/common/enums'
 import type { IotAutoSchedule } from '../../../types/iot/nodes'
+import type { IotAutoType } from '../../../utils/iot/iotCommand'
 import { AutoScheduleForm } from './AutoScheduleForm'
 
 export interface FeederCommandTarget {
@@ -10,6 +11,7 @@ export interface FeederCommandTarget {
   nodeId: string
   mode: FeederControlMode
   initial: IotAutoSchedule | null
+  initialType?: IotAutoType
   /** Tên mạch, mã hiển thị và số cột đúng như dòng mạch vừa bấm. */
   feederName?: string
   feederCode?: string
@@ -32,7 +34,7 @@ const MODE_UI: Record<FeederControlMode, { title: string; icon: typeof Sun; tile
     verb: 'Tắt',
   },
   auto: {
-    title: 'Chạy AUTO theo lịch',
+    title: 'Chạy AUTO',
     icon: Clock,
     tile: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
     confirm: 'bg-indigo-600 hover:bg-indigo-700',
@@ -47,7 +49,7 @@ const MODE_UI: Record<FeederControlMode, { title: string; icon: typeof Sun; tile
 export const FeederCommandDialog: React.FC<{
   target: FeederCommandTarget
   sending: boolean
-  onSend: (schedule?: { day_start: string; night_start: string }) => void
+  onSend: (auto?: { type: IotAutoType; schedule?: { day_start: string; night_start: string } }) => void
   onClose: () => void
 }> = ({ target, sending, onSend, onClose }) => {
   const ui = MODE_UI[target.mode]
@@ -113,7 +115,13 @@ export const FeederCommandDialog: React.FC<{
 
         <div className="p-4 space-y-3">
           {target.mode === 'auto' ? (
-            <AutoScheduleForm initial={target.initial} sending={sending} onSubmit={(schedule) => onSend(schedule)} onCancel={close} />
+            <AutoScheduleForm
+              initial={target.initial}
+              initialType={target.initialType}
+              sending={sending}
+              onSubmit={(auto) => onSend(auto)}
+              onCancel={close}
+            />
           ) : (
             <>
               <p className="text-sm text-slate-600 dark:text-slate-300">

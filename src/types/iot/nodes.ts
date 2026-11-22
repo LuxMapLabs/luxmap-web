@@ -41,6 +41,7 @@ export interface IotCommandHistoryItem {
     requested_at?: string | null
     bridge_accepted_at?: string | null
     status?: IotCommandHistoryStatus
+    auto_type?: string | null
 }
 
 export interface IotCommandHistoryItemPagedResult {
@@ -54,6 +55,7 @@ export interface IotCommandRequest {
     mode?: string | null
     command?: string | null
     auto_schedule?: IotAutoSchedule
+    auto_type?: string | null
 }
 
 export interface IotCommandStatus {
@@ -65,6 +67,7 @@ export interface IotCommandStatus {
     auto_schedule?: IotAutoSchedule
     expires_at?: string | null
     power_state?: FeederPowerState
+    auto_type?: string | null
 }
 
 export interface IotDiagnosticResult {
