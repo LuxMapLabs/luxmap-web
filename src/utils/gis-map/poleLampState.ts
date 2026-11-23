@@ -68,7 +68,7 @@ export const POLE_LAMP_UI: Record<PoleLampState, LampStateUi> = {
 export const poleFeatureLampState = (p?: { fixture_status?: string | null; power_state?: string | null } | null) =>
   poleLampState(p?.fixture_status, p?.power_state)
 
-export type FeederLineStatus = 'fault' | 'off' | 'active' | 'unknown'
+export type FeederLineStatus = 'fault' | 'warn' | 'off' | 'active' | 'unknown'
 
 /** Màu đường feeder (lõi + quầng) và nhãn ngắn trong mục "Mạch điện" của chú giải. */
 export const FEEDER_LINE_UI: Record<FeederLineStatus, { label: string; color: string; glow: string }> = {
@@ -76,14 +76,22 @@ export const FEEDER_LINE_UI: Record<FeederLineStatus, { label: string; color: st
   // Trắng như cột đang tắt: nét tối chìm mất trên mặt đường của ảnh vệ tinh
   off: { label: 'Đang tắt', color: '#f8fafc', glow: '#0f172a' },
   fault: { label: 'Sự cố', color: '#ef4444', glow: '#dc2626' },
+  // Lỗi phần cứng node / dữ liệu điện quá hạn / node mất liên lạc: thiết bị đo có vấn đề, chưa chắc đèn hỏng
+  warn: { label: 'Cảnh báo', color: '#f59e0b', glow: '#d97706' },
   unknown: { label: 'Chưa rõ', color: '#94a3b8', glow: '#64748b' },
 }
 
 /**
  * Trạng thái đường feeder: sự cố (tủ / mạch / cạnh `status = fault`) trước, rồi `power_state`.
+ * Chẩn đoán IoT (`diagnosticLevel`) chen giữa: lỗi điện = sự cố, lỗi phần cứng / mất liên lạc = cảnh báo.
  * Mạch `off` là mạch đang tắt (rơ-le OFF), KHÔNG tô như sự cố; chỉ `on` mới xanh.
  */
-export function feederLineStyle(isFault: boolean, powerState?: string | null) {
-  const status: FeederLineStatus = isFault ? 'fault' : powerState === 'off' ? 'off' : powerState === 'on' ? 'active' : 'unknown'
+export function feederLineStyle(isFault: boolean, powerState?: string | null, diagnosticLevel?: 'fault' | 'warn' | null) {
+  const status: FeederLineStatus =
+    isFault || diagnosticLevel === 'fault'
+      ? 'fault'
+      : diagnosticLevel === 'warn'
+        ? 'warn'
+        : powerState === 'off' ? 'off' : powerState === 'on' ? 'active' : 'unknown'
   return { status, ...FEEDER_LINE_UI[status] }
 }

@@ -12,6 +12,7 @@ import {
   type SearchResultItem,
 } from '../../utils/gis-map/gisSearchUtils'
 import { fetchMapLayersRequest } from '../../feature/map/mapSlice'
+import { refreshFeederDiagnosticsRequest } from '../../feature/map/mapSlice'
 import { fetchAssetsRequest, refreshFeedersRequest } from '../../feature/assets/assetSlice'
 import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
 import { toBboxParam } from '../../utils/gis-map/mapUtils'
@@ -53,6 +54,7 @@ export function useElectricalCascade({
   const boundsKey = useSelector((state: RootState) => toBboxParam(state.auth.user?.map_bounds?.bbox) ?? '')
   useEffect(() => {
     dispatch(fetchMapLayersRequest())
+    dispatch(refreshFeederDiagnosticsRequest())
   }, [dispatch, boundsKey])
 
   // Giữ màu chấm cột / mạch đúng với trạng thái mới: làm mới nền định kỳ khi tab đang mở (không bật loading, không chớp map)
@@ -62,7 +64,10 @@ export function useElectricalCascade({
       if (visible()) dispatch(refreshFeedersRequest())
     }, GIS_FEEDER_REFRESH_MS)
     const mapTimer = window.setInterval(() => {
-      if (visible()) dispatch(fetchMapLayersRequest())
+      if (visible()) {
+        dispatch(fetchMapLayersRequest())
+        dispatch(refreshFeederDiagnosticsRequest())
+      }
     }, GIS_MAP_REFRESH_MS)
     return () => {
       window.clearInterval(feederTimer)
