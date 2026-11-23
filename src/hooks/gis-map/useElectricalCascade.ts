@@ -270,9 +270,7 @@ export function useElectricalCascade({
         return false
       }
 
-      // Đèn chỉ còn bình thường / hỏng: dữ liệu cũ `dim` lọc như bình thường
-      const lampStatus = p.fixture_status === 'dim' ? 'normal' : p.fixture_status
-      if (statusFilter !== 'all' && lampStatus !== statusFilter) {
+      if (statusFilter !== 'all' && p.fixture_status !== statusFilter) {
         return false
       }
 
