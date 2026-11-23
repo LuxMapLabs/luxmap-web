@@ -44,6 +44,7 @@ export const AdminManagementPage: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   // Modal tạo mới chỉ đóng khi request xong và thành công (thất bại thì giữ lại để người dùng sửa)
   const [isCreatePending, setIsCreatePending] = useState(false)
+  const [isEditPending, setIsEditPending] = useState(false)
   const [editingUser, setEditingUser] = useState<UserAccountItem | null>(null)
   const [lockingUser, setLockingUser] = useState<UserAccountItem | null>(null)
 
@@ -64,33 +65,17 @@ export const AdminManagementPage: React.FC = () => {
     )
   }, [dispatch, filters.role, filters.status, page, pageSize])
 
-  // Lọc bỏ tài khoản đang đăng nhập (chính mình) và lọc theo từ khóa tìm kiếm (họ tên, username, email)
+  // Lọc theo từ khóa tìm kiếm (họ tên, username, email)
   const filteredUsers = useMemo(() => {
-    const otherUsers = users.filter((u) => {
-      if (!currentUser) return true
-      const matchId =
-        Boolean(currentUser.user_id && u.user_id === currentUser.user_id)
-
-      const matchUsername =
-        currentUser.username &&
-        u.username?.toLowerCase() === currentUser.username.toLowerCase()
-      const matchEmail =
-        currentUser.email &&
-        u.email?.toLowerCase() === currentUser.email.toLowerCase()
-
-      const isSelf = Boolean(matchId || matchUsername || matchEmail)
-      return !isSelf
-    })
-
-    if (!filters.search.trim()) return otherUsers
+    if (!filters.search.trim()) return users
     const query = filters.search.toLowerCase().trim()
-    return otherUsers.filter((u) => {
+    return users.filter((u) => {
       const matchName = (u.full_name || '').toLowerCase().includes(query)
       const matchUser = (u.username || '').toLowerCase().includes(query)
       const matchEmail = (u.email || '').toLowerCase().includes(query)
       return matchName || matchUser || matchEmail
     })
-  }, [users, filters.search, currentUser])
+  }, [users, filters.search])
 
   useEffect(() => {
     if (isCreatePending && !isSubmitting) {
@@ -104,9 +89,16 @@ export const AdminManagementPage: React.FC = () => {
     setIsCreatePending(true)
   }
 
+  useEffect(() => {
+    if (isEditPending && !isSubmitting) {
+      setIsEditPending(false)
+      if (!actionError) setEditingUser(null)
+    }
+  }, [isEditPending, isSubmitting, actionError])
+
   const handleEditSubmit = (id: string, payload: UpdateUserRequest) => {
     dispatch(updateUserRequest({ id, data: payload }))
-    setEditingUser(null)
+    setIsEditPending(true)
   }
 
   const handleConfirmToggleLock = () => {
@@ -144,6 +136,7 @@ export const AdminManagementPage: React.FC = () => {
         {/* User Table */}
         <UserTable
           users={filteredUsers}
+          currentUserId={currentUser?.user_id}
           isLoading={isLoading}
           invitingUserId={invitingUserId}
           onEdit={(user) => setEditingUser(user)}
@@ -174,6 +167,7 @@ export const AdminManagementPage: React.FC = () => {
       <EditUserModal
         isOpen={Boolean(editingUser)}
         user={editingUser}
+        isSelf={Boolean(currentUser?.user_id && editingUser?.user_id === currentUser.user_id)}
         isSubmitting={isSubmitting}
         onClose={() => setEditingUser(null)}
         onSubmit={handleEditSubmit}

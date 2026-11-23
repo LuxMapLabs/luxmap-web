@@ -20,7 +20,7 @@
     <p>Giao diện web quản lý tài sản và sự cố chiếu sáng. Bảng này bắt đầu ghi nhận từ ngày 20/10/2026; chưa tổng hợp lịch sử toàn dự án.</p>
     <section>
       <h2>Công việc hiện tại</h2>
-      <p>Hồ sơ cá nhân: một màn xem duy nhất, đổi ảnh đại diện (JPEG/PNG) ngay tại đó; họ tên và email chỉ đọc.</p>
+      <p>Quản trị tài khoản: xác nhận thay đổi vai trò/địa bàn với bảng giá trị trước → sau; giữ biểu mẫu khi cập nhật lỗi.</p>
       <label for="task-progress">Tiến độ bản sửa mã nguồn: 100%</label>
       <progress id="task-progress" value="100" max="100">100%</progress>
       <p>Lịch sử: hoàn tất ngày 20/10/2026, bản sửa <code>6b7a826</code> đã lên Production tại <a href="https://luxmap.com.vn">luxmap.com.vn</a> qua VPS. Vercel chỉ là bản Preview.</p>
@@ -28,6 +28,46 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>21/11/2026 — Quản trị tài khoản: hiện tài khoản đang đăng nhập</dt>
+        <dd>Bỏ bộ lọc ẩn tài khoản đang đăng nhập (có từ <code>e404283</code>, 23/10). Dòng của chính mình nằm đúng thứ tự server trả, có nhãn "Bạn"; nhận diện chỉ theo <code>user_id</code>. Nút khoá trên dòng đó bị vô hiệu ("Không thể khoá tài khoản của chính bạn"); sửa chính mình thì khoá vai trò và địa bàn, vẫn sửa được họ tên / email. Backend vốn đã chặn tự khoá (409) và hạ quyền admin cuối cùng (409).</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/users/UserManagementPage.tsx</code>; <code>src/pages/users/components/UserTable.tsx</code>; <code>src/pages/users/components/EditUserModal.tsx</code>; <code>src/test/06-admin/UserManagementPage.test.tsx</code>; <code>src/test/06-admin/EditUserModal.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(users): show the signed-in account in the user list</code> — nhánh <code>feat/users-show-self-row</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>vitest</code> 807/807 (13 test mới), <code>tsc</code>, build, eslint (0 lỗi); phá thử ẩn lại dòng của mình / mở nút khoá / mở ô vai trò → test đỏ. ⚠️ Chưa xem trên trình duyệt thật. Còn lại (chưa làm): ô tìm kiếm chỉ lọc trong trang đang xem.</dd>
+        <dt>21/11/2026 — Tổng quan quản trị: làm rõ thẻ "Bộ nhớ máy chủ"</dt>
+        <dd>Số lớn và vòng tròn cùng nói về dung lượng <em>đã dùng</em> ("29.7 GB đã dùng trên 38 GB", 78%), kèm "Còn trống x%" lấy từ <code>free_ratio</code> để nhãn An toàn / Sắp đầy có ngữ cảnh. Hàng dưới thành bảng phân bổ cộng đủ toàn ổ: Dữ liệu LuxMap (PostgreSQL · ảnh MinIO), Hệ thống &amp; khác (đã dùng − LuxMap, chặn ở 0), Trống — số trống chỉ hiện một lần; phần nhỏ hơn 1% ghi "&lt;1%". Không ghi cứng ngưỡng 15% (API chưa trả ngưỡng). Bỏ khoảng trắng giữa thẻ.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/admin-dashboard/components/StorageDistributionCard.tsx</code>; <code>src/test/06-admin/StorageDistributionCard.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(admin-dashboard): break the storage card down by what fills the disk</code> — nhánh <code>feat/admin-storage-card-breakdown</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>vitest</code> 807/807 (13 test mới), <code>tsc</code>, build, eslint (0 lỗi); phá thử bỏ chặn 0 / bỏ MinIO khỏi dữ liệu LuxMap / bỏ "&lt;1%" → test đỏ. ⚠️ Chưa xem trên trình duyệt thật. 📌 "Hệ thống &amp; khác" giả định PostgreSQL, MinIO và đường dẫn đo dung lượng chung một ổ trên VPS.</dd>
+        <dt>21/11/2026 — Xác nhận thay đổi quyền tài khoản</dt>
+        <dd>Khoá lưu khi không có thay đổi thực tế; xác nhận vai trò/địa bàn bằng bảng trước → sau (kèm họ tên/email nếu đổi). Chỉ sửa họ tên/email thì lưu trực tiếp. Nêu thời gian hiệu lực tối đa 60 phút, không thu hồi phiên ngay; chỉ nêu hậu quả địa bàn khi địa bàn đổi. Huỷ/Esc giữ lại chỉnh sửa. Khi gửi thì khoá nút; popup đóng khi xong, biểu mẫu chỉ đóng khi thành công.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/users/components/EditUserModal.tsx</code>; <code>src/pages/users/UserManagementPage.tsx</code>; <code>src/pages/iot-bridge/components/IotBridgeModal.tsx</code>; <code>src/test/06-admin/EditUserModal.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(users): confirm role and commune changes before saving</code> — nhánh <code>feat/edit-user-confirm-changes</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ Test mục tiêu 63/63; toàn bộ 794/794 (74 file); 18 test mới gồm luồng thành công/lỗi với Redux; TypeScript, lint (0 lỗi, 34 cảnh báo có sẵn), build đạt; phá thử bỏ popup / luôn coi là có thay đổi / đóng form ngay khi gửi → test đỏ. ⚠️ Chưa kiểm tra thủ công trên trình duyệt hoặc gửi PATCH thật.</dd>
+        <dt>21/11/2026 — Hồ sơ: hỏi xác nhận trước khi gỡ ảnh đại diện</dt>
+        <dd>Bấm "Gỡ ảnh đại diện" giờ mở popup xác nhận (<code>ConfirmModal</code> sẵn có, tông đỏ) thay vì gỡ ngay; chỉ khi bấm "Gỡ ảnh" mới dispatch <code>removeAvatarRequest</code>. Khi đang gỡ thì khoá nút, không bấm được hai lần; popup tự đóng khi xong (thành công hay lỗi). Esc trong popup chỉ đóng popup, không đóng cả hộp hồ sơ.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/components/ProfileModal.tsx</code>; <code>src/test/00-common/ProfileModal.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(profile): confirm before removing the avatar</code> — nhánh <code>feat/profile-avatar-remove-confirm</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>vitest</code> 776/776 (7 test mới), <code>tsc</code>, build, eslint (0 lỗi); phá thử bỏ chốt Esc / dispatch ngay khi bấm → test đỏ. ⚠️ Chưa xem trên trình duyệt thật.</dd>
+        <dt>21/11/2026 — Hồ sơ: thêm dòng "Chức vụ"</dt>
+        <dd>Danh sách thông tin trong hộp hồ sơ có dòng "Chức vụ" ngay dưới "Họ và tên", hiện tên vai trò (ví dụ "Quản lý") lấy từ <code>role</code> sẵn có của <code>/auth/me</code>. Không có trường mới ở backend.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/components/ProfileModal.tsx</code>; <code>src/test/00-common/ProfileModal.test.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>feat(profile): show the role as a "Chức vụ" row</code> — nhánh <code>feat/profile-role-row</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>vitest</code> 757/757 (1 test mới), <code>tsc</code>, build, eslint (0 lỗi); phá thử đổi nhãn → test đỏ. ⚠️ Chưa xem trên trình duyệt thật.</dd>
         <dt>19/11/2026 — Ảnh đại diện: thu nhỏ trên trình duyệt trước khi gửi</dt>
         <dd>Người dùng chọn ảnh JPEG/PNG dung lượng bao nhiêu cũng được: <code>convertToJpeg</code> (thêm tham số <code>maxEdge</code> + hàm <code>fitWithin</code>) thu về cạnh dài 1024 px, nền trắng, JPEG 0.85 rồi mới upload. Giới hạn backend (1 MB, 16 triệu pixel) giữ nguyên. Chú thích dưới avatar thành "Ảnh JPEG hoặc PNG"; có spinner khi đang xử lý; ảnh không đọc được hoặc vẫn quá 1 MB sau khi thu nhỏ → báo lỗi.</dd>
         <dt>File thay đổi</dt>

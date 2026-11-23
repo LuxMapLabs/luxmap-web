@@ -6,9 +6,10 @@ import { Loader2, X } from 'lucide-react'
 export const IotBridgeModal: React.FC<{
   title: string
   subtitle?: string
+  closeDisabled?: boolean
   onClose: () => void
   children: React.ReactNode
-}> = ({ title, subtitle, onClose, children }) => {
+}> = ({ title, subtitle, closeDisabled = false, onClose, children }) => {
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export const IotBridgeModal: React.FC<{
             type="button"
             onClick={onClose}
             title="Đóng"
+            disabled={closeDisabled}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition cursor-pointer focus-visible:ring-2 ring-primary/40 focus:outline-none"
           >
             <X className="w-5 h-5" />
@@ -80,6 +82,7 @@ export const Field: React.FC<{ label: string; hint?: React.ReactNode; children: 
 export interface ConfirmModalProps {
   title: string
   message: string
+  children?: React.ReactNode
   confirmLabel: string
   tone?: 'danger' | 'primary'
   busy?: boolean
@@ -90,6 +93,7 @@ export interface ConfirmModalProps {
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   title,
   message,
+  children,
   confirmLabel,
   tone = 'primary',
   busy = false,
@@ -102,8 +106,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       : `${primaryButtonClass} inline-flex items-center gap-1.5`
 
   return (
-    <IotBridgeModal title={title} onClose={busy ? () => {} : onCancel}>
+    <IotBridgeModal title={title} closeDisabled={busy} onClose={busy ? () => {} : onCancel}>
       <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{message}</p>
+      {children}
       <div className="flex justify-end gap-2 pt-2">
         <button
           type="button"
