@@ -42,6 +42,10 @@ export interface IotCommandHistoryItem {
     bridge_accepted_at?: string | null
     status?: IotCommandHistoryStatus
     auto_type?: string | null
+    executed_at?: string | null
+    acknowledged_at?: string | null
+    late_ack?: boolean
+    expires_at?: string | null
 }
 
 export interface IotCommandHistoryItemPagedResult {
@@ -68,6 +72,10 @@ export interface IotCommandStatus {
     expires_at?: string | null
     power_state?: FeederPowerState
     auto_type?: string | null
+    status?: string | null
+    executed_at?: string | null
+    acknowledged_at?: string | null
+    late_ack?: boolean
 }
 
 export interface IotDiagnosticResult {
@@ -107,6 +115,31 @@ export interface IotMeasurement {
     voltage?: number
     current_ma?: number
     power_mw?: number
+}
+
+export interface IotNodeImportError {
+    code?: string | null
+    message?: string | null
+    field?: string | null
+}
+
+export interface IotNodeImportItem {
+    row?: number
+    server_id?: string | null
+    feeder_id?: string | null
+    device_id?: string | null
+    status?: string | null
+    node_id?: string | null
+    error?: IotNodeImportError
+}
+
+export interface IotNodeImportResult {
+    sheet?: string | null
+    total?: number
+    created?: number
+    existing?: number
+    failed?: number
+    items?: IotNodeImportItem[]
 }
 
 export interface IotNodeSourceDetails {
