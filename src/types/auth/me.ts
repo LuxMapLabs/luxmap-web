@@ -25,6 +25,12 @@ export interface CurrentUserResponse {
     communes?: CommuneSummary[]
     map_bounds?: MapBounds
     avatar_url?: string | null
+    date_of_birth?: string | null
+    gender?: 'male' | 'female' | 'other' | null
+    address?: string | null
+    phone_number?: string | null
+    identity_number?: string | null
+    identity_type?: 'citizen_id' | 'identity_card' | 'passport' | 'other' | null
 }
 
 export interface MapBounds {
