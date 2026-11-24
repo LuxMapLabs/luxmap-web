@@ -117,6 +117,7 @@ export interface IotNodeSourceDetails {
     nominal_voltage?: number
     nominal_current_ma?: number
     nominal_power_mw?: number
+    radius_km?: number
 }
 
 export interface IotNodeStatus {
@@ -130,6 +131,7 @@ export interface IotNodeStatus {
     cabinet_id?: string | null
     commune_id?: string | null
     location?: IotLocation
+    radius_km?: number
 }
 
 export interface IotNodeStatusPagedResult {
@@ -146,12 +148,12 @@ export interface IotSensorHealth {
 
 export interface RegisterNodeRequest {
     server_id: string | null
-    cabinet_id: string | null
     feeder_id: string | null
     device_id: string | null
     nominal_voltage: number
     nominal_current_ma: number
     nominal_power_mw: number
+    radius_km?: number
 }
 
 export interface RegisteredNode {
@@ -168,5 +170,6 @@ export interface UpdateNodeRequest {
     nominal_voltage: number
     nominal_current_ma: number
     nominal_power_mw: number
+    radius_km?: number
 }
 

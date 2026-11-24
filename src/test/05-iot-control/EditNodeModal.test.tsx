@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { EditNodeModal } from '../../pages/iot-bridge/components/EditNodeModal'
 import iotBridgeReducer from '../../feature/iot/iotBridgeSlice'
 import iotBridgeSaga from '../../feature/iot/iotBridgeSaga'
@@ -8,6 +8,7 @@ import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 import iotAPI from '../../feature/iot/iotAPI'
 import { assetAPI } from '../../feature/assets/assetAPI'
 import { communeAPI } from '../../feature/communes/communeAPI'
+import mapReducer from '../../feature/map/mapSlice'
 import { renderWithSagaStore } from '../utils/sagaStore'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
@@ -23,6 +24,26 @@ vi.mock('../../feature/assets/assetAPI', () => ({
 }))
 vi.mock('../../feature/communes/communeAPI', () => ({
   communeAPI: { getCommunes: vi.fn() },
+}))
+
+vi.mock('../../pages/iot-bridge/components/NodeCoverageMap', () => ({
+  NodeCoverageMap: ({
+    cabinets,
+    selectedCabinetId,
+    onSelectCabinet,
+  }: {
+    cabinets: { cabinet_id: string | null }[]
+    selectedCabinetId: string
+    onSelectCabinet: (id: string) => void
+  }) => (
+    <div data-testid="coverage-map" data-selected={selectedCabinetId}>
+      {cabinets.map((c) => (
+        <button key={c.cabinet_id} type="button" onClick={() => onSelectCabinet(c.cabinet_id!)}>
+          {`Chấm ${c.cabinet_id}`}
+        </button>
+      ))}
+    </div>
+  ),
 }))
 
 const api = vi.mocked(iotAPI)
@@ -68,7 +89,7 @@ const renderModal = (onClose = vi.fn()) =>
     <EditNodeModal node={node} servers={servers} onClose={onClose} />,
     {
       role: 'system_admin',
-      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer, map: mapReducer },
       sagas: [iotBridgeSaga, iotMonitorSaga],
     }
   )
@@ -92,7 +113,35 @@ describe('EditNodeModal (PUT /iot/nodes/{nodeId})', () => {
     })
   })
 
-  it('prefills form from node and node source, and submits strictly 6 fields', async () => {
+  it('picks the cabinet first, then only that cabinet’s free feeders; the map chip picks a cabinet too', async () => {
+    assets.getCabinets.mockResolvedValue({
+      items: [
+        { cabinet_id: 'CAB-001', cabinet_name: 'Tủ A', commune_id: 'COM-001', location: { lat: 10.9, lng: 106.5 } },
+        { cabinet_id: 'CAB-002', cabinet_name: 'Tủ B', commune_id: 'COM-001', location: { lat: 10.95, lng: 106.55 } },
+        { cabinet_id: 'CAB-009', cabinet_name: 'Tủ xã khác', commune_id: 'COM-009', location: { lat: 11, lng: 106.6 } },
+      ],
+    } as never)
+    assets.getFeeders.mockResolvedValue({
+      items: [...feeders, { feeder_id: 'FDR-004', feeder_name: 'Mạch tủ B', cabinet: { cabinet_id: 'CAB-002' } }],
+    } as never)
+    renderModal()
+
+    await waitFor(() => expect(screen.getByLabelText('Mạch (rơ-le #1)')).toHaveValue('FDR-001'))
+    const cabinetSelect = screen.getByLabelText('Tủ điện')
+    expect(cabinetSelect).toHaveValue('CAB-001')
+    expect(within(cabinetSelect).queryByRole('option', { name: /CAB-009/ })).not.toBeInTheDocument()
+
+    fireEvent.change(cabinetSelect, { target: { value: 'CAB-002' } })
+    const feederSelect = screen.getByLabelText('Mạch (rơ-le #1)')
+    expect(feederSelect).toHaveValue('')
+    expect(within(feederSelect).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['', 'FDR-004'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chấm CAB-001' }))
+    expect(screen.getByLabelText('Tủ điện')).toHaveValue('CAB-001')
+    expect(screen.getByLabelText('Mạch (rơ-le #1)')).toHaveValue('')
+  })
+
+  it('prefills form from node and node source, and submits strictly 7 fields', async () => {
     api.updateNode.mockResolvedValue(undefined)
     const onClose = vi.fn()
     renderModal(onClose)
@@ -118,6 +167,7 @@ describe('EditNodeModal (PUT /iot/nodes/{nodeId})', () => {
       nominal_voltage: 5,
       nominal_current_ma: 93.55,
       nominal_power_mw: 500,
+      radius_km: 0,
     })
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })

@@ -10,6 +10,7 @@ import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 import iotAPI from '../../feature/iot/iotAPI'
 import { assetAPI } from '../../feature/assets/assetAPI'
 import { communeAPI } from '../../feature/communes/communeAPI'
+import mapReducer from '../../feature/map/mapSlice'
 import { renderWithSagaStore } from '../utils/sagaStore'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
@@ -36,6 +37,26 @@ vi.mock('../../feature/communes/communeAPI', () => ({
 }))
 vi.mock('../../components/LocationPickerMap', () => ({ LocationPickerMap: () => null }))
 
+vi.mock('../../pages/iot-bridge/components/NodeCoverageMap', () => ({
+  NodeCoverageMap: ({
+    cabinets,
+    selectedCabinetId,
+    onSelectCabinet,
+  }: {
+    cabinets: { cabinet_id: string | null }[]
+    selectedCabinetId: string
+    onSelectCabinet: (id: string) => void
+  }) => (
+    <div data-testid="coverage-map" data-selected={selectedCabinetId}>
+      {cabinets.map((c) => (
+        <button key={c.cabinet_id} type="button" onClick={() => onSelectCabinet(c.cabinet_id!)}>
+          {`Chấm ${c.cabinet_id}`}
+        </button>
+      ))}
+    </div>
+  ),
+}))
+
 const api = vi.mocked(iotAPI)
 const assets = vi.mocked(assetAPI)
 const communes = vi.mocked(communeAPI)
@@ -49,7 +70,7 @@ const nodes = [{ node_id: 'NODE-001', server_id: 'iot-server-01', status: 'onlin
 const renderPage = (role: string) =>
   renderWithSagaStore(<IotBridgeAdminPage />, {
     role,
-    reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+    reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer, map: mapReducer },
     sagas: [iotBridgeSaga, iotMonitorSaga],
   })
 
@@ -236,7 +257,7 @@ describe('RegisterNodeModal (POST /iot/nodes)', () => {
   )
   const renderModal = (onSaved = vi.fn()) =>
     renderWithSagaStore(modal(onSaved), {
-      reducers: { iotBridge: iotBridgeReducer },
+      reducers: { iotBridge: iotBridgeReducer, map: mapReducer },
       sagas: [iotBridgeSaga],
     })
 
@@ -293,18 +314,33 @@ describe('RegisterNodeModal (POST /iot/nodes)', () => {
     await waitFor(() =>
       expect(api.registerNode).toHaveBeenCalledWith({
         server_id: 'iot-server-01',
-        cabinet_id: 'CAB-002',
         feeder_id: 'FDR-002',
         device_id: 'LUXMAP-P002',
         nominal_voltage: 5,
         nominal_current_ma: 100,
         nominal_power_mw: 500,
+        radius_km: 0,
       })
     )
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
   })
 
-  it('submits strictly the 7 fields without gateway_id, data_source, or supports_remote_control', async () => {
+  it('sends the node radius and rejects an out-of-range one', async () => {
+    api.registerNode.mockResolvedValue({ node_id: 'NODE-002', server_id: 'iot-server-01', device_id: 'LUXMAP-P002', feeder_id: 'FDR-002' })
+    renderModal()
+    await fill()
+    fireEvent.change(screen.getByPlaceholderText('500'), { target: { value: '500' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Bán kính node (km)' }), { target: { value: '1500' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Đăng ký node' }))
+    expect(await screen.findByText(/Bán kính node phải từ 0 đến 1000 km/)).toBeInTheDocument()
+    expect(api.registerNode).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Bán kính node (km)' }), { target: { value: '0.2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Đăng ký node' }))
+    await waitFor(() => expect(api.registerNode).toHaveBeenCalledWith(expect.objectContaining({ radius_km: 0.2 })))
+  })
+
+  it('submits strictly the 7 fields (backend derives the cabinet from the feeder) without gateway_id, data_source, or supports_remote_control', async () => {
     api.registerNode.mockResolvedValue({
       node_id: 'NODE-002',
       server_id: 'iot-server-01',
@@ -322,12 +358,12 @@ describe('RegisterNodeModal (POST /iot/nodes)', () => {
     await waitFor(() => expect(api.registerNode).toHaveBeenCalledTimes(1))
     expect(api.registerNode.mock.calls[0][0]).toEqual({
       server_id: 'iot-server-01',
-      cabinet_id: 'CAB-002',
       feeder_id: 'FDR-002',
       device_id: 'LUXMAP-P002',
       nominal_voltage: 5,
       nominal_current_ma: 100,
       nominal_power_mw: 500,
+      radius_km: 0,
     })
   })
 
@@ -340,10 +376,11 @@ describe('RegisterNodeModal (POST /iot/nodes)', () => {
     expect(api.registerNode).not.toHaveBeenCalled()
   })
 
-  it('fixes the data source to the team-built hardware: no choice, no simulated option', async () => {
+  it('does not show or offer a data source: it is a fixed default', async () => {
     renderModal()
     expect(screen.queryByRole('combobox', { name: 'Nguồn dữ liệu' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('register-node-data-source')).toHaveTextContent('Phần cứng nhóm tự dựng (calibration_rig)')
+    expect(screen.queryByText('Nguồn dữ liệu')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('register-node-data-source')).not.toBeInTheDocument()
     expect(screen.queryByText(/simulated/)).not.toBeInTheDocument()
   })
 
@@ -407,7 +444,7 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
         onClose={vi.fn()}
       />,
       {
-        reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+        reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer, map: mapReducer },
         sagas: [iotBridgeSaga, iotMonitorSaga],
       }
     )
@@ -438,7 +475,7 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
     api.getElectrical.mockRejectedValue(err503)
     api.getDiagnostics.mockRejectedValue(err503)
     renderWithSagaStore(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />, {
-      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer, map: mapReducer },
       sagas: [iotBridgeSaga, iotMonitorSaga],
     })
 
@@ -451,7 +488,7 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
   it('shows muted notice in Hiệu chuẩn when getNodeSource rejects (404) and does not show Firmware', async () => {
     api.getNodeSource.mockRejectedValue({ response: { status: 404 } })
     renderWithSagaStore(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />, {
-      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer, map: mapReducer },
       sagas: [iotBridgeSaga, iotMonitorSaga],
     })
 
@@ -463,7 +500,7 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
 
   it('shows overview directly without tab bar and opens FeederHistoryModal from overview links', async () => {
     renderWithSagaStore(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />, {
-      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer, map: mapReducer },
       sagas: [iotBridgeSaga, iotMonitorSaga],
     })
 
@@ -481,7 +518,7 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
 
   it('clicking "Lịch sử lệnh của mạch →" opens FeederHistoryModal on commands tab and calls getCommandHistory', async () => {
     renderWithSagaStore(<IotNodeDetailModal nodeId="NODE-001" onClose={vi.fn()} />, {
-      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer },
+      reducers: { iotBridge: iotBridgeReducer, iotMonitor: iotMonitorReducer, map: mapReducer },
       sagas: [iotBridgeSaga, iotMonitorSaga],
     })
 

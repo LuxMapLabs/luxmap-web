@@ -110,7 +110,6 @@ describe('iotBridgeSaga integration tests', () => {
     store.dispatch(
       registerNodeRequest({
         server_id: 'SRV-1',
-        cabinet_id: 'CAB-1',
         feeder_id: 'FDR-1',
         device_id: 'DEV-NEW',
         nominal_voltage: 5,
