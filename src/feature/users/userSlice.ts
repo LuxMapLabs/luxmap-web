@@ -5,6 +5,8 @@ import type {
   CreateUserRequest,
   CreateUserResponse,
   UpdateUserRequest,
+  ChangeUserEmailRequest,
+  ChangeUserEmailResponse,
   InvitationResponse,
 } from '../../types/admin/users'
 import type { UserQueryParams } from './userAPI'
@@ -125,6 +127,34 @@ const adminUserSlice = createSlice({
       state.actionError = action.payload
     },
 
+    // --- Change User Email ---
+    changeUserEmailRequest: (
+      state,
+      _action: PayloadAction<{ id: string; data: ChangeUserEmailRequest }>
+    ) => {
+      state.isSubmitting = true
+      state.actionError = null
+      state.actionSuccessMessage = null
+    },
+    changeUserEmailSuccess: (state, action: PayloadAction<ChangeUserEmailResponse>) => {
+      state.isSubmitting = false
+      const updated = action.payload.user
+      if (updated?.user_id) {
+        const index = state.users.findIndex((u) => u.user_id === updated.user_id)
+        if (index !== -1) {
+          state.users[index] = { ...state.users[index], ...updated }
+        }
+        if (state.selectedUser && state.selectedUser.user_id === updated.user_id) {
+          state.selectedUser = { ...state.selectedUser, ...updated }
+        }
+      }
+      state.actionSuccessMessage = 'Đổi email tài khoản thành công'
+    },
+    changeUserEmailFailure: (state, action: PayloadAction<string>) => {
+      state.isSubmitting = false
+      state.actionError = action.payload
+    },
+
     // --- Lock User ---
     lockUserRequest: (state, _action: PayloadAction<string>) => {
       state.isSubmitting = true
@@ -221,6 +251,9 @@ export const {
   updateUserRequest,
   updateUserSuccess,
   updateUserFailure,
+  changeUserEmailRequest,
+  changeUserEmailSuccess,
+  changeUserEmailFailure,
   lockUserRequest,
   lockUserSuccess,
   lockUserFailure,

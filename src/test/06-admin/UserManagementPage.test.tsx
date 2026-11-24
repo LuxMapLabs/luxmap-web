@@ -33,51 +33,38 @@ const renderPage = (items = [other, self]) => {
 const rowFor = (name: string) => screen.getByRole('row', { name: new RegExp(name) })
 
 describe('UserManagementPage self row', () => {
-  it('renders self in server order with one badge and includes all page rows in the footer', () => {
+  it('hides the signed-in user row and reflects visible rows in the footer', () => {
     renderPage()
     const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
-    expect(rows).toHaveLength(2)
+    expect(rows).toHaveLength(1)
     expect(within(rows[0]).getByText('Other User')).toBeInTheDocument()
-    expect(within(rows[0]).queryByText('Bạn')).not.toBeInTheDocument()
-    expect(within(rows[1]).getByText('Signed-in Admin')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('Bạn')).toBeInTheDocument()
-    expect(screen.getAllByText('Bạn')).toHaveLength(1)
-    expect(screen.getByText(/Hiển thị/)).toHaveTextContent('Hiển thị 1 - 2 trên tổng số 2 bản ghi tài khoản')
+    expect(screen.queryByText('Signed-in Admin')).not.toBeInTheDocument()
+    expect(screen.queryByText('Bạn')).not.toBeInTheDocument()
+    expect(screen.getByText(/Hiển thị/)).toHaveTextContent(
+      'Hiển thị 1 - 1 trên tổng số 1 bản ghi tài khoản'
+    )
   })
 
-  it('disables the self lock button without opening the dialog; another row can still lock', () => {
+  it('keeps lock action working for other rows while self is hidden', () => {
     const store = renderPage()
     const dispatch = vi.spyOn(store, 'dispatch')
-    const button = within(rowFor('Signed-in Admin')).getByRole('button', { name: selfLockLabel })
-    expect(button).toBeDisabled()
-    expect(button).toHaveAttribute('title', selfLockLabel)
-    fireEvent.click(button)
-    expect(screen.queryByText('Khóa Tài Khoản')).not.toBeInTheDocument()
-    const otherLock = within(rowFor('Other User')).getByRole('button', { name: 'Khóa tài khoản (Thao tác bảo mật)' })
+    expect(screen.queryByText('Signed-in Admin')).not.toBeInTheDocument()
+    const otherLock = within(rowFor('Other User')).getByRole('button', {
+      name: 'Khóa tài khoản (Thao tác bảo mật)',
+    })
     expect(otherLock).toBeEnabled()
     fireEvent.click(otherLock)
     expect(screen.getByText('Khóa Tài Khoản')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Xác nhận Khóa' }))
-    expect(dispatch).toHaveBeenCalledWith({ type: 'adminUsers/lockUserRequest', payload: 'other-id' })
-  })
-
-  it('passes self status to the edit modal and saves a name change without confirmation', () => {
-    const store = renderPage()
-    const dispatch = vi.spyOn(store, 'dispatch')
-    fireEvent.click(within(rowFor('Signed-in Admin')).getByTitle('Chỉnh sửa tài khoản'))
-    expect(screen.getAllByRole('combobox')[2]).toBeDisabled()
-    expect(screen.getByText('Không thể đổi vai trò của chính bạn')).toBeInTheDocument()
-    fireEvent.change(screen.getByPlaceholderText('Ví dụ: Nguyễn Văn A'), { target: { value: 'Updated Admin' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(dispatch).toHaveBeenCalledWith({
-      type: 'adminUsers/updateUserRequest',
-      payload: { id: 'self-id', data: { full_name: 'Updated Admin', email: 'admin@example.com', role: 'system_admin' } },
+      type: 'adminUsers/lockUserRequest',
+      payload: 'other-id',
     })
   })
 
-  it('uses only user_id even when another account shares username and email', () => {
+  it('uses only user_id to hide self, keeping another account that shares username and email', () => {
     renderPage([{ ...other, username: self.username, email: self.email }, self])
+    expect(screen.queryByText('Signed-in Admin')).not.toBeInTheDocument()
     const row = rowFor('Other User')
     expect(within(row).queryByText('Bạn')).not.toBeInTheDocument()
     expect(within(row).getByTitle('Khóa tài khoản (Thao tác bảo mật)')).toBeEnabled()
@@ -86,12 +73,26 @@ describe('UserManagementPage self row', () => {
     expect(screen.queryByText('Không thể đổi vai trò của chính bạn')).not.toBeInTheDocument()
   })
 
-  it.each(['  SIGNED-IN  ', ' ADMIN ', ' ADMIN@EXAMPLE.COM '])('keeps the existing name/username/email search for %s', (query) => {
+  it.each(['  SIGNED-IN  ', ' ADMIN ', ' ADMIN@EXAMPLE.COM '])(
+    'does not return the hidden self account when searching for %s',
+    (query) => {
+      renderPage()
+      fireEvent.change(screen.getByPlaceholderText('Tìm theo họ tên, tài khoản, email...'), {
+        target: { value: query },
+      })
+      expect(screen.queryByText('Signed-in Admin')).not.toBeInTheDocument()
+      expect(screen.queryByText('Bạn')).not.toBeInTheDocument()
+      expect(screen.queryByText('Other User')).not.toBeInTheDocument()
+    }
+  )
+
+  it('still finds other accounts by name/username/email search', () => {
     renderPage()
-    fireEvent.change(screen.getByPlaceholderText('Tìm theo họ tên, tài khoản, email...'), { target: { value: query } })
-    expect(screen.getByText('Signed-in Admin')).toBeInTheDocument()
-    expect(screen.getByText('Bạn')).toBeInTheDocument()
-    expect(screen.queryByText('Other User')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo họ tên, tài khoản, email...'), {
+      target: { value: ' ENGINEER ' },
+    })
+    expect(screen.getByText('Other User')).toBeInTheDocument()
+    expect(screen.queryByText('Signed-in Admin')).not.toBeInTheDocument()
   })
 
   it('does not inject self when the server page does not contain it', () => {

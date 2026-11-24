@@ -1,5 +1,5 @@
 import apiClient from '../../config/apiClient'
-import type { SetPasswordRequest } from '../../types/auth/password'
+import type { ChangePasswordRequest, SetPasswordRequest } from '../../types/auth/password'
 
 export const passwordAPI = {
   /**
@@ -8,6 +8,14 @@ export const passwordAPI = {
    */
   setPassword: async (data: SetPasswordRequest): Promise<void> => {
     await apiClient.post('/auth/password/set', data)
+  },
+
+  /**
+   * Tự đổi mật khẩu cho người dùng đang đăng nhập (POST /api/v1/auth/password/change)
+   * Thành công trả 204 No Content, sau đó cần đăng nhập lại.
+   */
+  changePassword: async (data: ChangePasswordRequest): Promise<void> => {
+    await apiClient.post('/auth/password/change', data)
   },
 }
 

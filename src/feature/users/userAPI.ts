@@ -5,6 +5,8 @@ import type {
   CreateUserRequest,
   CreateUserResponse,
   UpdateUserRequest,
+  ChangeUserEmailRequest,
+  ChangeUserEmailResponse,
   InvitationResponse,
 } from '../../types/admin/users'
 
@@ -49,6 +51,21 @@ export const userAPI = {
    */
   updateUser: async (id: string, payload: UpdateUserRequest): Promise<UserAccountItem> => {
     const response = await apiClient.patch<UserAccountItem>(`/admin/users/${id}`, payload)
+    return response.data
+  },
+
+  /**
+   * Đổi email tài khoản người dùng (gửi thư thông báo tới email mới, mật khẩu giữ nguyên)
+   * PATCH /api/v1/admin/users/{id}/email
+   */
+  changeUserEmail: async (
+    id: string,
+    payload: ChangeUserEmailRequest
+  ): Promise<ChangeUserEmailResponse> => {
+    const response = await apiClient.patch<ChangeUserEmailResponse>(
+      `/admin/users/${id}/email`,
+      payload
+    )
     return response.data
   },
 
