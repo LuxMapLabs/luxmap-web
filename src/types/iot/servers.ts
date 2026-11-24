@@ -47,6 +47,7 @@ export interface IotServerStatus {
     status?: string | null
     commune_id?: string | null
     location?: IotLocation
+    radius_km?: number
     credential_issued?: boolean
 }
 
@@ -54,6 +55,7 @@ export interface RegisterServerRequest {
     server_id?: string | null
     commune_id?: string | null
     location?: IotLocation
+    radius_km?: number
 }
 
 export interface RegisteredServer {
@@ -63,5 +65,6 @@ export interface RegisteredServer {
 export interface ServerLocationRequest {
     commune_id?: string | null
     location?: IotLocation
+    radius_km?: number
 }
 

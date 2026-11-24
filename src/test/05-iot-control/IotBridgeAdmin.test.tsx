@@ -3,10 +3,11 @@ import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { ServerCredentialPanel } from '../../pages/iot-bridge/components/ServerCredentialPanel'
 import { IotServerFormModal } from '../../pages/iot-bridge/components/IotServerFormModal'
 import iotBridgeReducer from '../../feature/iot/iotBridgeSlice'
+import mapReducer, { fetchCommuneBoundariesSuccess } from '../../feature/map/mapSlice'
 import iotBridgeSaga from '../../feature/iot/iotBridgeSaga'
 import iotAPI from '../../feature/iot/iotAPI'
 import { communeAPI } from '../../feature/communes/communeAPI'
-import { renderWithSagaStore, type SagaStore } from '../utils/sagaStore'
+import { makeSagaStore, renderWithSagaStore, type SagaStore } from '../utils/sagaStore'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
@@ -31,15 +32,18 @@ vi.mock('../../components/LocationPickerMap', () => ({
   LocationPickerMap: ({
     onChange,
     boundary,
+    boundaryGeometry,
     unpicked,
   }: {
     onChange?: (c: { lat: number; lng: number }) => void
     boundary?: { min_lng?: number } | null
+    boundaryGeometry?: { type?: string } | null
     unpicked?: boolean
   }) => (
     <button
       type="button"
       data-boundary-min-lng={boundary?.min_lng ?? ''}
+      data-boundary-geometry={boundaryGeometry?.type ?? ''}
       data-unpicked={String(Boolean(unpicked))}
       onClick={() => onChange?.({ lat: 10.97, lng: 106.5 })}
     >
@@ -63,7 +67,7 @@ const communes = [
 
 const renderWithStore = (ui: React.ReactElement, customStore?: SagaStore) =>
   renderWithSagaStore(ui, {
-    reducers: { iotBridge: iotBridgeReducer },
+    reducers: { iotBridge: iotBridgeReducer, map: mapReducer },
     sagas: [iotBridgeSaga],
     store: customStore,
   })
@@ -106,6 +110,25 @@ describe('IotServerFormModal', () => {
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-002' } })
     expect(screen.getByText('Ghim trên bản đồ')).toHaveAttribute('data-boundary-min-lng', '')
+  })
+
+  it('passes the real commune polygon to the map when it is loaded', () => {
+    const store = makeSagaStore({ reducers: { iotBridge: iotBridgeReducer, map: mapReducer }, sagas: [iotBridgeSaga] })
+    store.dispatch(
+      fetchCommuneBoundariesSuccess([
+        {
+          type: 'Feature',
+          properties: { commune_id: 'COM-001' },
+          geometry: { type: 'Polygon', coordinates: [[[106.3, 10.8], [106.5, 10.8], [106.5, 11], [106.3, 10.8]]] },
+        },
+      ] as never)
+    )
+    renderWithStore(
+      <IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />,
+      store
+    )
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
+    expect(screen.getByText('Ghim trên bản đồ')).toHaveAttribute('data-boundary-geometry', 'Polygon')
   })
 
   it('starts with no commune selected and refuses to register until one is chosen', async () => {
@@ -152,9 +175,30 @@ describe('IotServerFormModal', () => {
         server_id: 'iot-server-01',
         commune_id: 'COM-001',
         location: { lat: 10.97, lng: 106.5 },
+        radius_km: 0,
       })
     )
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
+  })
+
+  it('sends the typed radius and rejects a radius above 1000 km', async () => {
+    api.registerServer.mockResolvedValue({ server_id: 'iot-server-01' })
+    renderWithStore(<IotServerFormModal server={null} communes={communes} communeStatus="ready" onClose={vi.fn()} onSaved={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('iot-server-01'), { target: { value: 'iot-server-01' } })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'COM-001' } })
+    fireEvent.click(screen.getByText('Ghim trên bản đồ'))
+
+    const radius = screen.getByLabelText(/Bán kính phủ sóng/)
+    fireEvent.change(radius, { target: { value: '1500' } })
+    fireEvent.click(submitButton())
+    expect(await screen.findByText(/Bán kính phải từ 0 đến 1000 km/)).toBeInTheDocument()
+    expect(api.registerServer).not.toHaveBeenCalled()
+
+    fireEvent.change(radius, { target: { value: '0.75' } })
+    fireEvent.click(submitButton())
+    await waitFor(() =>
+      expect(api.registerServer).toHaveBeenCalledWith(expect.objectContaining({ radius_km: 0.75 }))
+    )
   })
 
   it('edits only commune and location of an existing server', async () => {
@@ -175,6 +219,7 @@ describe('IotServerFormModal', () => {
       expect(api.updateServerLocation).toHaveBeenCalledWith('iot-server-01', {
         commune_id: 'COM-001',
         location: { lat: 10, lng: 106 },
+        radius_km: 0,
       })
     )
   })
