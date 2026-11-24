@@ -6,6 +6,7 @@ import type {
   ServerLocationRequest,
 } from '../../types/iot/servers'
 import type {
+  IotNodeImportResult,
   IotNodeStatus,
   RegisterNodeRequest,
   RegisteredNode,
@@ -41,6 +42,10 @@ export interface IotBridgeState {
   nodeEditError: string | null
   nodeDetach: IotSubmitStatus
   nodeDetachError: string | null
+  nodeImport: IotSubmitStatus
+  nodeImportError: string | null
+  nodeImportResult: IotNodeImportResult | null
+  nodeTemplateDownloading: boolean
   credential: IotGatewayCredential | null
   serverCredentialBusy: IotCredentialAction | null
   credentialError: string | null
@@ -68,6 +73,10 @@ const initialState: IotBridgeState = {
   nodeEditError: null,
   nodeDetach: 'idle',
   nodeDetachError: null,
+  nodeImport: 'idle',
+  nodeImportError: null,
+  nodeImportResult: null,
+  nodeTemplateDownloading: false,
   credential: null,
   serverCredentialBusy: null,
   credentialError: null,
@@ -213,6 +222,33 @@ const iotBridgeSlice = createSlice({
       state.nodeDetachError = null
     },
 
+    // ---- 6c. Node import (Excel) ----
+    importNodesRequest: (state, _action: PayloadAction<File>) => {
+      state.nodeImport = 'submitting'
+      state.nodeImportError = null
+      state.nodeImportResult = null
+    },
+    importNodesSuccess: (state, action: PayloadAction<IotNodeImportResult>) => {
+      state.nodeImport = 'succeeded'
+      state.nodeImportResult = action.payload
+      state.nodeImportError = null
+    },
+    importNodesFailure: (state, action: PayloadAction<string>) => {
+      state.nodeImport = 'failed'
+      state.nodeImportError = action.payload
+    },
+    resetNodeImport: (state) => {
+      state.nodeImport = 'idle'
+      state.nodeImportError = null
+      state.nodeImportResult = null
+    },
+    downloadNodeTemplateRequest: (state) => {
+      state.nodeTemplateDownloading = true
+    },
+    downloadNodeTemplateDone: (state) => {
+      state.nodeTemplateDownloading = false
+    },
+
     // ---- 5. Key MQTT theo server ----
     clearCredential: (state) => {
       state.credential = null
@@ -275,6 +311,12 @@ export const {
   detachNodeFeederSuccess,
   detachNodeFeederFailure,
   resetNodeDetach,
+  importNodesRequest,
+  importNodesSuccess,
+  importNodesFailure,
+  resetNodeImport,
+  downloadNodeTemplateRequest,
+  downloadNodeTemplateDone,
   clearCredential,
   issueServerCredentialRequest,
   viewServerCredentialRequest,

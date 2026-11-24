@@ -2,7 +2,7 @@
  * Auto-generated Types for: workorders/orders
  * Sinh tự động từ endpoint Backend
  */
-import type { AgendaFlag, CancellationRequestStatus, DataSource, EvidenceKind, FaultStatus, FaultType, FixtureStatus, FixtureType, InspectionOutcome, Severity, TaskKind, WorkOrderStatus } from '../common/enums'
+import type { AgendaFlag, CancellationRequestStatus, DataSource, EvidenceKind, FaultStatus, FaultType, FixtureStatus, FixtureType, InspectionOutcome, SchedulingSuggestionKind, SchedulingSuggestionState, Severity, TaskKind, WorkOrderStatus } from '../common/enums'
 
 export interface AgendaWorkOrder {
     work_order_id: string | null
@@ -193,6 +193,9 @@ export interface PolePhotoItem {
     thumbnail_url?: string | null
     original_url?: string | null
     video?: PolePhotoVideoItem
+    lux_id?: string | null
+    lux_value?: number
+    lux_measured_at?: string | null
 }
 
 export interface PolePhotoItemPagedResult {
@@ -244,6 +247,56 @@ export interface RequestCancellationRequest {
 
 export interface ReviewWorkOrderRequest {
     note?: string | null
+}
+
+export interface SchedulingSuggestionGroup {
+    kind?: SchedulingSuggestionKind
+    total?: number
+    ready_count?: number
+    in_work_order_count?: number
+    blocked_count?: number
+    pole_count?: number
+    segment_count?: number
+}
+
+export interface SchedulingSuggestionItem {
+    id: string | null
+    kind?: SchedulingSuggestionKind
+    state?: SchedulingSuggestionState
+    commune_id: string | null
+    segment_id?: string | null
+    segment_name?: string | null
+    segment_has_geometry?: boolean
+    pole_id?: string | null
+    external_ref?: string | null
+    note?: string | null
+    fault_id?: string | null
+    fault_type?: FaultType
+    fault_status?: FaultStatus
+    severity?: Severity
+    data_source?: DataSource
+    work_order_id?: string | null
+    work_order_title?: string | null
+    assigned_to?: string | null
+    wo_status?: WorkOrderStatus
+    recommended_task_kind?: TaskKind
+    blocking_reason?: string | null
+    observed_at?: string | null
+    scheduled_date?: string | null
+    due_date?: string | null
+}
+
+export interface SchedulingSuggestionItemPagedResult {
+    page?: number
+    page_size?: number
+    total?: number
+    items?: SchedulingSuggestionItem[]
+}
+
+export interface SchedulingSuggestionSummary {
+    generated_at?: string | null
+    night_of?: string | null
+    groups?: SchedulingSuggestionGroup[]
 }
 
 export interface StartWorkOrderRequest {

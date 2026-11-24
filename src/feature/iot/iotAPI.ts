@@ -1,3 +1,4 @@
+import axios from 'axios'
 import apiClient from '../../config/apiClient'
 import type {
   IotGatewayCredential,
@@ -12,6 +13,7 @@ import type {
   IotCommandStatus,
   IotDiagnosticResult,
   IotElectricalResult,
+  IotNodeImportResult,
   IotNodeSourceDetails,
   IotNodeStatusPagedResult,
   RegisterNodeRequest,
@@ -199,6 +201,29 @@ export const iotAPI = {
    */
   detachNodeFeeder: async (nodeId: string): Promise<void> => {
     await apiClient.delete(`/iot/nodes/${encodeURIComponent(nodeId)}/feeder`)
+  },
+
+  /**
+   * POST /api/v1/iot/nodes/import — nhập danh sách node IoT từ tệp Excel (.xlsx).
+   * Trả 200 kèm kết quả từng dòng kể cả khi có dòng lỗi.
+   */
+  importNodes: async (file: File): Promise<IotNodeImportResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post<IotNodeImportResult>('/iot/nodes/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+
+  /**
+   * GET /templates/iot-template.xlsx — tải tệp mẫu Excel tĩnh của FE dưới dạng ArrayBuffer.
+   */
+  getNodeImportTemplate: async (): Promise<ArrayBuffer> => {
+    const res = await axios.get<ArrayBuffer>('/templates/iot-template.xlsx', {
+      responseType: 'arraybuffer',
+    })
+    return res.data
   },
 }
 

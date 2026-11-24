@@ -5,6 +5,7 @@ import iotBridgeReducer, {
   registerNodeRequest,
   updateNodeRequest,
   detachNodeFeederRequest,
+  importNodesRequest,
   issueServerCredentialRequest,
   viewServerCredentialRequest,
   revokeServerCredentialRequest,
@@ -27,6 +28,7 @@ vi.mock('../../feature/iot/iotAPI', () => ({
     registerNode: vi.fn(),
     updateNode: vi.fn(),
     detachNodeFeeder: vi.fn(),
+    importNodes: vi.fn(),
   },
 }))
 
@@ -327,6 +329,103 @@ describe('iotBridgeSaga integration tests', () => {
       const state = store.getState().iotBridge
       expect(state.serverCredentialBusy).toBeNull()
       expect(state.credentialError).toBe('Lỗi thu hồi key.')
+    })
+  })
+
+  it('importNodesRequest: sets succeeded with result and triggers fetchBridgeRequest when all rows succeed', async () => {
+    const importResult = {
+      sheet: 'Nodes',
+      total: 2,
+      created: 1,
+      existing: 1,
+      failed: 0,
+      items: [
+        { row: 2, server_id: 'SRV-1', feeder_id: 'FDR-1', device_id: 'DEV-1', status: 'created', node_id: 'NODE-1' },
+        { row: 3, server_id: 'SRV-1', feeder_id: 'FDR-2', device_id: 'DEV-2', status: 'existing', node_id: 'NODE-2' },
+      ],
+    }
+    api.importNodes.mockResolvedValue(importResult)
+    const file = new File(['dummy'], 'nodes.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(importNodesRequest(file))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.nodeImport).toBe('succeeded')
+      expect(state.nodeImportResult).toEqual(importResult)
+      expect(state.nodeImportError).toBeNull()
+      expect(api.importNodes).toHaveBeenCalledWith(file)
+      expect(api.getServers).toHaveBeenCalled()
+      expect(api.getNodes).toHaveBeenCalled()
+    })
+  })
+
+  it('importNodesRequest: still sets succeeded with result when some rows fail', async () => {
+    const importResult = {
+      sheet: 'Nodes',
+      total: 2,
+      created: 0,
+      existing: 1,
+      failed: 1,
+      items: [
+        { row: 2, server_id: 'SRV-1', feeder_id: 'FDR-1', device_id: 'DEV-1', status: 'existing', node_id: 'NODE-1' },
+        {
+          row: 3,
+          server_id: 'SRV-1',
+          feeder_id: 'FDR-999',
+          device_id: 'DEV-2',
+          status: 'failed',
+          error: { code: 'NOT_FOUND', message: 'Không tìm thấy mạch', field: 'feeder_id' },
+        },
+      ],
+    }
+    api.importNodes.mockResolvedValue(importResult)
+    const file = new File(['dummy'], 'nodes.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(importNodesRequest(file))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.nodeImport).toBe('succeeded')
+      expect(state.nodeImportResult).toEqual(importResult)
+      expect(state.nodeImportError).toBeNull()
+      expect(api.importNodes).toHaveBeenCalledWith(file)
+      expect(api.getNodes).not.toHaveBeenCalled()
+    })
+  })
+
+  it('importNodesRequest: sets failed with error message when API rejects', async () => {
+    api.importNodes.mockRejectedValue({
+      response: { data: { error: { message: 'File không đúng định dạng .xlsx.' } } },
+    })
+    const file = new File(['bad'], 'nodes.txt', { type: 'text/plain' })
+
+    const store = makeSagaStore({
+      reducers: { iotBridge: iotBridgeReducer },
+      sagas: [iotBridgeSaga],
+    })
+
+    store.dispatch(importNodesRequest(file))
+
+    await waitFor(() => {
+      const state = store.getState().iotBridge
+      expect(state.nodeImport).toBe('failed')
+      expect(state.nodeImportError).toBe('File không đúng định dạng .xlsx.')
+      expect(state.nodeImportResult).toBeNull()
     })
   })
 })

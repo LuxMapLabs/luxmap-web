@@ -5,6 +5,8 @@ import iotAPI from './iotAPI'
 import { communeAPI } from '../communes/communeAPI'
 import { assetAPI } from '../assets/assetAPI'
 import { apiErrorMessage } from '../../utils/iot/apiError'
+import { saveWorkbookFile } from '../../utils/assets/workbookStyler'
+import { styleIotNodeWorkbook } from '../../utils/iot/nodeWorkbookStyler'
 import type {
   IotGatewayCredential,
   IotServerStatus,
@@ -12,6 +14,7 @@ import type {
   ServerLocationRequest,
 } from '../../types/iot/servers'
 import type {
+  IotNodeImportResult,
   IotNodeStatusPagedResult,
   RegisterNodeRequest,
   RegisteredNode,
@@ -44,6 +47,11 @@ import {
   detachNodeFeederRequest,
   detachNodeFeederSuccess,
   detachNodeFeederFailure,
+  importNodesRequest,
+  importNodesSuccess,
+  importNodesFailure,
+  downloadNodeTemplateRequest,
+  downloadNodeTemplateDone,
   issueServerCredentialRequest,
   viewServerCredentialRequest,
   revokeServerCredentialRequest,
@@ -171,6 +179,39 @@ function* handleDetachNodeFeeder(action: PayloadAction<string>) {
   }
 }
 
+function* handleImportNodes(action: PayloadAction<File>) {
+  try {
+    const result: IotNodeImportResult = yield call(iotAPI.importNodes, action.payload)
+    yield put(importNodesSuccess(result))
+    const created = result.created ?? 0
+    const existing = result.existing ?? 0
+    const failed = result.failed ?? 0
+    if (failed > 0) {
+      toast.warning(`Đã tạo ${created}, có sẵn ${existing}, lỗi ${failed} node`)
+    } else {
+      toast.success(`Đã tạo ${created} node, có sẵn ${existing}`)
+    }
+    if (created > 0) {
+      yield put(fetchBridgeRequest())
+    }
+  } catch (err: unknown) {
+    yield put(importNodesFailure(apiErrorMessage(err, 'Không nhập được file node IoT.')))
+  }
+}
+
+function* handleDownloadNodeTemplate() {
+  try {
+    const template: ArrayBuffer = yield call(iotAPI.getNodeImportTemplate)
+    const styled: ArrayBuffer = yield call(styleIotNodeWorkbook, template)
+    yield call(saveWorkbookFile, styled, 'Mau-nhap-node-iot.xlsx')
+    yield put(downloadNodeTemplateDone())
+    toast.success('Đã tải file mẫu')
+  } catch (err: unknown) {
+    toast.error(apiErrorMessage(err, 'Không tải được file mẫu.'))
+    yield put(downloadNodeTemplateDone())
+  }
+}
+
 // ---- 5. Key MQTT theo server ----
 function* handleIssueServerCredential(action: PayloadAction<string>) {
   const serverId = action.payload
@@ -228,6 +269,8 @@ export function* iotBridgeSaga() {
     takeEvery(registerNodeRequest.type, handleRegisterNode),
     takeEvery(updateNodeRequest.type, handleUpdateNode),
     takeEvery(detachNodeFeederRequest.type, handleDetachNodeFeeder),
+    takeEvery(importNodesRequest.type, handleImportNodes),
+    takeEvery(downloadNodeTemplateRequest.type, handleDownloadNodeTemplate),
     takeEvery(issueServerCredentialRequest.type, handleIssueServerCredential),
     takeEvery(viewServerCredentialRequest.type, handleViewServerCredential),
     takeEvery(revokeServerCredentialRequest.type, handleRevokeServerCredential),

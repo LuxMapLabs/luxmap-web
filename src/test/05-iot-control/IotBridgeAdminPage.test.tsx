@@ -123,6 +123,8 @@ describe('IotBridgeAdminPage role gating (server và node: Admin tạo / chỉnh
       'Sửa vị trí',
       'Đăng ký server',
       'Đăng ký node',
+      'Nhập Excel',
+      'Xuất Excel',
       'Cấp key',
       'Xem key',
       'Thu hồi',

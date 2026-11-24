@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Cpu, Eye, Loader2, MapPin, Pencil, Plus, Server, Unlink } from 'lucide-react'
+import { Cpu, Download, Eye, FileSpreadsheet, Loader2, MapPin, Pencil, Plus, Server, Unlink } from 'lucide-react'
 import type { AppDispatch, RootState } from '../../redux/store'
 import {
   detachNodeFeederRequest,
@@ -18,6 +18,7 @@ import { IotServerFormModal, type CommuneLoadStatus } from './components/IotServ
 import { ServerCredentialPanel } from './components/ServerCredentialPanel'
 import { RegisterNodeModal } from './components/RegisterNodeModal'
 import { EditNodeModal } from './components/EditNodeModal'
+import { ImportNodesModal } from './components/ImportNodesModal'
 import { IotBridgeModal, secondaryButtonClass } from './components/IotBridgeModal'
 import { IotNodeDetailModal } from '../assets/components/iot/components/IotNodeDetailModal'
 
@@ -68,6 +69,7 @@ export const IotBridgeAdminPage: React.FC = () => {
   const [formServer, setFormServer] = useState<IotServerStatus | null | undefined>(undefined)
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null)
   const [registering, setRegistering] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [editingNode, setEditingNode] = useState<IotNodeStatus | null>(null)
   const [detachingNode, setDetachingNode] = useState<{ nodeId: string; feederLabel: string } | null>(null)
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
@@ -332,13 +334,31 @@ export const IotBridgeAdminPage: React.FC = () => {
               </span>
             </h3>
             {canManage && (
-              <button
-                type="button"
-                onClick={() => setRegistering(true)}
-                className="px-3 py-1.5 rounded-xl bg-primary text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs hover:bg-primary/90 transition focus-visible:ring-2 ring-primary/40 focus:outline-none"
-              >
-                <Plus className="w-4 h-4" /> Đăng ký node
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Giao diện trước: backend chưa có API xuất node, nên nút tạm khoá. Nối saga khi có API. */}
+                <button
+                  type="button"
+                  disabled
+                  title="Chưa dùng được: chờ backend bổ sung API xuất danh sách node."
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs flex items-center gap-1.5 shadow-xs opacity-50 cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4" /> Xuất Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImporting(true)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs hover:bg-slate-50 transition focus-visible:ring-2 ring-primary/40 focus:outline-none"
+                >
+                  <FileSpreadsheet className="w-4 h-4" /> Nhập Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegistering(true)}
+                  className="px-3 py-1.5 rounded-xl bg-primary text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs hover:bg-primary/90 transition focus-visible:ring-2 ring-primary/40 focus:outline-none"
+                >
+                  <Plus className="w-4 h-4" /> Đăng ký node
+                </button>
+              </div>
             )}
           </div>
 
@@ -523,6 +543,10 @@ export const IotBridgeAdminPage: React.FC = () => {
               dispatch(fetchNodeAssetsRequest())
             }}
           />
+        )}
+
+        {canManage && importing && (
+          <ImportNodesModal onClose={() => setImporting(false)} />
         )}
 
         {canManage && editingNode && (

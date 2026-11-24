@@ -9,6 +9,7 @@ export interface CreateLuxReadingRequest {
     pole_id: string | null
     measured_at: string | null
     lux_value: number
+    photo_id?: string | null
     meter_model?: string | null
     data_source: DataSource
     note?: string | null
@@ -20,6 +21,7 @@ export interface LuxReadingResponse {
     lux_id?: string | null
     client_op_id?: string | null
     pole_id?: string | null
+    photo_id?: string | null
     measured_at?: string | null
     lux_value?: number
     meter_model?: string | null
@@ -38,6 +40,7 @@ export interface LuxReadingWithLuminanceResponse {
     lux_id?: string | null
     client_op_id?: string | null
     pole_id?: string | null
+    photo_id?: string | null
     measured_at?: string | null
     lux_value?: number
     meter_model?: string | null

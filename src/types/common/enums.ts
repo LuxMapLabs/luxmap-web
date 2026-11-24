@@ -55,6 +55,10 @@ export type PowerSource = 'grid'
 
 export type RoadClass = 'inter_commune' | 'inter_village'
 
+export type SchedulingSuggestionKind = 'fault_inspection' | 'fault_repair' | 'missing_gps' | 'survey_needed' | 'overdue'
+
+export type SchedulingSuggestionState = 'ready' | 'in_work_order' | 'blocked'
+
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
 
 export type SourceChannel = 'cv' | 'iot' | 'field_report'
