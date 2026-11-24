@@ -16,7 +16,10 @@ import type {
 import type { IotServerStatus } from '../../types/iot/servers'
 import {
   mergeElectricalPoints,
+  type ElectricalChunkDirection,
+  type ElectricalChunkState,
   type ElectricalPoint,
+  type ElectricalTimeSpan,
 } from '../../utils/iot/electricalSeries'
 import type { IotCommandChoice } from '../../utils/iot/iotCommand'
 
@@ -62,6 +65,16 @@ export interface ElectricalSeriesEntry {
   windowMs: number | null
 }
 
+/** Trạng thái tải dữ liệu điện theo khúc 6 giờ (không cắt số điểm). */
+export interface ElectricalChunksEntry {
+  feederId: string
+  timeBasis: ElectricalTimeBasis
+  live: boolean
+  points: ElectricalPoint[]
+  chunks: Record<number, ElectricalChunkState>
+  error: string | null
+}
+
 export interface CommandHistoryEntry {
   nodeId: string
   items: IotCommandHistoryItem[]
@@ -93,6 +106,7 @@ export interface AutoPrefillState {
 export interface IotMonitorState {
   cabinetStatus: Record<string, CabinetStatusEntry>
   electricalSeries: Record<string, ElectricalSeriesEntry>
+  electricalChunks: Record<string, ElectricalChunksEntry>
   commandModes: Record<string, Record<string, IotCommandChoice | null>>
   feederElectrical: Record<string, IotFeederElectricalResult | null>
   diagnostics: Record<
@@ -135,6 +149,7 @@ export interface IotMonitorState {
 const initialState: IotMonitorState = {
   cabinetStatus: {},
   electricalSeries: {},
+  electricalChunks: {},
   commandModes: {},
   feederElectrical: {},
   diagnostics: {},
@@ -282,6 +297,83 @@ export const iotMonitorSlice = createSlice({
       action: PayloadAction<{ key: string; error: string | null }>
     ) => {
       const entry = state.electricalSeries[action.payload.key]
+      if (entry) {
+        entry.error = action.payload.error
+      }
+    },
+
+    // B2. Electrical Chunks (tải theo khúc 6 giờ, không giới hạn mẫu)
+    startElectricalChunks: (
+      state,
+      action: PayloadAction<{
+        key: string
+        feederId: string
+        timeBasis: ElectricalTimeBasis
+        live: boolean
+      }>
+    ) => {
+      const { key, feederId, timeBasis, live } = action.payload
+      state.electricalChunks[key] = {
+        feederId,
+        timeBasis,
+        live,
+        points: [],
+        chunks: {},
+        error: null,
+      }
+    },
+    stopElectricalChunks: (state, action: PayloadAction<{ key: string }>) => {
+      delete state.electricalChunks[action.payload.key]
+    },
+    requestElectricalChunks: (
+      state,
+      action: PayloadAction<{
+        key: string
+        view: ElectricalTimeSpan
+        track: ElectricalTimeSpan
+        direction: ElectricalChunkDirection
+        bounds?: ElectricalTimeSpan | null
+        force?: boolean
+      }>
+    ) => {
+      if (action.payload.force) {
+        const entry = state.electricalChunks[action.payload.key]
+        if (entry) {
+          entry.error = null
+        }
+      }
+    },
+    setElectricalChunkState: (
+      state,
+      action: PayloadAction<{
+        key: string
+        start: number
+        state: ElectricalChunkState | null
+      }>
+    ) => {
+      const entry = state.electricalChunks[action.payload.key]
+      if (!entry) return
+      if (action.payload.state === null) {
+        delete entry.chunks[action.payload.start]
+      } else {
+        entry.chunks[action.payload.start] = action.payload.state
+      }
+    },
+    electricalChunksAbsorb: (
+      state,
+      action: PayloadAction<{ key: string; samples: IotFeederAverage[] }>
+    ) => {
+      const entry = state.electricalChunks[action.payload.key]
+      if (!entry) return
+      const samples = action.payload.samples
+      if (!samples || samples.length === 0) return
+      entry.points = mergeElectricalPoints(entry.points, samples, Number.MAX_SAFE_INTEGER)
+    },
+    setElectricalChunksError: (
+      state,
+      action: PayloadAction<{ key: string; error: string | null }>
+    ) => {
+      const entry = state.electricalChunks[action.payload.key]
       if (entry) {
         entry.error = action.payload.error
       }
@@ -694,6 +786,12 @@ export const {
   setElectricalSeriesBackfilling,
   setElectricalSeriesLoadError,
   setElectricalSeriesError,
+  startElectricalChunks,
+  stopElectricalChunks,
+  requestElectricalChunks,
+  setElectricalChunkState,
+  electricalChunksAbsorb,
+  setElectricalChunksError,
   startCommandModes,
   stopCommandModes,
   commandModesLoaded,
@@ -748,6 +846,13 @@ export const selectElectricalSeries = (
   key: string
 ): ElectricalSeriesEntry | undefined => {
   return state.iotMonitor.electricalSeries[key]
+}
+
+export const selectElectricalChunks = (
+  state: { iotMonitor: IotMonitorState },
+  key: string
+): ElectricalChunksEntry | undefined => {
+  return state.iotMonitor.electricalChunks[key]
 }
 
 export const selectCommandModes = (

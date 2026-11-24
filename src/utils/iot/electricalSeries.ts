@@ -11,15 +11,30 @@ export const ELECTRICAL_METRICS: Record<ElectricalMetric, { label: string; unit:
 
 export const ELECTRICAL_METRIC_KEYS = Object.keys(ELECTRICAL_METRICS) as ElectricalMetric[]
 
-export type ElectricalRange = '1h' | '6h' | '24h'
+export type ElectricalRange = '1h' | '6h' | '12h'
 export const ELECTRICAL_RANGES: Record<ElectricalRange, { label: string; windowMs: number; bucketMs: number; hint: string }> = {
-  '1h':  { label: '1 giờ',  windowMs: 3_600_000,      bucketMs: 0,       hint: 'Từng mẫu (10 giây / mẫu)' },
-  '6h':  { label: '6 giờ',  windowMs: 6 * 3_600_000,  bucketMs: 60_000,  hint: 'Trung bình mỗi phút' },
-  '24h': { label: '24 giờ', windowMs: 24 * 3_600_000, bucketMs: 300_000, hint: 'Trung bình mỗi 5 phút' },
+  '1h':  { label: '1 giờ',  windowMs: 3_600_000,       bucketMs: 0,       hint: 'Từng mẫu (10 giây / mẫu)' },
+  '6h':  { label: '6 giờ',  windowMs: 6 * 3_600_000,   bucketMs: 60_000,  hint: 'Trung bình mỗi phút' },
+  '12h': { label: '12 giờ', windowMs: 12 * 3_600_000,  bucketMs: 300_000, hint: 'Trung bình mỗi 5 phút' },
 }
 export const ELECTRICAL_RANGE_KEYS = Object.keys(ELECTRICAL_RANGES) as ElectricalRange[]
 /** Cửa sổ lớn nhất cần tải (24 giờ). */
-export const ELECTRICAL_HISTORY_MS = ELECTRICAL_RANGES['24h'].windowMs
+export const ELECTRICAL_HISTORY_MS = 24 * 3_600_000
+/** Ngưỡng khoảng trống mặc định (30 giây) khi không gom ô (chế độ 1 giờ, bucketMs = 0). */
+export const RAW_GAP_THRESHOLD_MS = 30_000
+/** Độ dài một khúc tải lịch sử điện (6 giờ), căn theo bội số của epoch ms. */
+export const ELECTRICAL_CHUNK_MS = 6 * 3_600_000
+/** Ngưỡng độ dài track tối đa (48 giờ) để tải trước toàn bộ track; dài hơn chỉ tải quanh khung xem ±12 giờ. */
+export const ELECTRICAL_PREFETCH_FULL_TRACK_MAX_MS = 48 * 3_600_000
+const LONG_TRACK_PREFETCH_RADIUS_MS = 12 * 3_600_000
+
+export type ElectricalChunkState = 'loading' | 'loaded' | 'error'
+export type ElectricalChunkDirection = -1 | 0 | 1
+
+export interface ElectricalTimeSpan {
+  from: number
+  to: number
+}
 
 export interface ElectricalPoint {
   key: string
@@ -219,6 +234,286 @@ export function summarizeMetric(
   }
 
   return { avg, min, max }
+}
+
+/**
+ * Chèn điểm ngắt (mọi chỉ số và min/max đều null, count = 0) giữa hai điểm liền kề cách nhau
+ * lớn hơn ngưỡng (2 lần `bucketMs`; nếu `bucketMs <= 0` thì dùng 30 giây) để biểu đồ không nối qua khoảng mất dữ liệu.
+ */
+export function insertElectricalGaps(
+  points: ElectricalBucketPoint[],
+  bucketMs: number
+): ElectricalBucketPoint[] {
+  if (points.length <= 1) return points.slice()
+  const thresholdMs = bucketMs > 0 ? bucketMs * 2 : RAW_GAP_THRESHOLD_MS
+  const result: ElectricalBucketPoint[] = [points[0]]
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]
+    const curr = points[i]
+    if (curr.time - prev.time > thresholdMs) {
+      const midTime = Math.floor((prev.time + curr.time) / 2)
+      result.push({
+        key: `gap-${prev.time}-${curr.time}`,
+        cursor: midTime,
+        time: midTime,
+        current: null,
+        voltage: null,
+        power: null,
+        lamp: null,
+        node: null,
+        count: 0,
+        min: { power: null, current: null, voltage: null },
+        max: { power: null, current: null, voltage: null },
+      })
+    }
+    result.push(curr)
+  }
+
+  return result
+}
+
+/** Kẹp mốc kết thúc khung trong phạm vi hợp lệ của dải 24 giờ. */
+export const clampWindowEnd = (value: number, minEnd: number, maxEnd: number): number => {
+  if (minEnd >= maxEnd) return maxEnd
+  return Math.min(maxEnd, Math.max(minEnd, value))
+}
+
+/** Mốc 00:00:00.000 giờ địa phương của ngày chứa `ms`. */
+export function startOfLocalDay(ms: number): number {
+  const d = new Date(ms)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+}
+
+/**
+ * Mốc 00:00 giờ địa phương của mọi ngày giao với `[from, to)`, tăng dần (`to <= from` → `[]`).
+ * Bước từng ngày bằng `setDate(getDate() + 1)` để đúng khi qua cuối tháng, cuối năm hoặc DST.
+ */
+export function localDayStarts(from: number, to: number): number[] {
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return []
+  const starts: number[] = []
+  const cursor = new Date(startOfLocalDay(from))
+  while (cursor.getTime() < to) {
+    starts.push(cursor.getTime())
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return starts
+}
+
+export interface ClampTrackStartOptions {
+  trackStart: number
+  spanMs: number
+  limitFrom: number
+  limitTo: number
+}
+
+/**
+ * Kẹp `trackStart` sao cho `[trackStart, trackStart + spanMs]` nằm trong `[limitFrom, limitTo]`.
+ * Nếu phạm vi hẹp hơn `spanMs` (`limitTo - limitFrom < spanMs`) thì trả `limitFrom`.
+ */
+export function clampTrackStart({
+  trackStart,
+  spanMs,
+  limitFrom,
+  limitTo,
+}: ClampTrackStartOptions): number {
+  if (limitTo - limitFrom < spanMs) return limitFrom
+  const maxStart = limitTo - spanMs
+  return Math.min(maxStart, Math.max(limitFrom, trackStart))
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Tính các mốc trục X tròn theo giờ địa phương trong đoạn `[startMs, endMs]`. */
+export function buildAxisTicks(startMs: number, endMs: number, stepMs: number): number[] {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || stepMs <= 0 || endMs <= startMs) {
+    return []
+  }
+  const offsetMs = new Date(startMs).getTimezoneOffset() * 60_000
+  const first = Math.ceil((startMs - offsetMs) / stepMs) * stepMs + offsetMs
+  const ticks: number[] = []
+  for (let t = first; t <= endMs; t += stepMs) {
+    ticks.push(t)
+  }
+  return ticks
+}
+
+/**
+ * Định dạng nhãn trục X cho chế độ Gần nhất (2 dòng: dòng trên `HH:mm`, dòng dưới `dd/MM`).
+ * Dòng ngày chỉ xuất hiện ở nhãn đầu khung (`isFirst`) và mốc đúng `00:00`.
+ */
+export function formatRecentAxisTick(
+  time: number,
+  isFirst: boolean
+): { clock: string; date: string | null } {
+  if (!Number.isFinite(time)) return { clock: '', date: null }
+  const d = new Date(time)
+  const clock = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  const isMidnight = d.getHours() === 0 && d.getMinutes() === 0
+  const date = isFirst || isMidnight ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}` : null
+  return { clock, date }
+}
+
+/** Mốc đầu khúc 6 giờ chứa thời điểm `time` (căn theo epoch ms). */
+export const chunkStartOf = (time: number): number =>
+  Math.floor(time / ELECTRICAL_CHUNK_MS) * ELECTRICAL_CHUNK_MS
+
+/**
+ * Trả về danh sách mốc đầu khúc 6 giờ (tăng dần) phủ khoảng `[from, to]`.
+ * Nếu `to > from` và `to` nằm đúng biên khúc (vd `06:00:00.000`), không kéo thêm khúc kế sau.
+ */
+export function chunkStartsCovering(from: number, to: number): number[] {
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return []
+  const first = chunkStartOf(from)
+  const last = to > from ? chunkStartOf(to - 1) : first
+  const starts: number[] = []
+  for (let s = first; s <= last; s += ELECTRICAL_CHUNK_MS) {
+    starts.push(s)
+  }
+  return starts
+}
+
+const chunkOverlapsSpan = (start: number, span: ElectricalTimeSpan): boolean => {
+  if (!Number.isFinite(span.from) || !Number.isFinite(span.to) || span.to < span.from) {
+    return false
+  }
+  const end = start + ELECTRICAL_CHUNK_MS
+  return span.to > span.from ? start < span.to && end > span.from : start <= span.from && span.from < end
+}
+
+export interface PlanElectricalChunksOptions {
+  /** Khung đang xem (ưu tiên tải trước). */
+  view: ElectricalTimeSpan
+  /** Khung nhìn 24 giờ trên thanh trượt. */
+  track: ElectricalTimeSpan
+  /** Hướng kéo gần nhất: `-1` quá khứ, `1` tương lai, `0` đứng yên (ưu tiên cả 2 bên). */
+  direction: ElectricalChunkDirection
+  /** Trạng thái tải hiện có theo mốc đầu khúc. */
+  states: Record<number, ElectricalChunkState>
+  /** Giới hạn khoảng ngày (chế độ Theo ngày); nếu có thì không lập khúc nằm hoàn toàn ngoài `bounds`. */
+  bounds?: ElectricalTimeSpan | null
+  /** `true` cho phép đưa lại khúc đang ở trạng thái `'error'` vào kế hoạch tải. */
+  force?: boolean
+}
+
+/**
+ * Lập danh sách mốc đầu khúc CẦN TẢI theo thứ tự ưu tiên:
+ * 1) Các khúc phủ `view`;
+ * 2) Khúc kế bên theo `direction`, rồi thêm 1 khúc nữa cùng hướng;
+ * 3) Phần còn lại của `track`, ưu tiên khúc gần `view` trước.
+ * Bỏ qua khúc đang `'loaded'`/`'loading'`; khúc `'error'` chỉ vào khi `force = true`.
+ */
+export function planElectricalChunks({
+  view,
+  track,
+  direction,
+  states,
+  bounds = null,
+  force = false,
+}: PlanElectricalChunksOptions): number[] {
+  const limit = bounds ?? track
+  const result: number[] = []
+  const seen = new Set<number>()
+
+  const tryAdd = (start: number) => {
+    if (seen.has(start)) return
+    if (!chunkOverlapsSpan(start, limit)) return
+    seen.add(start)
+    const state = states[start]
+    if (state === 'loaded' || state === 'loading') return
+    if (state === 'error' && !force) return
+    result.push(start)
+  }
+
+  // Nhóm (1): các khúc phủ khung đang xem (view)
+  const viewStarts = chunkStartsCovering(view.from, view.to)
+  for (const s of viewStarts) {
+    tryAdd(s)
+  }
+
+  // Nhóm (2): khúc kế bên theo hướng kéo, rồi thêm 1 khúc nữa cùng hướng
+  if (viewStarts.length > 0) {
+    const firstView = viewStarts[0]
+    const lastView = viewStarts[viewStarts.length - 1]
+    if (direction === -1) {
+      tryAdd(firstView - ELECTRICAL_CHUNK_MS)
+      tryAdd(firstView - 2 * ELECTRICAL_CHUNK_MS)
+    } else if (direction === 1) {
+      tryAdd(lastView + ELECTRICAL_CHUNK_MS)
+      tryAdd(lastView + 2 * ELECTRICAL_CHUNK_MS)
+    } else {
+      tryAdd(firstView - ELECTRICAL_CHUNK_MS)
+      tryAdd(lastView + ELECTRICAL_CHUNK_MS)
+      tryAdd(firstView - 2 * ELECTRICAL_CHUNK_MS)
+      tryAdd(lastView + 2 * ELECTRICAL_CHUNK_MS)
+    }
+  }
+
+  // Nhóm (3): phần còn lại của track (nếu track dài > 48h thì chỉ lấy quanh view ±12h), ưu tiên khúc gần tâm view hơn trước
+  const viewCenter = (view.from + view.to) / 2
+  const trackSpanMs = track.to - track.from
+  const group3From =
+    trackSpanMs > ELECTRICAL_PREFETCH_FULL_TRACK_MAX_MS
+      ? Math.max(track.from, view.from - LONG_TRACK_PREFETCH_RADIUS_MS)
+      : track.from
+  const group3To =
+    trackSpanMs > ELECTRICAL_PREFETCH_FULL_TRACK_MAX_MS
+      ? Math.min(track.to, view.to + LONG_TRACK_PREFETCH_RADIUS_MS)
+      : track.to
+  const trackStarts = chunkStartsCovering(group3From, group3To).sort((a, b) => {
+    const distA = Math.abs(a + ELECTRICAL_CHUNK_MS / 2 - viewCenter)
+    const distB = Math.abs(b + ELECTRICAL_CHUNK_MS / 2 - viewCenter)
+    return distA - distB || a - b
+  })
+  for (const s of trackStarts) {
+    tryAdd(s)
+  }
+
+  return result
+}
+
+export interface ActiveElectricalChunk {
+  start: number
+  isView: boolean
+}
+
+export interface PickPreemptibleChunkOptions {
+  /** Các khúc đang tải song song hiện tại (theo thứ tự bắt đầu sớm → muộn). */
+  active: ActiveElectricalChunk[]
+  /** Khung đang xem để ưu tiên hủy khúc tải trước ở xa nhất. */
+  view: ElectricalTimeSpan
+  /** Số khúc phủ `view` đang chờ slot. */
+  needed: number
+  /** Số slot tải đồng thời tối đa (mặc định 2). */
+  maxConcurrent?: number
+}
+
+/**
+ * Quyết định các khúc tải trước (`isView = false`) cần hủy để nhường slot cho khúc phủ `view`.
+ * Không hủy khi còn slot trống; tuyệt đối không hủy khúc `isView = true`; ưu tiên hủy khúc xa `view` nhất
+ * (hòa khoảng cách thì hủy khúc bắt đầu sớm nhất).
+ */
+export function pickPreemptibleChunk({
+  active,
+  view,
+  needed,
+  maxConcurrent = 2,
+}: PickPreemptibleChunkOptions): number[] {
+  if (needed <= 0 || maxConcurrent <= 0) return []
+  const freeSlots = Math.max(0, maxConcurrent - active.length)
+  const toCancelCount = Math.min(needed, maxConcurrent) - freeSlots
+  if (toCancelCount <= 0) return []
+
+  const viewCenter = (view.from + view.to) / 2
+  const candidates = active
+    .filter((item) => !item.isView)
+    .sort((a, b) => {
+      const distA = Math.abs(a.start + ELECTRICAL_CHUNK_MS / 2 - viewCenter)
+      const distB = Math.abs(b.start + ELECTRICAL_CHUNK_MS / 2 - viewCenter)
+      return distB - distA
+    })
+
+  return candidates.slice(0, toCancelCount).map((item) => item.start)
 }
 
 export const formatMetric = (value: number | null, metric: ElectricalMetric) =>

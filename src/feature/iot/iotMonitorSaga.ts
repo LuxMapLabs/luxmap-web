@@ -1,11 +1,13 @@
-import type { Task } from 'redux-saga'
+import { channel, type Channel, type Task } from 'redux-saga'
 import {
   all,
   call,
   cancel,
+  cancelled,
   delay,
   fork,
   put,
+  race,
   select,
   take,
   takeEvery,
@@ -25,6 +27,7 @@ import {
   clearCommandHistory,
   clearDiagnosticHistory,
   commandModesLoaded,
+  electricalChunksAbsorb,
   electricalSeriesAbsorb,
   feederElectricalLoaded,
   fetchAutoPrefillRequest,
@@ -48,23 +51,29 @@ import {
   fetchNodesTabRequest,
   fetchNodesTabSuccess,
   resetCommandHistory,
+  requestElectricalChunks,
   resetDiagnosticHistory,
   sendCommandFailure,
   sendCommandRequest,
   sendCommandSuccess,
   setCabinetStatusResult,
+  setElectricalChunkState,
+  setElectricalChunksError,
   setElectricalSeriesBackfilling,
   setElectricalSeriesError,
   setElectricalSeriesLoadError,
   setElectricalSeriesLoading,
   startCabinetStatus,
   startCommandModes,
+  startElectricalChunks,
   startElectricalSeries,
   startFeederElectrical,
   stopCabinetStatus,
   stopCommandModes,
+  stopElectricalChunks,
   stopElectricalSeries,
   stopFeederElectrical,
+  type ElectricalTimeBasis,
   type IotMonitorState,
 } from './iotMonitorSlice'
 import type {
@@ -84,7 +93,14 @@ import type {
 } from '../../types/iot/feeders'
 import type { IotServerStatus } from '../../types/iot/servers'
 import { apiErrorMessage } from '../../utils/iot/apiError'
-import { toElectricalPoint } from '../../utils/iot/electricalSeries'
+import {
+  ELECTRICAL_CHUNK_MS,
+  chunkStartsCovering,
+  pickPreemptibleChunk,
+  planElectricalChunks,
+  toElectricalPoint,
+  type ElectricalChunkState,
+} from '../../utils/iot/electricalSeries'
 import {
   currentChoice,
   latestSuccessAutoSchedule,
@@ -385,6 +401,412 @@ function* electricalSeriesManager(): Generator<unknown, void, unknown> {
       const startAction = action as ReturnType<typeof startElectricalSeries>
       const task = (yield fork(electricalSeriesSession, startAction.payload)) as Task
       tasks.set(key, task)
+    }
+  }
+}
+
+// ==========================================
+// B2. Tải mẫu điện theo khúc 6 giờ (useElectricalChunks)
+// ==========================================
+const CHUNK_PAGE_SIZE = 200
+const CHUNK_PAGE_CONCURRENCY = 4
+const CHUNK_MAX_CONCURRENT = 2
+const CHUNK_PREFETCH_DEBOUNCE_MS = 150
+/** Thời gian chờ trước khi âm thầm thử tải lại một khúc lỗi khi có request mới (10 giây). */
+const CHUNK_ERROR_RETRY_MS = 10_000
+
+type RequestElectricalChunksPayload = ReturnType<typeof requestElectricalChunks>['payload']
+
+function* fetchAndAbsorbChunkPage(
+  fetchHistory: typeof iotAPI.getFeederElectricalHistory,
+  key: string,
+  feederId: string,
+  page: number,
+  from: string,
+  to: string
+) {
+  const res: IotFeederHistoryResult = yield call(fetchHistory, feederId, {
+    page,
+    page_size: CHUNK_PAGE_SIZE,
+    from,
+    to,
+  })
+  const items = res.items || []
+  if (items.length > 0) {
+    yield put(electricalChunksAbsorb({ key, samples: items }))
+  }
+  return res
+}
+
+/** Tải trọn vẹn một khúc 6 giờ (trang 1 lấy `total`, các trang sau song song tối đa 4 trang mỗi lượt, không trần trang). */
+function* loadSingleElectricalChunk(
+  key: string,
+  feederId: string,
+  timeBasis: ElectricalTimeBasis,
+  start: number,
+  onFinished: () => void
+) {
+  const fetchHistory =
+    timeBasis === 'received_at'
+      ? iotAPI.getFeederElectricalHistoryReceived
+      : iotAPI.getFeederElectricalHistory
+  const from = new Date(start).toISOString()
+  const to = new Date(start + ELECTRICAL_CHUNK_MS).toISOString()
+
+  yield put(setElectricalChunkState({ key, start, state: 'loading' }))
+  let completed = false
+
+  try {
+    const first: IotFeederHistoryResult = yield call(
+      fetchAndAbsorbChunkPage,
+      fetchHistory,
+      key,
+      feederId,
+      1,
+      from,
+      to
+    )
+    const firstItems = first.items || []
+
+    if (typeof first.total === 'number') {
+      const totalPages = Math.ceil(first.total / CHUNK_PAGE_SIZE)
+      if (totalPages > 1 && firstItems.length > 0) {
+        for (let pageStart = 2; pageStart <= totalPages; pageStart += CHUNK_PAGE_CONCURRENCY) {
+          const batchPages: number[] = []
+          for (
+            let p = pageStart;
+            p < pageStart + CHUNK_PAGE_CONCURRENCY && p <= totalPages;
+            p++
+          ) {
+            batchPages.push(p)
+          }
+          yield all(
+            batchPages.map((page) =>
+              call(fetchAndAbsorbChunkPage, fetchHistory, key, feederId, page, from, to)
+            )
+          )
+        }
+      }
+    } else if (firstItems.length >= CHUNK_PAGE_SIZE) {
+      // Dự phòng nếu BE không trả `total`: tiếp tục tải tuần tự tới khi hết trang.
+      for (let page = 2; ; page++) {
+        const res: IotFeederHistoryResult = yield call(
+          fetchAndAbsorbChunkPage,
+          fetchHistory,
+          key,
+          feederId,
+          page,
+          from,
+          to
+        )
+        if ((res.items || []).length < CHUNK_PAGE_SIZE) break
+      }
+    }
+
+    yield put(setElectricalChunkState({ key, start, state: 'loaded' }))
+    completed = true
+  } catch (err) {
+    yield put(setElectricalChunkState({ key, start, state: 'error' }))
+    yield put(
+      setElectricalChunksError({
+        key,
+        error: apiErrorMessage(err, 'Không đọc được lịch sử điện.'),
+      })
+    )
+    completed = true
+  } finally {
+    const wasCancelled = (yield cancelled()) as boolean
+    if (!completed && wasCancelled) {
+      // Xóa trạng thái 'loading' khi bị hủy giữa chừng để khúc có thể tải lại sau này.
+      yield put(setElectricalChunkState({ key, start, state: null }))
+    }
+    onFinished()
+  }
+}
+
+/** Hỏi định kỳ mẫu điện mới nhất (trang 1, 20 mẫu, không from/to) cho phiên đang live. */
+function* liveElectricalChunksPoll(
+  key: string,
+  feederId: string,
+  timeBasis: ElectricalTimeBasis
+) {
+  const fetchHistory =
+    timeBasis === 'received_at'
+      ? iotAPI.getFeederElectricalHistoryReceived
+      : iotAPI.getFeederElectricalHistory
+
+  while (true) {
+    yield delay(ELECTRICAL_POLL_MS)
+    try {
+      const page: IotFeederHistoryResult = yield call(fetchHistory, feederId, {
+        page: 1,
+        page_size: 20,
+      })
+      yield put(electricalChunksAbsorb({ key, samples: page.items || [] }))
+      yield put(setElectricalChunksError({ key, error: null }))
+    } catch (err) {
+      yield put(
+        setElectricalChunksError({
+          key,
+          error: apiErrorMessage(err, 'Không lấy được mẫu điện mới.'),
+        })
+      )
+    }
+  }
+}
+
+function* electricalChunksSession(
+  payload: ReturnType<typeof startElectricalChunks>['payload'],
+  reqCh: Channel<RequestElectricalChunksPayload>
+): Generator<unknown, void, unknown> {
+  const { key, feederId, timeBasis, live } = payload
+  if (!feederId) return
+
+  const wakeCh = channel<string>()
+  const activeTasks = new Map<number, { task: Task; isView: boolean }>()
+  /** Ghi nhận mốc thời gian đầu tiên thấy khúc ở trạng thái `'error'` để tự thử lại âm thầm sau 10 giây. */
+  const errorSeenAt = new Map<number, number>()
+  let immediateQueue: number[] = []
+  let deferredQueue: number[] = []
+  let debounceTask: Task | null = null
+  let requestSeq = 0
+
+  const liveTask: Task | null = live
+    ? ((yield fork(liveElectricalChunksPoll, key, feederId, timeBasis)) as Task)
+    : null
+
+  function* pumpQueue(): Generator<unknown, void, unknown> {
+    // Dọn các task đã xong trước khi cấp slot mới.
+    for (const [start, info] of activeTasks.entries()) {
+      if (!info.task.isRunning()) {
+        activeTasks.delete(start)
+      }
+    }
+
+    while (activeTasks.size < CHUNK_MAX_CONCURRENT) {
+      let nextStart: number | undefined
+      let isView = false
+      if (immediateQueue.length > 0) {
+        nextStart = immediateQueue.shift()
+        isView = true
+      } else if (deferredQueue.length > 0) {
+        nextStart = deferredQueue.shift()
+        isView = false
+      } else {
+        break
+      }
+
+      if (nextStart === undefined || activeTasks.has(nextStart)) continue
+
+      const state = (yield select()) as { iotMonitor: IotMonitorState }
+      const entry = state.iotMonitor.electricalChunks[key]
+      if (!entry) break
+      const chunkState = entry.chunks[nextStart]
+      if (chunkState === 'loaded' || chunkState === 'loading') continue
+
+      const task = (yield fork(
+        loadSingleElectricalChunk,
+        key,
+        feederId,
+        timeBasis,
+        nextStart,
+        () => {
+          activeTasks.delete(nextStart)
+          wakeCh.put('slot_free')
+        }
+      )) as Task
+      activeTasks.set(nextStart, { task, isView })
+    }
+  }
+
+  try {
+    while (true) {
+      const outcome = (yield race({
+        req: take(reqCh),
+        wake: take(wakeCh),
+      })) as { req?: RequestElectricalChunksPayload; wake?: string }
+
+      if (outcome.req) {
+        requestSeq += 1
+        const mySeq = requestSeq
+
+        if (debounceTask && debounceTask.isRunning()) {
+          yield cancel(debounceTask)
+          debounceTask = null
+        }
+
+        const state = (yield select()) as { iotMonitor: IotMonitorState }
+        const entry = state.iotMonitor.electricalChunks[key]
+        if (!entry) continue
+
+        const { view, track, direction, bounds, force } = outcome.req
+
+        // Tự thử lại khúc lỗi âm thầm: lần đầu gặp lỗi ghi nhận mốc; sau quá 10 giây thì coi như chưa tải.
+        const now = Date.now()
+        const effectiveStates: Record<number, ElectricalChunkState> = { ...entry.chunks }
+        for (const start of [...errorSeenAt.keys()]) {
+          if (entry.chunks[start] !== 'error') {
+            errorSeenAt.delete(start)
+          }
+        }
+        for (const [startKey, chunkState] of Object.entries(entry.chunks)) {
+          const start = Number(startKey)
+          if (chunkState !== 'error') {
+            errorSeenAt.delete(start)
+            continue
+          }
+          const seenAt = errorSeenAt.get(start)
+          if (seenAt === undefined) {
+            errorSeenAt.set(start, now)
+          } else if (now - seenAt >= CHUNK_ERROR_RETRY_MS) {
+            errorSeenAt.delete(start)
+            delete effectiveStates[start]
+          }
+        }
+
+        const fullPlan = planElectricalChunks({
+          view,
+          track,
+          direction,
+          states: effectiveStates,
+          bounds,
+          force,
+        })
+        // Tập toàn bộ khúc thuộc kế hoạch mới (kể cả đang loading) để xác định khúc nào cần hủy.
+        const keepSet = new Set(
+          planElectricalChunks({
+            view,
+            track,
+            direction,
+            states: {},
+            bounds,
+            force: true,
+          })
+        )
+        const viewSet = new Set(chunkStartsCovering(view.from, view.to))
+
+        // Hủy task của các khúc không còn trong plan mới (trừ khúc đang là nhóm 1).
+        for (const [start, info] of activeTasks.entries()) {
+          if (viewSet.has(start)) {
+            info.isView = true
+          }
+          if (!info.isView && !keepSet.has(start)) {
+            activeTasks.delete(start)
+            if (info.task.isRunning()) {
+              yield cancel(info.task)
+            }
+          }
+        }
+
+        // Nhóm (1) phủ view: tải ngay; nhóm (2),(3): đợi 150ms nếu chưa có request mới hơn.
+        immediateQueue = fullPlan.filter((s) => viewSet.has(s) && !activeTasks.has(s))
+        deferredQueue = []
+        const pendingDeferred = fullPlan.filter((s) => !viewSet.has(s) && !activeTasks.has(s))
+
+        // Nếu khúc phủ view đang chờ mà slot đã đầy bởi khúc tải trước (isView = false), hủy bớt khúc tải trước xa view nhất.
+        if (immediateQueue.length > 0) {
+          const toPreempt = pickPreemptibleChunk({
+            active: [...activeTasks.entries()].map(([start, info]) => ({
+              start,
+              isView: info.isView,
+            })),
+            view,
+            needed: immediateQueue.length,
+            maxConcurrent: CHUNK_MAX_CONCURRENT,
+          })
+          for (const start of toPreempt) {
+            const info = activeTasks.get(start)
+            if (!info) continue
+            activeTasks.delete(start)
+            if (info.task.isRunning()) {
+              yield cancel(info.task)
+            }
+            // Khúc vừa nhường slot vẫn thuộc kế hoạch mới → đưa lại vào nhóm tải sau để tải tiếp khi trống slot.
+            if (keepSet.has(start) && !pendingDeferred.includes(start)) {
+              pendingDeferred.push(start)
+            }
+          }
+        }
+
+        yield* pumpQueue()
+
+        if (pendingDeferred.length > 0) {
+          debounceTask = (yield fork(function* () {
+            yield delay(CHUNK_PREFETCH_DEBOUNCE_MS)
+            if (mySeq === requestSeq) {
+              deferredQueue = pendingDeferred
+              wakeCh.put('debounce_ready')
+            }
+          })) as Task
+        }
+      } else if (outcome.wake) {
+        yield* pumpQueue()
+      }
+    }
+  } finally {
+    if (debounceTask && debounceTask.isRunning()) {
+      yield cancel(debounceTask)
+    }
+    if (liveTask && liveTask.isRunning()) {
+      yield cancel(liveTask)
+    }
+    for (const info of activeTasks.values()) {
+      if (info.task.isRunning()) {
+        yield cancel(info.task)
+      }
+    }
+    activeTasks.clear()
+    errorSeenAt.clear()
+    wakeCh.close()
+  }
+}
+
+function* electricalChunksManager(): Generator<unknown, void, unknown> {
+  const sessions = new Map<
+    string,
+    { task: Task; reqCh: Channel<RequestElectricalChunksPayload> }
+  >()
+
+  while (true) {
+    const action = (yield take([
+      startElectricalChunks.type,
+      requestElectricalChunks.type,
+      stopElectricalChunks.type,
+    ])) as
+      | ReturnType<typeof startElectricalChunks>
+      | ReturnType<typeof requestElectricalChunks>
+      | ReturnType<typeof stopElectricalChunks>
+
+    const key = action.payload.key
+
+    if (action.type === requestElectricalChunks.type) {
+      const session = sessions.get(key)
+      if (session) {
+        session.reqCh.put(
+          (action as ReturnType<typeof requestElectricalChunks>).payload
+        )
+      }
+      continue
+    }
+
+    const existing = sessions.get(key)
+    if (existing) {
+      sessions.delete(key)
+      existing.reqCh.close()
+      if (existing.task.isRunning()) {
+        yield cancel(existing.task)
+      }
+    }
+
+    if (action.type === startElectricalChunks.type) {
+      const startAction = action as ReturnType<typeof startElectricalChunks>
+      const reqCh = channel<RequestElectricalChunksPayload>()
+      const task = (yield fork(
+        electricalChunksSession,
+        startAction.payload,
+        reqCh
+      )) as Task
+      sessions.set(key, { task, reqCh })
     }
   }
 }
@@ -842,6 +1264,7 @@ export default function* iotMonitorSaga() {
   yield all([
     fork(cabinetStatusManager),
     fork(electricalSeriesManager),
+    fork(electricalChunksManager),
     fork(commandModesManager),
     fork(feederElectricalManager),
     fork(watchFetchDiagnostics),
