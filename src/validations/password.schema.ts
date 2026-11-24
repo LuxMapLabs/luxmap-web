@@ -23,3 +23,28 @@ export const setPasswordSchema = z
   })
 
 export type SetPasswordFormData = z.infer<typeof setPasswordSchema>
+
+/**
+ * Schema người dùng đang đăng nhập tự đổi mật khẩu (POST /auth/password/change).
+ * Dùng chung quy tắc độ dài 12-1024 ký tự với setPasswordSchema và yêu cầu mật khẩu mới khác mật khẩu cũ.
+ */
+export const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
+    newPassword: z
+      .string()
+      .min(1, 'Vui lòng nhập mật khẩu mới')
+      .min(PASSWORD_MIN_LENGTH, `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự`)
+      .max(PASSWORD_MAX_LENGTH, `Mật khẩu không được vượt quá ${PASSWORD_MAX_LENGTH} ký tự`),
+    confirmPassword: z.string().min(1, 'Vui lòng nhập lại mật khẩu mới'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Mật khẩu nhập lại không khớp',
+    path: ['confirmPassword'],
+  })
+  .refine((data) => data.oldPassword.length === 0 || data.newPassword !== data.oldPassword, {
+    message: 'Mật khẩu mới phải khác mật khẩu hiện tại',
+    path: ['newPassword'],
+  })
+
+export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>
