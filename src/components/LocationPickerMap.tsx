@@ -1,19 +1,27 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import type { RootState } from '../redux/rootReducer'
 import {
   GOOGLE_HYBRID_STYLE,
   DEFAULT_MAP_CENTER,
   applyMapBoundsLimits,
+  toBoundaryGeoJSON,
+  toLngLatBounds,
+  isPointInBounds,
+  OUTSIDE_MANAGED_AREA_MESSAGE,
   MAP_MAX_ZOOM,
   MAP_ASSET_PICKER_ZOOM,
   MAP_DEFAULT_MIN_ZOOM,
   FIT_BOUNDS_COMMUNE_INSTANT,
 } from '../utils/gis-map/mapUtils'
 import type { CommuneBbox } from '../types/admin/communes'
+import type { Geometry } from '../types/common/base'
+import { geometryToPolygons, polygonsToBbox } from '../utils/communeBoundary'
 import { Crosshair, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
+import { circleRing, isDrawableRadiusKm } from '../utils/gis-map/circleGeoJson'
 
 export interface LocationPickerMapProps {
   lat: number
@@ -26,27 +34,16 @@ export interface LocationPickerMapProps {
   initialZoom?: number
   /** Khung địa bàn (BBox xã): có thì vẽ viền và căn bản đồ vừa khung khi mở. */
   boundary?: CommuneBbox | null
+  /** Ranh giới thật (Polygon/MultiPolygon) của xã: có thì vẽ thay cho khung bbox và căn bản đồ theo nó. */
+  boundaryGeometry?: Geometry | null
   /** Chưa có vị trí: không vẽ ghim cho tới khi người dùng bấm lên bản đồ (`lat`/`lng` chỉ dùng để căn bản đồ). */
   unpicked?: boolean
+  /** Bán kính (km): > 0 thì vẽ vòng nét đứt quanh ghim, 0 hoặc rỗng thì không vẽ. */
+  radiusKm?: number
 }
 
 const BOUNDARY_SOURCE = 'picker-boundary-source'
-
-/** BBox đủ 4 cạnh hữu hạn và có diện tích; thiếu thì không vẽ. */
-const boundaryRing = (b?: CommuneBbox | null): [number, number][] | null => {
-  if (!b) return null
-  const { min_lng, min_lat, max_lng, max_lat } = b
-  const values = [min_lng, min_lat, max_lng, max_lat]
-  if (!values.every((v) => typeof v === 'number' && Number.isFinite(v))) return null
-  if (min_lng! >= max_lng! || min_lat! >= max_lat!) return null
-  return [
-    [min_lng!, min_lat!],
-    [max_lng!, min_lat!],
-    [max_lng!, max_lat!],
-    [min_lng!, max_lat!],
-    [min_lng!, min_lat!],
-  ]
-}
+const RADIUS_SOURCE = 'picker-radius-source'
 
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   lat,
@@ -58,7 +55,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   readOnly = false,
   initialZoom = MAP_ASSET_PICKER_ZOOM,
   boundary,
+  boundaryGeometry,
   unpicked = false,
+  radiusKm,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -105,6 +104,14 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     lat: validLat,
     lng: validLng,
   })
+
+  // Ghim chỉ được đặt trong xã đã chọn (ranh giới thật, chưa có thì khung bbox); không có cả hai thì không chặn.
+  const allowedRef = useRef<(lng: number, lat: number) => boolean>(() => true)
+  allowedRef.current = (lng, lat) => {
+    if (!boundary && !boundaryGeometry) return true
+    return isPointInBounds(toLngLatBounds(boundary), lng, lat, boundaryGeometry)
+  }
+  const lastValidRef = useRef<{ lat: number; lng: number }>({ lat: validLat, lng: validLng })
 
   // Round coordinate to 6 decimal places (~10cm precision)
   const roundCoord = (val: number) => Math.round(val * 1000000) / 1000000
@@ -230,6 +237,14 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       const pos = marker.getLngLat()
       const newLat = roundCoord(pos.lat)
       const newLng = roundCoord(pos.lng)
+      if (!allowedRef.current(newLng, newLat)) {
+        const back = lastValidRef.current
+        marker.setLngLat([back.lng, back.lat])
+        setCurrentDisplayCoords({ lat: roundCoord(back.lat), lng: roundCoord(back.lng) })
+        toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+        return
+      }
+      lastValidRef.current = { lat: newLat, lng: newLng }
       setCurrentDisplayCoords({ lat: newLat, lng: newLng })
       onChange?.({ lat: newLat, lng: newLng })
     })
@@ -239,6 +254,11 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
       map.on('click', (e: maplibregl.MapMouseEvent) => {
         const newLat = roundCoord(e.lngLat.lat)
         const newLng = roundCoord(e.lngLat.lng)
+        if (!allowedRef.current(newLng, newLat)) {
+          toast.error(OUTSIDE_MANAGED_AREA_MESSAGE)
+          return
+        }
+        lastValidRef.current = { lat: newLat, lng: newLng }
         marker.setLngLat([newLng, newLat])
         if (!placedRef.current) {
           marker.addTo(map)
@@ -278,23 +298,26 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     }
   }, [createMarkerElement, readOnly, initialZoom, mapBounds])
 
-  // Viền địa bàn: vẽ khung BBox xã (cùng kiểu trang Địa bàn & Khung BBox) và căn bản đồ vừa khung.
-  const ring = boundaryRing(boundary)
-  const ringKey = ring ? ring.flat().join(',') : ''
+  // Viền địa bàn: ranh giới thật của xã (chưa có thì khung bbox), căn bản đồ vừa viền.
+  const boundaryFeature = useMemo(
+    () => toBoundaryGeoJSON(boundaryGeometry, boundary),
+    [boundaryGeometry, boundary]
+  )
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !ring) return
+    if (!map || !boundaryFeature) return
+    const box = polygonsToBbox(geometryToPolygons(boundaryFeature.geometry))
+    if (!box) return
+    const { min_lng: minLng, min_lat: minLat, max_lng: maxLng, max_lat: maxLat } = box
+    if (![minLng, minLat, maxLng, maxLat].every((v) => typeof v === 'number' && Number.isFinite(v))) return
+    const sw: [number, number] = [minLng!, minLat!]
+    const ne: [number, number] = [maxLng!, maxLat!]
     const draw = () => {
-      const data = {
-        type: 'Feature' as const,
-        properties: {},
-        geometry: { type: 'Polygon' as const, coordinates: [ring] },
-      }
       const source = map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined
       if (source) {
-        source.setData(data)
+        source.setData(boundaryFeature)
       } else {
-        map.addSource(BOUNDARY_SOURCE, { type: 'geojson', data })
+        map.addSource(BOUNDARY_SOURCE, { type: 'geojson', data: boundaryFeature })
         map.addLayer({
           id: 'picker-boundary-fill',
           type: 'fill',
@@ -308,31 +331,90 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           paint: { 'line-color': '#2563eb', 'line-width': 2.5, 'line-dasharray': [3, 2] },
         })
       }
-      // Giới hạn theo tài khoản (map_bounds) có thể trùng mép xã, làm fitBounds bị kẹp lệch sang một bên.
-      // Khi đã có khung xã thì giới hạn quanh khung đó, nới thêm nửa khung mỗi phía.
-      const [[minLng, minLat], , [maxLng, maxLat]] = ring
-      const padLng = (maxLng - minLng) / 2
-      const padLat = (maxLat - minLat) / 2
-      map.setMaxBounds([
-        [minLng - padLng, minLat - padLat],
-        [maxLng + padLng, maxLat + padLat],
-      ])
+      // Không khoá bản đồ quanh xã: giới hạn theo tài khoản (map_bounds) có thể trùng mép xã và làm fitBounds
+      // bị kẹp lệch, nên gỡ hẳn để kéo / thu phóng tự do.
+      map.setMaxBounds(null)
       map.setMinZoom(MAP_DEFAULT_MIN_ZOOM)
-      map.fitBounds([ring[0], ring[2]], FIT_BOUNDS_COMMUNE_INSTANT)
+      map.fitBounds([sw, ne], FIT_BOUNDS_COMMUNE_INSTANT)
     }
     if (map.isStyleLoaded()) draw()
     else map.once('load', draw)
     // Modal còn đang giãn kích thước lúc mở: căn lại khung theo mỗi lần resize trong giây đầu.
-    const refit = () => map.fitBounds([ring[0], ring[2]], FIT_BOUNDS_COMMUNE_INSTANT)
+    const refit = () => map.fitBounds([sw, ne], FIT_BOUNDS_COMMUNE_INSTANT)
     map.on('resize', refit)
     const stopRefit = setTimeout(() => map.off('resize', refit), 1000)
     return () => {
       clearTimeout(stopRefit)
       map.off('resize', refit)
     }
-    // ringKey thay cho ring: chỉ vẽ lại khi toạ độ khung đổi, không phải mỗi lần render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ringKey])
+  }, [boundaryFeature])
+
+  const circleLat = currentDisplayCoords.lat
+  const circleLng = currentDisplayCoords.lng
+  // Nhập bán kính thì căn bản đồ vừa trọn vòng quanh ghim.
+  const pinRef = useRef({ lat: circleLat, lng: circleLng })
+  pinRef.current = { lat: circleLat, lng: circleLng }
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const timer = setTimeout(() => {
+      if (placed && isDrawableRadiusKm(radiusKm)) {
+        const ring = circleRing(pinRef.current.lng, pinRef.current.lat, radiusKm)
+        const lngs = ring.map((pt) => pt[0])
+        const lats = ring.map((pt) => pt[1])
+        map.fitBounds(
+          [
+            [Math.min(...lngs), Math.min(...lats)],
+            [Math.max(...lngs), Math.max(...lats)],
+          ],
+          { padding: 24, duration: 300, maxZoom: MAP_ASSET_PICKER_ZOOM }
+        )
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+    // Chỉ chạy khi đổi bán kính hoặc lúc ghim được đặt lần đầu; kéo ghim không tự căn lại.
+  }, [radiusKm, placed])
+
+  // Vòng bán kính nét đứt, tâm là ghim: chạy theo ghim khi kéo/bấm và theo bán kính đang nhập.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const draw = () => {
+      const drawable = placed && isDrawableRadiusKm(radiusKm) ? radiusKm : null
+      const data = {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: drawable ? [circleRing(circleLng, circleLat, drawable)] : [],
+        },
+      }
+      const source = map.getSource(RADIUS_SOURCE) as maplibregl.GeoJSONSource | undefined
+      if (source) {
+        source.setData(data)
+        return
+      }
+      map.addSource(RADIUS_SOURCE, { type: 'geojson', data })
+      map.addLayer({
+        id: 'picker-radius-fill',
+        type: 'fill',
+        source: RADIUS_SOURCE,
+        paint: { 'fill-color': '#f59e0b', 'fill-opacity': 0.1 },
+      })
+      map.addLayer({
+        id: 'picker-radius-line',
+        type: 'line',
+        source: RADIUS_SOURCE,
+        paint: { 'line-color': '#fbbf24', 'line-width': 2.5, 'line-dasharray': [2, 2] },
+      })
+    }
+    // isStyleLoaded() tạm thành false khi đang tải ô bản đồ (load đã bắn rồi), nên chỉ cần style đã có là vẽ được.
+    if (map.getStyle()) draw()
+    else map.once('load', draw)
+    return () => {
+      map.off('load', draw)
+    }
+  }, [placed, circleLat, circleLng, radiusKm])
 
   // Cập nhật Bbox và minZoom khi mapBounds từ Redux thay đổi
   useEffect(() => {
@@ -380,6 +462,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     if (!mapRef.current || !markerRef.current || readOnly) return
     const orig = initialCoordsRef.current
     markerRef.current.setLngLat([orig.lng, orig.lat])
+    lastValidRef.current = { lat: orig.lat, lng: orig.lng }
     setCurrentDisplayCoords({ lat: roundCoord(orig.lat), lng: roundCoord(orig.lng) })
     onChange?.({ lat: roundCoord(orig.lat), lng: roundCoord(orig.lng) })
     mapRef.current.flyTo({ center: [orig.lng, orig.lat], zoom: 17, duration: 400 })

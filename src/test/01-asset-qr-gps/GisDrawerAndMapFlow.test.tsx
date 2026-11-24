@@ -245,8 +245,7 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getByText('Chú giải bản đồ')).toBeInTheDocument()
       expect(screen.getByText('Cột đèn')).toBeInTheDocument()
       expect(screen.getByText('Bình thường')).toBeInTheDocument()
-      // Đèn chỉ còn bình thường / hỏng: không còn mục "Đèn mờ"
-      expect(screen.queryByText('Đèn mờ')).not.toBeInTheDocument()
+      expect(screen.getByText('Đèn mờ')).toBeInTheDocument()
       expect(screen.getByText('Hỏng')).toBeInTheDocument()
       expect(screen.getByText('Mạch điện')).toBeInTheDocument()
       // "Đang tắt" có ở cả mục cột lẫn mục mạch

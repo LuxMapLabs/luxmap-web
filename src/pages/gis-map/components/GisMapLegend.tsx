@@ -6,6 +6,7 @@ import { FEEDER_LINE_UI, POLE_LAMP_UI, type FeederLineStatus, type PoleLampState
 const LEGEND_POLES: { status: PoleLampState; label: string }[] = [
   { status: 'normal', label: 'Bình thường' },
   { status: 'off', label: POLE_LAMP_UI.off.label },
+  { status: 'dim', label: POLE_LAMP_UI.dim.label },
   { status: 'out', label: POLE_LAMP_UI.out.label },
   { status: 'unknown', label: POLE_LAMP_UI.unknown.label },
 ]
@@ -14,7 +15,7 @@ const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   <div className="col-span-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{children}</div>
 )
 
-const LEGEND_LINES: FeederLineStatus[] = ['active', 'off', 'fault', 'unknown']
+const LEGEND_LINES: FeederLineStatus[] = ['active', 'off', 'fault', 'warn', 'unknown']
 
 interface PoleLegendIconProps {
   status: PoleLampState
@@ -225,6 +226,9 @@ export const GisMapLegend: React.FC = () => {
             <span className="font-medium text-slate-700">{FEEDER_LINE_UI[status].label}</span>
           </div>
         ))}
+        <div className="col-span-2 w-0 min-w-full text-[10.5px] text-slate-500 leading-snug">
+          Sự cố / Cảnh báo có vạch trắng đứt: mạch đang tắt. Không có vạch: mạch đang bật hoặc chưa rõ.
+        </div>
 
         <div className="col-span-2 border-t border-slate-200 mt-1" />
         <div className="flex items-center gap-2">

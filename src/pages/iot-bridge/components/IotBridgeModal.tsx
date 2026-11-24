@@ -7,9 +7,13 @@ export const IotBridgeModal: React.FC<{
   title: string
   subtitle?: string
   closeDisabled?: boolean
+  /** Độ rộng khung, mặc định `max-w-md`. */
+  widthClass?: string
+  /** Thanh nút cố định dưới đáy, nằm ngoài vùng cuộn (nút lưu luôn thấy được). */
+  footer?: React.ReactNode
   onClose: () => void
   children: React.ReactNode
-}> = ({ title, subtitle, closeDisabled = false, onClose, children }) => {
+}> = ({ title, subtitle, closeDisabled = false, widthClass = 'max-w-md', footer, onClose, children }) => {
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -35,9 +39,9 @@ export const IotBridgeModal: React.FC<{
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
+        className={`bg-white border border-slate-200 rounded-3xl w-full ${widthClass} shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]`}
       >
-        <div className="flex items-center justify-between p-4 px-6 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex shrink-0 items-center justify-between p-4 px-6 border-b border-slate-100 bg-slate-50/50">
           <div>
             <h3 className="text-base font-bold text-slate-800">{title}</h3>
             {subtitle && <p className="text-[11px] font-mono text-slate-500">{subtitle}</p>}
@@ -52,7 +56,8 @@ export const IotBridgeModal: React.FC<{
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6 space-y-4">{children}</div>
+        <div className="p-6 space-y-4 overflow-y-auto min-h-0">{children}</div>
+        {footer && <div className="shrink-0 flex items-center justify-end gap-2 px-6 py-3 border-t border-slate-100 bg-slate-50/60">{footer}</div>}
       </div>
     </div>,
     document.body

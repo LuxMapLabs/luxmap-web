@@ -10,6 +10,7 @@ import {
 import type { IotServerStatus } from '../../../types/iot/servers'
 import type { CommuneItem } from '../../../types/admin/communes'
 import { isValidServerId } from '../../../utils/iot/iotRegistration'
+import { useCommuneBoundary } from '../../../hooks/gis-map/useCommuneBoundary'
 import { LocationPickerMap } from '../../../components/LocationPickerMap'
 import { Field, inputClass } from './IotBridgeModal'
 import {
@@ -25,6 +26,9 @@ const centerOf = (commune?: CommuneItem): Coords | null =>
   typeof commune?.center?.lat === 'number' && typeof commune.center.lng === 'number'
     ? { lat: commune.center.lat, lng: commune.center.lng }
     : null
+
+/** Giới hạn backend: radius_km từ 0 đến 1000. */
+const MAX_RADIUS_KM = 1000
 
 export type CommuneLoadStatus = 'loading' | 'ready' | 'failed'
 
@@ -55,7 +59,11 @@ export const IotServerFormModal: React.FC<{
   const [serverId, setServerId] = useState(server?.server_id || '')
   const [communeId, setCommuneId] = useState(server?.commune_id || '')
   const [picked, setPicked] = useState<Coords | null>(server?.location ?? null)
+  const [radiusText, setRadiusText] = useState(server?.radius_km ? String(server.radius_km) : '')
   const [localError, setLocalError] = useState<string | null>(null)
+
+  const radiusKm = radiusText.trim() === '' ? 0 : Number(radiusText)
+  const radiusValid = Number.isFinite(radiusKm) && radiusKm >= 0 && radiusKm <= MAX_RADIUS_KM
 
   const saving = serverSubmit === 'submitting'
   const error = localError || serverSubmitError
@@ -78,6 +86,7 @@ export const IotServerFormModal: React.FC<{
   }, [serverSubmit, onSaved])
 
   const commune = communes.find((c) => c.commune_id === communeId)
+  const communeBoundary = useCommuneBoundary(communeId || null)
   // Vị trí gửi đi CHỈ là chỗ người dùng tự ghim (`picked`). Tâm xã chỉ để căn bản đồ, không bao giờ thành vị trí gateway.
   const mapCenter = picked ?? centerOf(commune)
 
@@ -88,13 +97,14 @@ export const IotServerFormModal: React.FC<{
       return setLocalError('Server ID chỉ gồm chữ, số, "-" hoặc "_" (tối đa 64 ký tự) và không được là "default".')
     if (!communeId) return setLocalError('Cần chọn xã/phường.')
     if (!picked) return setLocalError('Hãy bấm lên bản đồ để đặt vị trí gateway.')
+    if (!radiusValid) return setLocalError(`Bán kính phải từ 0 đến ${MAX_RADIUS_KM} km.`)
 
     submittedRef.current = true
     if (editing) {
       dispatch(
         updateServerLocationRequest({
           serverId: server!.server_id!,
-          body: { commune_id: communeId, location: picked },
+          body: { commune_id: communeId, location: picked, radius_km: radiusKm },
         })
       )
     } else {
@@ -103,6 +113,7 @@ export const IotServerFormModal: React.FC<{
           server_id: serverId.trim(),
           commune_id: communeId,
           location: picked,
+          radius_km: radiusKm,
         })
       )
     }
@@ -119,7 +130,7 @@ export const IotServerFormModal: React.FC<{
       />
       <AssetModalError message={error} />
 
-      <form onSubmit={submit} className="flex-1 min-h-0 flex flex-col">
+      <form onSubmit={submit} noValidate className="flex-1 min-h-0 flex flex-col">
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
           <div className="lg:col-span-5 space-y-5">
             <section className="space-y-4">
@@ -165,6 +176,30 @@ export const IotServerFormModal: React.FC<{
               </section>
             )}
 
+            <section className="space-y-4">
+              <Field
+                label="Bán kính phủ sóng (km)"
+                hint={
+                  radiusValid
+                    ? 'Bản đồ vẽ vòng nét đứt quanh ghim. Để trống hoặc 0 là không đặt bán kính.'
+                    : `Nhập số từ 0 đến ${MAX_RADIUS_KM}.`
+                }
+              >
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={MAX_RADIUS_KM}
+                  step="any"
+                  className={`${inputClass} font-mono`}
+                  value={radiusText}
+                  onChange={(e) => setRadiusText(e.target.value)}
+                  placeholder="0.75"
+                  aria-invalid={!radiusValid}
+                />
+              </Field>
+            </section>
+
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-1">
               <p className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
                 <MapPin className="w-4 h-4 text-amber-500" /> Vị trí gateway
@@ -194,7 +229,9 @@ export const IotServerFormModal: React.FC<{
                 lng={mapCenter?.lng ?? Number.NaN}
                 height="380px"
                 boundary={commune?.bbox}
+                boundaryGeometry={communeBoundary}
                 unpicked={!picked}
+                radiusKm={radiusValid ? radiusKm : 0}
                 onChange={(coords) => setPicked(coords)}
               />
             ) : (

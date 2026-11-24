@@ -7,6 +7,7 @@ import { getFeederTooltipHtml, getRoadSegmentTooltipHtml } from '../../utils/gis
 import { fetchCabinetTopologyRequest, clearCabinetTopology } from '../../feature/map/mapSlice'
 import { findByIdOrRef } from '../../utils/assets/findByIdOrRef'
 import { feederLineStyle } from '../../utils/gis-map/poleLampState'
+import { buildFeederDiagnosticLevels } from '../../utils/gis-map/feederDiagnostics'
 
 interface UseFeederLinesLayerProps {
   map: maplibregl.Map | null
@@ -41,7 +42,7 @@ export function useFeederLinesLayer({
   onSelectFeeder,
 }: UseFeederLinesLayerProps) {
   const dispatch = useDispatch<AppDispatch>()
-  const { cabinetTopologyEdges, allTopologyEdges, cabinets: mapCabinets } = useSelector((state: RootState) => state.map)
+  const { cabinetTopologyEdges, allTopologyEdges, cabinets: mapCabinets, feederDiagnostics } = useSelector((state: RootState) => state.map)
   const {
     cabinets: assetCabinets,
     feeders: assetFeeders,
@@ -167,6 +168,22 @@ export function useFeederLinesLayer({
             ['case', ['==', ['get', 'status'], 'fault'], '#ef4444', '#10b981'],
           ],
           'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.2, 12, 1.8, 16, 2.6],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 11.0, 0.95],
+        },
+      })
+
+      // Mạch có lỗi nhưng đang TẮT: vạch trắng đứt đè lên màu lỗi, để không chỉ dựa vào màu (đỏ/cam vẫn đọc được "đang tắt")
+      map.addLayer({
+        id: 'feeder-lines-alert-off',
+        type: 'line',
+        source: 'feeder-lines',
+        minzoom: 8.5,
+        filter: ['all', ['in', ['get', 'status'], ['literal', ['fault', 'warn']]], ['==', ['get', 'power_state'], 'off']],
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.2, 12, 1.8, 16, 2.6],
+          'line-dasharray': [2, 2],
           'line-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 11.0, 0.95],
         },
       })
@@ -379,6 +396,7 @@ export function useFeederLinesLayer({
     // Bản đồ Feeder -> Cabinet, Feeder status, power_state và control_mode
     const feederToCabinetMap = new Map<string, string>()
     const feederStatusMap = new Map<string, string>()
+    const diagnosticLevels = buildFeederDiagnosticLevels(feederDiagnostics ?? [])
     const feederPowerStateMap = new Map<string, string>()
     const feederControlModeMap = new Map<string, string>()
 
@@ -443,7 +461,11 @@ export function useFeederLinesLayer({
             selectedCabinet.cabinet_id === p.cabinet_id) &&
           selectedCabinet.status === 'fault')
 
-      const { status: lineStatus, color: lineColor, glow: glowColor } = feederLineStyle(Boolean(isFault), powerState)
+      const { status: lineStatus, color: lineColor, glow: glowColor } = feederLineStyle(
+        Boolean(isFault),
+        powerState,
+        feederId ? diagnosticLevels.get(feederId) : null
+      )
 
       return {
         ...feat,
@@ -473,6 +495,7 @@ export function useFeederLinesLayer({
     mapCabinets,
     assetCabinets,
     assetFeeders,
+    feederDiagnostics,
     selectedSegment,
   ])
 

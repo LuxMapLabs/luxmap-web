@@ -3,6 +3,7 @@ import type { CabinetPropertiesFeature, CabinetTopologyEdgePropertiesFeature } f
 import type { PolePropertiesFeature, PoleMapDetail } from '../../types/map/poles'
 import type { SegmentPropertiesFeature } from '../../types/map/segments'
 import type { CommunePropertiesFeature } from '../../types/map/communes'
+import type { IotDiagnosticSummaryItem } from '../../types/iot/diagnostics'
 
 export interface MapState {
   poles: PolePropertiesFeature[]
@@ -15,6 +16,9 @@ export interface MapState {
   communeBoundaries: CommunePropertiesFeature[]
   isLoadingBoundaries: boolean
   boundariesLoaded: boolean
+
+  // Chẩn đoán IoT theo mạch (GET /iot/diagnostics/summary) để tô màu lỗi trên đường mạch
+  feederDiagnostics: IotDiagnosticSummaryItem[]
 
   // All Topology Edges (Toàn bộ các đường dây mạch điện PostGIS từ Backend khi load map)
   allTopologyEdges: CabinetTopologyEdgePropertiesFeature[]
@@ -42,6 +46,8 @@ const initialState: MapState = {
   communeBoundaries: [],
   isLoadingBoundaries: false,
   boundariesLoaded: false,
+
+  feederDiagnostics: [],
 
   allTopologyEdges: [],
 
@@ -83,6 +89,12 @@ const mapSlice = createSlice({
     fetchMapLayersFailure: (state, action: PayloadAction<string>) => {
       state.isLoadingMap = false
       state.mapError = action.payload
+    },
+
+    // Chẩn đoán IoT chạy ngầm: không bật loading, lỗi thì giữ dữ liệu cũ
+    refreshFeederDiagnosticsRequest: () => {},
+    refreshFeederDiagnosticsSuccess: (state, action: PayloadAction<IotDiagnosticSummaryItem[]>) => {
+      state.feederDiagnostics = action.payload
     },
 
     // Ranh giới địa bàn
@@ -152,6 +164,8 @@ const mapSlice = createSlice({
 })
 
 export const {
+  refreshFeederDiagnosticsRequest,
+  refreshFeederDiagnosticsSuccess,
   fetchCommuneBoundariesRequest,
   fetchCommuneBoundariesSuccess,
   fetchCommuneBoundariesFailure,

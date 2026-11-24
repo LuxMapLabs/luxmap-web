@@ -75,8 +75,12 @@ interface FeederTooltipParams {
 export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): string {
   // Cùng luật với màu đường (useFeederLinesLayer): sự cố trước, rồi mạch tắt, rồi đang cấp điện
   const isLineFault = p.status === 'fault'
-  const isLineOff = !isLineFault && (p.status === 'off' || p.power_state === 'off')
-  const isLineActive = !isLineFault && !isLineOff && (p.status === 'active' || p.power_state === 'on')
+  const isLineWarn = !isLineFault && p.status === 'warn'
+  const isLineOff = !isLineFault && !isLineWarn && (p.status === 'off' || p.power_state === 'off')
+  const isLineActive = !isLineFault && !isLineWarn && !isLineOff && (p.status === 'active' || p.power_state === 'on')
+
+  // Màu đỏ/cam chỉ nói có lỗi, nên luôn ghi riêng mạch đang bật hay tắt
+  const powerText = p.power_state === 'on' ? 'Đang bật' : p.power_state === 'off' ? 'Đang tắt' : 'Chưa rõ'
 
   let statusBg = 'bg-slate-400'
   let statusText = 'Chưa rõ trạng thái'
@@ -88,6 +92,11 @@ export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): 
     statusText = 'Sự cố'
     headerTitleColor = 'text-rose-700 dark:text-rose-400'
     badgeClasses = 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800'
+  } else if (isLineWarn) {
+    statusBg = 'bg-amber-500'
+    statusText = 'Cảnh báo'
+    headerTitleColor = 'text-amber-700 dark:text-amber-400'
+    badgeClasses = 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800'
   } else if (isLineOff) {
     statusBg = 'bg-white ring-1 ring-slate-400'
     statusText = 'Mạch đang tắt'
@@ -131,6 +140,7 @@ export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): 
         </span>
       </div>
       <div class="pt-2 space-y-1.5 text-[11.5px]">
+        <div>Nguồn mạch: <strong class="text-slate-900 dark:text-white font-semibold">${powerText}</strong></div>
         <div>Tủ cấp nguồn: <strong class="text-slate-900 dark:text-white font-semibold">${cabName}</strong></div>
         ${fromId && toPoleId ? `<div class="font-mono text-[11px] text-slate-600 dark:text-slate-300">Liên kết: <strong class="text-blue-600 dark:text-blue-400">${fromId}</strong> ➔ <strong class="text-emerald-600 dark:text-emerald-400">${toPoleId}</strong></div>` : ''}
         ${branch || order ? `<div class="text-[11px] text-slate-500 dark:text-slate-400">${[branch, order].filter(Boolean).join(' • ')}</div>` : ''}

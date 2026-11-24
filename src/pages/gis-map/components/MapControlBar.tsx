@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import {
   Search,
   Zap,
+  AlertTriangle,
   AlertCircle,
   HelpCircle,
   Route,
@@ -250,7 +251,34 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
         </span>
       </button>
 
-      {/* 3. Hỏng */}
+      {/* 3. Đèn mờ */}
+      <button
+        type="button"
+        onClick={() => setStatusFilter('dim')}
+        className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all duration-150 cursor-pointer shrink-0 border ${
+          statusFilter === 'dim'
+            ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-2xs dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+            : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
+        }`}
+      >
+        <AlertTriangle
+          className={`w-3 h-3 ${
+            statusFilter === 'dim' ? 'text-amber-700 dark:text-amber-400' : 'text-amber-500'
+          }`}
+        />
+        <span>Đèn mờ</span>
+        <span
+          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
+            statusFilter === 'dim'
+              ? 'bg-amber-200/80 text-amber-900 dark:bg-amber-900/90 dark:text-amber-200 font-bold'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          {stats.dim}
+        </span>
+      </button>
+
+      {/* 4. Hỏng */}
       <button
         type="button"
         onClick={() => setStatusFilter('out')}
@@ -277,7 +305,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
         </span>
       </button>
 
-      {/* 4. Chưa quét */}
+      {/* 5. Chưa quét */}
       <button
         type="button"
         onClick={() => setStatusFilter('unknown')}
