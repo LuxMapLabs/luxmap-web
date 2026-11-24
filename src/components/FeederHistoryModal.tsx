@@ -114,16 +114,20 @@ export const FeederHistoryModal: React.FC<FeederHistoryModalProps> = ({
         {activeTab === 'electrical' && (
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="px-6 pt-4 flex items-center justify-between gap-3 flex-wrap shrink-0">
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {viewMode === 'by_date'
-                  ? `Số đo theo khoảng ngày đã chọn, giờ theo ${
-                      timeBasis === 'received_at' ? 'Bridge nhận' : 'đo trên node'
-                    }. Không tự cập nhật.`
-                  : timeBasis === 'received_at'
+              {viewMode === 'by_date' ? (
+                timeBasis === 'received_at' ? (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Giờ theo Bridge nhận.
+                  </p>
+                ) : null
+              ) : (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {timeBasis === 'received_at'
                     ? 'Trung bình mỗi 30 giây theo giờ Bridge nhận. Mẫu gửi bù từ thẻ nhớ dồn vào lúc tới, mẫu thiếu giờ RTC chỉ có ở chế độ này. Dùng để xem node mất kết nối và gửi bù lúc nào.'
                     : 'Trung bình mỗi 30 giây theo giờ đo trên node. Số đo node lưu thẻ nhớ khi mất kết nối được gửi bù và xếp đúng lúc đo.'}
-              </p>
-              <div className="flex items-center gap-2 flex-wrap">
+                </p>
+              )}
+              <div className="flex items-center gap-2 flex-wrap md:flex-nowrap shrink-0 ml-auto">
                 <div
                   role="group"
                   aria-label="Kiểu xem"
@@ -178,17 +182,18 @@ export const FeederHistoryModal: React.FC<FeederHistoryModalProps> = ({
                     ))}
                   </div>
                 )}
-                {viewMode === 'recent' ? (
-                  <ElectricalRangeToggle value={range} onChange={setRange} />
-                ) : (
-                  <DateRangePicker
-                    value={dayRange}
-                    onChange={setDayRange}
-                    maxDate={maxPickerDate}
-                    placeholder="Chọn khoảng ngày"
-                    showPresets
-                  />
+                {viewMode === 'by_date' && (
+                  <div className="w-[260px] shrink-0">
+                    <DateRangePicker
+                      value={dayRange}
+                      onChange={setDayRange}
+                      maxDate={maxPickerDate}
+                      placeholder="Chọn khoảng ngày"
+                      showPresets
+                    />
+                  </div>
                 )}
+                <ElectricalRangeToggle value={range} onChange={setRange} />
               </div>
             </div>
             {viewMode === 'recent' ? (

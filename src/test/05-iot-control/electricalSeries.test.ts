@@ -3,8 +3,12 @@ import {
   ELECTRICAL_RANGES,
   ELECTRICAL_RANGE_KEYS,
   ELECTRICAL_HISTORY_MS,
+  RAW_GAP_THRESHOLD_MS,
   sliceWindow,
   bucketElectricalPoints,
+  buildAxisTicks,
+  formatRecentAxisTick,
+  insertElectricalGaps,
   findNodeChanges,
   findLampOnRanges,
   summarizeMetric,
@@ -24,14 +28,16 @@ const makePoint = (opts: Partial<ElectricalPoint> & { time: number }): Electrica
 
 describe('electricalSeries', () => {
   describe('ELECTRICAL_RANGES', () => {
-    it('định nghĩa đủ 3 khoảng 1h, 6h, 24h và ELECTRICAL_HISTORY_MS là 24h', () => {
-      expect(ELECTRICAL_RANGE_KEYS).toEqual(['1h', '6h', '24h'])
+    it('định nghĩa đủ 3 khoảng 1h, 6h, 12h và ELECTRICAL_HISTORY_MS là 24h', () => {
+      expect(ELECTRICAL_RANGE_KEYS).toEqual(['1h', '6h', '12h'])
       expect(ELECTRICAL_RANGES['1h'].windowMs).toBe(3_600_000)
       expect(ELECTRICAL_RANGES['1h'].bucketMs).toBe(0)
       expect(ELECTRICAL_RANGES['6h'].windowMs).toBe(21_600_000)
       expect(ELECTRICAL_RANGES['6h'].bucketMs).toBe(60_000)
-      expect(ELECTRICAL_RANGES['24h'].windowMs).toBe(86_400_000)
-      expect(ELECTRICAL_RANGES['24h'].bucketMs).toBe(300_000)
+      expect(ELECTRICAL_RANGES['12h'].label).toBe('12 giờ')
+      expect(ELECTRICAL_RANGES['12h'].windowMs).toBe(43_200_000)
+      expect(ELECTRICAL_RANGES['12h'].bucketMs).toBe(300_000)
+      expect(ELECTRICAL_RANGES['12h'].hint).toBe('Trung bình mỗi 5 phút')
       expect(ELECTRICAL_HISTORY_MS).toBe(86_400_000)
     })
   })
@@ -242,6 +248,101 @@ describe('electricalSeries', () => {
         min: 210,
         max: 230,
       })
+    })
+  })
+
+  describe('insertElectricalGaps', () => {
+    it('mảng rỗng hoặc 1 điểm trả về bản sao không chèn điểm ngắt', () => {
+      expect(insertElectricalGaps([], 0)).toEqual([])
+      const single = bucketElectricalPoints([makePoint({ time: 10_000, power: 500 })], 0)
+      const res = insertElectricalGaps(single, 0)
+      expect(res).toEqual(single)
+      expect(res).not.toBe(single)
+    })
+
+    it('chế độ 1h (bucketMs = 0): ngưỡng 30 giây — <= 30s không chèn, > 30s chèn điểm ngắt null ở giữa', () => {
+      expect(RAW_GAP_THRESHOLD_MS).toBe(30_000)
+      const pts = bucketElectricalPoints(
+        [
+          makePoint({ time: 100_000, power: 500, current: 100, voltage: 5 }),
+          makePoint({ time: 130_000, power: 510, current: 102, voltage: 5 }),
+          makePoint({ time: 200_000, power: 520, current: 104, voltage: 5 }),
+        ],
+        0
+      )
+      const originalSnapshot = pts.map((p) => p.time)
+      const res = insertElectricalGaps(pts, 0)
+
+      // Không làm biến đổi mảng đầu vào
+      expect(pts.map((p) => p.time)).toEqual(originalSnapshot)
+      // 100_000 -> 130_000 (= 30s): giữ liền; 130_000 -> 200_000 (70s > 30s): chèn 1 điểm ngắt tại 165_000
+      expect(res.length).toBe(4)
+      expect(res.map((p) => p.time)).toEqual([100_000, 130_000, 165_000, 200_000])
+      expect(res[2].count).toBe(0)
+      expect(res[2].power).toBeNull()
+      expect(res[2].current).toBeNull()
+      expect(res[2].voltage).toBeNull()
+      expect(res[2].min).toEqual({ power: null, current: null, voltage: null })
+      expect(res[2].max).toEqual({ power: null, current: null, voltage: null })
+    })
+
+    it('chế độ gom ô (bucketMs > 0): ngưỡng 2 lần bucketMs — đúng bằng ngưỡng không chèn, lớn hơn thì chèn', () => {
+      const bucketMs = 60_000
+      const pts = bucketElectricalPoints(
+        [
+          makePoint({ time: 60_000, power: 400 }),
+          makePoint({ time: 180_000, power: 410 }), // cách 120_000 (= 2 * bucketMs) -> không chèn
+          makePoint({ time: 420_000, power: 420 }), // cách 240_000 (> 2 * bucketMs) -> chèn tại 300_000
+        ],
+        bucketMs
+      )
+      const res = insertElectricalGaps(pts, bucketMs)
+      expect(res.map((p) => p.time)).toEqual([60_000, 180_000, 300_000, 420_000])
+      expect(res[2].power).toBeNull()
+      expect(res[2].min.power).toBeNull()
+      expect(res[2].max.power).toBeNull()
+      expect(res[2].count).toBe(0)
+    })
+  })
+
+  describe('formatRecentAxisTick & buildAxisTicks (nhãn 2 dòng trục X chế độ Gần nhất)', () => {
+    it('khung 6 giờ qua nửa đêm (21:00 hôm trước → 03:00 hôm sau): chỉ nhãn đầu và mốc 00:00 có dòng ngày', () => {
+      const start = new Date(2026, 10, 23, 21, 0, 0).getTime() // 23/11 21:00 giờ địa phương
+      const end = new Date(2026, 10, 24, 3, 0, 0).getTime()    // 24/11 03:00 giờ địa phương
+      const ticks = buildAxisTicks(start, end, 3_600_000)
+
+      const formatted = ticks.map((t, idx) => formatRecentAxisTick(t, idx === 0))
+      expect(formatted).toEqual([
+        { clock: '21:00', date: '23/11' },
+        { clock: '22:00', date: null },
+        { clock: '23:00', date: null },
+        { clock: '00:00', date: '24/11' },
+        { clock: '01:00', date: null },
+        { clock: '02:00', date: null },
+        { clock: '03:00', date: null },
+      ])
+    })
+
+    it('khung 6 giờ không qua nửa đêm (08:30 → 14:30): chỉ nhãn đầu khung (09:00) có dòng ngày', () => {
+      const start = new Date(2026, 10, 24, 8, 30, 0).getTime()
+      const end = new Date(2026, 10, 24, 14, 30, 0).getTime()
+      const ticks = buildAxisTicks(start, end, 3_600_000)
+
+      const formatted = ticks.map((t, idx) => formatRecentAxisTick(t, idx === 0))
+      expect(formatted).toEqual([
+        { clock: '09:00', date: '24/11' },
+        { clock: '10:00', date: null },
+        { clock: '11:00', date: null },
+        { clock: '12:00', date: null },
+        { clock: '13:00', date: null },
+        { clock: '14:00', date: null },
+      ])
+    })
+
+    it('mốc 00:00 luôn hiển thị ngày dù là nhãn đầu hay nằm giữa khung', () => {
+      const midnight = new Date(2026, 10, 24, 0, 0, 0).getTime()
+      expect(formatRecentAxisTick(midnight, true)).toEqual({ clock: '00:00', date: '24/11' })
+      expect(formatRecentAxisTick(midnight, false)).toEqual({ clock: '00:00', date: '24/11' })
     })
   })
 })

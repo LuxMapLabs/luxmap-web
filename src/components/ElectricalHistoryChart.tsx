@@ -1,9 +1,8 @@
-/** Biểu đồ lịch sử điện trung bình 30 giây dùng chung: mặc định theo giờ đo, có thể xem theo giờ nhận. */
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Loader2 } from 'lucide-react'
+/** Biểu đồ lịch sử điện trung bình 30 giây dùng chung: hỗ trợ chế độ Gần nhất và Theo ngày (tải theo khúc 6 giờ). */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Activity } from 'lucide-react'
 import {
   Area,
-  Brush,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -12,24 +11,27 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { useElectricalSeries, ELECTRICAL_POLL_MS } from '../hooks/iot/useElectricalSeries'
-import type { ElectricalTimeBasis } from '../feature/iot/iotMonitorSlice'
+import { useElectricalChunks } from '../hooks/iot/useElectricalChunks'
+import { ELECTRICAL_POLL_MS, type ElectricalTimeBasis } from '../feature/iot/iotMonitorSlice'
 import {
   ELECTRICAL_METRICS,
   ELECTRICAL_METRIC_KEYS,
   ELECTRICAL_RANGES,
   ELECTRICAL_RANGE_KEYS,
   ELECTRICAL_HISTORY_MS,
-  sliceWindow,
   bucketElectricalPoints,
+  buildAxisTicks,
+  clampWindowEnd,
+  formatRecentAxisTick,
+  insertElectricalGaps,
   summarizeMetric,
   formatMetric,
+  type ElectricalChunkDirection,
   type ElectricalMetric,
   type ElectricalRange,
   type ElectricalBucketPoint,
 } from '../utils/iot/electricalSeries'
-
-export const HISTORY_PAGE_SAMPLES = 200
+import { ElectricalWindowSlider } from './ElectricalWindowSlider'
 
 const METRIC_TONE: Record<ElectricalMetric, { active: string }> = {
   power: {
@@ -43,15 +45,16 @@ const METRIC_TONE: Record<ElectricalMetric, { active: string }> = {
   },
 }
 
-const RANGE_ORDER: Record<ElectricalRange, number> = { '1h': 1, '6h': 2, '24h': 3 }
+const RANGE_ORDER: Record<ElectricalRange, number> = { '1h': 1, '6h': 2, '12h': 3 }
+
+/** Bước chia nhãn trục X cố định cho từng khoảng thời gian. */
+const RANGE_TICK_STEP_MS: Record<ElectricalRange, number> = {
+  '1h': 10 * 60_000,      // mỗi 10 phút
+  '6h': 60 * 60_000,      // mỗi 1 giờ
+  '12h': 2 * 60 * 60_000, // mỗi 2 giờ
+}
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
-
-const formatXAxisTime = (time: number) => {
-  if (!Number.isFinite(time)) return ''
-  const d = new Date(time)
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
-}
 
 const fullTime = (time: number) => {
   if (!Number.isFinite(time)) return ''
@@ -65,6 +68,52 @@ const fullDateTime = (time: number) => {
   return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
 }
 
+interface AxisTickProps {
+  x?: number | string
+  y?: number | string
+  index?: number
+  payload?: { value?: number }
+  firstTick?: number
+}
+
+/** Nhãn trục X 2 dòng (giờ trên, ngày dưới cho mốc đầu khung và 00:00); mốc đầu canh trái tránh đè trục Y. */
+const ElectricalXAxisTick: React.FC<AxisTickProps> = ({ x, y, index, payload, firstTick }) => {
+  const value = payload?.value
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  const nx = Number(x ?? 0)
+  const ny = Number(y ?? 0)
+  const isFirst = index === 0 || (firstTick !== undefined && value === firstTick)
+  const { clock, date } = formatRecentAxisTick(value, isFirst)
+  const anchor = isFirst ? 'start' : 'middle'
+
+  return (
+    <g transform={`translate(${nx},${ny})`}>
+      <text
+        x={0}
+        y={0}
+        dy={11}
+        textAnchor={anchor}
+        fontSize={10}
+        className="fill-slate-600 dark:fill-slate-300"
+      >
+        {clock}
+      </text>
+      {date && (
+        <text
+          x={0}
+          y={0}
+          dy={22}
+          textAnchor={anchor}
+          fontSize={9}
+          className="fill-slate-500 dark:fill-slate-400"
+        >
+          {date}
+        </text>
+      )}
+    </g>
+  )
+}
+
 interface ChartDataPoint extends ElectricalBucketPoint {
   band: [number, number] | null
 }
@@ -72,21 +121,19 @@ interface ChartDataPoint extends ElectricalBucketPoint {
 const CustomTooltip: React.FC<{
   active?: boolean
   payload?: Array<{ payload: ChartDataPoint }>
-  range: ElectricalRange
   metric: ElectricalMetric
   bucketMs: number
-  isDateRange: boolean
-}> = ({ active, payload, range, metric, bucketMs, isDateRange }) => {
+}> = ({ active, payload, metric, bucketMs }) => {
   if (!active || !payload || !payload.length) return null
   const point = payload[0].payload
-  if (!point) return null
+  if (!point || point.count === 0) return null
 
   const d = new Date(point.time)
   const dateStr = `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`
   const timeStr = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 
   let timeDisplay = ''
-  if (!isDateRange && range === '1h') {
+  if (bucketMs <= 0) {
     timeDisplay = `${dateStr} ${timeStr}:${pad2(d.getSeconds())}`
   } else {
     const endD = new Date(point.time + bucketMs)
@@ -154,37 +201,128 @@ export const ElectricalHistoryChart: React.FC<{
   timeBasis?: ElectricalTimeBasis
   dateRange?: { from: Date; to: Date } | null
 }> = ({ feederId, live, range, timeBasis = 'measured_at', dateRange = null }) => {
-  const isDateRange = Boolean(dateRange)
-  const fromIso = dateRange ? dateRange.from.toISOString() : undefined
-  const toIso = dateRange ? dateRange.to.toISOString() : undefined
-
-  const { points, latest, loading, backfilling, error } = useElectricalSeries(feederId, {
-    initial: HISTORY_PAGE_SAMPLES,
-    maxPoints: isDateRange ? 40_000 : 9_000,
-    windowMs: isDateRange ? undefined : ELECTRICAL_HISTORY_MS,
-    live: isDateRange ? false : live,
-    timeBasis,
-    fromTo: fromIso && toIso ? { from: fromIso, to: toIso } : undefined,
-  })
+  const boundsFrom = dateRange ? dateRange.from.getTime() : null
+  const boundsTo = dateRange ? dateRange.to.getTime() : null
+  const bounds = useMemo(
+    () => (boundsFrom !== null && boundsTo !== null ? { from: boundsFrom, to: boundsTo } : null),
+    [boundsFrom, boundsTo]
+  )
+  const isDateRange = bounds !== null
 
   const [metric, setMetric] = useState<ElectricalMetric>('power')
-  const [brushRange, setBrushRange] = useState<{ from: number; to: number } | null>(null)
+  // Cập nhật mốc hiện tại định kỳ mỗi ELECTRICAL_POLL_MS ở chế độ Gần nhất.
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  // Mốc cuối đang ghim khi kéo sang trái ở chế độ Gần nhất; null = đang bám sát mép phải (hiện tại).
+  const [pinnedEnd, setPinnedEnd] = useState<number | null>(null)
+  // Mốc cuối khung đang xem ở chế độ Theo ngày (mặc định bằng bounds.to).
+  const [windowEndMs, setWindowEndMs] = useState<number>(() =>
+    boundsTo !== null ? boundsTo : Date.now()
+  )
+  // Hướng kéo gần nhất của người dùng (-1 quá khứ, 1 tương lai, 0 lúc đầu); không đổi khi khung tự trượt theo giờ.
+  const [direction, setDirection] = useState<ElectricalChunkDirection>(0)
+
+  useEffect(() => {
+    if (isDateRange) return
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, ELECTRICAL_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [isDateRange])
+
+  useEffect(() => {
+    setPinnedEnd(null)
+    setDirection(0)
+    if (boundsTo !== null) {
+      setWindowEndMs(boundsTo)
+    }
+  }, [feederId, timeBasis, boundsFrom, boundsTo])
+
+  const windowMs = ELECTRICAL_RANGES[range].windowMs
+
+  // Chế độ Theo ngày: track phủ toàn bộ [bounds.from, bounds.to]; chế độ Gần nhất: 24 giờ gần nhất.
+  const trackStart = bounds ? bounds.from : nowMs - ELECTRICAL_HISTORY_MS
+  const trackEnd = bounds ? bounds.to : nowMs
+  const trackSpanMs = Math.max(0, trackEnd - trackStart)
+  const effectiveWindowMs = bounds ? Math.min(windowMs, Math.max(1, trackSpanMs)) : windowMs
+
+  const minWindowEnd = trackStart + effectiveWindowMs
+  const maxWindowEnd = trackEnd
+
+  const windowEnd = bounds
+    ? clampWindowEnd(windowEndMs, minWindowEnd, maxWindowEnd)
+    : pinnedEnd === null
+      ? trackEnd
+      : clampWindowEnd(pinnedEnd, minWindowEnd, maxWindowEnd)
+  const windowStart = windowEnd - effectiveWindowMs
+
+  // Khi đổi 1h/6h/12h: giữ mốc cuối đang xem và kẹp lại trong phạm vi track.
+  useEffect(() => {
+    if (bounds) {
+      setWindowEndMs((prev) => clampWindowEnd(prev, minWindowEnd, maxWindowEnd))
+    } else {
+      setPinnedEnd((prev) =>
+        prev === null ? null : clampWindowEnd(prev, minWindowEnd, maxWindowEnd)
+      )
+    }
+  }, [range, bounds, minWindowEnd, maxWindowEnd])
+
+  // Hợp nhất cả hai chế độ vào useElectricalChunks (chế độ Theo ngày truyền live = false, track = bounds, bounds).
+  const { points, latest, viewLoading } = useElectricalChunks(feederId, {
+    timeBasis,
+    live: isDateRange ? false : live,
+    view: { from: windowStart, to: windowEnd },
+    track: { from: trackStart, to: trackEnd },
+    direction,
+    bounds,
+  })
+
+  // Thanh tiến trình mảnh 2px ở mép trên khung biểu đồ chỉ hiện khi viewLoading kéo dài quá 300ms.
+  const [showProgressBar, setShowProgressBar] = useState(false)
+
+  useEffect(() => {
+    if (!viewLoading) {
+      setShowProgressBar(false)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setShowProgressBar(true)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [viewLoading])
+
+  // Ngưỡng dính mép phải ở chế độ Gần nhất (nhỏ hơn 1/2 bước mũi tên).
+  const snapRightThresholdMs = Math.min(Math.floor(windowMs / 24), 5 * 60_000)
+
+  const handleWindowEndChange = useCallback(
+    (nextEnd: number) => {
+      const clamped = clampWindowEnd(nextEnd, minWindowEnd, maxWindowEnd)
+      if (clamped < windowEnd) {
+        setDirection(-1)
+      } else if (clamped > windowEnd) {
+        setDirection(1)
+      }
+      if (bounds) {
+        setWindowEndMs(clamped)
+        return
+      }
+      if (trackEnd - clamped <= snapRightThresholdMs) {
+        setPinnedEnd(null)
+      } else {
+        setPinnedEnd(clamped)
+      }
+    },
+    [bounds, minWindowEnd, maxWindowEnd, trackEnd, windowEnd, snapRightThresholdMs]
+  )
 
   const rangePoints = useMemo(
-    () => (isDateRange ? points : sliceWindow(points, ELECTRICAL_RANGES[range].windowMs)),
-    [isDateRange, points, range]
+    () => points.filter((p) => p.time >= windowStart && p.time <= windowEnd),
+    [points, windowStart, windowEnd]
   )
-  const bucketMs = useMemo(() => {
-    if (!dateRange) return ELECTRICAL_RANGES[range].bucketMs
-    const spanMs = dateRange.to.getTime() - dateRange.from.getTime()
-    if (spanMs <= 6 * 3_600_000) return 60_000
-    if (spanMs <= 24 * 3_600_000) return 300_000
-    if (spanMs <= 3 * 86_400_000) return 900_000
-    if (spanMs <= 7 * 86_400_000) return 1_800_000
-    return 3_600_000
-  }, [dateRange, range])
+
+  const bucketMs = ELECTRICAL_RANGES[range].bucketMs
+
   const series = useMemo(
-    () => bucketElectricalPoints(rangePoints, bucketMs),
+    () => insertElectricalGaps(bucketElectricalPoints(rangePoints, bucketMs), bucketMs),
     [rangePoints, bucketMs]
   )
 
@@ -200,14 +338,15 @@ export const ElectricalHistoryChart: React.FC<{
     [series, metric]
   )
 
-  useEffect(() => {
-    setBrushRange(null)
-  }, [range, metric, fromIso, toIso])
+  const xTicks = useMemo(
+    () => buildAxisTicks(windowStart, windowEnd, RANGE_TICK_STEP_MS[range]),
+    [windowStart, windowEnd, range]
+  )
 
   const prevRangeRef = useRef<ElectricalRange | null>(null)
   const isInitialMount = prevRangeRef.current === null
   const swapFrom =
-    !isDateRange && !isInitialMount && prevRangeRef.current !== range
+    !isInitialMount && prevRangeRef.current !== range
       ? RANGE_ORDER[range] < RANGE_ORDER[prevRangeRef.current!]
         ? 0.6
         : 1.4
@@ -218,45 +357,6 @@ export const ElectricalHistoryChart: React.FC<{
   useEffect(() => {
     prevRangeRef.current = range
   }, [range])
-
-  const brushIndices = useMemo(() => {
-    if (!brushRange || chartData.length === 0) {
-      return { startIndex: 0, endIndex: Math.max(0, chartData.length - 1) }
-    }
-    let startIndex = chartData.findIndex((p) => p.time >= brushRange.from)
-    if (startIndex === -1) startIndex = 0
-    let endIndex = chartData.findIndex((p) => p.time > brushRange.to)
-    if (endIndex === -1) endIndex = chartData.length - 1
-    else endIndex = Math.max(0, endIndex - 1)
-    if (startIndex > endIndex) startIndex = endIndex
-    return { startIndex, endIndex }
-  }, [brushRange, chartData])
-
-  const handleBrushChange = (event: { startIndex?: number; endIndex?: number }) => {
-    if (
-      typeof event.startIndex === 'number' &&
-      typeof event.endIndex === 'number' &&
-      chartData[event.startIndex] &&
-      chartData[event.endIndex]
-    ) {
-      if (event.startIndex === 0 && event.endIndex === chartData.length - 1) {
-        setBrushRange(null)
-      } else {
-        setBrushRange({
-          from: chartData[event.startIndex].time,
-          to: chartData[event.endIndex].time,
-        })
-      }
-    }
-  }
-
-  const hasIncompleteCoverage =
-    !isDateRange &&
-    !backfilling &&
-    !loading &&
-    points.length > 0 &&
-    latest &&
-    (latest.time - points[0].time) / ELECTRICAL_RANGES[range].windowMs < 0.95
 
   return (
     <div className="flex-1 min-h-0 p-4 sm:p-5 flex flex-col md:flex-row gap-4">
@@ -301,16 +401,12 @@ export const ElectricalHistoryChart: React.FC<{
           <p className="flex items-center gap-1.5">
             <span
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                error ? 'bg-rose-500' : latest ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'
+                latest ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'
               }`}
             />
             {latest ? <>Mẫu gần nhất {fullDateTime(latest.time)}</> : 'Chưa có mẫu'}
           </p>
-          <p>
-            {isDateRange
-              ? `${rangePoints.length} khoảng trong khoảng đã chọn`
-              : `${rangePoints.length} mẫu trong ${ELECTRICAL_RANGES[range].label}`}
-          </p>
+          <p>{`${rangePoints.length} mẫu trong ${ELECTRICAL_RANGES[range].label}`}</p>
           {isDateRange ? (
             <p>Xem theo khoảng ngày, không tự cập nhật</p>
           ) : live ? (
@@ -322,7 +418,15 @@ export const ElectricalHistoryChart: React.FC<{
       </div>
 
       {/* Khung biểu đồ */}
-      <div className="flex-1 min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col p-3 sm:p-4">
+      <div className="relative overflow-hidden flex-1 min-w-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col p-3 sm:p-4">
+        {showProgressBar && (
+          <div
+            aria-hidden="true"
+            data-testid="electrical-loading-bar"
+            className="absolute inset-x-0 top-0 h-0.5 animate-pulse motion-reduce:animate-none"
+            style={{ backgroundColor: ELECTRICAL_METRICS[metric].color }}
+          />
+        )}
         {/* Đầu khung */}
         <div className="flex items-start justify-between gap-3 pb-2 shrink-0 flex-wrap">
           <div className="min-w-0 space-y-0.5">
@@ -330,53 +434,30 @@ export const ElectricalHistoryChart: React.FC<{
               <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
                 {ELECTRICAL_METRICS[metric].label} ({ELECTRICAL_METRICS[metric].unit})
               </p>
-              {backfilling && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
-                  <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                  <span>Đang tải thêm lịch sử…</span>
-                </span>
-              )}
-              {error && points.length > 0 && (
-                <span
-                  className={`text-[10.5px] ${
-                    isDateRange
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-rose-600 dark:text-rose-400 truncate max-w-xs'
-                  }`}
-                  title={error}
-                >
-                  {error}
-                </span>
-              )}
             </div>
             <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
-              {dateRange ? (
+              {bounds ? (
                 <>
-                  Từ {fullTime(dateRange.from.getTime())} đến {fullTime(dateRange.to.getTime())} · trung bình mỗi{' '}
-                  {Math.round(bucketMs / 60_000) >= 60 ? '1 giờ' : `${Math.round(bucketMs / 60_000)} phút`}
+                  Khoảng đã chọn {fullTime(bounds.from)} – {fullTime(bounds.to)} · {ELECTRICAL_RANGES[range].hint}
                 </>
               ) : (
-                <>
-                  {ELECTRICAL_RANGES[range].hint}
-                  {hasIncompleteCoverage && (
-                    <span className="ml-2 italic text-slate-400">
-                      · Dữ liệu chỉ có từ {fullTime(points[0].time)}
-                    </span>
-                  )}
-                </>
+                ELECTRICAL_RANGES[range].hint
               )}
             </p>
           </div>
 
-          {/* Chú giải + nút reset Brush */}
+          {/* Chú giải + nút về hiện tại */}
           <div className="flex items-center gap-3 text-[10.5px] text-slate-500 dark:text-slate-400 shrink-0">
-            {brushRange && (
+            {!isDateRange && pinnedEnd !== null && (
               <button
                 type="button"
-                onClick={() => setBrushRange(null)}
-                className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                onClick={() => {
+                  setDirection(1)
+                  setPinnedEnd(null)
+                }}
+                className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500 cursor-pointer"
               >
-                Xem toàn bộ
+                Về hiện tại
               </button>
             )}
             <span className="flex items-center gap-1">
@@ -401,8 +482,8 @@ export const ElectricalHistoryChart: React.FC<{
           </div>
         </div>
 
-        {/* Nội dung biểu đồ hoặc trạng thái */}
-        {loading && points.length === 0 ? (
+        {/* Nội dung biểu đồ hoặc trạng thái (chế độ Theo ngày luôn hiện trục + thanh trượt, không che bằng skeleton/chữ rỗng) */}
+        {!isDateRange && viewLoading && points.length === 0 ? (
           <div className="flex-1 min-h-0 flex flex-col justify-between p-4 animate-pulse">
             <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/4" />
             <div className="space-y-4 my-auto">
@@ -413,99 +494,93 @@ export const ElectricalHistoryChart: React.FC<{
             </div>
             <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-full" />
           </div>
-        ) : error && points.length === 0 ? (
-          <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-4 text-center">
-            <AlertTriangle className="w-8 h-8 text-rose-500 mb-2" />
-            <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">{error}</p>
-            <p className="text-xs text-slate-400 mt-1">Chưa có mẫu điện nào.</p>
-            {!isDateRange && live && <p className="text-[11px] text-slate-400 mt-0.5">Tự thử lại sau 10 giây</p>}
-          </div>
-        ) : !loading && !backfilling && points.length === 0 ? (
+        ) : !isDateRange && !viewLoading && points.length === 0 ? (
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-4 text-center">
             <Activity className="w-8 h-8 text-slate-400 mb-2" />
             <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {isDateRange ? 'Không có số đo nào trong khoảng này.' : 'Mạch chưa có mẫu điện nào.'}
+              Mạch chưa có mẫu điện nào.
             </p>
-            {!isDateRange && live && (
+            {live && (
               <p className="text-[11px] text-slate-400 mt-0.5">
                 Biểu đồ tự hiện khi node gửi mẫu (mỗi 10 giây).
               </p>
             )}
           </div>
         ) : (
-          <div
-            className={`flex-1 min-h-0 ${swapClass}`}
-            style={swapStyle}
-            key={isDateRange ? `${fromIso}-${toIso}` : range}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 20, right: 36, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="time"
-                  type="number"
-                  scale="time"
-                  domain={['dataMin', 'dataMax']}
-                  tickFormatter={formatXAxisTime}
-                  minTickGap={40}
-                  stroke="#94a3b8"
-                  fontSize={10}
-                />
-                <YAxis
-                  width={56}
-                  domain={['auto', 'auto']}
-                  tickFormatter={(val) => {
-                    if (!Number.isFinite(val)) return ''
-                    const digits = metric === 'voltage' ? 2 : 0
-                    return Number(val).toFixed(digits)
-                  }}
-                  stroke="#94a3b8"
-                  fontSize={10}
-                />
-                {bucketMs > 0 && (
-                  <Area
+          <>
+            <div
+              className={`flex-1 min-h-0 ${swapClass}`}
+              style={swapStyle}
+              key={bounds ? `${bounds.from}-${bounds.to}-${range}` : range}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 20, right: 36, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="time"
+                    type="number"
+                    scale="time"
+                    domain={[windowStart, windowEnd]}
+                    ticks={xTicks}
+                    allowDataOverflow
+                    height={34}
+                    tick={<ElectricalXAxisTick firstTick={xTicks[0]} />}
+                    minTickGap={24}
+                    stroke="#94a3b8"
+                    fontSize={10}
+                  />
+                  <YAxis
+                    width={56}
+                    domain={['auto', 'auto']}
+                    tickFormatter={(val) => {
+                      if (!Number.isFinite(val)) return ''
+                      const digits = metric === 'voltage' ? 2 : 0
+                      return Number(val).toFixed(digits)
+                    }}
+                    stroke="#94a3b8"
+                    fontSize={10}
+                  />
+                  {bucketMs > 0 && (
+                    <Area
+                      type="monotone"
+                      dataKey="band"
+                      fill={ELECTRICAL_METRICS[metric].color}
+                      fillOpacity={0.15}
+                      stroke="none"
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
+                  )}
+                  <Line
                     type="monotone"
-                    dataKey="band"
-                    fill={ELECTRICAL_METRICS[metric].color}
-                    fillOpacity={0.15}
-                    stroke="none"
+                    dataKey={metric}
+                    stroke={ELECTRICAL_METRICS[metric].color}
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls={false}
                     isAnimationActive={false}
                   />
-                )}
-                <Line
-                  type="monotone"
-                  dataKey={metric}
-                  stroke={ELECTRICAL_METRICS[metric].color}
-                  strokeWidth={2}
-                  dot={false}
-                  connectNulls
-                  isAnimationActive={false}
-                />
-                <Tooltip
-                  content={
-                    <CustomTooltip
-                      range={range}
-                      metric={metric}
-                      bucketMs={bucketMs}
-                      isDateRange={isDateRange}
-                    />
-                  }
-                />
-                {chartData.length > 1 && (
-                  <Brush
-                    dataKey="time"
-                    height={26}
-                    tickFormatter={formatXAxisTime}
-                    stroke={ELECTRICAL_METRICS[metric].color}
-                    startIndex={brushIndices.startIndex}
-                    endIndex={brushIndices.endIndex}
-                    onChange={handleBrushChange}
-                    ariaLabel="Chọn đoạn thời gian để phóng to"
+                  <Tooltip
+                    content={
+                      <CustomTooltip
+                        metric={metric}
+                        bucketMs={bucketMs}
+                      />
+                    }
                   />
-                )}
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <ElectricalWindowSlider
+              points={points}
+              metric={metric}
+              trackStart={trackStart}
+              trackEnd={trackEnd}
+              windowMs={effectiveWindowMs}
+              windowEnd={windowEnd}
+              onChangeWindowEnd={handleWindowEndChange}
+            />
+          </>
         )}
       </div>
     </div>

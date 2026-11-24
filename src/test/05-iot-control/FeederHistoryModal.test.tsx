@@ -83,4 +83,21 @@ describe('FeederHistoryModal (modal lịch sử theo mạch)', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('hiển thị nhóm nút chọn khoảng 1 giờ / 6 giờ / 12 giờ ở cả chế độ Theo ngày và ẩn câu mô tả dài khi mặc định', () => {
+    renderModal(<FeederHistoryModal feederId="FDR-001" allowReceivedTime onClose={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Theo ngày' }))
+    expect(screen.getByRole('group', { name: 'Khoảng thời gian' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '1 giờ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '6 giờ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '12 giờ' })).toBeInTheDocument()
+    // Ở chế độ Theo ngày với timeBasis mặc định (measured_at): không hiện câu mô tả dài
+    expect(screen.queryByText(/Số đo theo khoảng ngày đã chọn/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Giờ theo Bridge nhận.')).not.toBeInTheDocument()
+
+    // Đổi sang "Theo giờ nhận" -> chỉ hiện câu ngắn "Giờ theo Bridge nhận."
+    fireEvent.click(screen.getByRole('button', { name: 'Theo giờ nhận' }))
+    expect(screen.getByText('Giờ theo Bridge nhận.')).toBeInTheDocument()
+  })
 })
