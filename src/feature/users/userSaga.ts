@@ -1,12 +1,16 @@
-import { all, call, put, takeLatest } from 'redux-saga/effects'
+import { all, call, put, select, takeLatest } from 'redux-saga/effects'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
+import type { RootState } from '../../redux/rootReducer'
+import { updateCurrentUserProfile } from '../auth/authSlice'
 import { userAPI as adminUserAPI, type UserQueryParams } from './userAPI'
 import type {
   UserAccountItemPagedResult,
   UserAccountItem,
   CreateUserRequest,
   CreateUserResponse,
+  ChangeUserEmailRequest,
+  ChangeUserEmailResponse,
   InvitationResponse,
 } from '../../types/admin/users'
 import {
@@ -19,6 +23,9 @@ import {
   updateUserRequest,
   updateUserSuccess,
   updateUserFailure,
+  changeUserEmailRequest,
+  changeUserEmailSuccess,
+  changeUserEmailFailure,
   lockUserRequest,
   lockUserSuccess,
   lockUserFailure,
@@ -89,11 +96,45 @@ function* handleUpdateUser(action: PayloadAction<UpdateUserPayload>) {
   try {
     const result: UserAccountItem = yield call(adminUserAPI.updateUser, id, data)
     yield put(updateUserSuccess(result))
+    const currentUserId: string | null | undefined = yield select(
+      (state: RootState) => state.auth?.user?.user_id
+    )
+    if (currentUserId && result?.user_id === currentUserId) {
+      yield put(updateCurrentUserProfile(result))
+    }
     toast.success('Cập nhật thông tin tài khoản thành công!')
   } catch (error: any) {
     const errorMsg = getErrorMessage(error, 'Lỗi khi cập nhật tài khoản.')
     yield put(updateUserFailure(errorMsg))
     toast.error(`Cập nhật thất bại: ${errorMsg}`)
+  }
+}
+
+/**
+ * Worker saga đổi email tài khoản người dùng
+ */
+function* handleChangeUserEmail(
+  action: PayloadAction<{ id: string; data: ChangeUserEmailRequest }>
+) {
+  const { id, data } = action.payload
+  try {
+    const result: ChangeUserEmailResponse = yield call(adminUserAPI.changeUserEmail, id, data)
+    yield put(changeUserEmailSuccess(result))
+    const currentUserId: string | null | undefined = yield select(
+      (state: RootState) => state.auth?.user?.user_id
+    )
+    if (currentUserId && result?.user?.user_id === currentUserId) {
+      yield put(updateCurrentUserProfile(result.user))
+    }
+    if (result?.notification_sent === false) {
+      toast.warning('Đã đổi email tài khoản, nhưng máy chủ mail chưa gửi được thư thông báo.')
+    } else {
+      toast.success('Đổi email tài khoản thành công!')
+    }
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error, 'Lỗi khi đổi email tài khoản.')
+    yield put(changeUserEmailFailure(errorMsg))
+    toast.error(`Đổi email thất bại: ${errorMsg}`)
   }
 }
 
@@ -154,6 +195,7 @@ export function* adminUserSaga() {
     takeLatest(fetchUsersRequest.type, handleFetchUsers),
     takeLatest(createUserRequest.type, handleCreateUser),
     takeLatest(updateUserRequest.type, handleUpdateUser),
+    takeLatest(changeUserEmailRequest.type, handleChangeUserEmail),
     takeLatest(lockUserRequest.type, handleLockUser),
     takeLatest(unlockUserRequest.type, handleUnlockUser),
     takeLatest(inviteUserRequest.type, handleInviteUser),

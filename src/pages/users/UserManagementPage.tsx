@@ -10,6 +10,7 @@ import {
   fetchUsersRequest,
   createUserRequest,
   updateUserRequest,
+  changeUserEmailRequest,
   lockUserRequest,
   unlockUserRequest,
   inviteUserRequest,
@@ -45,6 +46,7 @@ export const AdminManagementPage: React.FC = () => {
   // Modal tạo mới chỉ đóng khi request xong và thành công (thất bại thì giữ lại để người dùng sửa)
   const [isCreatePending, setIsCreatePending] = useState(false)
   const [isEditPending, setIsEditPending] = useState(false)
+  const [isChangeEmailPending, setIsChangeEmailPending] = useState(false)
   const [editingUser, setEditingUser] = useState<UserAccountItem | null>(null)
   const [lockingUser, setLockingUser] = useState<UserAccountItem | null>(null)
 
@@ -65,17 +67,20 @@ export const AdminManagementPage: React.FC = () => {
     )
   }, [dispatch, filters.role, filters.status, page, pageSize])
 
-  // Lọc theo từ khóa tìm kiếm (họ tên, username, email)
+  // Ẩn tài khoản của chính người đang đăng nhập (tự sửa qua ProfileModal) rồi lọc theo từ khóa tìm kiếm
   const filteredUsers = useMemo(() => {
-    if (!filters.search.trim()) return users
+    const visibleUsers = currentUser?.user_id
+      ? users.filter((u) => u.user_id !== currentUser.user_id)
+      : users
+    if (!filters.search.trim()) return visibleUsers
     const query = filters.search.toLowerCase().trim()
-    return users.filter((u) => {
+    return visibleUsers.filter((u) => {
       const matchName = (u.full_name || '').toLowerCase().includes(query)
       const matchUser = (u.username || '').toLowerCase().includes(query)
       const matchEmail = (u.email || '').toLowerCase().includes(query)
       return matchName || matchUser || matchEmail
     })
-  }, [users, filters.search])
+  }, [users, filters.search, currentUser?.user_id])
 
   useEffect(() => {
     if (isCreatePending && !isSubmitting) {
@@ -100,6 +105,23 @@ export const AdminManagementPage: React.FC = () => {
     dispatch(updateUserRequest({ id, data: payload }))
     setIsEditPending(true)
   }
+
+  useEffect(() => {
+    if (isChangeEmailPending && !isSubmitting) {
+      setIsChangeEmailPending(false)
+    }
+  }, [isChangeEmailPending, isSubmitting])
+
+  const handleChangeEmail = (id: string, email: string) => {
+    dispatch(changeUserEmailRequest({ id, data: { email } }))
+    setIsChangeEmailPending(true)
+  }
+
+  // Luôn lấy bản ghi mới nhất từ store để cập nhật email sau khi đổi email thành công
+  const activeEditingUser = useMemo(() => {
+    if (!editingUser?.user_id) return editingUser
+    return users.find((u) => u.user_id === editingUser.user_id) || editingUser
+  }, [editingUser, users])
 
   const handleConfirmToggleLock = () => {
     if (!lockingUser?.user_id) return
@@ -165,12 +187,14 @@ export const AdminManagementPage: React.FC = () => {
       />
 
       <EditUserModal
-        isOpen={Boolean(editingUser)}
-        user={editingUser}
-        isSelf={Boolean(currentUser?.user_id && editingUser?.user_id === currentUser.user_id)}
-        isSubmitting={isSubmitting}
+        isOpen={Boolean(activeEditingUser)}
+        user={activeEditingUser}
+        isSelf={Boolean(currentUser?.user_id && activeEditingUser?.user_id === currentUser.user_id)}
+        isSubmitting={isSubmitting && !isChangeEmailPending}
+        isChangingEmail={isChangeEmailPending && isSubmitting}
         onClose={() => setEditingUser(null)}
         onSubmit={handleEditSubmit}
+        onChangeEmail={handleChangeEmail}
       />
 
       <LockUserDialog

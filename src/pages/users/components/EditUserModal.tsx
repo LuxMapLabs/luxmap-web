@@ -8,48 +8,96 @@ import type { UserRole } from '../../../types/common/enums'
 import { USER_ROLE_LABELS } from '../../../constants/enums'
 import { ConfirmModal } from '../../iot-bridge/components/IotBridgeModal'
 import { UserAvatar } from '../../../components/UserAvatar'
+import { VIETNAM_PHONE_REGEX } from '../../../validations/common.schema'
+import { ChangeEmailModal } from './ChangeEmailModal'
+
+const GENDER_LABELS: Record<NonNullable<UpdateUserRequest['gender']>, string> = {
+  male: 'Nam',
+  female: 'Nữ',
+  other: 'Khác',
+}
+
+const IDENTITY_TYPE_LABELS: Record<NonNullable<UpdateUserRequest['identity_type']>, string> = {
+  citizen_id: 'Căn cước công dân',
+  identity_card: 'Chứng minh nhân dân',
+  passport: 'Hộ chiếu',
+  other: 'Khác',
+}
 
 export interface EditUserModalProps {
   isOpen: boolean
   user: UserAccountItem | null
   isSubmitting?: boolean
+  isChangingEmail?: boolean
   isSelf?: boolean
   onClose: () => void
   onSubmit: (id: string, payload: UpdateUserRequest) => void
+  onChangeEmail?: (id: string, email: string) => void
 }
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({
   isOpen,
   user,
   isSubmitting = false,
+  isChangingEmail = false,
   isSelf = false,
   onClose,
   onSubmit,
+  onChangeEmail,
 }) => {
   const communes = useSelector((state: RootState) => state.adminCommunes.communes)
-  const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('field_engineer')
   const [selectedCommune, setSelectedCommune] = useState<string>('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [gender, setGender] = useState<NonNullable<UpdateUserRequest['gender']> | ''>('')
+  const [address, setAddress] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [identityType, setIdentityType] = useState<
+    NonNullable<UpdateUserRequest['identity_type']> | ''
+  >('')
+  const [identityNumber, setIdentityNumber] = useState('')
+  const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false)
   const [confirmPayload, setConfirmPayload] = useState<UpdateUserRequest | null>(null)
   const wasSubmitting = useRef(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
   const initialRole = (user?.role as UserRole) || 'field_engineer'
   const initialCommune =
     initialRole === 'system_admin'
       ? ''
       : (user?.commune_ids || []).find((id) => Boolean(id) && id !== '*' && id !== 'all') || ''
+  const initialDob = user?.date_of_birth ? user.date_of_birth.slice(0, 10) : ''
+  const initialGender = user?.gender || ''
+  const initialAddress = (user?.address || '').trim()
+  const initialPhone = (user?.phone_number || '').trim()
+  const initialIdentityType = user?.identity_type || ''
+  const initialIdentityNumber = (user?.identity_number || '').trim()
 
   useEffect(() => {
     setConfirmPayload(null)
+    setIsChangeEmailOpen(false)
     if (user) {
-      setEmail(user.email || '')
       setFullName(user.full_name || '')
       setRole(initialRole)
       setSelectedCommune(initialCommune)
+      setDateOfBirth(initialDob)
+      setGender(initialGender)
+      setAddress(user.address || '')
+      setPhoneNumber(user.phone_number || '')
+      setIdentityType(initialIdentityType)
+      setIdentityNumber(user.identity_number || '')
       setErrors({})
     }
-  }, [user, isOpen, initialRole, initialCommune])
+  }, [
+    user,
+    isOpen,
+    initialRole,
+    initialCommune,
+    initialDob,
+    initialGender,
+    initialIdentityType,
+  ])
 
   useEffect(() => {
     if (wasSubmitting.current && !isSubmitting) setConfirmPayload(null)
@@ -78,12 +126,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    if (!email.trim()) {
-      newErrors.email = 'Email không được để trống'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      newErrors.email = 'Định dạng email không hợp lệ'
-    }
-
     if (!fullName.trim()) {
       newErrors.fullName = 'Họ và tên không được để trống'
     }
@@ -92,54 +134,152 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       newErrors.communes = 'Vui lòng chọn 1 địa bàn quản lý cho vai trò này'
     }
 
+    const trimmedPhone = phoneNumber.trim()
+    if (trimmedPhone && !VIETNAM_PHONE_REGEX.test(trimmedPhone.replace(/^\+84/, '0'))) {
+      newErrors.phoneNumber =
+        'Số điện thoại không hợp lệ. Vui lòng nhập đúng số điện thoại (10 chữ số, VD: 0901234567)'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
+  const trimmedFullName = fullName.trim()
+  const trimmedDob = dateOfBirth.trim()
+  const trimmedAddress = address.trim()
+  const trimmedPhone = phoneNumber.trim()
+  const trimmedIdentityNumber = identityNumber.trim()
+
   const effectiveCommune = role === 'system_admin' ? '' : selectedCommune
   const roleChanged = role !== initialRole
   const communeChanged = effectiveCommune !== initialCommune
-  const nameChanged = fullName.trim() !== (user.full_name || '').trim()
-  const emailChanged = email.trim() !== (user.email || '').trim()
-  const hasChanges = roleChanged || communeChanged || nameChanged || emailChanged
+  const nameChanged = trimmedFullName !== (user.full_name || '').trim()
+  const dobChanged = Boolean(trimmedDob) && trimmedDob !== initialDob
+  const genderChanged = Boolean(gender) && gender !== initialGender
+  const addressChanged = Boolean(trimmedAddress) && trimmedAddress !== initialAddress
+  const phoneChanged = Boolean(trimmedPhone) && trimmedPhone !== initialPhone
+  const identityTypeChanged = Boolean(identityType) && identityType !== initialIdentityType
+  const identityNumberChanged =
+    Boolean(trimmedIdentityNumber) && trimmedIdentityNumber !== initialIdentityNumber
+
+  const hasChanges =
+    roleChanged ||
+    communeChanged ||
+    nameChanged ||
+    dobChanged ||
+    genderChanged ||
+    addressChanged ||
+    phoneChanged ||
+    identityTypeChanged ||
+    identityNumberChanged
+
   const communeLabel = (id: string, userRole: string) =>
     userRole === 'system_admin'
       ? 'Phạm vi toàn hệ thống'
       : communes.find((c) => c.commune_id === id)?.name || id || '-'
+
   const changes = [
-    ...(nameChanged ? [{
-      label: 'Họ và tên',
-      old: (user.full_name || '').trim() || '-',
-      next: fullName.trim() || '-',
-    }] : []),
-    ...(emailChanged ? [{
-      label: 'Email',
-      old: (user.email || '').trim() || '-',
-      next: email.trim() || '-',
-    }] : []),
-    ...(roleChanged ? [{
-      label: 'Vai trò',
-      old: USER_ROLE_LABELS[initialRole] || '-',
-      next: USER_ROLE_LABELS[role] || '-',
-    }] : []),
-    ...(communeChanged ? [{
-      label: 'Địa bàn',
-      old: communeLabel(initialCommune, initialRole),
-      next: communeLabel(effectiveCommune, role),
-    }] : []),
+    ...(nameChanged
+      ? [
+          {
+            label: 'Họ và tên',
+            old: (user.full_name || '').trim() || '-',
+            next: trimmedFullName || '-',
+          },
+        ]
+      : []),
+    ...(roleChanged
+      ? [
+          {
+            label: 'Vai trò',
+            old: USER_ROLE_LABELS[initialRole] || '-',
+            next: USER_ROLE_LABELS[role] || '-',
+          },
+        ]
+      : []),
+    ...(communeChanged
+      ? [
+          {
+            label: 'Địa bàn',
+            old: communeLabel(initialCommune, initialRole),
+            next: communeLabel(effectiveCommune, role),
+          },
+        ]
+      : []),
+    ...(dobChanged
+      ? [
+          {
+            label: 'Ngày sinh',
+            old: initialDob || '-',
+            next: trimmedDob,
+          },
+        ]
+      : []),
+    ...(genderChanged && gender
+      ? [
+          {
+            label: 'Giới tính',
+            old: initialGender ? GENDER_LABELS[initialGender] : '-',
+            next: GENDER_LABELS[gender],
+          },
+        ]
+      : []),
+    ...(addressChanged
+      ? [
+          {
+            label: 'Địa chỉ',
+            old: initialAddress || '-',
+            next: trimmedAddress,
+          },
+        ]
+      : []),
+    ...(phoneChanged
+      ? [
+          {
+            label: 'Số điện thoại',
+            old: initialPhone || '-',
+            next: trimmedPhone,
+          },
+        ]
+      : []),
+    ...(identityTypeChanged && identityType
+      ? [
+          {
+            label: 'Loại giấy tờ',
+            old: initialIdentityType ? IDENTITY_TYPE_LABELS[initialIdentityType] : '-',
+            next: IDENTITY_TYPE_LABELS[identityType],
+          },
+        ]
+      : []),
+    ...(identityNumberChanged
+      ? [
+          {
+            label: 'Số giấy tờ',
+            old: initialIdentityNumber || '-',
+            next: trimmedIdentityNumber,
+          },
+        ]
+      : []),
   ]
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (isSubmitting || confirmPayload || !hasChanges || !validate() || !user.user_id) return
 
-    const payload: UpdateUserRequest = {
-      email: email.trim(),
-      full_name: fullName.trim(),
-      role,
-      // system_admin bao quát mọi địa bàn: backend yêu cầu không gửi commune_ids (ACCT-1)
-      ...(role === 'system_admin' ? {} : { commune_ids: [selectedCommune] }),
+    const payload: UpdateUserRequest = {}
+    if (nameChanged) payload.full_name = trimmedFullName
+    if (roleChanged) payload.role = role
+    // system_admin bao quát mọi địa bàn: backend yêu cầu không gửi commune_ids (ACCT-1)
+    if ((roleChanged || communeChanged) && role !== 'system_admin') {
+      payload.commune_ids = [selectedCommune]
     }
+    if (dobChanged) payload.date_of_birth = trimmedDob
+    if (genderChanged && gender) payload.gender = gender
+    if (addressChanged) payload.address = trimmedAddress
+    if (phoneChanged) payload.phone_number = trimmedPhone
+    if (identityTypeChanged && identityType) payload.identity_type = identityType
+    if (identityNumberChanged) payload.identity_number = trimmedIdentityNumber
+
     if (roleChanged || communeChanged) {
       setConfirmPayload(payload)
     } else {
@@ -152,9 +292,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     ? selectedCommuneObj.name || selectedCommuneObj.commune_id || '-'
     : ''
 
+  const inputBaseClass =
+    'w-full px-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition'
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-white/80 backdrop-blur-2xl dark:bg-slate-900 rounded-[28px] border border-white/80 dark:border-slate-800 shadow-2xl shadow-primary/30 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white/80 backdrop-blur-2xl dark:bg-slate-900 rounded-[28px] border border-white/80 dark:border-slate-800 shadow-2xl shadow-primary/30 w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white/50 dark:bg-slate-950/50">
           <div className="flex items-center gap-3">
@@ -174,6 +317,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             disabled={isSubmitting}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
@@ -199,10 +343,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
           {/* Full Name */}
           <div>
-            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+            <label
+              htmlFor="edit-user-fullname"
+              className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+            >
               Họ và tên <span className="text-rose-500">*</span>
             </label>
             <input
+              id="edit-user-fullname"
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -218,38 +366,49 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             ) : null}
           </div>
 
-          {/* Email */}
+          {/* Email (Readonly + Đổi email) */}
           <div>
-            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Địa chỉ Email <span className="text-rose-500">*</span>
+            <label
+              htmlFor="edit-user-email"
+              className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+            >
+              Địa chỉ Email
             </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="nguyenvana@gmail.com"
-                className={`w-full pl-9 pr-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
-                  errors.email
-                    ? 'border-rose-500 focus:ring-rose-500/20'
-                    : 'border-slate-200 dark:border-slate-700 focus:ring-secondary focus:border-secondary'
-                }`}
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="edit-user-email"
+                  type="text"
+                  readOnly
+                  disabled
+                  value={user.email || '-'}
+                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 cursor-not-allowed truncate"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={isSubmitting || isChangingEmail}
+                onClick={() => setIsChangeEmailOpen(true)}
+                className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer shrink-0 disabled:opacity-50"
+              >
+                Đổi email
+              </button>
             </div>
-            {errors.email ? (
-              <p className="text-rose-500 mt-1 text-[11px]">{errors.email}</p>
-            ) : null}
           </div>
 
           {/* Role */}
           <div>
-            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+            <label
+              htmlFor="edit-user-role"
+              className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+            >
               Vai trò <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <Shield className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
+                id="edit-user-role"
                 disabled={isSelf}
                 aria-describedby={isSelf ? 'self-role-hint' : undefined}
                 value={role}
@@ -358,6 +517,160 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             </div>
           )}
 
+          {/* Thông tin hồ sơ cá nhân */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="font-bold text-slate-600 dark:text-slate-400">Thông tin hồ sơ</div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="edit-user-dob"
+                  className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+                >
+                  Ngày sinh
+                </label>
+                <input
+                  id="edit-user-dob"
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  className={inputBaseClass}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-user-gender"
+                  className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+                >
+                  Giới tính
+                </label>
+                <select
+                  id="edit-user-gender"
+                  value={gender}
+                  onChange={(e) =>
+                    setGender(e.target.value as NonNullable<UpdateUserRequest['gender']> | '')
+                  }
+                  className={`${inputBaseClass} cursor-pointer`}
+                >
+                  <option value="" className="dark:bg-slate-900">
+                    -- Chọn giới tính --
+                  </option>
+                  {(
+                    Object.entries(GENDER_LABELS) as [
+                      NonNullable<UpdateUserRequest['gender']>,
+                      string,
+                    ][]
+                  ).map(([k, label]) => (
+                    <option key={k} value={k} className="dark:bg-slate-900">
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="edit-user-phone"
+                  className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+                >
+                  Số điện thoại
+                </label>
+                <input
+                  id="edit-user-phone"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    setPhoneNumber(e.target.value)
+                    if (errors.phoneNumber) {
+                      setErrors((prev) => ({ ...prev, phoneNumber: '' }))
+                    }
+                  }}
+                  placeholder="Ví dụ: 0912345678"
+                  className={`w-full px-3.5 py-2.5 bg-white/50 dark:bg-slate-800/80 border rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 transition ${
+                    errors.phoneNumber
+                      ? 'border-rose-500 focus:ring-rose-500/20'
+                      : 'border-slate-200 dark:border-slate-700 focus:ring-secondary focus:border-secondary'
+                  }`}
+                />
+                {errors.phoneNumber ? (
+                  <p className="text-rose-500 mt-1 text-[11px]">{errors.phoneNumber}</p>
+                ) : null}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-user-address"
+                  className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+                >
+                  Địa chỉ
+                </label>
+                <input
+                  id="edit-user-address"
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Nhập địa chỉ liên hệ"
+                  className={inputBaseClass}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="edit-user-identity-type"
+                  className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+                >
+                  Loại giấy tờ
+                </label>
+                <select
+                  id="edit-user-identity-type"
+                  value={identityType}
+                  onChange={(e) =>
+                    setIdentityType(
+                      e.target.value as NonNullable<UpdateUserRequest['identity_type']> | ''
+                    )
+                  }
+                  className={`${inputBaseClass} cursor-pointer`}
+                >
+                  <option value="" className="dark:bg-slate-900">
+                    -- Chọn loại giấy tờ --
+                  </option>
+                  {(
+                    Object.entries(IDENTITY_TYPE_LABELS) as [
+                      NonNullable<UpdateUserRequest['identity_type']>,
+                      string,
+                    ][]
+                  ).map(([k, label]) => (
+                    <option key={k} value={k} className="dark:bg-slate-900">
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-user-identity-number"
+                  className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5"
+                >
+                  Số giấy tờ
+                </label>
+                <input
+                  id="edit-user-identity-number"
+                  type="text"
+                  value={identityNumber}
+                  onChange={(e) => setIdentityNumber(e.target.value)}
+                  placeholder="Nhập số giấy tờ"
+                  className={inputBaseClass}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Footer Buttons */}
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
             <button
@@ -388,6 +701,18 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
         </form>
       </div>
+      <ChangeEmailModal
+        isOpen={isChangeEmailOpen}
+        currentEmail={user.email}
+        username={user.username}
+        isSubmitting={isChangingEmail}
+        onClose={() => setIsChangeEmailOpen(false)}
+        onSubmit={(newEmail) => {
+          if (user.user_id && onChangeEmail) {
+            onChangeEmail(user.user_id, newEmail)
+          }
+        }}
+      />
       {confirmPayload && (
         <ConfirmModal
           title="Xác nhận thay đổi quyền?"
@@ -413,7 +738,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               <tbody>
                 {changes.map((change) => (
                   <tr key={change.label} className="border-t border-slate-200">
-                    <th scope="row" className="py-2 pr-2">{change.label}</th>
+                    <th scope="row" className="py-2 pr-2">
+                      {change.label}
+                    </th>
                     <td className="py-2 break-words">{change.old}</td>
                     <td className="px-2">→</td>
                     <td className="py-2 break-words">{change.next}</td>

@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { AuthState, LoginRequest, GoogleLoginRequest } from '../../types/auth/web'
 import type { CurrentUserResponse } from '../../types/auth/me'
+import type { UserAccountItem } from '../../types/admin/users'
 
 // Khi ứng dụng khởi chạy, mặc định loading = true để thực hiện Silent Refresh kiểm tra phiên cookie
 const initialState: AuthState = {
@@ -71,6 +72,18 @@ const authSlice = createSlice({
     setAvatarUrl: (state, action: PayloadAction<string | null>) => {
       if (state.user) state.user.avatar_url = action.payload
     },
+    updateCurrentUserProfile: (state, action: PayloadAction<UserAccountItem>) => {
+      if (!state.user) return
+      const payload = action.payload
+      if (payload.email !== undefined) state.user.email = payload.email
+      if (payload.full_name !== undefined) state.user.full_name = payload.full_name
+      if (payload.date_of_birth !== undefined) state.user.date_of_birth = payload.date_of_birth
+      if (payload.gender !== undefined) state.user.gender = payload.gender
+      if (payload.address !== undefined) state.user.address = payload.address
+      if (payload.phone_number !== undefined) state.user.phone_number = payload.phone_number
+      if (payload.identity_type !== undefined) state.user.identity_type = payload.identity_type
+      if (payload.identity_number !== undefined) state.user.identity_number = payload.identity_number
+    },
   },
 })
 
@@ -87,6 +100,7 @@ export const {
   refreshProfileSuccess,
   refreshProfileFailure,
   setAvatarUrl,
+  updateCurrentUserProfile,
 } = authSlice.actions
 
 export default authSlice.reducer
