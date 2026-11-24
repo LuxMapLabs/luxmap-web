@@ -90,7 +90,7 @@ describe('passwordSaga - changePassword', () => {
     vi.clearAllMocks()
   })
 
-  it('thành công thì dispatch changePasswordSuccess, toast và không logout', async () => {
+  it('thành công thì dispatch changePasswordSuccess, toast và logout', async () => {
     const spy = vi.spyOn(passwordAPI, 'changePassword').mockResolvedValue(undefined)
     const store = makeSagaStore({
       reducers: {
@@ -112,8 +112,10 @@ describe('passwordSaga - changePassword', () => {
       })
       expect(state.password.isChanging).toBe(false)
       expect(state.password.changeSuccess).toBe(true)
-      expect(state.loggedOut).toBe(false)
-      expect(toast.success).toHaveBeenCalledWith('Đổi mật khẩu thành công.')
+      expect(state.loggedOut).toBe(true)
+      expect(toast.success).toHaveBeenCalledWith(
+        'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'
+      )
     })
   })
 

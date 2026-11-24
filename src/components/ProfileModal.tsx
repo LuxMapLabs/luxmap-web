@@ -91,9 +91,7 @@ function formatDateOfBirth(value?: string | null): string {
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, user }) => {
   const dispatch = useDispatch()
   const isAvatarSubmitting = useSelector((state: RootState) => state.avatar.isSubmitting)
-  const { isChanging, changeSuccess, changeError } = useSelector(
-    (state: RootState) => state.password
-  )
+  const { isChanging, changeError } = useSelector((state: RootState) => state.password)
   const { isSubmitting: isAdminUserSubmitting, actionError: adminUserActionError } = useSelector(
     (state: RootState) => state.adminUsers
   )
@@ -182,21 +180,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
     reset()
     dispatch(resetPasswordState())
   }, [isOpen, user?.user_id, dispatch, reset])
-
-  // Hoàn tất đổi mật khẩu: xoá form, ẩn mật khẩu, giữ modal mở ở tab Bảo mật và reset state
-  useEffect(() => {
-    if (!changeSuccess) return
-    reset()
-    setShowOldPassword(false)
-    setShowNewPassword(false)
-    setShowConfirmPassword(false)
-    setCapsLockActive(false)
-    const oldInput = document.getElementById('profile-old-password')
-    if (oldInput instanceof HTMLInputElement) {
-      oldInput.focus()
-    }
-    dispatch(resetPasswordState())
-  }, [changeSuccess, reset, dispatch])
 
   // Hoàn tất lưu hồ sơ: thành công thì thoát chế độ sửa, lỗi giữ nguyên form để chỉnh lại
   useEffect(() => {
@@ -1396,9 +1379,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, use
                   </PasswordRuleItem>
                 </ul>
 
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Sau khi đổi, các thiết bị khác có thể phải đăng nhập lại bằng mật khẩu mới.
-                </p>
+                <div
+                  role="note"
+                  className="flex items-start gap-2.5 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3.5 py-3 text-sm text-amber-800 dark:text-amber-200"
+                >
+                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <p className="leading-relaxed">
+                    Sau khi đổi mật khẩu, bạn sẽ bị đăng xuất khỏi mọi thiết bị và cần đăng nhập lại
+                    bằng mật khẩu mới.
+                  </p>
+                </div>
               </form>
             </div>
           )}

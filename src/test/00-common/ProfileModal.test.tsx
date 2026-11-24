@@ -15,7 +15,7 @@ import { ProfileModal } from '../../components/ProfileModal'
 import { convertToJpeg, fitWithin } from '../../utils/imageUtils'
 import type { CurrentUserResponse } from '../../types/auth/me'
 import { avatarSubmitDone, removeAvatarRequest } from '../../feature/avatar/avatarSlice'
-import { changePasswordRequest, changePasswordSuccess } from '../../feature/password/passwordSlice'
+import { changePasswordRequest } from '../../feature/password/passwordSlice'
 import {
   changeUserEmailRequest,
   changeUserEmailSuccess,
@@ -239,9 +239,9 @@ describe('ProfileModal', () => {
     expect(oldInput).toHaveAttribute('autocomplete', 'current-password')
     expect(newInput).toHaveAttribute('autocomplete', 'new-password')
     expect(confirmInput).toHaveAttribute('autocomplete', 'new-password')
-    expect(
-      screen.getByText('Sau khi đổi, các thiết bị khác có thể phải đăng nhập lại bằng mật khẩu mới.')
-    ).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'Sau khi đổi mật khẩu, bạn sẽ bị đăng xuất khỏi mọi thiết bị và cần đăng nhập lại bằng mật khẩu mới.'
+    )
 
     // 1. Thiếu mật khẩu hiện tại
     fireEvent.change(newInput, { target: { value: 'mat-khau-moi-123' } })
@@ -590,32 +590,6 @@ describe('ProfileModal', () => {
     expect(
       screen.getByText('Khuyến nghị: chữ hoa, chữ thường, số và ký tự đặc biệt')
     ).toBeInTheDocument()
-  })
-
-  it('clears password form and keeps modal open on Bảo mật tab when changePasswordSuccess is dispatched', () => {
-    const { store, onClose } = renderModal()
-    fireEvent.click(screen.getByRole('tab', { name: 'Bảo mật' }))
-
-    const oldInput = screen.getByLabelText('Mật khẩu hiện tại')
-    const newInput = screen.getByLabelText('Mật khẩu mới')
-    const confirmInput = screen.getByLabelText('Nhập lại mật khẩu mới')
-
-    fireEvent.change(oldInput, { target: { value: 'mat-khau-cu-123' } })
-    fireEvent.change(newInput, { target: { value: 'mat-khau-moi-456' } })
-    fireEvent.change(confirmInput, { target: { value: 'mat-khau-moi-456' } })
-
-    act(() => {
-      store.dispatch(changePasswordSuccess())
-    })
-
-    expect(onClose).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog', { name: 'Hồ sơ cá nhân' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Bảo mật' })).toHaveAttribute('aria-selected', 'true')
-    expect(oldInput).toHaveValue('')
-    expect(newInput).toHaveValue('')
-    expect(confirmInput).toHaveValue('')
-    expect(oldInput).toHaveFocus()
-    expect(store.getState().password.changeSuccess).toBe(false)
   })
 })
 

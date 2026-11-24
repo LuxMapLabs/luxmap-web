@@ -11,6 +11,7 @@ import {
   changePasswordSuccess,
   changePasswordFailure,
 } from './passwordSlice'
+import { logout } from '../auth/authSlice'
 
 function getSetPasswordErrorMessage(error: unknown): string {
   const err = error as { response?: { status?: number } }
@@ -73,7 +74,8 @@ function* handleChangePassword(action: PayloadAction<ChangePasswordRequest>) {
   try {
     yield call(passwordAPI.changePassword, action.payload)
     yield put(changePasswordSuccess())
-    toast.success('Đổi mật khẩu thành công.')
+    toast.success('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.')
+    yield put(logout())
   } catch (error: unknown) {
     const message = getChangePasswordErrorMessage(error)
     // Lỗi hiển thị ngay trong form nên không bật thêm toast trùng nội dung
