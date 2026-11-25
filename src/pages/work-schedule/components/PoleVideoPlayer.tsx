@@ -8,6 +8,7 @@ interface PoleVideoPlayerProps {
   posterUrl?: string
   className?: string
   autoPlay?: boolean
+  onVideoLoaded?: (photoId: string) => void
 }
 
 /**
@@ -20,10 +21,13 @@ export const PoleVideoPlayer: React.FC<PoleVideoPlayerProps> = ({
   posterUrl,
   className = 'w-full h-full object-contain bg-black',
   autoPlay = false,
+  onVideoLoaded,
 }) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(workOrderId && photoId))
   const [hasError, setHasError] = useState<boolean>(false)
+  const onVideoLoadedRef = React.useRef(onVideoLoaded)
+  onVideoLoadedRef.current = onVideoLoaded
 
   useEffect(() => {
     if (!workOrderId || !photoId) {
@@ -44,6 +48,7 @@ export const PoleVideoPlayer: React.FC<PoleVideoPlayerProps> = ({
         if (isMounted) {
           createdUrl = url
           setBlobUrl(url)
+          onVideoLoadedRef.current?.(photoId)
         } else {
           URL.revokeObjectURL(url)
         }

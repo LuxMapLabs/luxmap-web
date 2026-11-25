@@ -404,7 +404,7 @@ export const WorkSchedulePage: React.FC = () => {
       selectedCase?.phases[selectedCase.currentPhaseIndex]
     const effectiveParentWorkOrderId = workOrderId || currentPhase?.workOrderId || effectiveCaseCode
     const effectivePoleIds =
-      poleIds && poleIds.length > 0
+      poleIds !== undefined
         ? poleIds
         : selectedCase?.poleIds ||
           currentPhase?.poleIds ||
@@ -740,7 +740,14 @@ export const WorkSchedulePage: React.FC = () => {
         caseCode={nextPhaseContext?.caseCode || selectedCaseCode || ''}
         caseTitle={selectedCase?.title || ''}
         segment={nextPhaseContext?.segment || selectedCase?.segment || ''}
-        faults={workOrderDetail?.faults || []}
+        faults={
+          (nextPhaseContext?.targetNextPhaseType || targetNextPhaseType) === 'repair' &&
+          (workOrderDetail?.faults || []).some((f) => Boolean(f.inspection_outcome))
+            ? (workOrderDetail?.faults || []).filter(
+                (f) => f.inspection_outcome === 'fault_present'
+              )
+            : workOrderDetail?.faults || []
+        }
         defaultPoleIds={
           nextPhaseContext?.poleIds && nextPhaseContext.poleIds.length > 0
             ? nextPhaseContext.poleIds

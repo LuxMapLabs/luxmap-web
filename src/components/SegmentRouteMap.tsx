@@ -40,6 +40,10 @@ export interface SegmentRouteMapProps {
   communeBbox?: CommuneBbox | null
   editablePoleIds?: string[]
   invalidPoleIds?: string[]
+  /** Thứ tự các cột báo cáo để luôn hiển thị nhãn #1, #2... trên bản đồ kể cả khi đang khóa ở bước khác */
+  orderedReportPoleIds?: string[]
+  /** Callback khi người dùng bấm vào ghim cột báo cáo đang khóa trên bản đồ để chuyển nhanh sang bước chỉnh cột đó */
+  onSelectPoleStep?: (poleId: string) => void
   onPoleLocationChange?: (poleId: string, lng: number, lat: number) => void
 }
 
@@ -140,22 +144,31 @@ const createTerminalPinElement = (isStart: boolean, label: string) => {
   return el
 }
 
-// Ghim cột đèn cho phép Quản lý giữ chuột kéo thả để tinh chỉnh vị trí trên ảnh vệ tinh
-const createDraggablePoleMarkerElement = (label: string, isInvalid: boolean) => {
+// Ghim cột đèn cho phép Quản lý giữ chuột kéo thả để tinh chỉnh vị trí trên ảnh vệ tinh (hoặc hiển thị nhãn thứ tự bước khi khóa)
+const createDraggablePoleMarkerElement = (
+  label: string,
+  isInvalid: boolean,
+  isEditable = true,
+  stepNumber?: number
+) => {
   const el = document.createElement('div')
   el.className = 'segment-draggable-pole-pin'
   el.style.display = 'flex'
   el.style.flexDirection = 'column'
   el.style.alignItems = 'center'
   el.style.pointerEvents = 'auto'
-  el.style.zIndex = '48'
+  el.style.zIndex = isEditable ? '48' : '44'
   el.style.userSelect = 'none'
-  el.style.cursor = 'grab'
-  el.title = `Cột ${label} — Giữ chuột và kéo để điều chỉnh tọa độ GPS`
+  el.style.cursor = isEditable ? 'grab' : 'pointer'
+  const prefix = stepNumber != null ? `#${stepNumber} ` : ''
+  el.title = isEditable
+    ? `Cột ${prefix}${label} — Giữ chuột và kéo để điều chỉnh tọa độ GPS`
+    : `Cột ${prefix}${label} — Bấm để chọn chỉnh sửa cột này`
 
-  const badgeBg = isInvalid ? '#e11d48' : '#7c3aed'
-  const dotBg = isInvalid ? '#fb7185' : '#fde047'
-  const dotBorder = isInvalid ? '#881337' : '#4c1d95'
+  const badgeBg = isInvalid ? '#e11d48' : isEditable ? '#7c3aed' : '#334155'
+  const dotBg = isInvalid ? '#fb7185' : isEditable ? '#fde047' : '#e2e8f0'
+  const dotBorder = isInvalid ? '#881337' : isEditable ? '#4c1d95' : '#1e293b'
+  const badgePrefix = isEditable ? `✥ ${prefix}` : prefix
 
   el.innerHTML = `
     <div class="draggable-pole-badge" style="
@@ -174,7 +187,7 @@ const createDraggablePoleMarkerElement = (label: string, isInvalid: boolean) => 
       white-space: nowrap;
       transform: translateY(-2px);
     ">
-      <span>✥ ${label}</span>
+      <span class="draggable-pole-text">${badgePrefix}${label}</span>
     </div>
     <div class="draggable-pole-arrow" style="
       width: 0;
@@ -228,6 +241,8 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   communeBbox,
   editablePoleIds = [],
   invalidPoleIds = [],
+  orderedReportPoleIds = [],
+  onSelectPoleStep,
   onPoleLocationChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -236,11 +251,23 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
   const startMarkerRef = useRef<maplibregl.Marker | null>(null)
   const endMarkerRef = useRef<maplibregl.Marker | null>(null)
   const vertexMarkersRef = useRef<maplibregl.Marker[]>([])
-  const draggablePoleMarkersRef = useRef<Map<string, { marker: maplibregl.Marker; isInvalid: boolean }>>(new Map())
+  const draggablePoleMarkersRef = useRef<
+    Map<
+      string,
+      {
+        marker: maplibregl.Marker
+        isInvalid: boolean
+        isEditable: boolean
+        stepNumber?: number
+      }
+    >
+  >(new Map())
   const draggingPoleIdRef = useRef<string | null>(null)
   const currentCoordsRef = useRef<[number, number][]>([])
   const onPoleLocationChangeRef = useRef(onPoleLocationChange)
   onPoleLocationChangeRef.current = onPoleLocationChange
+  const onSelectPoleStepRef = useRef(onSelectPoleStep)
+  onSelectPoleStepRef.current = onSelectPoleStep
 
   const currentUser = useSelector((state: RootState) => state?.auth?.user)
   const mapBounds = currentUser?.map_bounds
@@ -526,7 +553,7 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
 
       loadedRef.current = true
       renderRoute(route)
-      syncEditableMarkers(polesRef.current, editablePoleIds, invalidPoleIds)
+      syncEditableMarkers(polesRef.current, editablePoleIds, invalidPoleIds, orderedReportPoleIds)
 
       const b = getBounds()
       if (b) map.fitBounds(b, ROUTE_FIT_SMOOTH)
@@ -565,9 +592,14 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Đồng bộ các ghim cột cho phép kéo thả tinh chỉnh vị trí
+  // Đồng bộ các ghim cột cho phép kéo thả tinh chỉnh vị trí (và các ghim cột báo cáo theo thứ tự bước)
   const syncEditableMarkers = useCallback(
-    (currentPoles: SegmentPoleItem[], editableIds: string[], invalidIds: string[]) => {
+    (
+      currentPoles: SegmentPoleItem[],
+      editableIds: string[],
+      invalidIds: string[],
+      orderedReportIds: string[] = []
+    ) => {
       const map = mapRef.current
       if (!map || !loadedRef.current) return
 
@@ -584,10 +616,18 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
 
       const editableSet = new Set(editableIds)
       const invalidSet = new Set(invalidIds)
-      const activeEditablePoles = validPoles.filter((p) => editableSet.has(p.id))
-      const activeIds = new Set(activeEditablePoles.map((p) => p.id))
+      const orderedIndexMap = new Map<string, number>()
+      orderedReportIds.forEach((id, idx) => {
+        orderedIndexMap.set(id, idx + 1)
+      })
 
-      // Gỡ bỏ các marker không còn nằm trong danh sách editable
+      // Hiển thị ghim cho mọi cột nằm trong editableIds HOẶC trong orderedReportIds
+      const activePinPoles = validPoles.filter(
+        (p) => editableSet.has(p.id) || orderedIndexMap.has(p.id)
+      )
+      const activeIds = new Set(activePinPoles.map((p) => p.id))
+
+      // Gỡ bỏ các marker không còn nằm trong danh sách hiển thị
       Array.from(draggablePoleMarkersRef.current.entries()).forEach(([id, entry]) => {
         if (!activeIds.has(id)) {
           entry.marker.remove()
@@ -595,32 +635,60 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
         }
       })
 
-      activeEditablePoles.forEach((p) => {
+      activePinPoles.forEach((p) => {
         const isInvalid = invalidSet.has(p.id)
+        const isEditable = editableSet.has(p.id)
+        const stepNumber = orderedReportIds.length >= 2 ? orderedIndexMap.get(p.id) : undefined
+        const label = p.code || p.id
         const currentEntry = draggablePoleMarkersRef.current.get(p.id)
+
         if (currentEntry) {
           if (draggingPoleIdRef.current !== p.id) {
             currentEntry.marker.setLngLat(p.coord)
           }
-          // Cập nhật trực tiếp màu sắc trên DOM của ghim mà không bao giờ xóa/tạo lại marker
-          if (currentEntry.isInvalid !== isInvalid) {
+          if (currentEntry.isEditable !== isEditable) {
+            currentEntry.marker.setDraggable(isEditable)
+          }
+          if (
+            currentEntry.isInvalid !== isInvalid ||
+            currentEntry.isEditable !== isEditable ||
+            currentEntry.stepNumber !== stepNumber
+          ) {
             const el = currentEntry.marker.getElement()
+            el.style.zIndex = isEditable ? '48' : '44'
+            el.style.cursor = isEditable ? 'grab' : 'pointer'
+            const prefix = stepNumber != null ? `#${stepNumber} ` : ''
+            el.title = isEditable
+              ? `Cột ${prefix}${label} — Giữ chuột và kéo để điều chỉnh tọa độ GPS`
+              : `Cột ${prefix}${label} — Bấm để chọn chỉnh sửa cột này`
+
             const badge = el.querySelector('.draggable-pole-badge') as HTMLElement | null
+            const textSpan = el.querySelector('.draggable-pole-text') as HTMLElement | null
             const arrow = el.querySelector('.draggable-pole-arrow') as HTMLElement | null
             const dot = el.querySelector('.draggable-pole-dot') as HTMLElement | null
-            if (badge) badge.style.background = isInvalid ? '#e11d48' : '#7c3aed'
-            if (arrow) arrow.style.borderTopColor = isInvalid ? '#e11d48' : '#7c3aed'
+            const badgeBg = isInvalid ? '#e11d48' : isEditable ? '#7c3aed' : '#334155'
+            if (badge) badge.style.background = badgeBg
+            if (arrow) arrow.style.borderTopColor = badgeBg
+            if (textSpan) {
+              textSpan.textContent = `${isEditable ? `✥ ${prefix}` : prefix}${label}`
+            }
             if (dot) {
-              dot.style.background = isInvalid ? '#fb7185' : '#fde047'
-              dot.style.borderColor = isInvalid ? '#881337' : '#4c1d95'
+              dot.style.background = isInvalid ? '#fb7185' : isEditable ? '#fde047' : '#e2e8f0'
+              dot.style.borderColor = isInvalid ? '#881337' : isEditable ? '#4c1d95' : '#1e293b'
             }
             currentEntry.isInvalid = isInvalid
+            currentEntry.isEditable = isEditable
+            currentEntry.stepNumber = stepNumber
           }
         } else {
-          const el = createDraggablePoleMarkerElement(p.code || p.id, isInvalid)
+          const el = createDraggablePoleMarkerElement(label, isInvalid, isEditable, stepNumber)
+          el.addEventListener('click', (e) => {
+            e.stopPropagation()
+            onSelectPoleStepRef.current?.(p.id)
+          })
           const marker = new maplibregl.Marker({
             element: el,
-            draggable: true,
+            draggable: isEditable,
             anchor: 'bottom',
           })
             .setLngLat(p.coord)
@@ -655,7 +723,12 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
             renderRoute(currentCoordsRef.current)
           })
 
-          draggablePoleMarkersRef.current.set(p.id, { marker, isInvalid })
+          draggablePoleMarkersRef.current.set(p.id, {
+            marker,
+            isInvalid,
+            isEditable,
+            stepNumber,
+          })
         }
       })
     },
@@ -664,8 +737,8 @@ export const SegmentRouteMap: React.FC<SegmentRouteMapProps> = ({
 
   // Cập nhật các ghim cột khi danh sách cột hoặc trạng thái hợp lệ thay đổi
   useEffect(() => {
-    syncEditableMarkers(poles, editablePoleIds, invalidPoleIds)
-  }, [poles, editablePoleIds, invalidPoleIds, syncEditableMarkers])
+    syncEditableMarkers(poles, editablePoleIds, invalidPoleIds, orderedReportPoleIds)
+  }, [poles, editablePoleIds, invalidPoleIds, orderedReportPoleIds, syncEditableMarkers])
 
   // Cập nhật khung ranh giới xã khi đổi địa bàn
   useEffect(() => {

@@ -167,7 +167,7 @@ export function mapWorkOrdersToScheduleCases(
       segmentId: raw.segment_id || undefined,
       qrPdfFiles: rawAttachments,
       returnReason:
-        isPoleGpsUpdate && woStatus !== 'done' && woStatus !== 'verified' && raw.review_note
+        woStatus !== 'done' && woStatus !== 'verified' && raw.review_note
           ? raw.review_note
           : undefined,
       cancellationRequest:

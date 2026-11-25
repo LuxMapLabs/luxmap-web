@@ -13,6 +13,11 @@ import {
   Cpu,
   RotateCcw,
   Save,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDispatch, useSelector } from 'react-redux'
@@ -51,6 +56,7 @@ import { PolePhotoImage } from './PolePhotoImage'
 import { PoleVideoPlayer } from './PoleVideoPlayer'
 
 const BACKEND_CORRIDOR_LIMIT_M = 25
+const MIN_POLE_CLEARANCE_M = 2
 
 const formatDurationMs = (ms?: number): string => {
   if (ms == null || ms <= 0) return '—'
@@ -105,6 +111,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   // State cho Popup Xem & Tinh chỉnh GIS (Dữ liệu tạm trước khi Duyệt báo cáo)
   const [isGisPreviewOpen, setIsGisPreviewOpen] = useState(false)
   const [draftPoleCoords, setDraftPoleCoords] = useState<Record<string, SetPoleLocationRequest>>({})
+  const [orderedReportPoleIds, setOrderedReportPoleIds] = useState<string[]>([])
+  const [activeStepIndex, setActiveStepIndex] = useState<number>(0)
+  const [isSequentialStepMode, setIsSequentialStepMode] = useState<boolean>(true)
 
   const handleDecidePolePhoto = async (
     photoId: string | null | undefined,
@@ -151,6 +160,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const allAssetPoles = useSelector((state: RootState) => state.assets.poles)
   const segmentDetail = useSelector((state: RootState) => state.assets.segmentDetail)
   const editedGpsByWorkOrder = useSelector((state: RootState) => state.workSchedule.editedGpsByWorkOrder)
+  const orderedGpsPolesByWorkOrder = useSelector(
+    (state: RootState) => state.workSchedule.orderedGpsPolesByWorkOrder
+  )
 
   // Xác định mã lệnh công tác (hỗ trợ fallback caseItem.code nếu phase.workOrderId trống)
   const targetWorkOrderId = phase?.workOrderId || caseItem?.code
@@ -158,6 +170,10 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const savedEditedGps = useMemo(
     () => (targetWorkOrderId ? editedGpsByWorkOrder?.[targetWorkOrderId] || {} : {}),
     [editedGpsByWorkOrder, targetWorkOrderId]
+  )
+  const savedOrderedPoleIds = useMemo(
+    () => (targetWorkOrderId ? orderedGpsPolesByWorkOrder?.[targetWorkOrderId] || [] : []),
+    [orderedGpsPolesByWorkOrder, targetWorkOrderId]
   )
 
   const effectivePoleGpsLocations: WorkOrderPoleLocation[] = useMemo(() => {
@@ -296,7 +312,196 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
     )
   }, [targetSegmentId, allAssetPoles, effectivePoleGpsLocations, draftPoleCoords, canEditGps, poles])
 
-  // Kiểm tra các quy tắc Validate của Backend (Tiếng Việt ngắn gọn) theo thời gian thực khi Quản lý kéo thả
+  // Danh sách các cột trong báo cáo đã sắp theo thứ tự tuần tự mà Quản lý chọn
+  const effectiveOrderedPoleIds = useMemo<string[]>(() => {
+    const reportedIds = effectivePoleGpsLocations
+      .map((g) => g.pole_id)
+      .filter((id): id is string => Boolean(id))
+    if (reportedIds.length <= 1) return reportedIds
+
+    const baseOrder =
+      orderedReportPoleIds.length > 0
+        ? orderedReportPoleIds
+        : savedOrderedPoleIds.length > 0
+        ? savedOrderedPoleIds
+        : []
+
+    if (baseOrder.length > 0) {
+      const reportedSet = new Set(reportedIds)
+      const validFromBase = baseOrder.filter((id) => reportedSet.has(id))
+      const remaining = reportedIds.filter((id) => !validFromBase.includes(id))
+      return [...validFromBase, ...remaining]
+    }
+
+    return reportedIds
+  }, [effectivePoleGpsLocations, orderedReportPoleIds, savedOrderedPoleIds])
+
+  // Dựng đường nối lộ trình cho bản đồ Popup Xem GIS theo đúng thứ tự tuần tự từng cột (Bước 1 -> Bước 2 -> ...)
+  const previewRouteInfo = useMemo(() => {
+    const reportedSet = new Set(effectiveOrderedPoleIds)
+    const previousPoles: OrderedPole[] = targetSegmentId
+      ? orderedPolesOfSegment(allAssetPoles, targetSegmentId)
+      : []
+
+    interface RouteNode {
+      id?: string
+      coord: [number, number]
+    }
+
+    // 1. Khởi tạo các đỉnh từ đường tuyến gốc hoặc các cột cũ đã có trên tuyến (trừ các cột đang cập nhật trong báo cáo này)
+    let nodes: RouteNode[] = []
+    if (roadPolylineCoords.length >= 2) {
+      const usedPrevIds = new Set<string>()
+      nodes = roadPolylineCoords.map((vertex) => {
+        const matchedPrev = previousPoles.find(
+          (p) =>
+            !usedPrevIds.has(p.id) &&
+            calculateDistanceMeters(p.coord, vertex) <= VERTEX_MATCH_METERS
+        )
+        if (matchedPrev) {
+          usedPrevIds.add(matchedPrev.id)
+          return { id: matchedPrev.id, coord: vertex }
+        }
+        return { coord: vertex }
+      })
+      // Gỡ đỉnh cũ của các cột nằm trong báo cáo để chèn/nối lại tuần tự theo tọa độ mới
+      nodes = nodes.filter((n) => !n.id || !reportedSet.has(n.id))
+    } else {
+      const staticPoles = previewMapPoles.filter((p) => !reportedSet.has(p.id))
+      if (staticPoles.length >= 2) {
+        nodes = orderPolesByChain(staticPoles.map((p) => ({ id: p.id, coord: p.coord }))).map(
+          (p) => ({ id: p.id, coord: p.coord })
+        )
+      } else if (staticPoles.length === 1) {
+        nodes = [{ id: staticPoles[0].id, coord: staticPoles[0].coord }]
+      }
+    }
+
+    // Lưu lại các đoạn tuyến theo từng bước tuần tự để validate hành lang cho từng cột mà không ép các cột dính vào nhau
+    const stepPolylinesByPoleId: Record<string, [number, number][]> = {}
+    let chainDir: -1 | 1 = 1
+
+    // 2. Lần lượt đưa từng cột trong báo cáo vào tuyến theo đúng thứ tự tuần tự (Bước 1 -> Bước 2 -> ...)
+    effectiveOrderedPoleIds.forEach((poleId, stepIdx) => {
+      const pole = previewMapPoles.find((p) => p.id === poleId)
+      if (!pole) return
+
+      if (nodes.length === 0) {
+        nodes = [{ id: pole.id, coord: pole.coord }]
+      } else if (nodes.length === 1) {
+        nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+        chainDir = 1
+      } else {
+        // Nếu là cột tiếp theo trong chuỗi tuần tự (stepIdx > 0), luôn nối trực tiếp ngay cạnh cột vừa cập nhật ở bước trước đó (prevNodeIdx)
+        // để khi Quản lý đổi thứ tự #1 -> #2 -> #3 (kể cả ở đầu, cuối hay giữa tuyến) thì đường nối luôn đi đúng theo thứ tự đã chọn.
+        const prevStepPoleId = stepIdx > 0 ? effectiveOrderedPoleIds[stepIdx - 1] : null
+        const prevNodeIdx = prevStepPoleId ? nodes.findIndex((n) => n.id === prevStepPoleId) : -1
+
+        if (prevNodeIdx !== -1) {
+          if (stepIdx === 1) {
+            if (prevNodeIdx === nodes.length - 1) {
+              chainDir = 1
+            } else if (prevNodeIdx === 0) {
+              chainDir = -1
+            } else {
+              const prevPt = nodes[prevNodeIdx - 1].coord
+              const nextPt = nodes[prevNodeIdx + 1].coord
+              const costAfter =
+                calculateDistanceMeters(nodes[prevNodeIdx].coord, pole.coord) +
+                calculateDistanceMeters(pole.coord, nextPt) -
+                calculateDistanceMeters(nodes[prevNodeIdx].coord, nextPt)
+              const costBefore =
+                calculateDistanceMeters(prevPt, pole.coord) +
+                calculateDistanceMeters(pole.coord, nodes[prevNodeIdx].coord) -
+                calculateDistanceMeters(prevPt, nodes[prevNodeIdx].coord)
+              chainDir = costBefore < costAfter ? -1 : 1
+            }
+          }
+
+          if (chainDir === -1) {
+            nodes = [
+              ...nodes.slice(0, prevNodeIdx),
+              { id: pole.id, coord: pole.coord },
+              ...nodes.slice(prevNodeIdx),
+            ]
+          } else {
+            nodes = [
+              ...nodes.slice(0, prevNodeIdx + 1),
+              { id: pole.id, coord: pole.coord },
+              ...nodes.slice(prevNodeIdx + 1),
+            ]
+          }
+        } else {
+          let bestIdx = 0
+          let bestT = 0
+          let bestDist = Infinity
+          for (let i = 0; i < nodes.length - 1; i++) {
+            const proj = projectPointOnSegment(pole.coord, nodes[i].coord, nodes[i + 1].coord)
+            if (proj.dist < bestDist) {
+              bestDist = proj.dist
+              bestIdx = i
+              bestT = proj.t
+            }
+          }
+
+          const lastEdgeIdx = nodes.length - 2
+          const dStart = calculateDistanceMeters(pole.coord, nodes[0].coord)
+          const dEnd = calculateDistanceMeters(pole.coord, nodes[nodes.length - 1].coord)
+
+          if (bestIdx === 0 && bestT <= 0) {
+            nodes = [{ id: pole.id, coord: pole.coord }, ...nodes]
+            chainDir = -1
+          } else if (bestIdx === lastEdgeIdx && bestT >= 1) {
+            nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+            chainDir = 1
+          } else if (bestDist > BACKEND_CORRIDOR_LIMIT_M && (dStart <= dEnd ? bestIdx === 0 : bestIdx === lastEdgeIdx)) {
+            // Khi cột nằm ngoài hành lang 25m ở phía kéo dài đầu/cuối tuyến: tự động nối dài tuyến tới cột đó
+            if (dStart < dEnd) {
+              nodes = [{ id: pole.id, coord: pole.coord }, ...nodes]
+              chainDir = -1
+            } else {
+              nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+              chainDir = 1
+            }
+          } else {
+            nodes = [
+              ...nodes.slice(0, bestIdx + 1),
+              { id: pole.id, coord: pole.coord },
+              ...nodes.slice(bestIdx + 1),
+            ]
+            chainDir = 1
+          }
+        }
+      }
+
+      stepPolylinesByPoleId[poleId] = nodes.map((n) => n.coord)
+    })
+
+    const coords = nodes.map((n) => n.coord)
+    if (coords.length >= 2) {
+      return {
+        initialStart: coords[0],
+        initialEnd: coords[coords.length - 1],
+        initialCoords: coords,
+        stepPolylinesByPoleId,
+      }
+    }
+
+    const fallback = extractSegmentCoordinates(matchedSegment || {}, previewMapPoles)
+    return {
+      ...fallback,
+      stepPolylinesByPoleId,
+    }
+  }, [
+    effectiveOrderedPoleIds,
+    targetSegmentId,
+    allAssetPoles,
+    roadPolylineCoords,
+    previewMapPoles,
+    matchedSegment,
+  ])
+
+  // Kiểm tra các quy tắc Validate hợp lý theo thứ tự cập nhật từng cột (chống dính cột & kiểm tra trên tuyến đã nối tuần tự)
   const poleValidations = useMemo(() => {
     const result: Record<
       string,
@@ -304,11 +509,12 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
         isModified: boolean
         movedMeters: number
         distToRoadMeters: number | null
+        nearestPoleDistMeters: number | null
         errorVn: string | null
       }
     > = {}
 
-    const hasFixedRoadGeometry = Boolean(matchedSegment?.has_geometry && roadPolylineCoords.length >= 2)
+    const hasGeometryOnMap = (previewRouteInfo.initialCoords?.length || 0) >= 2
 
     effectivePoleGpsLocations.forEach((g) => {
       const pid = g.pole_id
@@ -335,6 +541,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           : 0
 
       let distToRoadMeters: number | null = null
+      let nearestPoleDistMeters: number | null = null
       let errorVn: string | null = null
 
       if (
@@ -349,8 +556,15 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
       ) {
         errorVn = `Cột ${pid}: tọa độ không hợp lệ`
       } else {
-        if (hasFixedRoadGeometry) {
-          const snap = snapPointToPolyline([curLng, curLat], roadPolylineCoords)
+        // 1. Đo khoảng cách tới đường tuyến đã được nối tuần tự theo thứ tự cột (tuyệt đối không ép tất cả cột mới vào đoạn đường ngắn cũ)
+        const polylineForPole =
+          previewRouteInfo.stepPolylinesByPoleId?.[pid] &&
+          previewRouteInfo.stepPolylinesByPoleId[pid].length >= 2
+            ? previewRouteInfo.stepPolylinesByPoleId[pid]
+            : previewRouteInfo.initialCoords || []
+
+        if (hasGeometryOnMap && polylineForPole.length >= 2) {
+          const snap = snapPointToPolyline([curLng, curLat], polylineForPole)
           distToRoadMeters = snap.distMeters
           if (distToRoadMeters > BACKEND_CORRIDOR_LIMIT_M) {
             errorVn = `Cột ${pid} cách tuyến ${distToRoadMeters.toLocaleString('vi-VN', {
@@ -359,16 +573,28 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           }
         }
 
-        // Kiểm tra trùng vị trí với cột khác trên tuyến (< 0.5m)
-        if (!errorVn) {
-          const collidingPole = previewMapPoles.find(
-            (other) =>
-              other.id !== pid &&
-              calculateDistanceMeters([curLng, curLat], other.coord) < 0.5
-          )
-          if (collidingPole) {
-            errorVn = `Cột ${pid} trùng vị trí với cột ${collidingPole.code || collidingPole.id}`
+        // 2. Kiểm tra khoảng cách tối thiểu giữa các cột trên tuyến để chống các cột bị dính vào nhau (< 2m)
+        let minOtherDist = Infinity
+        let collidingPole: SegmentPoleItem | undefined
+        for (const other of previewMapPoles) {
+          if (other.id === pid) continue
+          const d = calculateDistanceMeters([curLng, curLat], other.coord)
+          if (d < minOtherDist) {
+            minOtherDist = d
           }
+          if (d < MIN_POLE_CLEARANCE_M && !collidingPole) {
+            collidingPole = other
+          }
+        }
+        if (Number.isFinite(minOtherDist)) {
+          nearestPoleDistMeters = minOtherDist
+        }
+        if (!errorVn && collidingPole) {
+          errorVn = `Cột ${pid} quá sát hoặc trùng vị trí với cột ${
+            collidingPole.code || collidingPole.id
+          } (${minOtherDist.toLocaleString('vi-VN', {
+            maximumFractionDigits: 1,
+          })} m < ${MIN_POLE_CLEARANCE_M} m) — các cột không được dính vào nhau`
         }
       }
 
@@ -376,124 +602,32 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
         isModified,
         movedMeters,
         distToRoadMeters,
+        nearestPoleDistMeters,
         errorVn,
       }
     })
 
     return result
-  }, [effectivePoleGpsLocations, draftPoleCoords, matchedSegment?.has_geometry, roadPolylineCoords, previewMapPoles])
-
-  // Dựng đường nối lộ trình cho bản đồ Popup Xem GIS (Luôn luôn nối thẳng đường tuyến vào mọi điểm cột được cập nhật và chạy theo khi kéo thả)
-  const previewRouteInfo = useMemo(() => {
-    const previousPoles: OrderedPole[] = targetSegmentId
-      ? orderedPolesOfSegment(allAssetPoles, targetSegmentId)
-      : []
-
-    // Nếu tuyến đã có đường hình học (roadPolylineCoords >= 2 đỉnh), gắn các đỉnh hiện có và nối trực tiếp mọi cột cập nhật vào tuyến
-    if (roadPolylineCoords.length >= 2) {
-      interface RouteNode {
-        id?: string
-        coord: [number, number]
-      }
-
-      // 1. Khởi tạo các đỉnh từ đường tuyến gốc; đỉnh nào trùng vị trí cũ của cột thì gắn poleId của cột đó
-      const usedPrevIds = new Set<string>()
-      let nodes: RouteNode[] = roadPolylineCoords.map((vertex) => {
-        const matchedPrev = previousPoles.find(
-          (p) =>
-            !usedPrevIds.has(p.id) &&
-            calculateDistanceMeters(p.coord, vertex) <= VERTEX_MATCH_METERS
-        )
-        if (matchedPrev) {
-          usedPrevIds.add(matchedPrev.id)
-          return { id: matchedPrev.id, coord: vertex }
-        }
-        return { coord: vertex }
-      })
-
-      // 2. Với mỗi cột hiển thị (đặc biệt là cột kỹ sư gửi lên / Quản lý đang kéo), cập nhật hoặc chèn thẳng vào đường tuyến
-      previewMapPoles.forEach((pole) => {
-        const existingIdx = nodes.findIndex((n) => n.id === pole.id)
-        if (existingIdx !== -1) {
-          // Gỡ đỉnh cũ của cột này ra để đặt lại theo vị trí mới (nếu kéo sang đoạn khác thì thứ tự trên tuyến tự đổi theo)
-          nodes = nodes.filter((_, idx) => idx !== existingIdx)
-        }
-
-        if (nodes.length === 0) {
-          nodes = [{ id: pole.id, coord: pole.coord }]
-          return
-        }
-        if (nodes.length === 1) {
-          nodes = [...nodes, { id: pole.id, coord: pole.coord }]
-          return
-        }
-
-        // Tìm đoạn thẳng gần nhất trên tuyến để nối điểm cột vào (đầu tuyến, cuối tuyến, hoặc chèn vào giữa tuyến)
-        let bestIdx = 0
-        let bestT = 0
-        let bestDist = Infinity
-        for (let i = 0; i < nodes.length - 1; i++) {
-          const proj = projectPointOnSegment(pole.coord, nodes[i].coord, nodes[i + 1].coord)
-          if (proj.dist < bestDist) {
-            bestDist = proj.dist
-            bestIdx = i
-            bestT = proj.t
-          }
-        }
-
-        const lastEdgeIdx = nodes.length - 2
-        if (bestIdx === 0 && bestT <= 0) {
-          nodes = [{ id: pole.id, coord: pole.coord }, ...nodes]
-        } else if (bestIdx === lastEdgeIdx && bestT >= 1) {
-          nodes = [...nodes, { id: pole.id, coord: pole.coord }]
-        } else {
-          nodes = [
-            ...nodes.slice(0, bestIdx + 1),
-            { id: pole.id, coord: pole.coord },
-            ...nodes.slice(bestIdx + 1),
-          ]
-        }
-      })
-
-      const coords = nodes.map((n) => n.coord)
-      if (coords.length >= 2) {
-        return {
-          initialStart: coords[0],
-          initialEnd: coords[coords.length - 1],
-          initialCoords: coords,
-        }
-      }
-    }
-
-    // Nếu tuyến chưa có đường hình học sẵn, tự động sắp chuỗi và nối tất cả các cột hiện có trên bản đồ
-    if (previewMapPoles.length >= 2) {
-      const ordered = orderPolesByChain(
-        previewMapPoles.map((p) => ({ id: p.id, coord: p.coord }))
-      )
-      const coords = ordered.map((item) => item.coord)
-      return {
-        initialStart: coords[0],
-        initialEnd: coords[coords.length - 1],
-        initialCoords: coords,
-      }
-    }
-
-    return extractSegmentCoordinates(matchedSegment || {}, previewMapPoles)
   }, [
-    targetSegmentId,
-    allAssetPoles,
-    roadPolylineCoords,
+    effectivePoleGpsLocations,
+    draftPoleCoords,
+    previewRouteInfo,
     previewMapPoles,
-    matchedSegment,
   ])
 
-  const editablePoleIds = useMemo(
-    () =>
-      effectivePoleGpsLocations
-        .map((g) => g.pole_id)
-        .filter((id): id is string => Boolean(id)),
-    [effectivePoleGpsLocations]
-  )
+  const activeSequentialPoleId = useMemo(() => {
+    if (effectiveOrderedPoleIds.length === 0) return null
+    const clampedIdx = Math.max(0, Math.min(activeStepIndex, effectiveOrderedPoleIds.length - 1))
+    return effectiveOrderedPoleIds[clampedIdx] || null
+  }, [effectiveOrderedPoleIds, activeStepIndex])
+
+  const editablePoleIds = useMemo(() => {
+    if (!canEditGps) return []
+    if (isSequentialStepMode && effectiveOrderedPoleIds.length >= 2 && activeSequentialPoleId) {
+      return [activeSequentialPoleId]
+    }
+    return effectiveOrderedPoleIds
+  }, [canEditGps, isSequentialStepMode, effectiveOrderedPoleIds, activeSequentialPoleId])
 
   const invalidPoleIds = useMemo(
     () => Object.entries(poleValidations).filter(([, v]) => Boolean(v.errorVn)).map(([id]) => id),
@@ -516,6 +650,19 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
       dispatch(fetchSegmentDetailRequest(targetSegmentId))
     }
     setDraftPoleCoords({ ...savedEditedGps })
+    const defaultIds = effectivePoleGpsLocations
+      .map((g) => g.pole_id)
+      .filter((id): id is string => Boolean(id))
+    if (savedOrderedPoleIds.length > 0) {
+      const setIds = new Set(defaultIds)
+      const validSaved = savedOrderedPoleIds.filter((id) => setIds.has(id))
+      const rest = defaultIds.filter((id) => !validSaved.includes(id))
+      setOrderedReportPoleIds([...validSaved, ...rest])
+    } else {
+      setOrderedReportPoleIds(defaultIds)
+    }
+    setActiveStepIndex(0)
+    setIsSequentialStepMode(defaultIds.length >= 2)
     setIsGisPreviewOpen(true)
     if (onPreviewGis && caseItem) {
       onPreviewGis({
@@ -531,10 +678,107 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
     targetSegmentId,
     segmentDetail?.segmentId,
     savedEditedGps,
+    savedOrderedPoleIds,
     onPreviewGis,
     caseItem,
     effectivePoleGpsLocations,
   ])
+
+  const handleMovePoleOrder = useCallback(
+    (index: number, direction: -1 | 1) => {
+      setOrderedReportPoleIds((prev) => {
+        const base = prev.length > 0 ? [...prev] : [...effectiveOrderedPoleIds]
+        const targetIdx = index + direction
+        if (index < 0 || index >= base.length || targetIdx < 0 || targetIdx >= base.length) {
+          return base
+        }
+        const temp = base[index]
+        base[index] = base[targetIdx]
+        base[targetIdx] = temp
+        return base
+      })
+      setActiveStepIndex((prevIdx) => {
+        if (prevIdx === index) return index + direction
+        if (prevIdx === index + direction) return index
+        return prevIdx
+      })
+    },
+    [effectiveOrderedPoleIds]
+  )
+
+  const handleAutoOrderReportPoles = useCallback(() => {
+    if (effectiveOrderedPoleIds.length < 2) return
+    const reportSet = new Set(effectiveOrderedPoleIds)
+    const reportItems = effectiveOrderedPoleIds
+      .map((id) => previewMapPoles.find((p) => p.id === id))
+      .filter((p): p is SegmentPoleItem => Boolean(p))
+    if (reportItems.length < 2) return
+
+    // Tìm điểm neo từ đường tuyến cũ hoặc cột đã có trên tuyến để nối chuỗi theo đúng chiều tuyến đường
+    const staticPoles = previewMapPoles.filter((p) => !reportSet.has(p.id))
+    let anchorCoord: [number, number] | null = null
+    if (roadPolylineCoords.length >= 2) {
+      const startPt = roadPolylineCoords[0]
+      const endPt = roadPolylineCoords[roadPolylineCoords.length - 1]
+      const minToStart = Math.min(...reportItems.map((p) => calculateDistanceMeters(p.coord, startPt)))
+      const minToEnd = Math.min(...reportItems.map((p) => calculateDistanceMeters(p.coord, endPt)))
+      anchorCoord = minToEnd <= minToStart ? endPt : startPt
+    } else if (staticPoles.length > 0) {
+      const orderedStatic = orderPolesByChain(
+        staticPoles.map((p) => ({ id: p.id, coord: p.coord }))
+      )
+      const firstStatic = orderedStatic[0].coord
+      const lastStatic = orderedStatic[orderedStatic.length - 1].coord
+      const minToFirst = Math.min(...reportItems.map((p) => calculateDistanceMeters(p.coord, firstStatic)))
+      const minToLast = Math.min(...reportItems.map((p) => calculateDistanceMeters(p.coord, lastStatic)))
+      anchorCoord = minToLast <= minToFirst ? lastStatic : firstStatic
+    }
+
+    if (anchorCoord) {
+      const remaining = [...reportItems]
+      const orderedIds: string[] = []
+      let curCoord = anchorCoord
+      while (remaining.length > 0) {
+        let bestIdx = 0
+        let bestDist = Infinity
+        remaining.forEach((p, idx) => {
+          const d = calculateDistanceMeters(curCoord, p.coord)
+          if (d < bestDist) {
+            bestDist = d
+            bestIdx = idx
+          }
+        })
+        const chosen = remaining.splice(bestIdx, 1)[0]
+        orderedIds.push(chosen.id)
+        curCoord = chosen.coord
+      }
+      setOrderedReportPoleIds(orderedIds)
+    } else {
+      const ordered = orderPolesByChain(reportItems.map((p) => ({ id: p.id, coord: p.coord })))
+      setOrderedReportPoleIds(ordered.map((p) => p.id))
+    }
+    setActiveStepIndex(0)
+    toast.success('Đã tự động sắp xếp thứ tự các cột theo chuỗi khoảng cách gần nhất!')
+  }, [effectiveOrderedPoleIds, previewMapPoles, roadPolylineCoords])
+
+  const handleResetReportPoleOrder = useCallback(() => {
+    const defaultIds = effectivePoleGpsLocations
+      .map((g) => g.pole_id)
+      .filter((id): id is string => Boolean(id))
+    setOrderedReportPoleIds(defaultIds)
+    setActiveStepIndex(0)
+    toast.info('Đã khôi phục thứ tự nối cột về mặc định ban đầu!')
+  }, [effectivePoleGpsLocations])
+
+  const handleSelectPoleStepFromMap = useCallback(
+    (poleId: string) => {
+      const idx = effectiveOrderedPoleIds.indexOf(poleId)
+      if (idx >= 0) {
+        setActiveStepIndex(idx)
+      }
+    },
+    [effectiveOrderedPoleIds]
+  )
 
   const handleDraftPoleDrag = useCallback(
     (poleId: string, newLng: number, newLat: number) => {
@@ -572,25 +816,30 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   const handleSaveDraftGps = useCallback(() => {
     if (!targetWorkOrderId) return
     if (invalidPoleIds.length > 0) {
-      toast.error('Còn vị trí cột đèn vi phạm quy tắc hành lang tuyến đường. Vui lòng kéo chỉnh lại trước khi lưu!')
+      toast.error('Còn vị trí cột đèn không hợp lệ hoặc quá sát nhau. Vui lòng kéo chỉnh lại trước khi lưu!')
       return
     }
     dispatch(
       saveEditedGpsLocations({
         workOrderId: targetWorkOrderId,
         locations: draftPoleCoords,
+        orderedPoleIds: effectiveOrderedPoleIds,
       })
     )
     const editedCount = Object.keys(draftPoleCoords).length
     if (editedCount > 0) {
       toast.success(
-        `Đã lưu tạm tọa độ tinh chỉnh của ${editedCount} cột. Khi bấm "Duyệt & Import GIS", tọa độ này sẽ được cập nhật lên Bản đồ GIS thật!`
+        `Đã lưu tạm tọa độ tinh chỉnh của ${editedCount} cột (theo thứ tự ${effectiveOrderedPoleIds.join(' → ')}). Khi bấm "Duyệt & Import GIS", dữ liệu sẽ được cập nhật lên Bản đồ GIS thật!`
+      )
+    } else if (effectiveOrderedPoleIds.length >= 2) {
+      toast.success(
+        `Đã lưu thứ tự cập nhật cột (${effectiveOrderedPoleIds.join(' → ')}). Khi bấm "Duyệt & Import GIS", các cột sẽ được nối tuần tự lên Bản đồ GIS!`
       )
     } else {
       toast.info('Đã khôi phục toàn bộ tọa độ về dữ liệu gốc của Kỹ sư hiện trường.')
     }
     setIsGisPreviewOpen(false)
-  }, [targetWorkOrderId, invalidPoleIds.length, dispatch, draftPoleCoords])
+  }, [targetWorkOrderId, invalidPoleIds.length, dispatch, draftPoleCoords, effectiveOrderedPoleIds])
 
   // Tải ảnh bằng chứng nghiệm thu và danh sách cột từ Backend nếu có mã lệnh công tác
   useEffect(() => {
@@ -619,21 +868,23 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
         })
         .catch(() => setPoles([]))
 
-      // Tải danh sách ảnh chụp từng cột đèn khảo sát thực tế từ Kỹ sư Mobile
-      workScheduleAPI
-        .getWorkOrderPolePhotos(targetWorkOrderId)
-        .then((res) => {
-          if (cancelled) return
-          const items = res.items || []
-          setPolePhotos(items)
-          if (phase?.phaseType === 'survey') {
+      // Tải danh sách ảnh chụp từng cột đèn khảo sát thực tế từ Kỹ sư Mobile (chỉ áp dụng cho giai đoạn Khảo sát)
+      if (phase?.phaseType === 'survey') {
+        workScheduleAPI
+          .getWorkOrderPolePhotos(targetWorkOrderId)
+          .then((res) => {
+            if (cancelled) return
+            const items = res.items || []
+            setPolePhotos(items)
             const hasClip = items.some((p) => Boolean(p.video && p.photo_id))
             setActiveTab(hasClip ? 'video' : items.length > 0 ? 'photos' : 'video')
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setPolePhotos([])
-        })
+          })
+          .catch(() => {
+            if (!cancelled) setPolePhotos([])
+          })
+      } else {
+        setPolePhotos([])
+      }
 
       return () => {
         cancelled = true
@@ -705,11 +956,12 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
   // Danh sách hình ảnh bằng chứng thực địa từ Backend
   const displayPhotos = backendEvidence.map((ev, idx) => ({
     evidenceId: ev.evidence_id,
+    poleId: ev.pole_id || undefined,
     src:
       ev.original_url ||
       ev.thumbnail_url ||
       workScheduleAPI.getEvidenceImageUrl(ev.evidence_id || '', 'original'),
-    title: `Ảnh ${idx + 1}: ${
+    title: `Ảnh ${idx + 1}${ev.pole_id ? ` (${ev.pole_id})` : ''}: ${
       ev.kind === 'before'
         ? 'Trước sửa chữa'
         : ev.kind === 'after'
@@ -784,22 +1036,24 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
             </button>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={() => setActiveTab('video')}
-                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-                  activeTab === 'video'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Video className="w-4 h-4" />
-                <span>
-                  {phase.phaseType === 'survey'
-                    ? `Video Quét Thực Địa (${poleVideos.length})`
-                    : `Video Tuyến (${poleVideos.length})`}
-                </span>
-              </button>
+              {(phase.phaseType === 'survey' || poleVideos.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('video')}
+                  className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+                    activeTab === 'video'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Video className="w-4 h-4" />
+                  <span>
+                    {phase.phaseType === 'survey'
+                      ? `Video Quét Thực Địa (${poleVideos.length})`
+                      : `Video Tuyến (${poleVideos.length})`}
+                  </span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -855,11 +1109,38 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <p className="text-xs text-slate-700 font-medium leading-relaxed whitespace-pre-line">
                     {effectiveReportNote}
                   </p>
-                  {Object.keys(savedEditedGps).length > 0 && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/90 border border-amber-300 text-[11px] font-bold text-amber-900">
-                      <span>
-                        ✏️ Đã lưu tạm tọa độ tinh chỉnh cho {Object.keys(savedEditedGps).length} cột (chỉ cập nhật lên GIS thật khi bấm Duyệt &amp; Import GIS)
-                      </span>
+                  {(Object.keys(savedEditedGps).length > 0 || savedOrderedPoleIds.length >= 2) && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {Object.keys(savedEditedGps).length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/90 border border-amber-300 text-[11px] font-bold text-amber-900">
+                          ✏️ Đã lưu tạm tọa độ tinh chỉnh cho {Object.keys(savedEditedGps).length} cột
+                        </span>
+                      )}
+                      {savedOrderedPoleIds.length >= 2 && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-100/90 border border-indigo-300 text-[11px] font-bold text-indigo-900 font-mono">
+                          <span>🔢 Thứ tự nối cột: {savedOrderedPoleIds.join(' → ')}</span>
+                          {canEditGps && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!targetWorkOrderId) return
+                                dispatch(
+                                  saveEditedGpsLocations({
+                                    workOrderId: targetWorkOrderId,
+                                    locations: savedEditedGps,
+                                    orderedPoleIds: [],
+                                  })
+                                )
+                                toast.info('Đã xóa thứ tự nối cột tùy chỉnh và quay về mặc định.')
+                              }}
+                              className="ml-1 px-1.5 py-0.2 rounded bg-white/80 hover:bg-white text-indigo-700 border border-indigo-300 font-sans text-[10px] font-bold cursor-pointer"
+                              title="Đặt lại thứ tự nối cột về mặc định"
+                            >
+                              Đặt lại
+                            </button>
+                          )}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -870,13 +1151,42 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                 >
                   <MapIcon className="w-3.5 h-3.5" />
                   <span>Xem GIS</span>
-                  {Object.keys(savedEditedGps).length > 0 && (
+                  {(Object.keys(savedEditedGps).length > 0 || savedOrderedPoleIds.length >= 2) && (
                     <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black">
-                      {Object.keys(savedEditedGps).length}
+                      {Object.keys(savedEditedGps).length || savedOrderedPoleIds.length}
                     </span>
                   )}
                 </button>
               </div>
+
+              {(() => {
+                const assignedGpsPoles =
+                  (isTargetDetail && workOrderDetail?.pole_ids) ||
+                  phase.poleIds ||
+                  caseItem.poleIds ||
+                  []
+                const reportedGpsSet = new Set(
+                  effectivePoleGpsLocations
+                    .map((g) => g.pole_id)
+                    .filter((id): id is string => Boolean(id))
+                )
+                const missingGpsPoles = assignedGpsPoles.filter(
+                  (pid) => !reportedGpsSet.has(pid)
+                )
+                if (missingGpsPoles.length === 0) return null
+                return (
+                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-950 flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>
+                        Đã báo cáo {effectivePoleGpsLocations.length}/{assignedGpsPoles.length} cột được giao:
+                      </strong>{' '}
+                      Còn <strong>{missingGpsPoles.length} cột</strong> chưa được kỹ sư gửi tọa độ GPS về (
+                      <strong className="font-mono">{missingGpsPoles.join(', ')}</strong>).
+                    </div>
+                  </div>
+                )
+              })()}
 
               <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
                 <table className="w-full text-left border-collapse text-xs">
@@ -886,12 +1196,23 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                       <th className="py-2.5 px-3 font-extrabold">Ảnh chụp</th>
                       <th className="py-2.5 px-3 font-extrabold">Vĩ độ (Lat)</th>
                       <th className="py-2.5 px-3 font-extrabold">Kinh độ (Lng)</th>
+                      <th className="py-2.5 px-3 font-extrabold">Sai số GPS</th>
                       <th className="py-2.5 px-3 font-extrabold">Thời gian ghi nhận</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {effectivePoleGpsLocations.length > 0 ? (
-                      effectivePoleGpsLocations.map((g, idx) => {
+                      (savedOrderedPoleIds.length >= 2
+                        ? [
+                            ...savedOrderedPoleIds
+                              .map((pid) => effectivePoleGpsLocations.find((item) => item.pole_id === pid))
+                              .filter((item): item is WorkOrderPoleLocation => Boolean(item)),
+                            ...effectivePoleGpsLocations.filter(
+                              (item) => !item.pole_id || !savedOrderedPoleIds.includes(item.pole_id)
+                            ),
+                          ]
+                        : effectivePoleGpsLocations
+                      ).map((g, idx) => {
                         const evidenceMatches = g.pole_id
                           ? backendEvidence.filter((ev) => ev.pole_id === g.pole_id)
                           : []
@@ -942,6 +1263,11 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                           >
                             <td className="py-2.5 px-3 font-mono font-black text-slate-900">
                               <div className="flex items-center gap-1.5 flex-wrap">
+                                {effectivePoleGpsLocations.length >= 2 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono text-[10px] font-extrabold">
+                                    #{idx + 1}
+                                  </span>
+                                )}
                                 <span>{g.pole_id || '-'}</span>
                                 {isSavedModified && (
                                   <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-sans text-[10px] font-bold">
@@ -1018,6 +1344,26 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                 </div>
                               )}
                             </td>
+                            <td className="py-2.5 px-3">
+                              {typeof g.accuracy_m === 'number' ? (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold border ${
+                                    g.accuracy_m > 10
+                                      ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  }`}
+                                  title={
+                                    g.accuracy_m > 10
+                                      ? 'Sai số GPS hiện trường cao (> 10m), nên kiểm tra lại trong Xem GIS'
+                                      : 'Độ chính xác GPS tốt (≤ 10m)'
+                                  }
+                                >
+                                  ±{g.accuracy_m.toFixed(1)} m
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">-</span>
+                              )}
+                            </td>
                             <td className="py-2.5 px-3 text-[11px] text-slate-500">
                               <div className="flex items-center justify-between gap-2">
                                 <span>
@@ -1036,6 +1382,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                         saveEditedGpsLocations({
                                           workOrderId: targetWorkOrderId,
                                           locations: next,
+                                          orderedPoleIds: savedOrderedPoleIds,
                                         })
                                       )
                                       toast.info(`Đã khôi phục tọa độ gốc của kỹ sư cho cột ${g.pole_id}.`)
@@ -1054,7 +1401,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                       })
                     ) : (
                       <tr>
-                        <td colSpan={5} className="py-6 text-center text-slate-400">
+                        <td colSpan={6} className="py-6 text-center text-slate-400">
                           Chưa có dữ liệu tọa độ GPS chi tiết cho từng cột.
                         </td>
                       </tr>
@@ -1075,87 +1422,178 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                       workOrderId={targetWorkOrderId}
                       photoId={selectedVideoPhoto.photo_id}
                       className="w-full h-full object-contain bg-black"
+                      onVideoLoaded={(loadedPhotoId) => {
+                        setPolePhotos((prev) =>
+                          prev.map((item) =>
+                            item.photo_id === loadedPhotoId && item.video && !item.video.viewed_by
+                              ? {
+                                  ...item,
+                                  video: {
+                                    ...item.video,
+                                    viewed_by: 'current_manager',
+                                    viewed_at: new Date().toISOString(),
+                                  },
+                                }
+                              : item
+                          )
+                        )
+                      }}
                     />
                   </div>
 
                   {/* Thông số thực tế và báo cáo của kỹ sư trên clip đang phát */}
-                  <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-slate-900 text-white">
-                        {selectedVideoPhoto.pole_id || 'Cột đèn'}
-                      </span>
-                      <span className="text-slate-600 font-medium">
-                        Thời lượng: <strong>{formatDurationMs(selectedVideoPhoto.video?.duration_ms)}</strong>
-                      </span>
-                      <span className="text-slate-300">•</span>
-                      <span className="text-slate-600 font-medium">
-                        Dung lượng: <strong>{formatByteCount(selectedVideoPhoto.video?.byte_count)}</strong>
-                      </span>
-                      {(() => {
-                        const effectiveState = selectedVideoPhoto.final_cv_state || selectedVideoPhoto.cv_state
-                        const isOut = effectiveState === 'off'
-                        const isNormal = effectiveState === 'on'
-                        return (
+                  <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2.5 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-slate-900 text-white">
+                          {selectedVideoPhoto.pole_id || 'Cột đèn'}
+                        </span>
+                        <span className="text-slate-600 font-medium">
+                          Thời lượng: <strong>{formatDurationMs(selectedVideoPhoto.video?.duration_ms)}</strong>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-600 font-medium">
+                          Dung lượng: <strong>{formatByteCount(selectedVideoPhoto.video?.byte_count)}</strong>
+                        </span>
+                        {typeof selectedVideoPhoto.lux_value === 'number' && (
                           <>
                             <span className="text-slate-300">•</span>
-                            <span className="text-slate-600 font-medium">
-                              Báo cáo kỹ sư:{' '}
-                              <strong
-                                className={
-                                  isOut
-                                    ? 'text-rose-700'
-                                    : isNormal
-                                    ? 'text-emerald-700'
-                                    : 'text-amber-700'
-                                }
-                              >
-                                {isOut ? 'Mất sáng (Cần kiểm tra)' : isNormal ? 'Đèn sáng bình thường' : 'Chưa chốt trạng thái'}
-                              </strong>
+                            <span
+                              className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-mono font-extrabold text-[11px]"
+                              title={
+                                selectedVideoPhoto.lux_measured_at
+                                  ? `Đo Lux lúc ${new Date(selectedVideoPhoto.lux_measured_at).toLocaleString('vi-VN')}`
+                                  : 'Độ rọi đo từ cảm biến BLE ESP32C3_LUX'
+                              }
+                            >
+                              ☀ {selectedVideoPhoto.lux_value.toFixed(1)} lux
                             </span>
                           </>
-                        )
-                      })()}
-                      {selectedVideoPhoto.video?.hdr && (
-                        <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">
-                          HDR
+                        )}
+                        {(() => {
+                          const effectiveState = selectedVideoPhoto.final_cv_state || selectedVideoPhoto.cv_state
+                          const isOut = effectiveState === 'off'
+                          const isNormal = effectiveState === 'on'
+                          const isOverride = Boolean(
+                            selectedVideoPhoto.final_cv_state &&
+                              selectedVideoPhoto.cv_state &&
+                              selectedVideoPhoto.final_cv_state !== selectedVideoPhoto.cv_state
+                          )
+                          return (
+                            <>
+                              <span className="text-slate-300">•</span>
+                              <span className="text-slate-600 font-medium">
+                                Kỹ sư chốt:{' '}
+                                <strong
+                                  className={
+                                    isOut
+                                      ? 'text-rose-700'
+                                      : isNormal
+                                      ? 'text-emerald-700'
+                                      : 'text-amber-700'
+                                  }
+                                >
+                                  {isOut ? 'Mất sáng (Cần kiểm tra)' : isNormal ? 'Đèn sáng bình thường' : 'Chưa chốt trạng thái'}
+                                </strong>
+                              </span>
+                              {isOverride && (
+                                <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 border border-violet-300 text-[10px] font-bold">
+                                  ⚡ Kỹ sư ghi đè AI
+                                </span>
+                              )}
+                            </>
+                          )
+                        })()}
+                        {selectedVideoPhoto.video?.hdr && (
+                          <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">
+                            HDR
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {selectedVideoPhoto.captured_at && (
+                          <span className="text-[11px] text-slate-500">
+                            Quay lúc: {new Date(selectedVideoPhoto.captured_at).toLocaleString('vi-VN')}
+                          </span>
+                        )}
+                        {selectedVideoPhoto.decision === 'confirm' ? (
+                          <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            ✓ Đã xác nhận
+                          </span>
+                        ) : selectedVideoPhoto.decision === 'reject' ? (
+                          <span className="text-[10.5px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                            ✕ Đã từ chối
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={decidingPhotoId === selectedVideoPhoto.photo_id}
+                              onClick={() => handleDecidePolePhoto(selectedVideoPhoto.photo_id, 'confirm')}
+                              className="py-1 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                            >
+                              ✓ Xác nhận clip
+                            </button>
+                            <button
+                              type="button"
+                              disabled={decidingPhotoId === selectedVideoPhoto.photo_id}
+                              onClick={() => handleDecidePolePhoto(selectedVideoPhoto.photo_id, 'reject')}
+                              className="py-1 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                            >
+                              Từ chối
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Thông số phân tích AI trên các frame của Video */}
+                    <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                      <span className="font-bold text-slate-700">Phân tích AI:</span>
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-semibold">
+                        {selectedVideoPhoto.ai_status === 'unavailable'
+                          ? 'AI không khả dụng'
+                          : selectedVideoPhoto.cv_state === 'off'
+                          ? 'Đèn tắt'
+                          : selectedVideoPhoto.cv_state === 'on'
+                          ? 'Đèn sáng'
+                          : 'Chưa rõ (Inconclusive)'}
+                        {typeof selectedVideoPhoto.confidence === 'number'
+                          ? ` • Độ tin cậy: ${Math.round(selectedVideoPhoto.confidence * 100)}%`
+                          : typeof selectedVideoPhoto.video?.confidence_median === 'number'
+                          ? ` • Độ tin cậy TV: ${Math.round(selectedVideoPhoto.video.confidence_median * 100)}%`
+                          : ''}
+                      </span>
+                      {typeof selectedVideoPhoto.video?.sampled_frames === 'number' && (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 font-mono font-semibold">
+                          Frame sáng: {selectedVideoPhoto.video.on_frames ?? 0}/{selectedVideoPhoto.video.sampled_frames} • Tắt:{' '}
+                          {selectedVideoPhoto.video.off_frames ?? 0}
+                          {selectedVideoPhoto.video.daylight_frames
+                            ? ` • Quá sáng: ${selectedVideoPhoto.video.daylight_frames}`
+                            : ''}
+                        </span>
+                      )}
+                      {selectedVideoPhoto.video?.reason_code && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-semibold">
+                          Mã cảnh báo AI:{' '}
+                          {selectedVideoPhoto.video.reason_code === 'NO_LAMP'
+                            ? 'Không tìm thấy đèn trong khung hình'
+                            : selectedVideoPhoto.video.reason_code === 'MULTIPLE_LAMPS'
+                            ? 'Có nhiều nguồn sáng gây nhiễu'
+                            : selectedVideoPhoto.video.reason_code === 'TOO_BRIGHT'
+                            ? 'Khung hình quá sáng / ban ngày'
+                            : selectedVideoPhoto.video.reason_code === 'INCONSISTENT'
+                            ? 'Trạng thái đèn chập chờn giữa các frame'
+                            : selectedVideoPhoto.video.reason_code}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {selectedVideoPhoto.captured_at && (
-                        <span className="text-[11px] text-slate-500">
-                          Quay lúc: {new Date(selectedVideoPhoto.captured_at).toLocaleString('vi-VN')}
-                        </span>
-                      )}
-                      {selectedVideoPhoto.decision === 'confirm' ? (
-                        <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                          ✓ Đã xác nhận
-                        </span>
-                      ) : selectedVideoPhoto.decision === 'reject' ? (
-                        <span className="text-[10.5px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
-                          ✕ Đã từ chối
-                        </span>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            disabled={decidingPhotoId === selectedVideoPhoto.photo_id}
-                            onClick={() => handleDecidePolePhoto(selectedVideoPhoto.photo_id, 'confirm')}
-                            className="py-1 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
-                          >
-                            ✓ Xác nhận clip
-                          </button>
-                          <button
-                            type="button"
-                            disabled={decidingPhotoId === selectedVideoPhoto.photo_id}
-                            onClick={() => handleDecidePolePhoto(selectedVideoPhoto.photo_id, 'reject')}
-                            className="py-1 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
-                          >
-                            Từ chối
-                          </button>
-                        </div>
-                      )}
-                    </div>
+
+                    {selectedVideoPhoto.review_note && (
+                      <div className="p-2 rounded-xl bg-amber-50/80 border border-amber-200 text-[11px] text-amber-900">
+                        <strong>Giải trình / Ghi chú kỹ sư trên cột này:</strong> {selectedVideoPhoto.review_note}
+                      </div>
+                    )}
                   </div>
 
                   {/* Danh sách chọn video theo cột đèn (nếu có nhiều hơn 1 clip) */}
@@ -1198,9 +1636,20 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                   {isOut ? 'LỖI' : isNormal ? 'ĐẠT' : 'CHƯA RÕ'}
                                 </span>
                               </div>
-                              <span className="text-[10.5px] text-slate-500 font-mono">
-                                {formatDurationMs(vp.video?.duration_ms)} • {formatByteCount(vp.video?.byte_count)}
-                              </span>
+                              <div className="flex items-center justify-between gap-1 text-[10px]">
+                                <span className="text-slate-500 font-mono">
+                                  {formatDurationMs(vp.video?.duration_ms)} • {formatByteCount(vp.video?.byte_count)}
+                                </span>
+                                {vp.decision === 'confirm' ? (
+                                  <span className="text-emerald-700 font-bold">✓ Đã duyệt</span>
+                                ) : vp.decision === 'reject' ? (
+                                  <span className="text-rose-700 font-bold">✕ Từ chối</span>
+                                ) : vp.video?.viewed_by ? (
+                                  <span className="text-blue-700 font-bold">✓ Đã xem</span>
+                                ) : (
+                                  <span className="text-amber-700 font-bold">👁 Chưa xem</span>
+                                )}
+                              </div>
                             </button>
                           )
                         })}
@@ -1279,8 +1728,8 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                               {isOut ? 'MẤT SÁNG (LỖI)' : isNormal ? 'ĐẠT CHUẨN' : 'CHƯA RÕ'}
                             </span>
 
-                            {/* Mã cột & nhãn có video */}
-                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                            {/* Mã cột, nhãn có video & số đo Lux thực địa */}
+                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-900/80 backdrop-blur-md text-white border border-blue-400/20">
                                 {photo.pole_id || `Cột #${idx + 1}`}
                               </span>
@@ -1290,6 +1739,19 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                 </span>
                               )}
                             </div>
+
+                            {typeof photo.lux_value === 'number' && (
+                              <span
+                                className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-amber-400/95 text-slate-950 shadow-xs border border-amber-200"
+                                title={
+                                  photo.lux_measured_at
+                                    ? `Đo bằng ESP32C3_LUX lúc ${new Date(photo.lux_measured_at).toLocaleString('vi-VN')}`
+                                    : 'Độ rọi đo từ cảm biến BLE hiện trường'
+                                }
+                              >
+                                ☀ {photo.lux_value.toFixed(1)} lux
+                              </span>
+                            )}
 
                             <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/20 transition-colors flex items-center justify-center">
                               <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-slate-900 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shadow-lg">
@@ -1321,10 +1783,89 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                               <p className="text-[11px] text-slate-500 mt-1">
                                 Chụp lúc: {photo.captured_at ? new Date(photo.captured_at).toLocaleString('vi-VN') : '-'}
                               </p>
+
+                              {/* Đối chiếu Nhận định AI vs Kết luận của Kỹ sư */}
+                              <div className="mt-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col gap-1 text-[11px]">
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-slate-500">AI nhận định:</span>
+                                  <span className="font-bold text-slate-800">
+                                    {photo.ai_status === 'unavailable'
+                                      ? 'Không khả dụng'
+                                      : photo.cv_state === 'off'
+                                      ? 'Đèn tắt'
+                                      : photo.cv_state === 'on'
+                                      ? 'Đèn sáng'
+                                      : 'Chưa rõ'}
+                                    {typeof photo.confidence === 'number'
+                                      ? ` (${Math.round(photo.confidence * 100)}%)`
+                                      : ''}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-slate-500">Kỹ sư chốt:</span>
+                                  <span
+                                    className={`font-extrabold ${
+                                      isOut
+                                        ? 'text-rose-700'
+                                        : isNormal
+                                        ? 'text-emerald-700'
+                                        : 'text-amber-700'
+                                    }`}
+                                  >
+                                    {photo.final_cv_state === 'off'
+                                      ? 'Đèn tắt (Mất sáng)'
+                                      : photo.final_cv_state === 'on'
+                                      ? 'Đèn sáng bình thường'
+                                      : isOut
+                                      ? 'Đèn tắt (Theo AI)'
+                                      : isNormal
+                                      ? 'Đèn sáng (Theo AI)'
+                                      : 'Chưa chốt'}
+                                  </span>
+                                </div>
+                                {photo.final_cv_state &&
+                                  photo.cv_state &&
+                                  photo.final_cv_state !== photo.cv_state && (
+                                    <div className="mt-0.5 px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 border border-violet-200 text-[10px] font-bold text-center">
+                                      ⚡ Kỹ sư đã ghi đè kết quả nhận diện của AI
+                                    </div>
+                                  )}
+                              </div>
+
                               {photo.review_note && (
-                                <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200 mt-1 line-clamp-2">
-                                  <strong>Ghi chú:</strong> {photo.review_note}
+                                <p className="text-[11px] text-amber-800 bg-amber-50 p-1.5 rounded border border-amber-200 mt-1.5 line-clamp-2">
+                                  <strong>Ghi chú kỹ sư:</strong> {photo.review_note}
                                 </p>
+                              )}
+                              {isRejected && photo.decision_note && (
+                                <p className="text-[11px] text-rose-700 bg-rose-50 p-1.5 rounded border border-rose-200 mt-1 line-clamp-2">
+                                  <strong>Lý do từ chối:</strong> {photo.decision_note}
+                                </p>
+                              )}
+                              {photo.video && (
+                                <div
+                                  className="mt-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const vidIdx = poleVideos.findIndex(
+                                        (vp) => vp.photo_id === photo.photo_id
+                                      )
+                                      if (vidIdx >= 0) setSelectedVideoIndex(vidIdx)
+                                      setActiveTab('video')
+                                    }}
+                                    className="w-full py-1 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[10.5px] transition cursor-pointer flex items-center justify-center gap-1"
+                                  >
+                                    <Video className="w-3 h-3" />
+                                    <span>
+                                      {photo.video.viewed_by
+                                        ? 'Mở xem lại Video clip'
+                                        : '▶ Mở xem Video (Bắt buộc trước khi duyệt)'}
+                                    </span>
+                                  </button>
+                                </div>
                               )}
                               {!photo.decision && (
                                 <div
@@ -1435,7 +1976,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
           {/* TAB 3: KẾT QUẢ KHẢO SÁT & ĐÁNH GIÁ KỸ THUẬT */}
           {activeTab === 'ai' && (
             <div className="flex flex-col gap-4 animate-in fade-in duration-150">
-              {/* Thẻ danh sách cột đèn hoặc Mạch & Node IoT kỹ sư hiện trường ghi nhận */}
+              {/* Thẻ danh sách cột đèn, sự cố hoặc Mạch & Node IoT kỹ sư hiện trường ghi nhận */}
               <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-3">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -1444,92 +1985,61 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                         <Cpu className="w-4 h-4 text-indigo-600" />
                         Danh Sách Mạch (Feeder) &amp; Node IoT Ghi Nhận Từ Kỹ Sư Hiện Trường
                       </>
-                    ) : (
+                    ) : phase.phaseType === 'survey' ? (
                       <>
                         <FileText className="w-4 h-4 text-blue-600" />
-                        Danh Sách Cột Đèn Ghi Nhận Từ Kỹ Sư Hiện Trường
+                        Danh Sách Cột Đèn Khảo Sát Thực Địa ({polePhotos.length})
+                      </>
+                    ) : phase.phaseType === 'inspection' ? (
+                      <>
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        Kết Quả Kiểm Tra Từng Sự Cố Từ Kỹ Sư Hiện Trường ({detailFaults.length || abnormalPoles.length})
+                      </>
+                    ) : (
+                      <>
+                        <Wrench className="w-4 h-4 text-emerald-600" />
+                        Danh Sách Sự Cố &amp; Cột Đèn Thực Hiện Sửa Chữa ({detailFaults.length || abnormalPoles.length})
                       </>
                     )}
                   </h4>
                 </div>
 
-                {/* Nhánh riêng cho phiếu IoT: hiển thị Tủ, Mạch, Node & kết quả kiểm tra */}
-                {isIotReport ? (
-                  iotFaults.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {iotFaults.map((f, idx) => {
-                        const outcome = f.inspection_outcome
-                        const outcomeBadge =
-                          outcome === 'fault_present'
-                            ? { label: 'Xác nhận có sự cố', cls: 'bg-rose-100 text-rose-800 border-rose-200' }
-                            : outcome === 'fault_absent'
-                            ? { label: 'Thiết bị bình thường', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
-                            : outcome === 'inconclusive'
-                            ? { label: 'Chưa kết luận', cls: 'bg-amber-100 text-amber-800 border-amber-200' }
-                            : { label: 'Đã tiếp nhận / xử lý', cls: 'bg-slate-100 text-slate-700 border-slate-200' }
-                        const typeLabel =
-                          (f.fault_type && FAULT_TYPE_LABELS_VN[f.fault_type]) || f.fault_type || '-'
-
-                        return (
-                          <div
-                            key={f.fault_id || idx}
-                            className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200 flex flex-wrap items-start justify-between gap-2.5 text-xs"
-                          >
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono font-bold text-slate-900">{f.fault_id || '-'}</span>
-                                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-purple-50 text-purple-700 border border-purple-200/70">
-                                  {typeLabel}
-                                </span>
-                                {f.iot_anomaly_code && (
-                                  <span className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                    {iotAnomalyLabel(f.iot_anomaly_code)}
-                                  </span>
-                                )}
-                                {f.recovered_at && (
-                                  <span
-                                    className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    title={`Tự phục hồi lúc ${new Date(f.recovered_at).toLocaleString('vi-VN')}`}
-                                  >
-                                    Đã tự phục hồi
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-mono text-indigo-800">
-                                <span>Tủ: {f.cabinet_id || '-'}</span>
-                                <span>Mạch: {f.feeder_id || '-'}</span>
-                                <span>Node: {f.origin_node_id || '-'}</span>
-                              </div>
-                              {f.location?.lat != null && f.location?.lng != null && (
-                                <div className="text-[10.5px] font-mono text-slate-500">
-                                  GPS tủ: {f.location.lat.toFixed(6)}, {f.location.lng.toFixed(6)}
-                                </div>
-                              )}
-                            </div>
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${outcomeBadge.cls}`}>
-                              {outcomeBadge.label}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
-                      Chưa có dữ liệu thiết bị IoT (Mạch / Node) gắn với lệnh công tác này.
-                    </div>
-                  )
-                ) : phase.phaseType === 'survey' && polePhotos.length > 0 ? (
+                {/* Nhánh 1: Giai đoạn Khảo sát (Survey) */}
+                {phase.phaseType === 'survey' && polePhotos.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {polePhotos.map((photo, idx) => {
                       const effectiveState = photo.final_cv_state || photo.cv_state
                       const isOut = effectiveState === 'off'
                       const isNormal = effectiveState === 'on'
+                      const isRejected = photo.decision === 'reject'
+                      const isConfirmed = photo.decision === 'confirm'
+                      const isEngineerOverride = Boolean(
+                        photo.final_cv_state &&
+                          photo.cv_state &&
+                          photo.final_cv_state !== photo.cv_state
+                      )
+                      const aiLabel =
+                        photo.ai_status === 'unavailable'
+                          ? 'AI: Không khả dụng'
+                          : photo.cv_state === 'off'
+                          ? 'AI: Đèn tắt'
+                          : photo.cv_state === 'on'
+                          ? 'AI: Đèn sáng'
+                          : photo.cv_state === 'inconclusive'
+                          ? 'AI: Chưa rõ'
+                          : null
+                      const aiConf =
+                        typeof photo.confidence === 'number'
+                          ? ` (${Math.round(photo.confidence * 100)}%)`
+                          : ''
 
                       return (
                         <div
                           key={photo.photo_id || idx}
                           className={`p-3 rounded-xl border flex items-start gap-3 ${
-                            isOut
+                            isRejected
+                              ? 'bg-slate-100/80 border-slate-300 opacity-75'
+                              : isOut
                               ? 'bg-rose-50/70 border-rose-200'
                               : isNormal
                               ? 'bg-emerald-50/70 border-emerald-200'
@@ -1538,7 +2048,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                         >
                           <AlertTriangle
                             className={`w-4 h-4 shrink-0 mt-0.5 ${
-                              isOut
+                              isRejected
+                                ? 'text-slate-400'
+                                : isOut
                                 ? 'text-rose-600'
                                 : isNormal
                                 ? 'text-emerald-600'
@@ -1547,12 +2059,18 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                           />
                           <div className="flex flex-col gap-1 text-xs text-slate-900 flex-1">
                             <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-blue-700 font-bold">
+                              <span
+                                className={`font-mono font-bold ${
+                                  isRejected ? 'text-slate-500 line-through' : 'text-blue-700'
+                                }`}
+                              >
                                 {photo.pole_id || '-'}
                               </span>
                               <span
                                 className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  isOut
+                                  isRejected
+                                    ? 'bg-slate-200 text-slate-700'
+                                    : isOut
                                     ? 'bg-rose-100 text-rose-800'
                                     : isNormal
                                     ? 'bg-emerald-100 text-emerald-800'
@@ -1560,24 +2078,166 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                 }`}
                               >
                                 {isOut
-                                  ? 'Báo mất sáng (Cần kiểm tra)'
+                                  ? 'Kỹ sư: Báo mất sáng (Cần kiểm tra)'
                                   : isNormal
-                                  ? 'Đèn sáng bình thường'
+                                  ? 'Kỹ sư: Đèn sáng bình thường'
                                   : 'Chưa chốt trạng thái (Cần yêu cầu làm lại)'}
                               </span>
-                              {photo.decision === 'confirm' && (
-                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              {aiLabel && (
+                                <span className="px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200 text-[10px] font-semibold">
+                                  {aiLabel}
+                                  {aiConf}
+                                </span>
+                              )}
+                              {isEngineerOverride && (
+                                <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-800 border border-violet-300 text-[10px] font-bold">
+                                  ⚡ Kỹ sư ghi đè AI
+                                </span>
+                              )}
+                              {typeof photo.lux_value === 'number' && (
+                                <span
+                                  className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-mono text-[10px] font-extrabold"
+                                  title={
+                                    photo.lux_measured_at
+                                      ? `Đo bằng ESP32C3_LUX lúc ${new Date(photo.lux_measured_at).toLocaleString('vi-VN')}`
+                                      : 'Độ rọi thực địa từ cảm biến BLE'
+                                  }
+                                >
+                                  ☀ {photo.lux_value.toFixed(1)} lux
+                                </span>
+                              )}
+                              {typeof photo.video?.sampled_frames === 'number' && (
+                                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 font-mono text-[10px] font-semibold">
+                                  Video: {photo.video.on_frames ?? 0}/{photo.video.sampled_frames} frame sáng
+                                </span>
+                              )}
+                              {isConfirmed && (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold">
                                   ✓ Đã duyệt nghiệm thu
+                                </span>
+                              )}
+                              {isRejected && (
+                                <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300 text-[10px] font-bold">
+                                  ✕ Đã từ chối
                                 </span>
                               )}
                             </div>
                             <p className="text-[11px] text-slate-700 leading-relaxed">
                               {photo.review_note || 'Kỹ sư không đính kèm ghi chú riêng cho cột này.'}
                             </p>
+                            {isRejected && photo.decision_note && (
+                              <p className="text-[11px] text-rose-700 font-medium">
+                                Lý do từ chối: {photo.decision_note}
+                              </p>
+                            )}
                           </div>
                         </div>
                       )
                     })}
+                  </div>
+                ) : detailFaults.length > 0 ? (
+                  /* Nhánh 2: Phiếu Kiểm tra / Sửa chữa có danh sách sự cố từ Backend (cả cột đèn lẫn Tủ/Node IoT) */
+                  <div className="flex flex-col gap-2">
+                    {detailFaults.map((f, idx) => {
+                      const outcome = f.inspection_outcome
+                      const isVerifiedPhase =
+                        phase.status === 'ended' ||
+                        phase.rawStatus === 'verified' ||
+                        f.fault_status === 'resolved' ||
+                        f.fault_status === 'verified'
+                      const outcomeBadge =
+                        phase.phaseType === 'repair'
+                          ? isVerifiedPhase
+                            ? {
+                                label: '✓ Đã khắc phục',
+                                cls: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                              }
+                            : {
+                                label: 'Đã sửa chữa (Chờ duyệt)',
+                                cls: 'bg-blue-100 text-blue-800 border-blue-200',
+                              }
+                          : outcome === 'fault_present'
+                          ? {
+                              label: 'Xác nhận có sự cố',
+                              cls: 'bg-rose-100 text-rose-800 border-rose-200',
+                            }
+                          : outcome === 'fault_absent'
+                          ? {
+                              label: 'Không có sự cố (Bình thường)',
+                              cls: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                            }
+                          : outcome === 'inconclusive'
+                          ? {
+                              label: 'Chưa kết luận',
+                              cls: 'bg-amber-100 text-amber-800 border-amber-200',
+                            }
+                          : {
+                              label: 'Đã tiếp nhận / xử lý',
+                              cls: 'bg-slate-100 text-slate-700 border-slate-200',
+                            }
+                      const typeLabel =
+                        (f.fault_type && FAULT_TYPE_LABELS_VN[f.fault_type]) || f.fault_type || '-'
+
+                      return (
+                        <div
+                          key={f.fault_id || idx}
+                          className="p-3 rounded-xl bg-indigo-50/50 border border-indigo-200 flex flex-wrap items-start justify-between gap-2.5 text-xs"
+                        >
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900">
+                                {f.fault_id || '-'}
+                              </span>
+                              {f.pole_id && (
+                                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                  Cột: {f.pole_id}
+                                </span>
+                              )}
+                              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-purple-50 text-purple-700 border border-purple-200/70">
+                                {typeLabel}
+                              </span>
+                              {f.iot_anomaly_code && (
+                                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                  {iotAnomalyLabel(f.iot_anomaly_code)}
+                                </span>
+                              )}
+                              {f.recovered_at && (
+                                <span
+                                  className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  title={`Tự phục hồi lúc ${new Date(f.recovered_at).toLocaleString('vi-VN')}`}
+                                >
+                                  Đã tự phục hồi
+                                </span>
+                              )}
+                            </div>
+                            {(f.cabinet_id || f.feeder_id || f.origin_node_id || f.segment_id) && (
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-mono text-indigo-800">
+                                {f.segment_id && (
+                                  <span>Tuyến: {formatSegmentDisplay(f.segment_id)}</span>
+                                )}
+                                {f.cabinet_id && <span>Tủ: {f.cabinet_id}</span>}
+                                {f.feeder_id && <span>Mạch: {f.feeder_id}</span>}
+                                {f.origin_node_id && <span>Node: {f.origin_node_id}</span>}
+                              </div>
+                            )}
+                            {f.location?.lat != null && f.location?.lng != null && (
+                              <div className="text-[10.5px] font-mono text-slate-500">
+                                GPS: {f.location.lat.toFixed(6)}, {f.location.lng.toFixed(6)}
+                              </div>
+                            )}
+                          </div>
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${outcomeBadge.cls}`}
+                          >
+                            {outcomeBadge.label}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : isIotReport ? (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                    Chưa có dữ liệu thiết bị IoT (Mạch / Node) gắn với lệnh công tác này.
                   </div>
                 ) : abnormalPoles.length > 0 ? (
                   <div className="flex flex-col gap-2">
@@ -1629,40 +2289,192 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                 </p>
               </div>
 
-              {/* Thẻ đo đạc Luxmeter & Vật tư */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                    <Gauge className="w-3.5 h-3.5 text-blue-600" />
-                    Độ rọi mặt đường đo thực tế
-                  </span>
-                  {report?.luxMeasured ? (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-rose-600 font-mono">{report.luxMeasured}</span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-slate-500">Chưa có số đo Lux thực tế</span>
-                      <p className="text-[11px] text-slate-400">
-                        Kỹ sư hiện trường chưa ghi nhận kết quả đo độ rọi mặt đường cho giai đoạn này.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                    <Wrench className="w-3.5 h-3.5 text-emerald-600" />
-                    Vật tư đề xuất từ kỹ sư
-                  </span>
-                  <div className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    {effectiveSuggestedMaterials || effectiveUsedMaterials || 'Kỹ sư không ghi nhận vật tư'}
+              {/* Thẻ tổng hợp theo đúng nghiệp vụ từng giai đoạn (Khảo sát vs Kiểm tra vs Sửa chữa) */}
+              {phase.phaseType === 'survey' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Thẻ 1: Độ rọi mặt đường đo thực tế từ cảm biến BLE ESP32C3_LUX */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                      <Gauge className="w-3.5 h-3.5 text-blue-600" />
+                      Độ rọi mặt đường đo thực tế (ESP32C3_LUX)
+                    </span>
+                    {(() => {
+                      const validLuxPhotos = polePhotos.filter(
+                        (p) => p.decision !== 'reject' && typeof p.lux_value === 'number'
+                      )
+                      if (validLuxPhotos.length > 0) {
+                        const luxNums = validLuxPhotos.map((p) => p.lux_value as number)
+                        const avgLux =
+                          luxNums.reduce((acc, v) => acc + v, 0) / luxNums.length
+                        const minLux = Math.min(...luxNums)
+                        const maxLux = Math.max(...luxNums)
+                        return (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span className="text-2xl font-black text-blue-700 font-mono">
+                                TB: {avgLux.toFixed(1)} lux
+                              </span>
+                              <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-mono">
+                                Min {minLux.toFixed(1)} – Max {maxLux.toFixed(1)} lux
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {validLuxPhotos.map((p, idx) => (
+                                <span
+                                  key={p.photo_id || idx}
+                                  className="px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-900 font-mono text-[10.5px] font-bold"
+                                >
+                                  {p.pole_id || `Cột #${idx + 1}`}: {(p.lux_value as number).toFixed(1)} lux
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      }
+                      if (report?.luxMeasured) {
+                        return (
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-black text-rose-600 font-mono">
+                              {report.luxMeasured}
+                            </span>
+                          </div>
+                        )
+                      }
+                      return (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-bold text-slate-500">
+                            Chưa có số đo Lux thực địa
+                          </span>
+                          <p className="text-[11px] text-slate-400">
+                            Kỹ sư hiện trường không đính kèm kết quả đo cảm biến BLE ESP32C3_LUX trong ca khảo sát này.
+                          </p>
+                        </div>
+                      )
+                    })()}
                   </div>
-                  <p className="text-[11px] text-slate-400">
-                    Thông tin đề xuất phục vụ lập kế hoạch cho các giai đoạn tiếp theo của sự vụ.
-                  </p>
+
+                  {/* Thẻ 2: Tổng hợp Đối chiếu AI & Kỹ sư khảo sát */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Tổng hợp Đối chiếu AI &amp; Kỹ sư Hiện trường
+                    </span>
+                    {(() => {
+                      const activePhotos = polePhotos.filter((p) => p.decision !== 'reject')
+                      const offCount = activePhotos.filter(
+                        (p) => (p.final_cv_state || p.cv_state) === 'off'
+                      ).length
+                      const onCount = activePhotos.filter(
+                        (p) => (p.final_cv_state || p.cv_state) === 'on'
+                      ).length
+                      const overrideCount = polePhotos.filter(
+                        (p) => p.final_cv_state && p.cv_state && p.final_cv_state !== p.cv_state
+                      ).length
+                      const rejectedCount = polePhotos.filter(
+                        (p) => p.decision === 'reject'
+                      ).length
+                      return (
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="p-2 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between">
+                            <span className="text-rose-800 font-semibold">Đèn tắt (Lỗi):</span>
+                            <span className="font-mono font-black text-rose-900">{offCount}</span>
+                          </div>
+                          <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                            <span className="text-emerald-800 font-semibold">Đèn sáng (Đạt):</span>
+                            <span className="font-mono font-black text-emerald-900">{onCount}</span>
+                          </div>
+                          <div className="p-2 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-between">
+                            <span className="text-violet-800 font-semibold">Kỹ sư ghi đè AI:</span>
+                            <span className="font-mono font-black text-violet-900">{overrideCount}</span>
+                          </div>
+                          <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between">
+                            <span className="text-slate-600 font-semibold">Đã từ chối:</span>
+                            <span className="font-mono font-black text-slate-800">{rejectedCount}</span>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
                 </div>
-              </div>
+              ) : phase.phaseType === 'inspection' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Thẻ 1: Tổng hợp Kết quả Kiểm tra Sự cố */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                      Tổng hợp Kết luận Kiểm tra từ Kỹ sư
+                    </span>
+                    {(() => {
+                      const presentCount = detailFaults.filter(
+                        (f) => f.inspection_outcome === 'fault_present'
+                      ).length
+                      const absentCount = detailFaults.filter(
+                        (f) => f.inspection_outcome === 'fault_absent'
+                      ).length
+                      const incCount = detailFaults.filter(
+                        (f) => f.inspection_outcome === 'inconclusive'
+                      ).length
+                      return (
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 flex flex-col">
+                            <span className="text-[10.5px] text-rose-700 font-semibold">Có sự cố</span>
+                            <span className="text-base font-mono font-black text-rose-900">{presentCount}</span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col">
+                            <span className="text-[10.5px] text-emerald-700 font-semibold">Bình thường</span>
+                            <span className="text-base font-mono font-black text-emerald-900">{absentCount}</span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex flex-col">
+                            <span className="text-[10.5px] text-amber-700 font-semibold">Chưa rõ</span>
+                            <span className="text-base font-mono font-black text-amber-900">{incCount}</span>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Thẻ 2: Vật tư / Thiết bị Quản lý chỉ định mang theo */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                      <Wrench className="w-3.5 h-3.5 text-amber-600" />
+                      Vật tư / Thiết bị Quản lý chỉ định mang theo
+                    </span>
+                    <div className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      {effectiveSuggestedMaterials || 'Quản lý không ghi chú vật tư chỉ định'}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Thẻ 1: Vật tư / Thiết bị Quản lý chỉ định mang theo (materials_note) */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                      <Wrench className="w-3.5 h-3.5 text-amber-600" />
+                      Vật tư / Thiết bị Quản lý chỉ định mang theo
+                    </span>
+                    <div className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      {effectiveSuggestedMaterials || 'Quản lý không ghi chú vật tư chỉ định'}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Danh mục vật tư được Quản lý ghi chú khi phân công phiếu sửa chữa.
+                    </p>
+                  </div>
+
+                  {/* Thẻ 2: Vật tư Kỹ sư thực tế đã thay tại hiện trường (materials_used) */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                      <Wrench className="w-3.5 h-3.5 text-emerald-600" />
+                      Vật tư Kỹ sư thực tế đã thay tại hiện trường
+                    </span>
+                    <div className="text-xs font-bold text-emerald-950 leading-relaxed bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200">
+                      {effectiveUsedMaterials || 'Kỹ sư không ghi nhận vật tư thay thế'}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Báo cáo vật tư thực tế do Kỹ sư hiện trường nhập khi hoàn tất sửa chữa.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1748,14 +2560,117 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   </span>
                 </div>
                 <div className="p-2.5 rounded-2xl bg-white border border-slate-200 flex items-center justify-between">
-                  <span className="text-slate-500 font-semibold">Hành lang tuyến tối đa:</span>
+                  <span className="text-slate-500 font-semibold">Quy tắc kiểm tra:</span>
                   <span className="font-extrabold text-emerald-700 font-mono">
-                    {matchedSegment?.has_geometry && roadPolylineCoords.length >= 2
-                      ? `≤ ${BACKEND_CORRIDOR_LIMIT_M} m quanh tuyến`
-                      : 'Tuyến chưa có hình (tự nối cột)'}
+                    Nối tuần tự • Cách nhau ≥ {MIN_POLE_CLEARANCE_M} m
                   </span>
                 </div>
               </div>
+
+              {/* Thanh điều hướng Cập nhật tuần tự từng cột (Khi có từ 2 cột trở lên) */}
+              {effectiveOrderedPoleIds.length >= 2 && (
+                <div className="p-3 rounded-2xl bg-indigo-50/80 border border-indigo-200 flex flex-wrap items-center justify-between gap-2.5 text-xs shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white font-extrabold text-[11px]">
+                      Thứ tự nối cột ({effectiveOrderedPoleIds.length} cột)
+                    </span>
+                    {effectiveOrderedPoleIds.map((pid, idx) => {
+                      const isCurrentStep = isSequentialStepMode && idx === activeStepIndex
+                      const hasErr = Boolean(poleValidations[pid]?.errorVn)
+                      return (
+                        <React.Fragment key={pid}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveStepIndex(idx)
+                              setIsSequentialStepMode(true)
+                            }}
+                            className={`px-2.5 py-1 rounded-lg font-mono font-bold text-[11px] border transition cursor-pointer flex items-center gap-1 ${
+                              hasErr
+                                ? 'bg-rose-100 text-rose-800 border-rose-400'
+                                : isCurrentStep
+                                ? 'bg-indigo-700 text-white border-indigo-800 shadow-xs ring-2 ring-indigo-300'
+                                : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-400'
+                            }`}
+                            title={`Bấm để chọn tinh chỉnh cột ${pid} (Bước ${idx + 1})`}
+                          >
+                            <span className="text-[10px] opacity-80">#{idx + 1}</span>
+                            <span>{pid}</span>
+                          </button>
+                          {idx < effectiveOrderedPoleIds.length - 1 && (
+                            <span className="text-indigo-400 font-bold">→</span>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
+                  </div>
+
+                  {canEditGps && (
+                    <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+                      <button
+                        type="button"
+                        onClick={handleAutoOrderReportPoles}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-300 transition cursor-pointer flex items-center gap-1"
+                        title="Tự động sắp xếp thứ tự các cột theo chuỗi khoảng cách gần nhất dọc theo tuyến"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Tự sắp theo chuỗi</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleResetReportPoleOrder}
+                        className="px-2 py-1 rounded-lg text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 transition cursor-pointer flex items-center gap-1"
+                        title="Khôi phục thứ tự cột về mặc định ban đầu"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Mặc định</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsSequentialStepMode((prev) => !prev)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                          isSequentialStepMode
+                            ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                            : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                        }`}
+                        title="Chuyển đổi giữa chế độ chỉnh từng cột theo thứ tự hoặc mở khóa kéo tất cả cột"
+                      >
+                        {isSequentialStepMode ? 'Chế độ: Từng cột' : 'Chế độ: Tất cả cột'}
+                      </button>
+
+                      {isSequentialStepMode && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={activeStepIndex <= 0}
+                            onClick={() => setActiveStepIndex((i) => Math.max(0, i - 1))}
+                            className="p-1 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                            title="Quay lại cột trước"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={activeStepIndex >= effectiveOrderedPoleIds.length - 1}
+                            onClick={() =>
+                              setActiveStepIndex((i) =>
+                                Math.min(effectiveOrderedPoleIds.length - 1, i + 1)
+                              )
+                            }
+                            className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                            title="Xác nhận cột hiện tại và chuyển sang cột tiếp theo"
+                          >
+                            <span>Cột tiếp</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Bản đồ vệ tinh tương tác (Cố định vị trí tuyệt đối để không bao giờ bị giật khung khi kéo thả) */}
               <div className="relative w-full h-[350px] shrink-0 rounded-2xl overflow-hidden border border-slate-300 shadow-xs bg-slate-900">
@@ -1768,6 +2683,8 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   communeId={matchedSegment?.commune_id || workOrderDetail?.commune_id}
                   editablePoleIds={canEditGps ? editablePoleIds : []}
                   invalidPoleIds={invalidPoleIds}
+                  orderedReportPoleIds={effectiveOrderedPoleIds}
+                  onSelectPoleStep={handleSelectPoleStepFromMap}
                   onPoleLocationChange={handleDraftPoleDrag}
                 />
 
@@ -1782,9 +2699,9 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                     <div className="px-3 py-1.5 rounded-xl bg-slate-900/80 text-emerald-300 text-[11px] font-bold shadow-md border border-white/15 flex items-center gap-1.5 backdrop-blur-xs">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
                       <span>
-                        {matchedSegment?.has_geometry && roadPolylineCoords.length >= 2
-                          ? `Vị trí cột hợp lệ (cách tuyến ≤ ${BACKEND_CORRIDOR_LIMIT_M} m)`
-                          : 'Kéo thả chấm cột tím (✥) để tinh chỉnh vị trí'}
+                        {isSequentialStepMode && effectiveOrderedPoleIds.length >= 2 && activeSequentialPoleId
+                          ? `Bước ${activeStepIndex + 1}/${effectiveOrderedPoleIds.length}: Đang mở khóa kéo thả cột ${activeSequentialPoleId} (✥) — tuyến nối tuần tự hợp lệ`
+                          : `Vị trí các cột hợp lệ (tuyến nối tuần tự, cách nhau ≥ ${MIN_POLE_CLEARANCE_M} m)`}
                       </span>
                     </div>
                   )}
@@ -1813,37 +2730,65 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10.5px] uppercase">
-                        <th className="py-2 px-3 font-extrabold">Mã cột</th>
+                        <th className="py-2 px-3 font-extrabold">Thứ tự &amp; Mã cột</th>
                         <th className="py-2 px-3 font-extrabold">Tọa độ Kỹ sư gửi (Gốc)</th>
                         <th className="py-2 px-3 font-extrabold">Tọa độ trên bản đồ (Hiện tại)</th>
-                        <th className="py-2 px-3 font-extrabold">Độ lệch / Hành lang tuyến</th>
+                        <th className="py-2 px-3 font-extrabold">Độ lệch / Khoảng cách</th>
                         <th className="py-2 px-3 font-extrabold text-right">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {effectivePoleGpsLocations.map((g, idx) => {
-                        const pid = g.pole_id || ''
+                      {effectiveOrderedPoleIds.map((pid, idx) => {
+                        const g = effectivePoleGpsLocations.find((item) => item.pole_id === pid)
+                        if (!g) return null
                         const draft = pid ? draftPoleCoords[pid] : undefined
                         const curLat = typeof draft?.lat === 'number' ? draft.lat : g.lat
                         const curLng = typeof draft?.lng === 'number' ? draft.lng : g.lng
                         const valInfo = pid ? poleValidations[pid] : undefined
                         const isMod = Boolean(valInfo?.isModified)
                         const hasErr = Boolean(valInfo?.errorVn)
+                        const isCurrentStep =
+                          isSequentialStepMode &&
+                          effectiveOrderedPoleIds.length >= 2 &&
+                          idx === activeStepIndex
 
                         return (
                           <tr
                             key={pid || idx}
+                            onClick={() => {
+                              if (effectiveOrderedPoleIds.length >= 2) {
+                                setActiveStepIndex(idx)
+                              }
+                            }}
                             className={
                               hasErr
                                 ? 'bg-rose-50/70'
+                                : isCurrentStep
+                                ? 'bg-indigo-50/70 ring-1 ring-inset ring-indigo-300'
                                 : isMod
                                 ? 'bg-amber-50/60'
                                 : 'hover:bg-slate-50'
                             }
                           >
                             <td className="py-2 px-3 font-mono font-black text-slate-900">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {effectiveOrderedPoleIds.length >= 2 && (
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                      isCurrentStep
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-slate-200 text-slate-700'
+                                    }`}
+                                  >
+                                    #{idx + 1}
+                                  </span>
+                                )}
                                 <span>{pid || '-'}</span>
+                                {isCurrentStep && canEditGps && (
+                                  <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-300 font-sans text-[10px] font-bold">
+                                    Đang chọn kéo
+                                  </span>
+                                )}
                                 {isMod && !hasErr && (
                                   <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-sans text-[10px] font-bold">
                                     Đã kéo chỉnh
@@ -1851,15 +2796,28 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                 )}
                                 {hasErr && (
                                   <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300 font-sans text-[10px] font-bold">
-                                    Ngoài hành lang
+                                    Vi phạm vị trí
                                   </span>
                                 )}
                               </div>
                             </td>
                             <td className="py-2 px-3 font-mono text-slate-500">
-                              {g.lat != null && g.lng != null
-                                ? `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}`
-                                : '-'}
+                              <div>
+                                {g.lat != null && g.lng != null
+                                  ? `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}`
+                                  : '-'}
+                              </div>
+                              {typeof g.accuracy_m === 'number' && (
+                                <span
+                                  className={`mt-0.5 inline-block px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                    g.accuracy_m > 10
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-slate-100 text-slate-600'
+                                  }`}
+                                >
+                                  Sai số GPS: ±{g.accuracy_m.toFixed(1)} m
+                                </span>
+                              )}
                             </td>
                             <td className="py-2 px-3 font-mono font-extrabold text-indigo-700">
                               {curLat != null && curLng != null
@@ -1877,6 +2835,21 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                     m
                                   </strong>
                                 </span>
+                                {valInfo?.nearestPoleDistMeters != null && (
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded font-bold ${
+                                      valInfo.nearestPoleDistMeters < MIN_POLE_CLEARANCE_M
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                    }`}
+                                  >
+                                    Cách cột gần nhất:{' '}
+                                    {valInfo.nearestPoleDistMeters.toLocaleString('vi-VN', {
+                                      maximumFractionDigits: 1,
+                                    })}{' '}
+                                    m
+                                  </span>
+                                )}
                                 {valInfo?.distToRoadMeters != null && (
                                   <span
                                     className={`px-1.5 py-0.5 rounded font-bold ${
@@ -1895,18 +2868,45 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                               </div>
                             </td>
                             <td className="py-2 px-3 text-right">
-                              {canEditGps && pid && isMod ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRestoreSinglePoleDraft(pid)}
-                                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition"
-                                >
-                                  <RotateCcw className="w-3 h-3" />
-                                  <span>Khôi phục gốc</span>
-                                </button>
-                              ) : (
-                                <span className="text-[11px] text-slate-400">Tọa độ gốc</span>
-                              )}
+                              <div
+                                className="inline-flex items-center justify-end gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {canEditGps && effectiveOrderedPoleIds.length >= 2 && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={idx === 0}
+                                      onClick={() => handleMovePoleOrder(idx, -1)}
+                                      className="p-1 rounded-md bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 disabled:opacity-35 cursor-pointer disabled:cursor-not-allowed"
+                                      title="Đưa cột này lên bước trước"
+                                    >
+                                      <ArrowUp className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={idx === effectiveOrderedPoleIds.length - 1}
+                                      onClick={() => handleMovePoleOrder(idx, 1)}
+                                      className="p-1 rounded-md bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 disabled:opacity-35 cursor-pointer disabled:cursor-not-allowed"
+                                      title="Đưa cột này xuống bước sau"
+                                    >
+                                      <ArrowDown className="w-3 h-3" />
+                                    </button>
+                                  </>
+                                )}
+                                {canEditGps && pid && isMod ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRestoreSinglePoleDraft(pid)}
+                                    className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Gốc</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 ml-1">Tọa độ gốc</span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         )

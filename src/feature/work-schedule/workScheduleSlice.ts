@@ -110,10 +110,11 @@ export interface WorkScheduleState {
     | 'ended'
     | 'has_report'
     | 'has_cancel'
-    | 'overdue_not_started'
-    | 'overdue_no_report'
+    | 'overdue'
   /** Tọa độ GPS tạm do Quản lý kéo thả tinh chỉnh trong popup Xem GIS (chỉ lưu thật khi bấm Duyệt báo cáo) */
   editedGpsByWorkOrder: Record<string, Record<string, SetPoleLocationRequest>>
+  /** Thứ tự các cột được Quản lý sắp xếp khi cập nhật tuần tự trong popup Xem GIS */
+  orderedGpsPolesByWorkOrder: Record<string, string[]>
 }
 
 const now = new Date()
@@ -148,6 +149,7 @@ const initialState: WorkScheduleState = {
   currentYear: now.getFullYear(),
   filterPhase: 'all',
   editedGpsByWorkOrder: {},
+  orderedGpsPolesByWorkOrder: {},
 }
 
 export const workScheduleSlice = createSlice({
@@ -209,9 +211,9 @@ export const workScheduleSlice = createSlice({
 
       // Tự động gán poleIds, cập nhật báo cáo và segment từ chi tiết vào phase và case tương ứng
       const detail = action.payload
-      const poleIds = Array.from(
-        new Set((detail.faults || []).map((f) => f.pole_id).filter(Boolean) as string[])
-      )
+      const faultPoleIds = (detail.faults || []).map((f) => f.pole_id).filter(Boolean) as string[]
+      const targetPoleIds = (detail.pole_ids || []).filter(Boolean) as string[]
+      const poleIds = Array.from(new Set([...targetPoleIds, ...faultPoleIds]))
       const segmentLabel = segmentLabelFromIds(
         [
           detail.segment_id,
@@ -233,6 +235,9 @@ export const workScheduleSlice = createSlice({
             if (detail.materials_note) {
               p.materialsNote = detail.materials_note
             }
+            if (detail.attachments && detail.attachments.length > 0) {
+              p.qrPdfFiles = detail.attachments
+            }
             if (detail.scheduled_date) {
               p.date = detail.scheduled_date.substring(0, 10)
             }
@@ -253,7 +258,16 @@ export const workScheduleSlice = createSlice({
               if (detail.wo_status === 'done') p.status = 'reported'
               else if (detail.wo_status === 'verified') p.status = 'ended'
             }
-            if (detail.report_note || detail.wo_status === 'done' || detail.wo_status === 'verified') {
+            p.returnReason =
+              detail.wo_status !== 'done' && detail.wo_status !== 'verified' && detail.review_note
+                ? detail.review_note
+                : undefined
+            if (
+              detail.report_note ||
+              detail.wo_status === 'done' ||
+              detail.wo_status === 'verified' ||
+              Boolean(detail.pole_locations && detail.pole_locations.length > 0)
+            ) {
               p.report = {
                 ...(p.report || {
                   submittedAt: `${p.date} 17:00`,
@@ -265,6 +279,10 @@ export const workScheduleSlice = createSlice({
                   : p.report?.submittedAt || `${p.date} 17:00`,
                 usedMaterialsNote: detail.materials_used || p.report?.usedMaterialsNote,
                 suggestedMaterialsNote: detail.materials_note || p.report?.suggestedMaterialsNote,
+                poleGpsLocations:
+                  detail.pole_locations && detail.pole_locations.length > 0
+                    ? detail.pole_locations
+                    : p.report?.poleGpsLocations,
               }
             }
           }
@@ -520,17 +538,26 @@ export const workScheduleSlice = createSlice({
       action: PayloadAction<{
         workOrderId: string
         locations: Record<string, SetPoleLocationRequest>
+        orderedPoleIds?: string[]
       }>
     ) {
-      const { workOrderId, locations } = action.payload
+      const { workOrderId, locations, orderedPoleIds } = action.payload
       if (Object.keys(locations).length === 0) {
         delete state.editedGpsByWorkOrder[workOrderId]
       } else {
         state.editedGpsByWorkOrder[workOrderId] = locations
       }
+      if (orderedPoleIds) {
+        if (orderedPoleIds.length === 0) {
+          delete state.orderedGpsPolesByWorkOrder[workOrderId]
+        } else {
+          state.orderedGpsPolesByWorkOrder[workOrderId] = orderedPoleIds
+        }
+      }
     },
     clearEditedGpsLocations(state, action: PayloadAction<string>) {
       delete state.editedGpsByWorkOrder[action.payload]
+      delete state.orderedGpsPolesByWorkOrder[action.payload]
     },
   },
 })
