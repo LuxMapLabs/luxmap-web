@@ -3,6 +3,8 @@
  * Nguồn duy nhất cho in ấn PDF và xem trước trực tiếp trên giao diện
  */
 
+import luxmapMark from '../../assets/images/luxmap-mark.svg'
+
 export interface DecalCanvasData {
   poleCode?: string | null // external_ref
   segmentName?: string | null
@@ -237,22 +239,24 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
 
-  // - Thương hiệu: chấm tròn AMBER bán kính 9 tại (509, 77)
-  ctx.beginPath()
-  ctx.arc(509, 77, 9, 0, Math.PI * 2)
-  ctx.fillStyle = AMBER
-  ctx.fill()
+  // - Thương hiệu: biểu tượng LuxMap cao 40px tại (500, 56)
+  try {
+    const mark = await loadImage(luxmapMark)
+    ctx.drawImage(mark, 500, 56, 35.5, 40)
+  } catch (err) {
+    console.error('Lỗi khi vẽ logo lên canvas:', err)
+  }
 
-  // Chữ LuxMap 800 28px DISPLAY NAVY tại (526, 86)
+  // Chữ LuxMap 800 28px DISPLAY NAVY tại (546, 86)
   ctx.fillStyle = NAVY
   ctx.font = `800 28px ${DISPLAY}`
-  ctx.fillText('LuxMap', 526, 86)
+  ctx.fillText('LuxMap', 546, 86)
 
   // Ngay sau (đo width + 14px) chữ Chiếu sáng công cộng 500 22px TEXT MUTED cùng baseline 86
   const luxMapWidth = ctx.measureText('LuxMap').width
   ctx.fillStyle = MUTED
   ctx.font = `500 22px ${TEXT}`
-  ctx.fillText('Chiếu sáng công cộng', 526 + luxMapWidth + 14, 86)
+  ctx.fillText('Chiếu sáng công cộng', 546 + luxMapWidth + 14, 86)
 
   // - Biển mã cột: roundRect(500, 108, 494, 108, 14) nền NAVY
   roundRect(ctx, 500, 108, 494, 108, 14)
