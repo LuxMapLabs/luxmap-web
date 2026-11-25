@@ -27,6 +27,10 @@ KHÔNG dùng `agy -p`, KHÔNG dùng `/antigravity:delegate`, không chạy ngầ
 4. Hiện cho tôi spec đã gửi và tóm tắt kết quả 5-10 dòng.
 5. Agy treo, hỏi trust/quyền, hết quota thì dừng và báo tôi, không tự bấm, không tự thử cờ khác.
 
+- Nếu tôi bảo "tự làm" thì Claude tự làm, không giao agy.
+- Trước khi giao: chạy `orca status --json` (Orca chưa chạy thì thử `orca open --json`), rồi `pwd` và `git branch --show-current`. Khung agy phải cùng thư mục và nhánh với Claude, không khớp thì dừng và báo tôi.
+- Lần đầu agy ở thư mục mới hiện hộp trust thì dừng và báo tôi, tôi tự bấm.
+
 ### Chia việc
 
 - Chia task nhỏ, mỗi task một việc, tối đa khoảng 3-5 file, giao lần lượt. Review xong task này mới giao task kế.
