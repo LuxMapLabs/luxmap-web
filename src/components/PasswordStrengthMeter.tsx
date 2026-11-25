@@ -53,7 +53,7 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthMeterProps> = ({
           />
         ))}
       </div>
-      <div className="mt-2 flex min-h-[18px] justify-between text-[12.5px] text-slate-500 dark:text-slate-400">
+      <div className="mt-2 flex min-h-[18px] justify-between text-[12.5px] text-slate-600 dark:text-slate-400">
         <span aria-live="polite">
           Độ mạnh:{' '}
           <b className="font-semibold" style={{ color: levelColor }}>

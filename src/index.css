@@ -268,34 +268,6 @@ button:focus-visible {
 /* LOGIN PAGE ANIMATIONS & AMBIENT DEPTH                                     */
 /* ========================================================================= */
 
-/* Entrance animation mượt mà cho thẻ Login Card (Fade-in + Slide-up nhẹ) */
-@keyframes loginCardEntrance {
-  0% {
-    opacity: 0;
-    transform: translateY(22px) scale(0.985);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.login-form {
-  --login-input-background: #0f172a;
-  color-scheme: dark;
-}
-
-.login-input:is(:autofill, :-webkit-autofill) {
-  box-shadow: 0 0 0 1000px var(--login-input-background) inset;
-  -webkit-text-fill-color: #fff;
-  caret-color: #fff;
-}
-
-.animate-login-card {
-  animation: loginCardEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: opacity, transform;
-}
-
 /* Chuyển động lơ lửng rất nhẹ cho các khối ánh sáng nền (Ambient Orbs) */
 @keyframes ambientFloatSlow {
   0%, 100% {
@@ -1076,5 +1048,18 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .electrical-chart-swap {
     animation: none;
+  }
+}
+
+/* Trang xác thực trên desktop lớn: phóng cả khối form theo màn hình để không lọt thỏm */
+@media (min-width: 1700px) and (min-height: 860px) {
+  .auth-scale {
+    zoom: 1.2;
+  }
+}
+
+@media (min-width: 2300px) and (min-height: 1200px) {
+  .auth-scale {
+    zoom: 1.5;
   }
 }
