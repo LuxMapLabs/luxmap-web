@@ -8,6 +8,9 @@ import passwordReducer, {
   changePasswordRequest,
   changePasswordSuccess,
   changePasswordFailure,
+  forgotPasswordRequest,
+  forgotPasswordSuccess,
+  forgotPasswordFailure,
   resetPasswordState,
 } from '../../feature/password/passwordSlice'
 import { logout } from '../../feature/auth/authSlice'
@@ -80,7 +83,41 @@ describe('passwordSlice', () => {
       isChanging: false,
       changeSuccess: false,
       changeError: null,
+      isRequestingReset: false,
+      resetRequestSent: false,
+      resetRequestError: null,
     })
+  })
+
+  it('forgotPasswordRequest bật isRequestingReset và xoá lỗi cũ', () => {
+    const failed = passwordReducer(undefined, forgotPasswordFailure('Lỗi cũ'))
+    const next = passwordReducer(failed, forgotPasswordRequest({ email: 'user@example.com' }))
+    expect(next.isRequestingReset).toBe(true)
+    expect(next.resetRequestSent).toBe(false)
+    expect(next.resetRequestError).toBeNull()
+  })
+
+  it('forgotPasswordSuccess và forgotPasswordFailure cập nhật trạng thái đúng', () => {
+    const ok = passwordReducer(undefined, forgotPasswordSuccess())
+    expect(ok.isRequestingReset).toBe(false)
+    expect(ok.resetRequestSent).toBe(true)
+    expect(ok.resetRequestError).toBeNull()
+
+    const bad = passwordReducer(ok, forgotPasswordFailure('Email không hợp lệ.'))
+    expect(bad.isRequestingReset).toBe(false)
+    expect(bad.resetRequestSent).toBe(false)
+    expect(bad.resetRequestError).toBe('Email không hợp lệ.')
+  })
+
+  it('resetPasswordState đưa 3 field forgotPassword về mặc định', () => {
+    const dirty = passwordReducer(
+      passwordReducer(undefined, forgotPasswordSuccess()),
+      forgotPasswordFailure('Lỗi gửi email')
+    )
+    const next = passwordReducer(dirty, resetPasswordState())
+    expect(next.isRequestingReset).toBe(false)
+    expect(next.resetRequestSent).toBe(false)
+    expect(next.resetRequestError).toBeNull()
   })
 })
 
@@ -136,6 +173,78 @@ describe('passwordSaga - changePassword', () => {
       const state = store.getState().password
       expect(state.isChanging).toBe(false)
       expect(state.changeError).toBe('Mật khẩu hiện tại không chính xác.')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+  })
+})
+
+describe('passwordSaga - forgotPassword', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllMocks()
+  })
+
+  it('gọi API đúng payload { email } thì bật resetRequestSent và không bật toast', async () => {
+    const spy = vi.spyOn(passwordAPI, 'forgotPassword').mockResolvedValue({
+      message: 'Nếu email tồn tại, liên kết đặt lại mật khẩu đã được gửi.',
+    })
+    const store = makeSagaStore({
+      reducers: { password: passwordReducer },
+      sagas: [passwordSaga],
+    })
+
+    store.dispatch(forgotPasswordRequest({ email: 'user@example.com' }))
+
+    await waitFor(() => {
+      const state = store.getState().password
+      expect(spy).toHaveBeenCalledWith({ email: 'user@example.com' })
+      expect(state.isRequestingReset).toBe(false)
+      expect(state.resetRequestSent).toBe(true)
+      expect(state.resetRequestError).toBeNull()
+      expect(toast.success).not.toHaveBeenCalled()
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+  })
+
+  it('lỗi 429 thì lưu resetRequestError đúng message 429 và không bật toast', async () => {
+    vi.spyOn(passwordAPI, 'forgotPassword').mockRejectedValue({
+      response: { status: 429 },
+    })
+    const store = makeSagaStore({
+      reducers: { password: passwordReducer },
+      sagas: [passwordSaga],
+    })
+
+    store.dispatch(forgotPasswordRequest({ email: 'user@example.com' }))
+
+    await waitFor(() => {
+      const state = store.getState().password
+      expect(state.isRequestingReset).toBe(false)
+      expect(state.resetRequestSent).toBe(false)
+      expect(state.resetRequestError).toBe(
+        'Bạn đã yêu cầu quá nhiều lần. Vui lòng đợi một lát rồi thử lại.'
+      )
+      expect(toast.error).not.toHaveBeenCalled()
+      expect(toast.success).not.toHaveBeenCalled()
+    })
+  })
+
+  it('lỗi mất mạng (không response) thì lưu message mất mạng và không bật toast', async () => {
+    vi.spyOn(passwordAPI, 'forgotPassword').mockRejectedValue(new Error('Network Error'))
+    const store = makeSagaStore({
+      reducers: { password: passwordReducer },
+      sagas: [passwordSaga],
+    })
+
+    store.dispatch(forgotPasswordRequest({ email: 'user@example.com' }))
+
+    await waitFor(() => {
+      const state = store.getState().password
+      expect(state.isRequestingReset).toBe(false)
+      expect(state.resetRequestSent).toBe(false)
+      expect(state.resetRequestError).toBe(
+        'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng rồi thử lại.'
+      )
       expect(toast.error).not.toHaveBeenCalled()
     })
   })

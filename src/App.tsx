@@ -32,6 +32,7 @@ import { CitizenReviewPage } from './pages/citizen-review/CitizenReviewPage'
 import { AdminDashboardPage } from './pages/admin-dashboard/AdminDashboardPage'
 import { PrivacyPolicyPage } from './pages/privacy/PrivacyPolicyPage'
 import { SetPasswordPage } from './pages/set-password/SetPasswordPage'
+import { ForgotPasswordPage } from './pages/forgot-password/ForgotPasswordPage'
 
 /**
  * Điều hướng trang gốc / dựa theo vai trò người dùng (RBAC)
@@ -79,9 +80,9 @@ function App() {
     if (path === '/report' || path.startsWith('/r/') || path.startsWith('/privacy')) {
       return
     }
-    // /set-password bỏ qua kiểm tra phiên nhưng người dùng sẽ chuyển sang /login ngay sau đó,
+    // /set-password và /forgot-password bỏ qua kiểm tra phiên nhưng người dùng sẽ chuyển sang /login ngay sau đó,
     // nên phải tắt cờ loading mặc định (true), nếu không form đăng nhập bị khóa cứng
-    if (path.startsWith('/set-password')) {
+    if (path.startsWith('/set-password') || path.startsWith('/forgot-password')) {
       dispatch(checkAuthFailure())
       return
     }
@@ -107,6 +108,9 @@ function App() {
 
           {/* Đặt mật khẩu từ link mời / đặt lại trong email (Public, token trên URL) */}
           <Route path="/set-password" element={<SetPasswordPage />} />
+
+          {/* Quên mật khẩu: gửi link đặt lại qua email (Public) */}
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* Route thông báo từ chối quyền truy cập (403 Forbidden) */}
           <Route path="/forbidden" element={<ForbiddenPage />} />
