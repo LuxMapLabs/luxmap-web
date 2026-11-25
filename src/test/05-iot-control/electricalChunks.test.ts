@@ -25,12 +25,11 @@ import iotMonitorReducer, {
 } from '../../feature/iot/iotMonitorSlice'
 import iotMonitorSaga from '../../feature/iot/iotMonitorSaga'
 import iotAPI from '../../feature/iot/iotAPI'
-import type { IotFeederAverage } from '../../types/iot/feeders'
+import type { IotFeederHistorySample } from '../../types/iot/feeders'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
     getFeederElectricalHistory: vi.fn(),
-    getFeederElectricalHistoryReceived: vi.fn(),
   },
 }))
 
@@ -55,14 +54,15 @@ const H = 3_600_000
 const C = ELECTRICAL_CHUNK_MS // 6 giờ
 const BASE = Date.UTC(2026, 10, 20, 0, 0, 0) // Đúng bội số 6 giờ (00:00Z)
 
-const makeSample = (timeMs: number, power = 500): IotFeederAverage => ({
-  period_start: new Date(timeMs).toISOString(),
-  period_end: new Date(timeMs + 30_000).toISOString(),
-  sample_count: 3,
-  voltage_avg: 5,
-  current_ma_avg: power / 5,
-  power_mw_avg: power,
-  is_complete: true,
+const makeSample = (timeMs: number, power = 500): IotFeederHistorySample => ({
+  node_id: 'NODE-001',
+  measured_at: new Date(timeMs).toISOString(),
+  received_at: new Date(timeMs + 1_000).toISOString(),
+  reception_type: 'live',
+  voltage: 5,
+  current_ma: power / 5,
+  power_mw: power,
+  lamp_command: 'ON',
 })
 
 describe('electricalChunks — hàm thuần (electricalSeries)', () => {
@@ -410,11 +410,11 @@ describe('electricalChunks — reducer của iotMonitorSlice', () => {
     )
 
     // Tạo 10.000 mẫu (> trần 9.000 cũ của electricalSeries) ở thứ tự đảo ngược + 1 mẫu trùng
-    const batch1: IotFeederAverage[] = []
+    const batch1: IotFeederHistorySample[] = []
     for (let i = 5000; i >= 1; i--) {
       batch1.push(makeSample(BASE + i * 10_000, i))
     }
-    const batch2: IotFeederAverage[] = []
+    const batch2: IotFeederHistorySample[] = []
     for (let i = 5000; i <= 10_000; i++) {
       batch2.push(makeSample(BASE + i * 10_000, i))
     }
@@ -552,6 +552,7 @@ describe('electricalChunks — saga (tải nhiều trang song song, debounce pre
     expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-009', {
       page: 1,
       page_size: 20,
+      sort_by: 'measured_at',
     })
     expect(selectElectricalChunks(store.getState(), 'live1')?.points).toHaveLength(1)
 
@@ -566,10 +567,10 @@ describe('electricalChunks — saga (tải nhiều trang song song, debounce pre
 
     const pending = new Map<
       number,
-      Array<(res: { page: number; page_size: number; total: number; items: IotFeederAverage[] }) => void>
+      Array<(res: { page: number; page_size: number; total: number; items: IotFeederHistorySample[] }) => void>
     >()
     const enqueuePending = (start: number) =>
-      new Promise<{ page: number; page_size: number; total: number; items: IotFeederAverage[] }>(
+      new Promise<{ page: number; page_size: number; total: number; items: IotFeederHistorySample[] }>(
         (resolve) => {
           const list = pending.get(start) ?? []
           list.push(resolve)

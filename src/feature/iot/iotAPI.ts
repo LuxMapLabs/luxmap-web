@@ -120,25 +120,19 @@ export const iotAPI = {
     return response.data
   },
 
-  /** GET /api/v1/iot/feeders/{feederId}/electrical/history — lịch sử điện trung bình 30 giây, mới nhất trước. */
+  /** GET /api/v1/iot/feeders/{feederId}/electrical/history — từng mẫu điện (không trung bình), mới nhất trước; `sort_by` chọn xếp và lọc theo giờ đo hoặc giờ nhận. */
   getFeederElectricalHistory: async (
     feederId: string,
-    params: { page?: number; page_size?: number; from?: string; to?: string } = {}
+    params: {
+      page?: number
+      page_size?: number
+      sort_by?: 'measured_at' | 'received_at'
+      from?: string
+      to?: string
+    } = {}
   ): Promise<IotFeederHistoryResult> => {
     const response = await apiClient.get<IotFeederHistoryResult>(
       `/iot/feeders/${encodeURIComponent(feederId)}/electrical/history`,
-      { params }
-    )
-    return response.data
-  },
-
-  /** GET /api/v1/iot/feeders/{feederId}/electrical/history/received — lịch sử điện trung bình 30 giây theo giờ Bridge nhận (mẫu gửi bù dồn vào lúc tới), mới nhất trước. */
-  getFeederElectricalHistoryReceived: async (
-    feederId: string,
-    params: { page?: number; page_size?: number; from?: string; to?: string } = {}
-  ): Promise<IotFeederHistoryResult> => {
-    const response = await apiClient.get<IotFeederHistoryResult>(
-      `/iot/feeders/${encodeURIComponent(feederId)}/electrical/history/received`,
       { params }
     )
     return response.data

@@ -22,7 +22,6 @@ vi.mock('../../hooks/useShowCommune', () => ({ useShowCommune: () => false }))
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
     getFeederElectricalHistory: vi.fn(),
-    getFeederElectricalHistoryReceived: vi.fn(),
     getFeederDiagnosticHistory: vi.fn(),
     getCommand: vi.fn(),
     getCommandHistory: vi.fn(),

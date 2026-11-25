@@ -5,7 +5,7 @@ import type { FaultItem } from '../../types/faults/faults'
 import type { FixtureStatusRow } from '../../types/statistics/fixture-status'
 import type { IotDiagnosticSummaryItem } from '../../types/iot/diagnostics'
 import type { IotServerStatus } from '../../types/iot/servers'
-import type { IotFeederAverage } from '../../types/iot/feeders'
+import type { IotFeederHistorySample } from '../../types/iot/feeders'
 
 export interface DashboardState {
   loading: boolean
@@ -28,7 +28,7 @@ export interface DashboardState {
   /** Kèm dữ liệu bộ thử (calibration_rig) trong danh sách sự cố */
   includeCalibrationRig: boolean
   /** Lịch sử điện 30s của mạch đang chọn trên biểu đồ IoT */
-  selectedFeederHistory: IotFeederAverage[]
+  selectedFeederHistory: IotFeederHistorySample[]
   selectedFeederHistoryLoading: boolean
   iotLastUpdated: string | null
   lastUpdated: string | null
@@ -128,7 +128,7 @@ const dashboardSlice = createSlice({
     fetchFeederHistoryRequest: (state, _action: PayloadAction<string>) => {
       state.selectedFeederHistoryLoading = true
     },
-    fetchFeederHistorySuccess: (state, action: PayloadAction<IotFeederAverage[]>) => {
+    fetchFeederHistorySuccess: (state, action: PayloadAction<IotFeederHistorySample[]>) => {
       state.selectedFeederHistory = action.payload
       state.selectedFeederHistoryLoading = false
     },

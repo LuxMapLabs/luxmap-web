@@ -23,7 +23,6 @@ vi.mock('../../feature/iot/iotAPI', () => ({
     getElectrical: vi.fn(),
     getNodeSource: vi.fn(),
     getFeederElectricalHistory: vi.fn(),
-    getFeederElectricalHistoryReceived: vi.fn(),
     getFeederDiagnosticHistory: vi.fn(),
     getCommandHistory: vi.fn(),
     getDiagnostics: vi.fn(),
@@ -425,7 +424,6 @@ describe('IotNodeDetailModal (read-only, mục 5)', () => {
     api.getFeederDiagnosticHistory.mockResolvedValue({ page: 1, page_size: 20, total: 0, items: [] })
     api.getCommandHistory.mockResolvedValue({ page: 1, page_size: 10, total: 0, items: [] })
     api.getFeederElectricalHistory.mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] })
-    api.getFeederElectricalHistoryReceived.mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] })
     api.getNodeSource.mockResolvedValue({
       node_id: 'NODE-001',
       server_id: 'iot-server-01',

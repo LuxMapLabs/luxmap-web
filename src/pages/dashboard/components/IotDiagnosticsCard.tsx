@@ -15,7 +15,7 @@ import {
 import { OpsCard } from '../../../components/ops/OpsCard'
 import type { IotDiagnosticSummaryItem } from '../../../types/iot/diagnostics'
 import type { IotServerStatus } from '../../../types/iot/servers'
-import type { IotFeederAverage } from '../../../types/iot/feeders'
+import type { IotFeederHistorySample } from '../../../types/iot/feeders'
 import {
   IOT_DIAGNOSTIC_STATUS,
   IOT_ELECTRICAL_STATUS,
@@ -34,7 +34,7 @@ import {
 interface IotDiagnosticsCardProps {
   summary: IotDiagnosticSummaryItem[]
   servers: IotServerStatus[]
-  feederHistory: IotFeederAverage[]
+  feederHistory: IotFeederHistorySample[]
   historyLoading?: boolean
   onSelectFeeder: (feederId: string) => void
   iotLastUpdated: string | null
@@ -184,7 +184,7 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
   const chartData = useMemo(
     () =>
       activeHistory.map((item) => {
-        const ts = item.period_end || item.period_start
+        const ts = item.measured_at || item.received_at
         const dateObj = ts ? new Date(ts) : null
         const validDate = dateObj && !Number.isNaN(dateObj.getTime()) ? dateObj : null
         const timeLabel = validDate
@@ -205,14 +205,13 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
           : '-'
         const val =
           metric === 'power'
-            ? item.power_mw_avg
+            ? item.power_mw
             : metric === 'current'
-            ? item.current_ma_avg
-            : item.voltage_avg
+            ? item.current_ma
+            : item.voltage
         return {
           timeLabel,
           fullTimeLabel,
-          samples: item.sample_count,
           value: typeof val === 'number' && Number.isFinite(val) ? val : null,
         }
       }),
@@ -224,10 +223,10 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
     if (!last) return null
     const v =
       metric === 'power'
-        ? last.power_mw_avg
+        ? last.power_mw
         : metric === 'current'
-        ? last.current_ma_avg
-        : last.voltage_avg
+        ? last.current_ma
+        : last.voltage
     return typeof v === 'number' && Number.isFinite(v) ? v : null
   }, [activeHistory, metric])
 
@@ -240,10 +239,10 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
     const vals = activeHistory
       .map((item) =>
         metric === 'power'
-          ? item.power_mw_avg
+          ? item.power_mw
           : metric === 'current'
-          ? item.current_ma_avg
-          : item.voltage_avg
+          ? item.current_ma
+          : item.voltage
       )
       .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
     if (vals.length === 0) return null
@@ -571,11 +570,9 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                       ]}
                       labelFormatter={(lbl, payload) => {
                         const first = payload?.[0]?.payload as
-                          | { fullTimeLabel?: string; samples?: number }
+                          | { fullTimeLabel?: string }
                           | undefined
-                        const sampleInfo =
-                          first?.samples != null ? ` · ${first.samples} mẫu` : ''
-                        return `Cửa sổ ${first?.fullTimeLabel || lbl}${sampleInfo}`
+                        return `Mẫu ${first?.fullTimeLabel || lbl}`
                       }}
                     />
                     <Area

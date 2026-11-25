@@ -10,7 +10,6 @@ import { renderWithSagaStore } from '../utils/sagaStore'
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
     getFeederElectricalHistory: vi.fn(),
-    getFeederElectricalHistoryReceived: vi.fn(),
     getFeederDiagnosticHistory: vi.fn(),
     getCommandHistory: vi.fn(),
   },
@@ -28,7 +27,6 @@ describe('FeederHistoryModal (modal lịch sử theo mạch)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     api.getFeederElectricalHistory.mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] })
-    api.getFeederElectricalHistoryReceived.mockResolvedValue({ page: 1, page_size: 200, total: 0, items: [] })
     api.getFeederDiagnosticHistory.mockResolvedValue({ page: 1, page_size: 20, total: 0, items: [] })
     api.getCommandHistory.mockResolvedValue({ page: 1, page_size: 10, total: 0, items: [] })
   })

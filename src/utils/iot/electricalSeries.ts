@@ -1,4 +1,10 @@
-import type { IotFeederAverage } from '../../types/iot/feeders'
+import type { IotFeederHistoryResult, IotFeederHistorySample } from '../../types/iot/feeders'
+
+/** Mốc giờ dùng để xếp mẫu trên trục thời gian (khớp `sort_by` của BE). */
+export type ElectricalSampleBasis = NonNullable<IotFeederHistoryResult['sort_by']>
+
+/** Cách mẫu tới hệ thống: `live` gửi ngay khi đo, `backfill` lấy lại từ thẻ nhớ gửi bù sau khi mất kết nối. */
+export type ElectricalReception = NonNullable<IotFeederHistorySample['reception_type']>
 
 export type ElectricalMetric = 'power' | 'current' | 'voltage'
 
@@ -13,7 +19,7 @@ export const ELECTRICAL_METRIC_KEYS = Object.keys(ELECTRICAL_METRICS) as Electri
 
 export type ElectricalRange = '1h' | '6h' | '12h'
 export const ELECTRICAL_RANGES: Record<ElectricalRange, { label: string; windowMs: number; bucketMs: number; hint: string }> = {
-  '1h':  { label: '1 giờ',  windowMs: 3_600_000,       bucketMs: 0,       hint: 'Từng mẫu (10 giây / mẫu)' },
+  '1h':  { label: '1 giờ',  windowMs: 3_600_000,       bucketMs: 0,       hint: 'Từng mẫu (mỗi giây một mẫu)' },
   '6h':  { label: '6 giờ',  windowMs: 6 * 3_600_000,   bucketMs: 60_000,  hint: 'Trung bình mỗi phút' },
   '12h': { label: '12 giờ', windowMs: 12 * 3_600_000,  bucketMs: 300_000, hint: 'Trung bình mỗi 5 phút' },
 }
@@ -45,39 +51,68 @@ export interface ElectricalPoint {
   power: number | null
   lamp: string | null
   node: string | null
+  /** Giờ đo trên node (`measured_at`), null khi node không có RTC hợp lệ. */
+  measuredAt: number | null
+  /** Giờ Bridge nhận mẫu lần đầu (`received_at`). */
+  receivedAt: number | null
+  /** Cách mẫu tới hệ thống; null khi firmware cũ chưa đánh dấu. */
+  reception: ElectricalReception | null
+}
+
+const parseTime = (iso?: string | null) => {
+  const t = iso ? Date.parse(iso) : NaN
+  return Number.isFinite(t) ? t : null
 }
 
 const finite = (v?: number | null) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
-export function toElectricalPoint(sample: IotFeederAverage): ElectricalPoint | null {
-  const ts = sample.period_start || sample.period_end
-  const time = ts ? Date.parse(ts) : NaN
-  if (!Number.isFinite(time)) return null
+export function toElectricalPoint(
+  sample: IotFeederHistorySample,
+  timeBasis: ElectricalSampleBasis = 'measured_at'
+): ElectricalPoint | null {
+  const measuredAt = parseTime(sample.measured_at)
+  const receivedAt = parseTime(sample.received_at)
+  const time = timeBasis === 'received_at' ? receivedAt : measuredAt
+  if (time === null) return null
   return {
-    key: ts || String(time),
+    key: `${sample.node_id ?? ''}|${sample.measured_at ?? ''}|${sample.received_at ?? ''}`,
     cursor: time,
     time,
-    current: finite(sample.current_ma_avg),
-    voltage: finite(sample.voltage_avg),
-    power: finite(sample.power_mw_avg),
+    current: finite(sample.current_ma),
+    voltage: finite(sample.voltage),
+    power: finite(sample.power_mw),
     lamp: null,
     node: null,
+    measuredAt,
+    receivedAt,
+    reception: sample.reception_type ?? null,
   }
 }
 
 /** Gộp mẫu mới vào chuỗi theo key (không trùng), sắp theo thời gian nhận, giữ `maxPoints` điểm mới nhất. */
-export function mergeElectricalPoints(prev: ElectricalPoint[], samples: IotFeederAverage[], maxPoints: number): ElectricalPoint[] {
+export function mergeElectricalPoints(
+  prev: ElectricalPoint[],
+  samples: IotFeederHistorySample[],
+  maxPoints: number,
+  timeBasis: ElectricalSampleBasis = 'measured_at'
+): ElectricalPoint[] {
   const byKey = new Map(prev.map((p) => [p.key, p]))
   for (const s of samples) {
-    const p = toElectricalPoint(s)
+    const p = toElectricalPoint(s, timeBasis)
     if (p) byKey.set(p.key, p)
   }
   return [...byKey.values()].sort((a, b) => a.time - b.time || a.cursor - b.cursor).slice(-maxPoints)
 }
 
-/** Một điểm sau khi gộp: `count` = số mẫu thô trong khoảng. */
+/** Một điểm sau khi gộp: `count` = số mẫu thô trong khoảng, `backfillCount` = số mẫu gửi bù trong đó. */
 export interface ElectricalBucketPoint extends ElectricalPoint {
   count: number
+  backfillCount: number
+  /** Khoảng giờ đo / giờ nhận của các mẫu trong điểm (bằng nhau khi chỉ có một mẫu). */
+  measuredFrom: number | null
+  measuredTo: number | null
+  receivedFrom: number | null
+  receivedTo: number | null
   min: Record<ElectricalMetric, number | null>
   max: Record<ElectricalMetric, number | null>
 }
@@ -97,6 +132,8 @@ const maxOf = (values: (number | null)[]) => {
   return nums.length ? Math.max(...nums) : null
 }
 
+const EMPTY_SPAN = { backfillCount: 0, measuredFrom: null, measuredTo: null, receivedFrom: null, receivedTo: null }
+
 /**
  * Gộp mẫu thô thành trung bình theo khoảng `bucketMs` (phút / giờ), mốc là đầu khoảng.
  * Giá trị null không tính vào trung bình; khoảng toàn null thì null. `bucketMs <= 0` trả nguyên mẫu (count = 1).
@@ -106,6 +143,11 @@ export function bucketElectricalPoints(points: ElectricalPoint[], bucketMs: numb
     return points.map((p) => ({
       ...p,
       count: 1,
+      backfillCount: p.reception === 'backfill' ? 1 : 0,
+      measuredFrom: p.measuredAt,
+      measuredTo: p.measuredAt,
+      receivedFrom: p.receivedAt,
+      receivedTo: p.receivedAt,
       min: { power: p.power, current: p.current, voltage: p.voltage },
       max: { power: p.power, current: p.current, voltage: p.voltage },
     }))
@@ -132,7 +174,15 @@ export function bucketElectricalPoints(points: ElectricalPoint[], bucketMs: numb
         power: average(group.map((p) => p.power)),
         lamp: last.lamp,
         node: last.node,
+        measuredAt: last.measuredAt,
+        receivedAt: last.receivedAt,
+        reception: last.reception,
         count: group.length,
+        backfillCount: group.filter((p) => p.reception === 'backfill').length,
+        measuredFrom: minOf(group.map((p) => p.measuredAt)),
+        measuredTo: maxOf(group.map((p) => p.measuredAt)),
+        receivedFrom: minOf(group.map((p) => p.receivedAt)),
+        receivedTo: maxOf(group.map((p) => p.receivedAt)),
         min: {
           power: minOf(group.map((p) => p.power)),
           current: minOf(group.map((p) => p.current)),
@@ -262,7 +312,11 @@ export function insertElectricalGaps(
         power: null,
         lamp: null,
         node: null,
+        measuredAt: null,
+        receivedAt: null,
+        reception: null,
         count: 0,
+        ...EMPTY_SPAN,
         min: { power: null, current: null, voltage: null },
         max: { power: null, current: null, voltage: null },
       })
@@ -271,6 +325,31 @@ export function insertElectricalGaps(
   }
 
   return result
+}
+
+/**
+ * Gom các điểm liền kề có mẫu gửi bù (`backfillCount > 0`) thành khoảng thời gian để tô nền biểu đồ.
+ * Điểm ngắt (count = 0) hoặc điểm không có mẫu gửi bù cắt khoảng; `end` = đầu điểm cuối + độ rộng ô (tối thiểu 1 giây).
+ */
+export function findBackfillRanges(
+  points: ElectricalBucketPoint[],
+  bucketMs: number
+): { start: number; end: number }[] {
+  const width = bucketMs > 0 ? bucketMs : 1000
+  const ranges: { start: number; end: number }[] = []
+  let start: number | null = null
+  let last = 0
+  for (const p of points) {
+    if (p.backfillCount > 0) {
+      if (start === null) start = p.time
+      last = p.time
+    } else if (start !== null) {
+      ranges.push({ start, end: last + width })
+      start = null
+    }
+  }
+  if (start !== null) ranges.push({ start, end: last + width })
+  return ranges
 }
 
 /** Kẹp mốc kết thúc khung trong phạm vi hợp lệ của dải 24 giờ. */

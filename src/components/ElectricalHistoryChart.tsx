@@ -1,4 +1,4 @@
-/** Biểu đồ lịch sử điện trung bình 30 giây dùng chung: hỗ trợ chế độ Gần nhất và Theo ngày (tải theo khúc 6 giờ). */
+/** Biểu đồ lịch sử điện từng mẫu dùng chung: hỗ trợ chế độ Gần nhất và Theo ngày (tải theo khúc 6 giờ). */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity } from 'lucide-react'
 import {
@@ -6,6 +6,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -22,6 +23,7 @@ import {
   bucketElectricalPoints,
   buildAxisTicks,
   clampWindowEnd,
+  findBackfillRanges,
   formatRecentAxisTick,
   insertElectricalGaps,
   summarizeMetric,
@@ -44,6 +46,10 @@ const METRIC_TONE: Record<ElectricalMetric, { active: string }> = {
     active: 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 text-amber-900 dark:text-amber-100 shadow-xs',
   },
 }
+
+/** Màu mẫu gửi bù (tím) tách khỏi ba màu chỉ số xanh lá, xanh dương, vàng. */
+const BACKFILL_COLOR = '#7c3aed'
+const BACKFILL_LABEL = 'Gửi bù từ thẻ nhớ'
 
 const RANGE_ORDER: Record<ElectricalRange, number> = { '1h': 1, '6h': 2, '12h': 3 }
 
@@ -116,6 +122,16 @@ const ElectricalXAxisTick: React.FC<AxisTickProps> = ({ x, y, index, payload, fi
 
 interface ChartDataPoint extends ElectricalBucketPoint {
   band: [number, number] | null
+  /** Giá trị chỉ số ở điểm có mẫu gửi bù (vẽ nét đứt tím chồng lên đường chính); null ở điểm khác. */
+  backfill: number | null
+}
+
+/** Một mốc giờ hoặc khoảng giờ `dd/MM HH:mm:ss`; null → '-'. */
+const formatSpan = (from: number | null, to: number | null) => {
+  if (from === null || to === null) return '-'
+  if (from === to) return fullDateTime(from)
+  const end = new Date(to)
+  return `${fullDateTime(from)} – ${pad2(end.getHours())}:${pad2(end.getMinutes())}:${pad2(end.getSeconds())}`
 }
 
 const CustomTooltip: React.FC<{
@@ -156,6 +172,19 @@ const CustomTooltip: React.FC<{
       <p className="font-semibold text-slate-800 dark:text-slate-100">
         {point.count <= 1 ? 'Giá trị' : 'Trung bình'}: <span className="font-mono">{valStr}</span>
       </p>
+      <p className="text-slate-600 dark:text-slate-300">
+        Giờ đo: <span className="font-mono">{formatSpan(point.measuredFrom, point.measuredTo)}</span>
+      </p>
+      <p className="text-slate-600 dark:text-slate-300">
+        Giờ nhận: <span className="font-mono">{formatSpan(point.receivedFrom, point.receivedTo)}</span>
+      </p>
+      {point.backfillCount > 0 && (
+        <p className="font-semibold" style={{ color: BACKFILL_COLOR }}>
+          {point.count <= 1
+            ? `${BACKFILL_LABEL} (node mất kết nối, gửi lại sau)`
+            : `${point.backfillCount}/${point.count} mẫu là ${BACKFILL_LABEL.toLowerCase()}`}
+        </p>
+      )}
       {point.count > 1 && (
         <p className="text-slate-600 dark:text-slate-300">
           {minMaxStr && <>Dao động: <span className="font-mono">{minMaxStr}</span> · </>}
@@ -334,9 +363,12 @@ export const ElectricalHistoryChart: React.FC<{
           p.min[metric] !== null && p.max[metric] !== null
             ? [p.min[metric]!, p.max[metric]!]
             : null,
+        backfill: p.backfillCount > 0 ? p[metric] : null,
       })),
     [series, metric]
   )
+
+  const backfillRanges = useMemo(() => findBackfillRanges(series, bucketMs), [series, bucketMs])
 
   const xTicks = useMemo(
     () => buildAxisTicks(windowStart, windowEnd, RANGE_TICK_STEP_MS[range]),
@@ -460,17 +492,30 @@ export const ElectricalHistoryChart: React.FC<{
                 Về hiện tại
               </button>
             )}
-            <span className="flex items-center gap-1">
+            <span
+              className="flex items-center gap-1"
+              title="Mẫu node gửi ngay khi đo"
+            >
               <span
                 className="w-2.5 h-2.5 rounded-xs"
                 style={{ backgroundColor: ELECTRICAL_METRICS[metric].color }}
               />
-              <span>Trung bình</span>
+              <span>{bucketMs > 0 ? 'Trực tiếp (trung bình)' : 'Trực tiếp'}</span>
+            </span>
+            <span
+              className="flex items-center gap-1"
+              title="Node mất kết nối nên lưu mẫu vào thẻ nhớ, khi nối lại thì lấy ra gửi bù (hoặc sau khi node khởi động lại). Mẫu giữ giờ đo gốc nên nằm đúng đoạn mất kết nối."
+            >
+              <span
+                className="w-2.5 h-2.5 rounded-xs border"
+                style={{ backgroundColor: `${BACKFILL_COLOR}33`, borderColor: BACKFILL_COLOR }}
+              />
+              <span>{BACKFILL_LABEL}</span>
             </span>
             {bucketMs > 0 && (
               <span
                 className="flex items-center gap-1"
-                title="Thấp nhất và cao nhất của các số trung bình 30 giây trong mỗi ô gom"
+                title="Thấp nhất và cao nhất của các mẫu trong mỗi ô gom"
               >
                 <span
                   className="w-2.5 h-2.5 rounded-xs opacity-40"
@@ -502,7 +547,7 @@ export const ElectricalHistoryChart: React.FC<{
             </p>
             {live && (
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Biểu đồ tự hiện khi node gửi mẫu (mỗi 10 giây).
+                Biểu đồ tự hiện khi node gửi mẫu.
               </p>
             )}
           </div>
@@ -540,6 +585,17 @@ export const ElectricalHistoryChart: React.FC<{
                     stroke="#94a3b8"
                     fontSize={10}
                   />
+                  {backfillRanges.map((r) => (
+                    <ReferenceArea
+                      key={`backfill-${r.start}`}
+                      x1={Math.max(r.start, windowStart)}
+                      x2={Math.min(r.end, windowEnd)}
+                      fill={BACKFILL_COLOR}
+                      fillOpacity={0.12}
+                      stroke="none"
+                      ifOverflow="hidden"
+                    />
+                  ))}
                   {bucketMs > 0 && (
                     <Area
                       type="monotone"
@@ -557,6 +613,17 @@ export const ElectricalHistoryChart: React.FC<{
                     stroke={ELECTRICAL_METRICS[metric].color}
                     strokeWidth={2}
                     dot={false}
+                    connectNulls={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="backfill"
+                    stroke={BACKFILL_COLOR}
+                    strokeWidth={2}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    activeDot={false}
                     connectNulls={false}
                     isAnimationActive={false}
                   />
