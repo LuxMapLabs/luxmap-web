@@ -17,7 +17,6 @@ import iotAPI from '../../feature/iot/iotAPI'
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
     getFeederElectricalHistory: vi.fn(),
-    getFeederElectricalHistoryReceived: vi.fn(),
   },
 }))
 
@@ -35,13 +34,14 @@ const sample = (
   _nodeId: string | null = 'NODE-001',
   _serverId: string | null = 'srv-1'
 ) => ({
-  period_start: `2026-11-16T01:${String(minute).padStart(2, '0')}:00Z`,
-  period_end: `2026-11-16T01:${String(minute).padStart(2, '0')}:30Z`,
-  sample_count: 3,
-  voltage_avg: 5,
-  current_ma_avg: current,
-  power_mw_avg: current * 5,
-  is_complete: true,
+  node_id: 'NODE-001',
+  measured_at: `2026-11-16T01:${String(minute).padStart(2, '0')}:00Z`,
+  received_at: `2026-11-16T01:${String(minute).padStart(2, '0')}:01Z`,
+  reception_type: 'live' as const,
+  voltage: 5,
+  current_ma: current,
+  power_mw: current * 5,
+  lamp_command: 'ON',
 })
 
 const makePoint = (timeMs: number, current: number): ElectricalPoint => ({
@@ -53,6 +53,9 @@ const makePoint = (timeMs: number, current: number): ElectricalPoint => ({
   power: current * 5,
   lamp: null,
   node: null,
+  measuredAt: timeMs,
+  receivedAt: timeMs,
+  reception: 'live',
 })
 
 interface MockChunksReturn {
@@ -361,6 +364,13 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     expect(screen.getByRole('slider', { name: 'Di chuyển khung thời gian' })).toBeInTheDocument()
   })
 
+  it('shows legend for live and backfill samples (backfill = lấy lại từ thẻ nhớ khi mất kết nối)', () => {
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="1h" />)
+    expect(screen.getByText('Trực tiếp')).toBeInTheDocument()
+    const backfill = screen.getByText('Gửi bù từ thẻ nhớ')
+    expect(backfill.closest('span[title]')?.getAttribute('title')).toMatch(/mất kết nối/)
+  })
+
   it('shows "Dao động trong ô" legend at range 6h and hides "Đèn bật" and "Đổi node"', () => {
     renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
     expect(screen.getByText(/2 mẫu/)).toBeInTheDocument()
@@ -369,7 +379,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     expect(legend).toBeInTheDocument()
     expect(legend.closest('span[title]')).toHaveAttribute(
       'title',
-      'Thấp nhất và cao nhất của các số trung bình 30 giây trong mỗi ô gom'
+      'Thấp nhất và cao nhất của các mẫu trong mỗi ô gom'
     )
     expect(screen.queryByText('Đèn bật')).not.toBeInTheDocument()
     expect(screen.queryByText('Đổi node')).not.toBeInTheDocument()
@@ -624,7 +634,7 @@ describe('FeederElectricalSummary (dòng số đo trong mạch của khung tủ)
   it('shows the latest power, current and voltage of the feeder node', async () => {
     renderWithMonitor(<FeederElectricalSummary feederId="FDR-009" nodeId="NODE-001" />)
     await waitFor(() =>
-      expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-009', { page: 1, page_size: SPARKLINE_SAMPLES })
+      expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-009', { page: 1, page_size: SPARKLINE_SAMPLES, sort_by: 'measured_at' })
     )
     expect(await screen.findByText('492.5 mW')).toBeInTheDocument()
     expect(screen.getByTestId('feeder-electrical-summary')).toHaveTextContent('98.5 mA · 5.000 V')
@@ -635,7 +645,7 @@ describe('FeederElectricalSummary (dòng số đo trong mạch của khung tủ)
     api.getFeederElectricalHistory.mockResolvedValueOnce({ page: 1, page_size: 30, total: 0, items: [] })
     renderWithMonitor(<FeederElectricalSummary feederId="FDR-011" nodeId={null} />)
     await waitFor(() =>
-      expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-011', { page: 1, page_size: SPARKLINE_SAMPLES })
+      expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-011', { page: 1, page_size: SPARKLINE_SAMPLES, sort_by: 'measured_at' })
     )
     expect(await screen.findByText(/chưa gắn IoT/)).toBeInTheDocument()
   })
@@ -643,7 +653,7 @@ describe('FeederElectricalSummary (dòng số đo trong mạch của khung tủ)
   it('a feeder without an IoT node but with samples shows numbers and "Không gắn node"', async () => {
     renderWithMonitor(<FeederElectricalSummary feederId="FDR-011" nodeId={null} />)
     await waitFor(() =>
-      expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-011', { page: 1, page_size: SPARKLINE_SAMPLES })
+      expect(api.getFeederElectricalHistory).toHaveBeenCalledWith('FDR-011', { page: 1, page_size: SPARKLINE_SAMPLES, sort_by: 'measured_at' })
     )
     expect(await screen.findByText('492.5 mW')).toBeInTheDocument()
     expect(screen.getByText(/Không gắn node · mẫu cuối/)).toBeInTheDocument()
