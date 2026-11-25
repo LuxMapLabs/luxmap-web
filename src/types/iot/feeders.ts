@@ -9,8 +9,8 @@ export interface IotDiagnosticHistoryItem {
     history_id?: number
     feeder_id?: string | null
     node_id?: string | null
-    code?: string | null
-    status?: string | null
+    code?: 'telemetry_stale' | 'voltage_loss' | 'voltage_deviation' | 'current_drop' | 'ds3231_unavailable' | 'ds3231_read_failed' | 'ds3231_time_invalid' | 'ina226_unavailable' | 'ina226_read_failed' | 'ina226_shunt_out_of_range' | 'bh1750_unavailable' | 'bh1750_read_failed' | 'microsd_unavailable' | 'microsd_read_failed' | 'microsd_write_failed' | 'lora_tx_blocked' | 'lora_rx_frame_error'
+    status?: 'active' | 'resolved' | 'interrupted'
     started_at?: string | null
     ended_at?: string | null
     closed_at?: string | null
@@ -27,7 +27,7 @@ export interface IotDiagnosticHistoryItemPagedResult {
 export interface IotDiagnosticResult {
     node_id?: string | null
     feeder_id?: string | null
-    status?: string | null
+    status?: 'normal' | 'anomaly' | 'stale' | 'no_data'
     measurement?: IotMeasurement
     anomalies?: IotAnomaly[]
     connection_status?: 'online' | 'offline' | 'no_data'
@@ -44,32 +44,32 @@ export interface IotDiagnosticResult {
     sensor_health?: IotSensorHealth
 }
 
-export interface IotFeederAverage {
-    period_start?: string | null
-    period_end?: string | null
-    sample_count?: number
-    voltage_avg?: number
-    current_ma_avg?: number
-    power_mw_avg?: number
-    is_complete?: boolean
-}
-
 export interface IotFeederElectricalResult {
     feeder_id?: string | null
     node_id?: string | null
     server_id?: string | null
-    status?: string | null
+    status?: 'online' | 'offline' | 'no_data' | 'unconfigured'
     measurement?: IotMeasurement
     power_state?: FeederPowerState
 }
 
 export interface IotFeederHistoryResult {
     feeder_id?: string | null
-    time_basis?: 'measured_at' | 'received_at'
-    interval_seconds?: number
+    sort_by?: 'measured_at' | 'received_at'
     page?: number
     page_size?: number
     total?: number
-    items?: IotFeederAverage[]
+    items?: IotFeederHistorySample[]
+}
+
+export interface IotFeederHistorySample {
+    node_id?: string | null
+    measured_at?: string | null
+    received_at?: string | null
+    reception_type?: 'live' | 'backfill' | null
+    voltage?: number
+    current_ma?: number
+    power_mw?: number
+    lamp_command?: string | null
 }
 
