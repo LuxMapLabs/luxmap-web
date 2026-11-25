@@ -5,13 +5,13 @@ import {
   ArrowLeft,
   Home,
   Map as MapIcon,
-  Lightbulb,
   Lock,
   LogOut,
 } from 'lucide-react'
 import { RootState } from '../../redux/rootReducer'
 import { logout } from '../../feature/auth/authSlice'
 import { isFieldCrew } from '../../utils/roleUtils'
+import luxmapMark from '../../assets/images/luxmap-mark.svg'
 
 export const ForbiddenPage: React.FC = () => {
   const navigate = useNavigate()
@@ -43,17 +43,15 @@ export const ForbiddenPage: React.FC = () => {
       </div>
 
       {/* 1. Full-Width Top Navbar */}
-      <header className="relative z-20 h-16 w-full bg-white/85 backdrop-blur-md border-b border-slate-200/90 px-6 sm:px-12 flex items-center justify-between shrink-0 shadow-2xs">
+      <header className="relative z-20 h-20 w-full bg-white/85 backdrop-blur-md border-b border-slate-200/90 px-6 sm:px-12 flex items-center justify-between shrink-0 shadow-2xs">
         <div
           onClick={() => navigate('/')}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <div className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shadow-md shadow-primary/20 transition-transform duration-200 group-hover:scale-105">
-            <Lightbulb className="w-5 h-5 text-amber-300 fill-amber-300" />
-          </div>
+          <img src={luxmapMark} alt="" className="h-14 w-auto shrink-0 transition-transform duration-200 group-hover:scale-105" />
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-base tracking-wider text-slate-900 uppercase">LuxMap</span>
+              <span className="font-extrabold text-xl tracking-wider text-slate-900 uppercase">LuxMap</span>
             </div>
             <p className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">
               Hệ thống GIS Quản lý Chiếu sáng Nông thôn

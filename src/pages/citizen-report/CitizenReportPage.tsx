@@ -32,6 +32,7 @@ import {
   User,
   Ban,
 } from 'lucide-react'
+import luxmapMark from '../../assets/images/luxmap-mark.svg'
 
 type FaultOptionId = CitizenReportKind | 'other_generic'
 
@@ -403,8 +404,8 @@ export const CitizenReportPage: React.FC = () => {
         {/* Header thương hiệu công ích */}
         <header className="px-1 pt-1 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#F5A623]" aria-hidden="true" />
-            <span className="text-sm font-extrabold text-[#1f3864] dark:text-blue-200">LuxMap</span>
+            <img src={luxmapMark} alt="" className="h-14 w-auto shrink-0" />
+            <span className="text-xl font-extrabold text-[#1f3864] dark:text-blue-200">LuxMap</span>
             <span className="text-xs text-slate-500 dark:text-slate-400">Chiếu sáng công cộng</span>
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Báo đèn hỏng</h1>

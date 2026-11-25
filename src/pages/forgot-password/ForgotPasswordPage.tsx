@@ -14,7 +14,7 @@ import {
 } from '../../components/AuthPageShell'
 
 const INPUT_CLASS =
-  'h-[46px] w-full min-w-0 bg-transparent pl-3.5 pr-3.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50'
+  'h-full w-full min-w-0 bg-transparent px-3.5 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50'
 
 export const ForgotPasswordPage: React.FC = () => {
   const dispatch = useDispatch()
@@ -51,8 +51,10 @@ export const ForgotPasswordPage: React.FC = () => {
             <MailCheck className="h-7 w-7" />
           </div>
           <div className="space-y-1.5" role="status">
-            <h1 className="text-2xl font-bold">Kiểm tra email của bạn</h1>
-            <p className="mx-auto max-w-[36ch] text-sm leading-relaxed text-slate-500">
+            <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-slate-900 md:text-[28px]">
+              Kiểm tra email của bạn
+            </h1>
+            <p className="mx-auto max-w-[36ch] text-sm leading-relaxed text-slate-600">
               Nếu email này có tài khoản LuxMap, liên kết đặt lại mật khẩu đã được gửi. Liên kết có hiệu lực 1&nbsp;giờ.
             </p>
           </div>
@@ -66,16 +68,18 @@ export const ForgotPasswordPage: React.FC = () => {
 
   return (
     <AuthPageShell>
-      <h1 className="mb-1.5 text-2xl font-bold leading-tight">Quên mật khẩu</h1>
-      <p className="mb-6 max-w-[36ch] text-sm leading-relaxed text-slate-500">
+      <h1 className="mb-2 text-2xl font-extrabold leading-tight tracking-tight text-slate-900 md:text-[28px]">
+        Quên mật khẩu
+      </h1>
+      <p className="mb-5 text-balance text-sm leading-relaxed text-slate-600 [@media(max-height:659px)]:mb-3">
         Nhập email tài khoản LuxMap, chúng tôi sẽ gửi liên kết để đặt lại mật khẩu.
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-5 [@media(max-height:759px)]:space-y-4 [@media(max-height:659px)]:space-y-3" noValidate>
         {resetRequestError ? (
           <div
             role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-[13px] text-red-800"
+            className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
           >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="leading-relaxed">{resetRequestError}</p>
@@ -83,7 +87,7 @@ export const ForgotPasswordPage: React.FC = () => {
         ) : null}
 
         <div>
-          <label htmlFor="forgot-email" className="mb-1.5 block text-[13px] font-semibold">
+          <label htmlFor="forgot-email" className="mb-2 block text-sm font-semibold text-slate-700">
             Email
           </label>
           <div className={`${INPUT_WRAP} ${emailError ? INPUT_ERROR : INPUT_OK}`}>
@@ -101,7 +105,7 @@ export const ForgotPasswordPage: React.FC = () => {
             />
           </div>
           {emailError ? (
-            <p id="forgot-email-error" className="mt-1.5 text-xs text-red-600">
+            <p id="forgot-email-error" className="mt-1.5 text-[13px] font-semibold text-rose-600">
               {emailError}
             </p>
           ) : null}
@@ -119,8 +123,8 @@ export const ForgotPasswordPage: React.FC = () => {
         </button>
       </form>
 
-      <p className="mt-5 text-center text-[13px]">
-        <Link to="/login" className="font-semibold text-[#1f3864] hover:underline">
+      <p className="mt-5 text-center text-sm">
+        <Link to="/login" className="font-semibold text-primary hover:underline">
           Quay lại đăng nhập
         </Link>
       </p>

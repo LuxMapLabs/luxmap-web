@@ -2,7 +2,6 @@ import React from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import {
-  Lightbulb,
   Map,
   Boxes,
   ShieldCheck,
@@ -19,6 +18,7 @@ import {
 import type { CurrentUserResponse } from '../types/auth/me'
 import { canAccessTab } from '../utils/roleUtils'
 import type { RootState } from '../redux/rootReducer'
+import luxmapMark from '../assets/images/luxmap-mark.svg'
 
 export interface SidebarProps {
   brandTitle?: string
@@ -76,10 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* 1. Header / Logo Area */}
       <div className={`h-16 flex items-center border-b border-slate-200/80 px-4 transition-all duration-300 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
         <div className="flex items-center gap-3 overflow-hidden cursor-default select-none">
-          {/* Emblem: Deep sapphire tile with warm golden glowing bulb */}
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-blue-700 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-blue-600/25 ring-4 ring-blue-50 shrink-0">
-            <Lightbulb className="w-5 h-5 text-amber-300 fill-amber-300/90 drop-shadow-[0_0_8px_rgba(252,211,77,0.5)]" />
-          </div>
+          <img src={luxmapMark} alt="LuxMap" className="h-10 w-auto shrink-0" />
 
           {!isCollapsed && (
             <div className="flex flex-col min-w-0 transition-opacity duration-200 pr-2">

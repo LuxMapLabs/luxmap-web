@@ -28,6 +28,12 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>25/11/2026 — Nhận diện: gắn bộ icon LuxMap</dt>
+        <dd>Thay chữ "C" (Civic Flow) của boilerplate bằng bộ icon LuxMap từ backend <code>assets/branding/icon/</code> (PR luxmap_backend #301). Favicon <code>.ico</code> + <code>.svg</code> và <code>apple-touch-icon</code> trong <code>index.html</code>; Sidebar dùng biểu tượng ghim + đèn (<code>luxmap-mark.svg</code>) thay ô bóng đèn Lucide; trang Đăng nhập dùng ô icon nền trắng (<code>luxmap-icon.svg</code>) vì biểu tượng navy chìm trên nền tối.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>index.html</code>; <code>public/favicon.ico</code>; <code>public/favicon.svg</code>; <code>public/apple-touch-icon-180.png</code>; <code>src/assets/images/luxmap-mark.svg</code>; <code>src/assets/images/luxmap-icon.svg</code>; xoá <code>src/assets/images/icon.svg</code>; <code>src/components/Sidebar.tsx</code>; <code>src/pages/login/LoginPage.tsx</code>; <code>tracking.html</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>tsc</code>, eslint (0 lỗi), build, <code>vitest</code> 906/906; trang Đăng nhập xem trên trình duyệt, ba file favicon trả 200. ⚠️ Sidebar chưa xem trên trình duyệt (cần đăng nhập). <code>public/favicon.png</code>, <code>public/icon.png</code> của boilerplate không còn ai dùng — để nguyên.</dd>
         <dt>21/11/2026 — Quản trị tài khoản: hiện tài khoản đang đăng nhập</dt>
         <dd>Bỏ bộ lọc ẩn tài khoản đang đăng nhập (có từ <code>e404283</code>, 23/10). Dòng của chính mình nằm đúng thứ tự server trả, có nhãn "Bạn"; nhận diện chỉ theo <code>user_id</code>. Nút khoá trên dòng đó bị vô hiệu ("Không thể khoá tài khoản của chính bạn"); sửa chính mình thì khoá vai trò và địa bàn, vẫn sửa được họ tên / email. Backend vốn đã chặn tự khoá (409) và hạ quyền admin cuối cùng (409).</dd>
         <dt>File thay đổi</dt>
