@@ -12,6 +12,8 @@ import {
   findNodeChanges,
   findLampOnRanges,
   summarizeMetric,
+  toElectricalPoint,
+  findBackfillRanges,
   type ElectricalPoint,
 } from '../../utils/iot/electricalSeries'
 
@@ -24,6 +26,9 @@ const makePoint = (opts: Partial<ElectricalPoint> & { time: number }): Electrica
   power: opts.power ?? null,
   lamp: opts.lamp ?? null,
   node: opts.node ?? null,
+  measuredAt: opts.measuredAt ?? opts.time,
+  receivedAt: opts.receivedAt ?? opts.time,
+  reception: opts.reception ?? 'live',
 })
 
 describe('electricalSeries', () => {
@@ -343,6 +348,64 @@ describe('electricalSeries', () => {
       const midnight = new Date(2026, 10, 24, 0, 0, 0).getTime()
       expect(formatRecentAxisTick(midnight, true)).toEqual({ clock: '00:00', date: '24/11' })
       expect(formatRecentAxisTick(midnight, false)).toEqual({ clock: '00:00', date: '24/11' })
+    })
+  })
+
+  describe('reception_type (live / backfill)', () => {
+    const raw = {
+      node_id: 'NODE-001',
+      measured_at: '2026-11-25T07:59:58Z',
+      received_at: '2026-11-25T08:05:00Z',
+      voltage: 5,
+      current_ma: 95,
+      power_mw: 475,
+      lamp_command: 'ON',
+    }
+
+    it('giữ giờ đo, giờ nhận và loại nhận; xếp theo giờ đo mặc định', () => {
+      const p = toElectricalPoint({ ...raw, reception_type: 'backfill' })
+      expect(p?.time).toBe(Date.parse(raw.measured_at))
+      expect(p?.measuredAt).toBe(Date.parse(raw.measured_at))
+      expect(p?.receivedAt).toBe(Date.parse(raw.received_at))
+      expect(p?.reception).toBe('backfill')
+      expect(p?.power).toBe(475)
+    })
+
+    it('xếp theo giờ nhận khi timeBasis = received_at; thiếu giờ đo thì bỏ ở chế độ giờ đo', () => {
+      expect(toElectricalPoint(raw, 'received_at')?.time).toBe(Date.parse(raw.received_at))
+      expect(toElectricalPoint({ ...raw, measured_at: null })).toBeNull()
+      expect(toElectricalPoint({ ...raw, measured_at: null }, 'received_at')?.measuredAt).toBeNull()
+    })
+
+    it('reception_type null (firmware cũ) → reception null', () => {
+      expect(toElectricalPoint({ ...raw, reception_type: null })?.reception).toBeNull()
+    })
+
+    it('đếm mẫu gửi bù trong ô gom và tính khoảng giờ đo / giờ nhận', () => {
+      const t = Date.parse('2026-11-25T08:00:00Z')
+      const pts = [
+        makePoint({ time: t + 1_000, key: 'a', reception: 'live', measuredAt: t + 1_000, receivedAt: t + 2_000 }),
+        makePoint({ time: t + 5_000, key: 'b', reception: 'backfill', measuredAt: t + 5_000, receivedAt: t + 90_000 }),
+      ]
+      const [b] = bucketElectricalPoints(pts, 60_000)
+      expect(b.count).toBe(2)
+      expect(b.backfillCount).toBe(1)
+      expect(b.measuredFrom).toBe(t + 1_000)
+      expect(b.measuredTo).toBe(t + 5_000)
+      expect(b.receivedFrom).toBe(t + 2_000)
+      expect(b.receivedTo).toBe(t + 90_000)
+    })
+
+    it('findBackfillRanges gom các điểm gửi bù liền kề thành khoảng, điểm live cắt khoảng', () => {
+      const mk = (time: number, reception: 'live' | 'backfill') => makePoint({ time, key: String(time), reception })
+      const series = bucketElectricalPoints(
+        [mk(0, 'live'), mk(1_000, 'backfill'), mk(2_000, 'backfill'), mk(3_000, 'live'), mk(4_000, 'backfill')],
+        0
+      )
+      expect(findBackfillRanges(series, 0)).toEqual([
+        { start: 1_000, end: 3_000 },
+        { start: 4_000, end: 5_000 },
+      ])
     })
   })
 })

@@ -10,7 +10,7 @@ import type {
 } from '../../types/iot/nodes'
 import type {
   IotDiagnosticHistoryItem,
-  IotFeederAverage,
+  IotFeederHistorySample,
   IotFeederElectricalResult,
 } from '../../types/iot/feeders'
 import type { IotServerStatus } from '../../types/iot/servers'
@@ -57,6 +57,7 @@ export type ElectricalTimeBasis = 'measured_at' | 'received_at'
 
 export interface ElectricalSeriesEntry {
   feederId: string
+  timeBasis: ElectricalTimeBasis
   points: ElectricalPoint[]
   loading: boolean
   backfilling: boolean
@@ -232,9 +233,10 @@ export const iotMonitorSlice = createSlice({
         fromTo?: { from: string; to: string }
       }>
     ) => {
-      const { key, feederId, maxPoints, windowMs, fromTo } = action.payload
+      const { key, feederId, maxPoints, windowMs, fromTo, timeBasis = 'measured_at' } = action.payload
       state.electricalSeries[key] = {
         feederId,
+        timeBasis,
         points: [],
         loading: true,
         backfilling: true,
@@ -248,13 +250,13 @@ export const iotMonitorSlice = createSlice({
     },
     electricalSeriesAbsorb: (
       state,
-      action: PayloadAction<{ key: string; samples: IotFeederAverage[] }>
+      action: PayloadAction<{ key: string; samples: IotFeederHistorySample[] }>
     ) => {
       const entry = state.electricalSeries[action.payload.key]
       if (!entry) return
       const samples = action.payload.samples
       if (!samples || samples.length === 0) return
-      const merged = mergeElectricalPoints(entry.points, samples, entry.maxPoints)
+      const merged = mergeElectricalPoints(entry.points, samples, entry.maxPoints, entry.timeBasis)
       if (!entry.windowMs || merged.length === 0) {
         entry.points = merged
       } else {
@@ -361,13 +363,13 @@ export const iotMonitorSlice = createSlice({
     },
     electricalChunksAbsorb: (
       state,
-      action: PayloadAction<{ key: string; samples: IotFeederAverage[] }>
+      action: PayloadAction<{ key: string; samples: IotFeederHistorySample[] }>
     ) => {
       const entry = state.electricalChunks[action.payload.key]
       if (!entry) return
       const samples = action.payload.samples
       if (!samples || samples.length === 0) return
-      entry.points = mergeElectricalPoints(entry.points, samples, Number.MAX_SAFE_INTEGER)
+      entry.points = mergeElectricalPoints(entry.points, samples, Number.MAX_SAFE_INTEGER, entry.timeBasis)
     },
     setElectricalChunksError: (
       state,

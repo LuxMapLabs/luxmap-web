@@ -123,8 +123,8 @@ export const FeederHistoryModal: React.FC<FeederHistoryModalProps> = ({
               ) : (
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   {timeBasis === 'received_at'
-                    ? 'Trung bình mỗi 30 giây theo giờ Bridge nhận. Mẫu gửi bù từ thẻ nhớ dồn vào lúc tới, mẫu thiếu giờ RTC chỉ có ở chế độ này. Dùng để xem node mất kết nối và gửi bù lúc nào.'
-                    : 'Trung bình mỗi 30 giây theo giờ đo trên node. Số đo node lưu thẻ nhớ khi mất kết nối được gửi bù và xếp đúng lúc đo.'}
+                    ? 'Từng mẫu theo giờ Bridge nhận. Mẫu gửi bù từ thẻ nhớ dồn vào lúc tới, mẫu thiếu giờ RTC chỉ có ở chế độ này. Dùng để xem node mất kết nối và gửi bù lúc nào.'
+                    : 'Từng mẫu theo giờ đo trên node. Số đo node lưu thẻ nhớ khi mất kết nối được gửi bù và xếp đúng lúc đo.'}
                 </p>
               )}
               <div className="flex items-center gap-2 flex-wrap md:flex-nowrap shrink-0 ml-auto">

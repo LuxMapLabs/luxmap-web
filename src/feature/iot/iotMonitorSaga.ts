@@ -87,7 +87,7 @@ import type {
 } from '../../types/iot/nodes'
 import type {
   IotDiagnosticHistoryItemPagedResult,
-  IotFeederAverage,
+  IotFeederHistorySample,
   IotFeederElectricalResult,
   IotFeederHistoryResult,
 } from '../../types/iot/feeders'
@@ -111,7 +111,8 @@ type SettledResult<T> =
   | { status: 'fulfilled'; value: T }
   | { status: 'rejected'; reason: unknown }
 
-const sampleTime = (s: IotFeederAverage) => toElectricalPoint(s)?.time ?? null
+const sampleTime = (s: IotFeederHistorySample, timeBasis: ElectricalTimeBasis) =>
+  toElectricalPoint(s, timeBasis)?.time ?? null
 
 // ==========================================
 // A. Trạng thái IoT của tủ (useCabinetIotStatus)
@@ -254,10 +255,7 @@ function* electricalSeriesSession(
 ) {
   const { key, feederId, initial, windowMs, live = true, timeBasis = 'measured_at', fromTo } = payload
   if (!feederId) return
-  const fetchHistory =
-    timeBasis === 'received_at'
-      ? iotAPI.getFeederElectricalHistoryReceived
-      : iotAPI.getFeederElectricalHistory
+  const fetchHistory = iotAPI.getFeederElectricalHistory
 
   if (fromTo) {
     try {
@@ -267,6 +265,7 @@ function* electricalSeriesSession(
         const result: IotFeederHistoryResult = yield call(fetchHistory, feederId, {
           page,
           page_size: pageSize,
+          sort_by: timeBasis,
           from: fromTo.from,
           to: fromTo.to,
         })
@@ -290,7 +289,7 @@ function* electricalSeriesSession(
           key,
           backfilling: false,
           error: truncated
-            ? 'Khoảng quá dài, chỉ tải 40.000 khoảng 30 giây gần nhất (≈ 13,9 ngày).'
+            ? 'Khoảng quá dài, chỉ tải 40.000 mẫu gần nhất.'
             : null,
         })
       )
@@ -313,7 +312,7 @@ function* electricalSeriesSession(
         const result: IotFeederHistoryResult = yield call(
           fetchHistory,
           feederId,
-          { page, page_size: initial }
+          { page, page_size: initial, sort_by: timeBasis }
         )
         const items = result.items || []
         yield put(electricalSeriesAbsorb({ key, samples: items }))
@@ -326,7 +325,7 @@ function* electricalSeriesSession(
         if (typeof result.total === 'number' && page * initial >= result.total) {
           break
         }
-        const times = items.map(sampleTime).filter((t): t is number => t !== null)
+        const times = items.map((s) => sampleTime(s, timeBasis)).filter((t): t is number => t !== null)
         if (times.length === 0) break
         newest ??= Math.max(...times)
         if (newest - Math.min(...times) >= windowMs) break
@@ -362,7 +361,7 @@ function* electricalSeriesSession(
           const page: IotFeederHistoryResult = yield call(
             fetchHistory,
             feederId,
-            { page: 1, page_size: 20 }
+            { page: 1, page_size: 20, sort_by: timeBasis }
           )
           yield put(electricalSeriesAbsorb({ key, samples: page.items || [] }))
           yield put(setElectricalSeriesError({ key, error: null }))
@@ -423,11 +422,13 @@ function* fetchAndAbsorbChunkPage(
   feederId: string,
   page: number,
   from: string,
-  to: string
+  to: string,
+  timeBasis: ElectricalTimeBasis
 ) {
   const res: IotFeederHistoryResult = yield call(fetchHistory, feederId, {
     page,
     page_size: CHUNK_PAGE_SIZE,
+    sort_by: timeBasis,
     from,
     to,
   })
@@ -446,10 +447,7 @@ function* loadSingleElectricalChunk(
   start: number,
   onFinished: () => void
 ) {
-  const fetchHistory =
-    timeBasis === 'received_at'
-      ? iotAPI.getFeederElectricalHistoryReceived
-      : iotAPI.getFeederElectricalHistory
+  const fetchHistory = iotAPI.getFeederElectricalHistory
   const from = new Date(start).toISOString()
   const to = new Date(start + ELECTRICAL_CHUNK_MS).toISOString()
 
@@ -464,7 +462,8 @@ function* loadSingleElectricalChunk(
       feederId,
       1,
       from,
-      to
+      to,
+      timeBasis
     )
     const firstItems = first.items || []
 
@@ -482,7 +481,7 @@ function* loadSingleElectricalChunk(
           }
           yield all(
             batchPages.map((page) =>
-              call(fetchAndAbsorbChunkPage, fetchHistory, key, feederId, page, from, to)
+              call(fetchAndAbsorbChunkPage, fetchHistory, key, feederId, page, from, to, timeBasis)
             )
           )
         }
@@ -497,7 +496,8 @@ function* loadSingleElectricalChunk(
           feederId,
           page,
           from,
-          to
+          to,
+          timeBasis
         )
         if ((res.items || []).length < CHUNK_PAGE_SIZE) break
       }
@@ -530,10 +530,7 @@ function* liveElectricalChunksPoll(
   feederId: string,
   timeBasis: ElectricalTimeBasis
 ) {
-  const fetchHistory =
-    timeBasis === 'received_at'
-      ? iotAPI.getFeederElectricalHistoryReceived
-      : iotAPI.getFeederElectricalHistory
+  const fetchHistory = iotAPI.getFeederElectricalHistory
 
   while (true) {
     yield delay(ELECTRICAL_POLL_MS)
@@ -541,6 +538,7 @@ function* liveElectricalChunksPoll(
       const page: IotFeederHistoryResult = yield call(fetchHistory, feederId, {
         page: 1,
         page_size: 20,
+        sort_by: timeBasis,
       })
       yield put(electricalChunksAbsorb({ key, samples: page.items || [] }))
       yield put(setElectricalChunksError({ key, error: null }))

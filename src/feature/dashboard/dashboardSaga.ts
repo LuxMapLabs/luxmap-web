@@ -14,7 +14,7 @@ import type { FixtureStatusStatistics } from '../../types/statistics/fixture-sta
 import type { PoleListItem } from '../../types/assets/poles'
 import type { IotDiagnosticSummaryItem } from '../../types/iot/diagnostics'
 import type { IotServerStatus } from '../../types/iot/servers'
-import type { IotFeederAverage, IotFeederHistoryResult } from '../../types/iot/feeders'
+import type { IotFeederHistorySample, IotFeederHistoryResult } from '../../types/iot/feeders'
 import type { RootState } from '../../redux/store'
 import iotAPI from '../iot/iotAPI'
 import {
@@ -168,7 +168,7 @@ function* handleFetchFeederHistory(action: ReturnType<typeof fetchFeederHistoryR
       action.payload,
       { page: 1, page_size: 20 }
     )
-    const items: IotFeederAverage[] = [...(res?.items || [])].reverse()
+    const items: IotFeederHistorySample[] = [...(res?.items || [])].reverse()
     yield put(fetchFeederHistorySuccess(items))
   } catch {
     yield put(fetchFeederHistorySuccess([]))
