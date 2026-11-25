@@ -66,8 +66,7 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
     const todayYmd = getLocalTodayYmd()
     let pendingCancel = 0
     let pendingReport = 0
-    let overdueNotStarted = 0
-    let overdueNoReport = 0
+    let overdue = 0
     let inProgress = 0
     let ended = 0
     let survey = 0
@@ -92,11 +91,9 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
           } else if (p.status === 'reported') {
             pendingReport++
           } else {
-            const overdue = getPhaseOverdueInfo(p, c.isTerminated, undefined, todayYmd)
-            if (overdue.kind === 'overdue_not_started') {
-              overdueNotStarted++
-            } else if (overdue.kind === 'overdue_no_report') {
-              overdueNoReport++
+            const overdueInfo = getPhaseOverdueInfo(p, c.isTerminated, undefined, todayYmd)
+            if (overdueInfo.isOverdue) {
+              overdue++
             }
             inProgress++
           }
@@ -107,8 +104,7 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
     return {
       pendingCancel,
       pendingReport,
-      overdueNotStarted,
-      overdueNoReport,
+      overdue,
       inProgress,
       ended,
       survey,
@@ -146,14 +142,12 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
   const hasPendingActions =
     metrics.pendingCancel > 0 ||
     metrics.pendingReport > 0 ||
-    metrics.overdueNotStarted > 0 ||
-    metrics.overdueNoReport > 0
+    metrics.overdue > 0
 
   const isQuickFilterActive =
     filterPhase === 'has_report' ||
     filterPhase === 'has_cancel' ||
-    filterPhase === 'overdue_not_started' ||
-    filterPhase === 'overdue_no_report'
+    filterPhase === 'overdue'
 
   return (
     <div className="ops-rise relative z-20 bg-white rounded-[20px] shadow-ops p-3.5 sm:p-4 mb-5 flex flex-col gap-3">
@@ -417,49 +411,25 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
               </button>
             )}
 
-            {metrics.overdueNotStarted > 0 && (
+            {metrics.overdue > 0 && (
               <button
                 type="button"
                 onClick={() =>
-                  onFilterChange(
-                    filterPhase === 'overdue_not_started' ? 'all' : 'overdue_not_started'
-                  )
+                  onFilterChange(filterPhase === 'overdue' ? 'all' : 'overdue')
                 }
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer active:scale-95 ${
-                  filterPhase === 'overdue_not_started'
+                  filterPhase === 'overdue'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'bg-orange-50 text-orange-800 hover:bg-orange-100 border border-orange-300'
                 }`}
-                title="Bấm để lọc các ca đã quá hạn nhưng kỹ sư chưa bấm Bắt đầu"
+                title="Bấm để lọc các phiếu công tác đã quá hạn hoàn thành"
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                    filterPhase === 'overdue_not_started' ? 'bg-white' : 'bg-orange-600'
+                    filterPhase === 'overdue' ? 'bg-white' : 'bg-orange-600'
                   }`}
                 />
-                <span>{metrics.overdueNotStarted} Quá hạn • Chưa bắt đầu</span>
-              </button>
-            )}
-
-            {metrics.overdueNoReport > 0 && (
-              <button
-                type="button"
-                onClick={() =>
-                  onFilterChange(filterPhase === 'overdue_no_report' ? 'all' : 'overdue_no_report')
-                }
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer active:scale-95 ${
-                  filterPhase === 'overdue_no_report'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300'
-                }`}
-                title="Bấm để lọc các ca kỹ sư đã bắt đầu nhưng quá hạn chưa nộp báo cáo"
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                    filterPhase === 'overdue_no_report' ? 'bg-white' : 'bg-amber-600'
-                  }`}
-                />
-                <span>{metrics.overdueNoReport} Quá hạn • Chưa báo cáo</span>
+                <span>{metrics.overdue} Quá hạn</span>
               </button>
             )}
 

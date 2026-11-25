@@ -115,6 +115,9 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   // Dữ liệu chi tiết lệnh công tác từ máy chủ
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
   const editedGpsByWorkOrder = useSelector((state: RootState) => state.workSchedule.editedGpsByWorkOrder)
+  const orderedGpsPolesByWorkOrder = useSelector(
+    (state: RootState) => state.workSchedule.orderedGpsPolesByWorkOrder
+  )
 
   // Trạng thái cục bộ khi duyệt kiểm tra
   const [isInspectionApprovedLocal, setIsInspectionApprovedLocal] = useState(false)
@@ -399,18 +402,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   // Kiểm tra bước hiện tại đã được duyệt hay chưa
   const isCurrentlyApproved = isInspectionApprovedLocal && currentPhase?.phaseType === 'inspection'
 
-  // Kiểm tra cảnh báo quá hạn (chưa ấn bắt đầu vs đã bắt đầu nhưng chưa có báo cáo)
+  // Kiểm tra cảnh báo quá hạn
   const overdueInfo = getPhaseOverdueInfo(
     currentPhase,
     caseItem.isTerminated,
     effectiveRawStatus
   )
-  const isOverdueNotStarted =
-    overdueInfo.kind === 'overdue_not_started' &&
-    currentPhase?.cancellationRequest?.status !== 'pending' &&
-    !isCurrentlyApproved
-  const isOverdueNoReport =
-    overdueInfo.kind === 'overdue_no_report' &&
+  const isOverdue =
+    overdueInfo.isOverdue &&
     currentPhase?.cancellationRequest?.status !== 'pending' &&
     !isCurrentlyApproved
 
@@ -573,10 +572,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   circleClass = 'bg-rose-500 text-white border-rose-500 shadow-xs'
                 } else if (isCompleted) {
                   circleClass = 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                } else if (isActive && stepOverdue?.kind === 'overdue_not_started') {
+                } else if (isActive && stepOverdue?.isOverdue) {
                   circleClass = 'bg-orange-600 text-white border-orange-600 ring-4 ring-orange-100 shadow-xs'
-                } else if (isActive && stepOverdue?.kind === 'overdue_no_report') {
-                  circleClass = 'bg-amber-600 text-white border-amber-600 ring-4 ring-amber-100 shadow-xs'
                 } else if (isActive) {
                   circleClass = 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100 shadow-xs'
                 }
@@ -722,9 +719,9 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           )}
 
           {/* ======================================================== */}
-          {/* BANNER CẢNH BÁO QUÁ HẠN: CHƯA BẮT ĐẦU HOẶC CHƯA BÁO CÁO */}
+          {/* BANNER CẢNH BÁO QUÁ HẠN */}
           {/* ======================================================== */}
-          {isOverdueNotStarted && currentPhase && (
+          {isOverdue && currentPhase && (
             <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50 via-amber-50/70 to-orange-50 border-2 border-orange-300 shadow-sm flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-start gap-2.5">
                 <div className="p-2 rounded-xl bg-orange-600 text-white shadow-xs shrink-0 mt-0.5">
@@ -733,16 +730,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 border border-orange-300">
-                      Quá hạn {overdueInfo.overdueDays} ngày • Chưa bắt đầu
+                      Quá hạn {overdueInfo.overdueDays} ngày
                     </span>
                     <h4 className="font-extrabold text-sm text-orange-950">
-                      Kỹ sư hiện trường chưa ấn bắt đầu ca làm việc
+                      Phiếu công tác đã quá hạn hoàn thành
                     </h4>
                   </div>
                   <p className="text-xs text-orange-900/90 mt-1 leading-relaxed">
-                    Kỹ sư <strong className="text-orange-950">{currentPhase.assigneeName}</strong> vẫn{' '}
-                    <strong>chưa bấm bắt đầu</strong> nhiệm vụ dù đã qua hạn hoàn thành (
-                    <strong>{overdueInfo.deadlineFormatted}</strong>). Quản lý có thể gia hạn hoàn thành, đổi kỹ sư thay thế hoặc hủy ca này.
+                    Phiếu công tác của kỹ sư <strong className="text-orange-950">{currentPhase.assigneeName}</strong> đã qua hạn hoàn thành (
+                    <strong>{overdueInfo.deadlineFormatted}</strong>) mà <strong>chưa có báo cáo nghiệm thu</strong>. Quản lý có thể gia hạn hoàn thành, đổi kỹ sư thay thế hoặc hủy ca này.
                   </p>
                 </div>
               </div>
@@ -761,51 +757,6 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     type="button"
                     onClick={() => setIsEditModalOpen(true)}
                     className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Gia hạn / Đổi kỹ sư</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {isOverdueNoReport && currentPhase && (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-yellow-50/70 to-amber-50 border-2 border-amber-300 shadow-sm flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-start gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-600 text-white shadow-xs shrink-0 mt-0.5">
-                  <Clock className="w-5 h-5 stroke-[2.5]" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
-                      Quá hạn {overdueInfo.overdueDays} ngày • Chưa báo cáo
-                    </span>
-                    <h4 className="font-extrabold text-sm text-amber-950">
-                      Kỹ sư đã bắt đầu thực hiện nhưng chưa nộp báo cáo
-                    </h4>
-                  </div>
-                  <p className="text-xs text-amber-900/90 mt-1 leading-relaxed">
-                    Kỹ sư <strong className="text-amber-950">{currentPhase.assigneeName}</strong> đã bấm bắt đầu tại hiện trường nhưng đã quá hạn hoàn thành (
-                    <strong>{overdueInfo.deadlineFormatted}</strong>) mà <strong>chưa gửi báo cáo nghiệm thu</strong>.
-                  </p>
-                </div>
-              </div>
-
-              {canModify && (
-                <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-amber-200/70">
-                  <button
-                    type="button"
-                    onClick={() => setIsCancelModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-rose-300 bg-white text-rose-700 hover:bg-rose-50 font-bold text-xs shadow-2xs transition active:scale-95 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Hủy lịch</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Gia hạn / Đổi kỹ sư</span>
@@ -981,10 +932,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         Đã có báo cáo (Chờ Quản lý duyệt)
                       </span>
                     ) : effectiveRawStatus === 'in_progress' ? (
-                      overdueInfo.kind === 'overdue_no_report' ? (
-                        <span className="text-amber-700 font-extrabold flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span>Đang thực hiện • Quá hạn {overdueInfo.overdueDays} ngày (Chưa báo cáo)</span>
+                      overdueInfo.isOverdue ? (
+                        <span className="text-orange-700 font-extrabold flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                          <span>Đang thực hiện • Quá hạn {overdueInfo.overdueDays} ngày</span>
                         </span>
                       ) : (
                         <span className="text-amber-600 font-bold flex items-center gap-1">
@@ -993,10 +944,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         </span>
                       )
                     ) : effectiveRawStatus === 'assigned' || Boolean(currentPhase.assigneeId) ? (
-                      overdueInfo.kind === 'overdue_not_started' ? (
+                      overdueInfo.isOverdue ? (
                         <span className="text-orange-700 font-extrabold flex items-center gap-1">
                           <AlertTriangle className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                          <span>Chưa bắt đầu • Quá hạn {overdueInfo.overdueDays} ngày</span>
+                          <span>Đã giao việc • Quá hạn {overdueInfo.overdueDays} ngày</span>
                         </span>
                       ) : (
                         <span className="text-sky-600 font-bold flex items-center gap-1">
@@ -1177,8 +1128,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 </div>
               )}
 
-              {/* Thông báo nếu nhiệm vụ GPS vừa bị yêu cầu làm lại */}
-              {currentPhase.phaseType === 'pole_gps_update' && effectiveReturnReason && (
+              {/* Thông báo nếu nhiệm vụ vừa bị yêu cầu làm lại (áp dụng cho cả 4 loại phiếu) */}
+              {effectiveReturnReason && (
                 <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
                   <RotateCcw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
@@ -1194,7 +1145,12 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     <FileCheck className="w-4 h-4" />
                     Báo cáo nghiệm thu: {currentPhase.name}
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {effectiveRawStatus === 'in_progress' && hasPhaseReport && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 text-[10.5px] font-bold">
+                        🔄 Đang chờ Kỹ sư làm lại (Dữ liệu lần nộp trước)
+                      </span>
+                    )}
                     {effectiveSubmittedAt && (
                       <span className="text-[11px] text-slate-500">
                         Nộp lúc: {effectiveSubmittedAt}
@@ -1231,35 +1187,110 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </button>
 
                       {/* Bản xem trước tóm tắt dữ liệu GPS */}
-                      <div className="p-3 bg-violet-50/70 border border-violet-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full bg-violet-600 animate-pulse shrink-0" />
-                          <span className="font-bold text-violet-950 shrink-0">
-                            Dữ liệu GPS đã thu thập:
-                          </span>
-                          <span className="font-extrabold text-violet-800 font-mono truncate">
-                            {effectivePoleGpsLocations.length > 0
-                              ? `${effectivePoleGpsLocations.length} cột (${effectivePoleGpsLocations
-                                  .map((g) => g.pole_id || '-')
-                                  .join(', ')})`
-                              : 'Chưa có tọa độ chi tiết'}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-violet-700 font-semibold bg-violet-100 px-2 py-0.5 rounded-md shrink-0">
-                          {currentPhase.status === 'ended' ? 'Đã chốt' : 'Chờ duyệt'}
-                        </span>
-                      </div>
+                      {(() => {
+                        const assignedGpsPoles =
+                          (isCurrentPhaseDetail && workOrderDetail?.pole_ids) ||
+                          currentPhase.poleIds ||
+                          caseItem.poleIds ||
+                          []
+                        const reportedGpsSet = new Set(
+                          effectivePoleGpsLocations
+                            .map((g) => g.pole_id)
+                            .filter((id): id is string => Boolean(id))
+                        )
+                        const missingGpsPoles = assignedGpsPoles.filter(
+                          (pid) => !reportedGpsSet.has(pid)
+                        )
+                        const highAccuracyErrorPoles = effectivePoleGpsLocations.filter(
+                          (g) => typeof g.accuracy_m === 'number' && g.accuracy_m > 10
+                        )
+
+                        return (
+                          <div className="flex flex-col gap-2">
+                            <div className="p-3 bg-violet-50/70 border border-violet-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                <span className="w-2.5 h-2.5 rounded-full bg-violet-600 animate-pulse shrink-0" />
+                                <span className="font-bold text-violet-950 shrink-0">
+                                  Dữ liệu GPS đã thu thập:
+                                </span>
+                                <span className="font-extrabold text-violet-800 font-mono truncate">
+                                  {effectivePoleGpsLocations.length > 0
+                                    ? `${effectivePoleGpsLocations.length}${
+                                        assignedGpsPoles.length > 0
+                                          ? `/${assignedGpsPoles.length}`
+                                          : ''
+                                      } cột (${effectivePoleGpsLocations
+                                        .map((g) =>
+                                          typeof g.accuracy_m === 'number'
+                                            ? `${g.pole_id || '-'} ±${g.accuracy_m.toFixed(1)}m`
+                                            : g.pole_id || '-'
+                                        )
+                                        .join(', ')})`
+                                    : 'Chưa có tọa độ chi tiết'}
+                                </span>
+                              </div>
+                              <span
+                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${
+                                  currentPhase.status === 'ended'
+                                    ? 'text-emerald-700 bg-emerald-100'
+                                    : effectiveRawStatus === 'in_progress'
+                                    ? 'text-amber-800 bg-amber-100'
+                                    : 'text-violet-700 bg-violet-100'
+                                }`}
+                              >
+                                {currentPhase.status === 'ended'
+                                  ? 'Đã chốt'
+                                  : effectiveRawStatus === 'in_progress'
+                                  ? 'Đang làm lại'
+                                  : 'Chờ duyệt'}
+                              </span>
+                            </div>
+
+                            {missingGpsPoles.length > 0 && (
+                              <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <span>
+                                  <strong>Báo cáo thiếu {missingGpsPoles.length} cột được giao:</strong>{' '}
+                                  Kỹ sư chưa gửi tọa độ GPS cho cột{' '}
+                                  <strong className="font-mono">{missingGpsPoles.join(', ')}</strong>.
+                                </span>
+                              </div>
+                            )}
+
+                            {highAccuracyErrorPoles.length > 0 && (
+                              <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-800">
+                                📡 Có <strong>{highAccuracyErrorPoles.length} cột</strong> có sai số tín hiệu GPS hiện trường &gt; 10 m (
+                                <strong className="font-mono">
+                                  {highAccuracyErrorPoles
+                                    .map((g) => `${g.pole_id} (±${g.accuracy_m?.toFixed(1)}m)`)
+                                    .join(', ')}
+                                </strong>
+                                ). Khuyến nghị mở <strong>Xem GIS</strong> để kiểm tra và kéo chỉnh vị trí nếu cần.
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
 
                       {(() => {
                         const targetWoId = currentPhase.workOrderId || caseItem.code
                         const savedEdits = targetWoId ? editedGpsByWorkOrder?.[targetWoId] : undefined
+                        const savedOrder = targetWoId ? orderedGpsPolesByWorkOrder?.[targetWoId] : undefined
                         const editedCount = savedEdits ? Object.keys(savedEdits).length : 0
-                        if (editedCount <= 0) return null
+                        const hasSavedOrder = Boolean(savedOrder && savedOrder.length >= 2)
+                        if (editedCount <= 0 && !hasSavedOrder) return null
                         return (
-                          <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-2 text-xs text-amber-900">
-                            <span className="font-bold">
-                              ✏️ Đã lưu tạm tọa độ tinh chỉnh của {editedCount} cột trong Xem GIS (sẽ cập nhật lên Bản đồ GIS thật khi bấm Duyệt &amp; Import GIS).
-                            </span>
+                          <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl flex flex-col gap-1 text-xs text-amber-900">
+                            {editedCount > 0 && (
+                              <span className="font-bold">
+                                ✏️ Đã lưu tạm tọa độ tinh chỉnh của {editedCount} cột trong Xem GIS (sẽ cập nhật lên Bản đồ GIS thật khi bấm Duyệt &amp; Import GIS).
+                              </span>
+                            )}
+                            {hasSavedOrder && (
+                              <span className="font-bold text-indigo-900 font-mono">
+                                🔢 Thứ tự nối cột đã chọn: {savedOrder!.join(' → ')}
+                              </span>
+                            )}
                           </div>
                         )
                       })()}
@@ -1277,24 +1308,20 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                               <EvidenceImage
                                 evidenceId={ev.evidence_id}
                                 fallbackSrc={ev.thumbnail_url || ev.original_url || undefined}
-                                alt={`Ảnh cột ${idx + 1}`}
+                                alt={`Ảnh cột ${ev.pole_id || idx + 1}`}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                               />
-                              <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-bold rounded py-0.5 truncate">
-                                Ảnh #{idx + 1}
+                              <span className="absolute bottom-1 inset-x-1 text-center bg-slate-900/80 text-white text-[9px] font-mono font-bold rounded py-0.5 truncate px-1">
+                                {ev.pole_id || `Ảnh #${idx + 1}`}
                               </span>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
-                  ) : overdueInfo.kind === 'overdue_not_started' ? (
+                  ) : overdueInfo.isOverdue ? (
                     <div className="p-4 rounded-xl bg-orange-50/90 border border-orange-200 text-center text-xs text-orange-800 font-semibold">
-                      ⚠️ Đã quá hạn {overdueInfo.overdueDays} ngày nhưng Kỹ sư hiện trường vẫn chưa ấn Bắt đầu thực hiện nhiệm vụ cập nhật tọa độ GPS.
-                    </div>
-                  ) : overdueInfo.kind === 'overdue_no_report' ? (
-                    <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-center text-xs text-amber-800 font-semibold">
-                      ⏳ Kỹ sư hiện trường đã bắt đầu thực hiện nhưng đã quá hạn {overdueInfo.overdueDays} ngày vẫn chưa gửi báo cáo tọa độ GPS.
+                      ⚠️ Đã quá hạn {overdueInfo.overdueDays} ngày (Hạn: {overdueInfo.deadlineFormatted}) nhưng Kỹ sư hiện trường vẫn chưa gửi báo cáo tọa độ GPS.
                     </div>
                   ) : (
                     <div className="py-6 text-center text-xs text-slate-500">
@@ -1325,26 +1352,52 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </div>
                     </button>
 
-                    {/* Kết quả kiểm tra / xử lý riêng cho sự cố IoT (khi không gắn cột đèn) */}
+                    {/* Kết quả kiểm tra / xử lý từng sự cố từ Kỹ sư (cho cả sự cố Cột đèn lẫn Tủ/Node IoT) */}
                     {currentPhase.phaseType !== 'survey' &&
                       isCurrentPhaseDetail &&
                       workOrderDetail?.faults &&
-                      workOrderDetail.faults.some((f) => !f.pole_id) && (
+                      workOrderDetail.faults.length > 0 && (
                         <div className="flex flex-col gap-2">
                           <span className="text-[11px] font-bold text-indigo-800">
-                            Kết quả kiểm tra thiết bị IoT từ Kỹ sư ({workOrderDetail.faults.length}):
+                            {currentPhase.phaseType === 'inspection'
+                              ? `Kết quả kiểm tra từng sự cố từ Kỹ sư (${workOrderDetail.faults.length}):`
+                              : `Danh sách sự cố thực hiện sửa chữa (${workOrderDetail.faults.length}):`}
                           </span>
                           <div className="flex flex-col gap-1.5">
                             {workOrderDetail.faults.map((f) => {
                               const outcome = f.inspection_outcome
                               const outcomeBadge =
-                                outcome === 'fault_present'
-                                  ? { label: 'Xác nhận có sự cố', cls: 'bg-rose-100 text-rose-800 border-rose-200' }
+                                currentPhase.phaseType === 'repair'
+                                  ? effectiveRawStatus === 'verified' ||
+                                    f.fault_status === 'resolved' ||
+                                    f.fault_status === 'verified'
+                                    ? {
+                                        label: '✓ Đã khắc phục',
+                                        cls: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                                      }
+                                    : {
+                                        label: 'Đã sửa chữa (Chờ duyệt)',
+                                        cls: 'bg-blue-100 text-blue-800 border-blue-200',
+                                      }
+                                  : outcome === 'fault_present'
+                                  ? {
+                                      label: 'Xác nhận có sự cố',
+                                      cls: 'bg-rose-100 text-rose-800 border-rose-200',
+                                    }
                                   : outcome === 'fault_absent'
-                                  ? { label: 'Thiết bị bình thường', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
+                                  ? {
+                                      label: 'Không có sự cố (Bình thường)',
+                                      cls: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                                    }
                                   : outcome === 'inconclusive'
-                                  ? { label: 'Chưa kết luận', cls: 'bg-amber-100 text-amber-800 border-amber-200' }
-                                  : { label: 'Đã tiếp nhận / xử lý', cls: 'bg-slate-100 text-slate-700 border-slate-200' }
+                                  ? {
+                                      label: 'Chưa kết luận',
+                                      cls: 'bg-amber-100 text-amber-800 border-amber-200',
+                                    }
+                                  : {
+                                      label: 'Đã tiếp nhận / xử lý',
+                                      cls: 'bg-slate-100 text-slate-700 border-slate-200',
+                                    }
 
                               return (
                                 <div
@@ -1353,9 +1406,18 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                 >
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <span className="font-mono font-bold text-slate-900">{f.fault_id}</span>
+                                      <span className="font-mono font-bold text-slate-900">
+                                        {f.fault_id}
+                                      </span>
+                                      {f.pole_id && (
+                                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 font-mono text-[10.5px] font-bold">
+                                          Cột: {f.pole_id}
+                                        </span>
+                                      )}
                                       <span className="text-[11px] font-semibold text-slate-600">
-                                        {(f.fault_type && FAULT_TYPE_LABELS_VN[f.fault_type]) || f.fault_type || '-'}
+                                        {(f.fault_type && FAULT_TYPE_LABELS_VN[f.fault_type]) ||
+                                          f.fault_type ||
+                                          '-'}
                                       </span>
                                       {f.iot_anomaly_code && (
                                         <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10.5px] font-semibold">
@@ -1380,22 +1442,26 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                     )}
                                     {f.location?.lat != null && f.location?.lng != null && (
                                       <div className="text-[10.5px] font-mono text-slate-400 mt-0.5">
-                                        GPS tủ: {f.location.lat.toFixed(6)}, {f.location.lng.toFixed(6)}
+                                        GPS: {f.location.lat.toFixed(6)}, {f.location.lng.toFixed(6)}
                                       </div>
                                     )}
                                   </div>
-                                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${outcomeBadge.cls}`}>
+                                  <span
+                                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${outcomeBadge.cls}`}
+                                  >
                                     {outcomeBadge.label}
                                   </span>
                                 </div>
                               )
                             })}
                           </div>
-                          {workOrderDetail.materials_used && (
-                            <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-[11px] text-emerald-900">
-                              <strong>Vật tư đã sử dụng:</strong> {workOrderDetail.materials_used}
-                            </div>
-                          )}
+                          {workOrderDetail.materials_used &&
+                            currentPhase.phaseType !== 'repair' && (
+                              <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-[11px] text-emerald-900">
+                                <strong>Vật tư kỹ sư đã sử dụng:</strong>{' '}
+                                {workOrderDetail.materials_used}
+                              </div>
+                            )}
                         </div>
                       )}
 
@@ -1429,15 +1495,38 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                 const effectiveState = photo.final_cv_state || photo.cv_state
                                 const isOut = effectiveState === 'off'
                                 const isNormal = effectiveState === 'on'
-                                const needsVideoView = Boolean(
-                                  photo.video && !photo.video.viewed_by && photo.decision !== 'confirm'
+                                const isRejected = photo.decision === 'reject'
+                                const isConfirmed = photo.decision === 'confirm'
+                                const isEngineerOverride = Boolean(
+                                  photo.final_cv_state &&
+                                    photo.cv_state &&
+                                    photo.final_cv_state !== photo.cv_state
                                 )
+                                const needsVideoView = Boolean(
+                                  photo.video && !photo.video.viewed_by && photo.decision !== 'confirm' && !isRejected
+                                )
+                                const aiStateLabel =
+                                  photo.ai_status === 'unavailable'
+                                    ? 'AI: Không khả dụng'
+                                    : photo.cv_state === 'off'
+                                    ? 'AI: Đèn tắt'
+                                    : photo.cv_state === 'on'
+                                    ? 'AI: Đèn sáng'
+                                    : photo.cv_state === 'inconclusive'
+                                    ? 'AI: Chưa rõ'
+                                    : null
+                                const aiConfText =
+                                  typeof photo.confidence === 'number'
+                                    ? ` (${Math.round(photo.confidence * 100)}%)`
+                                    : ''
 
                                 return (
                                   <div
                                     key={photo.photo_id || i}
                                     className={`p-2.5 rounded-xl border text-xs flex flex-col gap-1 ${
-                                      isOut
+                                      isRejected
+                                        ? 'bg-slate-100/80 border-slate-300 opacity-75'
+                                        : isOut
                                         ? 'bg-rose-50/70 border-rose-200/90'
                                         : isNormal
                                         ? 'bg-emerald-50/70 border-emerald-200/90'
@@ -1445,11 +1534,36 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                     }`}
                                   >
                                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                                      <span className="font-bold text-slate-900">
-                                        Cột <strong className="font-mono text-blue-700">{photo.pole_id || '-'}</strong>
-                                      </span>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`font-bold ${isRejected ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+                                          Cột <strong className="font-mono text-blue-700">{photo.pole_id || '-'}</strong>
+                                        </span>
+                                        {typeof photo.lux_value === 'number' && (
+                                          <span
+                                            className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-mono font-extrabold text-[10px] rounded-md"
+                                            title={
+                                              photo.lux_measured_at
+                                                ? `Đo Lux lúc ${new Date(photo.lux_measured_at).toLocaleString('vi-VN')}`
+                                                : 'Độ rọi đo từ cảm biến BLE hiện trường'
+                                            }
+                                          >
+                                            ☀ {photo.lux_value.toFixed(1)} lux
+                                          </span>
+                                        )}
+                                        {aiStateLabel && (
+                                          <span className="px-1.5 py-0.5 bg-white/90 text-slate-600 border border-slate-200 font-semibold text-[10px] rounded-md">
+                                            {aiStateLabel}
+                                            {aiConfText}
+                                          </span>
+                                        )}
+                                        {isEngineerOverride && (
+                                          <span className="px-1.5 py-0.5 bg-violet-100 text-violet-800 border border-violet-300 font-bold text-[10px] rounded-md">
+                                            ⚡ Kỹ sư ghi đè AI
+                                          </span>
+                                        )}
+                                      </div>
                                       <div className="flex items-center gap-1.5 flex-wrap">
-                                        {photo.pole_id && conflictPoleSet.has(photo.pole_id) && (
+                                        {!isRejected && photo.pole_id && conflictPoleSet.has(photo.pole_id) && (
                                           <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px] rounded-md">
                                             Đang ở phiếu{' '}
                                             {surveyConflicts.find((c) => c.poleId === photo.pole_id)?.workOrderId}
@@ -1460,9 +1574,21 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                             Cần mở xem video
                                           </span>
                                         )}
+                                        {isConfirmed && (
+                                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[10px] rounded-md">
+                                            ✓ Đã xác nhận
+                                          </span>
+                                        )}
+                                        {isRejected && (
+                                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 border border-rose-300 font-bold text-[10px] rounded-md">
+                                            ✕ Đã từ chối
+                                          </span>
+                                        )}
                                         <span
                                           className={`px-2 py-0.5 font-extrabold text-[10px] rounded-md ${
-                                            isOut
+                                            isRejected
+                                              ? 'bg-slate-200 text-slate-600'
+                                              : isOut
                                               ? 'bg-rose-200/80 text-rose-900'
                                               : isNormal
                                               ? 'bg-emerald-200/80 text-emerald-900'
@@ -1470,9 +1596,9 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                           }`}
                                         >
                                           {isOut
-                                            ? 'Báo mất sáng (Cần kiểm tra)'
+                                            ? 'Kỹ sư: Mất sáng (Cần kiểm tra)'
                                             : isNormal
-                                            ? 'Đèn sáng bình thường'
+                                            ? 'Kỹ sư: Đèn sáng bình thường'
                                             : 'Chưa chốt trạng thái (Cần yêu cầu làm lại)'}
                                         </span>
                                       </div>
@@ -1480,6 +1606,11 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                     {photo.review_note && (
                                       <p className="text-[11px] text-slate-700">
                                         <strong>Ghi chú kỹ sư:</strong> {photo.review_note}
+                                      </p>
+                                    )}
+                                    {isRejected && photo.decision_note && (
+                                      <p className="text-[11px] text-rose-700">
+                                        <strong>Lý do từ chối:</strong> {photo.decision_note}
                                       </p>
                                     )}
                                   </div>
@@ -1568,22 +1699,46 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </div>
                     )}
 
-                    {/* Đo độ rọi Luxmeter (nếu có) */}
-                    {currentPhase.report?.luxMeasured && (
-                      <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs flex items-center justify-between">
-                        <span className="font-semibold text-slate-700">Độ rọi mặt đường đo được:</span>
-                        <span className="font-black text-blue-800 font-mono bg-blue-100 px-2 py-0.5 rounded-md">
-                          {currentPhase.report.luxMeasured}
-                        </span>
-                      </div>
-                    )}
+                    {/* Đo độ rọi Luxmeter từ cảm biến BLE hiện trường (nếu có) */}
+                    {(() => {
+                      const luxValues = surveyPolePhotos
+                        .filter((p) => p.decision !== 'reject' && typeof p.lux_value === 'number')
+                        .map((p) => p.lux_value as number)
+                      if (luxValues.length > 0) {
+                        const avgLux =
+                          luxValues.reduce((acc, v) => acc + v, 0) / luxValues.length
+                        const minLux = Math.min(...luxValues)
+                        const maxLux = Math.max(...luxValues)
+                        return (
+                          <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs flex items-center justify-between flex-wrap gap-2">
+                            <span className="font-semibold text-slate-700">
+                              ☀ Độ rọi đo thực địa (ESP32C3_LUX tại {luxValues.length} cột):
+                            </span>
+                            <span className="font-black text-blue-800 font-mono bg-blue-100 px-2.5 py-0.5 rounded-md">
+                              TB: {avgLux.toFixed(1)} lux (Min {minLux.toFixed(1)} – Max {maxLux.toFixed(1)} lux)
+                            </span>
+                          </div>
+                        )
+                      }
+                      if (currentPhase.report?.luxMeasured) {
+                        return (
+                          <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs flex items-center justify-between">
+                            <span className="font-semibold text-slate-700">Độ rọi mặt đường đo được:</span>
+                            <span className="font-black text-blue-800 font-mono bg-blue-100 px-2 py-0.5 rounded-md">
+                              {currentPhase.report.luxMeasured}
+                            </span>
+                          </div>
+                        )
+                      }
+                      return null
+                    })()}
 
-                    {/* Đề xuất vật tư từ Kỹ sư */}
-                    {effectiveSuggestedMaterials && (
+                    {/* Vật tư / Thiết bị Quản lý chỉ định mang theo */}
+                    {effectiveSuggestedMaterials && currentPhase.phaseType !== 'survey' && (
                       <div className="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl text-xs flex flex-col gap-1">
                         <span className="font-extrabold text-amber-900 flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-amber-700" />
-                          Đề xuất vật tư từ Kỹ sư:
+                          Vật tư / Thiết bị Quản lý chỉ định mang theo:
                         </span>
                         <p className="text-slate-800 font-medium">
                           {effectiveSuggestedMaterials}
@@ -1591,30 +1746,22 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </div>
                     )}
 
-                    {/* Ghi chú vật tư thực tế (ở bước Sửa chữa: Quản lý tự do chỉnh sửa) */}
+                    {/* Vật tư thực tế đã thay tại hiện trường (ở bước Sửa chữa: Báo cáo gốc từ Kỹ sư) */}
                     {currentPhase.phaseType === 'repair' && (
-                      <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl flex flex-col gap-2">
-                        <label className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                      <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex flex-col gap-1 text-xs">
+                        <span className="font-extrabold text-emerald-950 flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-emerald-700" />
-                          Vật tư thực tế đã sử dụng (Quản lý có thể hiệu chỉnh):
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={editedMaterialsNote}
-                          onChange={(e) => setEditedMaterialsNote(e.target.value)}
-                          placeholder="Nhập hoặc chỉnh sửa vật tư thực tế đã nghiệm thu..."
-                          className="p-2 bg-white border border-emerald-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
-                        />
+                          Vật tư Kỹ sư thực tế đã thay tại hiện trường:
+                        </span>
+                        <p className="text-slate-800 font-medium">
+                          {editedMaterialsNote || 'Kỹ sư không ghi nhận vật tư thay thế'}
+                        </p>
                       </div>
                     )}
                   </div>
-                ) : overdueInfo.kind === 'overdue_not_started' ? (
+                ) : overdueInfo.isOverdue ? (
                   <div className="p-4 rounded-xl bg-orange-50/90 border border-orange-200 text-center text-xs text-orange-800 font-semibold">
-                    ⚠️ Đã quá hạn {overdueInfo.overdueDays} ngày nhưng Kỹ sư hiện trường vẫn chưa ấn Bắt đầu thực hiện nhiệm vụ.
-                  </div>
-                ) : overdueInfo.kind === 'overdue_no_report' ? (
-                  <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-center text-xs text-amber-800 font-semibold">
-                    ⏳ Kỹ sư hiện trường đã bắt đầu thực hiện nhưng đã quá hạn {overdueInfo.overdueDays} ngày vẫn chưa nộp báo cáo nghiệm thu.
+                    ⚠️ Đã quá hạn {overdueInfo.overdueDays} ngày (Hạn: {overdueInfo.deadlineFormatted}) nhưng Kỹ sư hiện trường vẫn chưa nộp báo cáo nghiệm thu.
                   </div>
                 ) : (
                   <div className="py-6 text-center text-xs text-slate-500">
@@ -1844,56 +1991,109 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                     </>
                   )}
 
-                  {(isInspectionApprovedLocal || canSpawnRepairFromInspection) && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
-                        ✓ Đã nghiệm thu kiểm tra
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const inspectionPoles = currentPhase.poleIds || caseItem.poleIds || []
-                          onOpenCreateNextPhaseModal(
-                            caseItem.code,
-                            'repair',
-                            currentPhase.workOrderId,
-                            inspectionPoles
-                          )
-                        }}
-                        className="flex items-center gap-1 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
-                        title="Tạo lịch sửa chữa tiếp nối (kế thừa mã sự vụ)"
-                      >
-                        <Wrench className="w-3.5 h-3.5" />
-                        <span>Tạo lịch sửa chữa</span>
-                      </button>
-                    </div>
-                  )}
+                  {(isInspectionApprovedLocal || canSpawnRepairFromInspection) &&
+                    (() => {
+                      const detailFaults =
+                        isCurrentPhaseDetail && workOrderDetail?.faults
+                          ? workOrderDetail.faults
+                          : []
+                      const hasOutcomesRecorded = detailFaults.some((f) =>
+                        Boolean(f.inspection_outcome)
+                      )
+                      const confirmedFaults = hasOutcomesRecorded
+                        ? detailFaults.filter((f) => f.inspection_outcome === 'fault_present')
+                        : detailFaults
+                      const confirmedPoles = Array.from(
+                        new Set(
+                          confirmedFaults
+                            .map((f) => f.pole_id)
+                            .filter((id): id is string => Boolean(id))
+                        )
+                      )
+                      const canSpawnRepair = hasOutcomesRecorded
+                        ? confirmedFaults.length > 0
+                        : confirmedFaults.length > 0 ||
+                          (currentPhase.poleIds && currentPhase.poleIds.length > 0) ||
+                          (caseItem.poleIds && caseItem.poleIds.length > 0)
+
+                      return (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                            ✓ Đã nghiệm thu kiểm tra
+                          </span>
+                          <button
+                            type="button"
+                            disabled={!canSpawnRepair}
+                            onClick={() => {
+                              if (!canSpawnRepair) return
+                              const inspectionPoles =
+                                confirmedPoles.length > 0
+                                  ? confirmedPoles
+                                  : currentPhase.poleIds || caseItem.poleIds || []
+                              onOpenCreateNextPhaseModal(
+                                caseItem.code,
+                                'repair',
+                                currentPhase.workOrderId,
+                                inspectionPoles
+                              )
+                            }}
+                            className={`flex items-center gap-1 px-4 py-2 text-xs font-bold rounded-xl shadow-xs transition ${
+                              canSpawnRepair
+                                ? 'text-white bg-emerald-600 hover:bg-emerald-700 cursor-pointer active:scale-95'
+                                : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed opacity-70'
+                            }`}
+                            title={
+                              canSpawnRepair
+                                ? 'Tạo lịch sửa chữa tiếp nối cho các sự cố đã xác nhận'
+                                : 'Kỹ sư hiện trường xác nhận không có sự cố (hoặc chưa kết luận) nên không cần tạo lịch sửa chữa'
+                            }
+                          >
+                            <Wrench className="w-3.5 h-3.5" />
+                            <span>
+                              {canSpawnRepair
+                                ? 'Tạo lịch sửa chữa'
+                                : 'Không có sự cố cần sửa chữa'}
+                            </span>
+                          </button>
+                        </div>
+                      )
+                    })()}
                 </>
               )}
 
               {/* Giai đoạn 3: Sửa chữa */}
-              {currentPhase.phaseType === 'repair' && isActivePhase && hasReport && (
+              {currentPhase.phaseType === 'repair' && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReturnReason('')
-                      setIsReturnModalOpen(true)
-                    }}
-                    className="flex items-center gap-1 px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition cursor-pointer active:scale-95"
-                    title="Yêu cầu kỹ sư hiện trường sửa lại hoặc bổ sung ảnh sau sửa chữa"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Yêu cầu làm lại</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onSubmitSuperior(caseItem.code, editedMaterialsNote)}
-                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Duyệt & Gửi lên cấp trên</span>
-                  </button>
+                  {isActivePhase && hasReport && !isCurrentPhaseVerified && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReturnReason('')
+                          setIsReturnModalOpen(true)
+                        }}
+                        className="flex items-center gap-1 px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition cursor-pointer active:scale-95"
+                        title="Yêu cầu kỹ sư hiện trường sửa lại hoặc bổ sung ảnh sau sửa chữa"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Yêu cầu làm lại</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSubmitSuperior(caseItem.code, editedMaterialsNote)}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Duyệt &amp; Gửi lên cấp trên</span>
+                      </button>
+                    </>
+                  )}
+
+                  {isCurrentPhaseVerified && (
+                    <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                      ✓ Đã nghiệm thu &amp; gửi cấp trên
+                    </span>
+                  )}
                 </>
               )}
             </div>

@@ -9,7 +9,7 @@
  *   3. Lệnh đã bị hủy trước đó (cancelled).
  */
 
-export type PhaseOverdueKind = 'none' | 'overdue_not_started' | 'overdue_no_report'
+export type PhaseOverdueKind = 'none' | 'overdue'
 
 export interface PhaseOverdueInfo {
   kind: PhaseOverdueKind
@@ -83,8 +83,7 @@ function diffDaysBetweenYmd(earlierYmd: string, laterYmd: string): number {
 
 /**
  * Xác định trạng thái quá hạn của một bước công tác (đồng bộ với WorkOrderOverdueJob ở Backend):
- * - 'overdue_not_started': Đã qua hạn (dueDate/date < hôm nay) nhưng kỹ sư chưa bấm Bắt đầu (open / assigned).
- * - 'overdue_no_report': Đã qua hạn (dueDate/date < hôm nay), kỹ sư đã bấm Bắt đầu (in_progress) nhưng chưa nộp báo cáo.
+ * - 'overdue': Đã qua hạn (dueDate/date < hôm nay) nhưng lệnh vẫn đang mở (open / assigned / in_progress), chưa nộp báo cáo nghiệm thu.
  */
 export function getPhaseOverdueInfo(
   phase?: {
@@ -153,11 +152,9 @@ export function getPhaseOverdueInfo(
   }
 
   const overdueDays = diffDaysBetweenYmd(deadlineYmd, todayYmd)
-  const kind: PhaseOverdueKind =
-    normRaw === 'in_progress' ? 'overdue_no_report' : 'overdue_not_started'
 
   return {
-    kind,
+    kind: 'overdue',
     isOverdue: true,
     isExtended,
     overdueDays,

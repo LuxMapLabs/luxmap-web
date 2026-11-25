@@ -79,15 +79,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           )
             return
           if (
-            filterPhase === 'overdue_not_started' &&
-            (overdue.kind !== 'overdue_not_started' ||
-              p.cancellationRequest?.status === 'pending' ||
-              sc.isTerminated)
-          )
-            return
-          if (
-            filterPhase === 'overdue_no_report' &&
-            (overdue.kind !== 'overdue_no_report' ||
+            filterPhase === 'overdue' &&
+            (!overdue.isOverdue ||
               p.cancellationRequest?.status === 'pending' ||
               sc.isTerminated)
           )
@@ -96,8 +89,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             filterPhase !== 'ended' &&
             filterPhase !== 'has_report' &&
             filterPhase !== 'has_cancel' &&
-            filterPhase !== 'overdue_not_started' &&
-            filterPhase !== 'overdue_no_report' &&
+            filterPhase !== 'overdue' &&
             p.phaseType !== filterPhase
           )
             return
@@ -298,13 +290,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     undefined,
                     todayYmd
                   )
-                  const isOverdueNotStarted =
-                    overdue.kind === 'overdue_not_started' &&
-                    !isEnded &&
-                    !hasPendingCancel &&
-                    !hasReport
-                  const isOverdueNoReport =
-                    overdue.kind === 'overdue_no_report' &&
+                  const isOverdue =
+                    overdue.isOverdue &&
                     !isEnded &&
                     !hasPendingCancel &&
                     !hasReport
@@ -321,12 +308,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   } else if (hasReport) {
                     cardStyle =
                       'border-blue-500 ring-2 ring-blue-300/80 bg-gradient-to-br from-blue-50/95 via-sky-50/50 to-white shadow-xs'
-                  } else if (isOverdueNotStarted) {
+                  } else if (isOverdue) {
                     cardStyle =
                       'border-orange-500 ring-2 ring-orange-300/85 bg-gradient-to-br from-orange-50/95 via-amber-50/40 to-white shadow-xs'
-                  } else if (isOverdueNoReport) {
-                    cardStyle =
-                      'border-amber-500 ring-2 ring-amber-300/85 bg-gradient-to-br from-amber-50/95 via-yellow-50/40 to-white shadow-xs'
                   }
 
                   return (
@@ -394,23 +378,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                             </span>
                           )}
 
-                          {isOverdueNotStarted && (
+                          {isOverdue && (
                             <span
                               className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-orange-600 text-white font-black text-[9px] shadow-xs whitespace-nowrap hover:bg-orange-700 transition"
-                              title={`Quá hạn ${overdue.overdueDays} ngày (Hạn: ${overdue.deadlineFormatted}) — Kỹ sư chưa ấn Bắt đầu`}
+                              title={`Quá hạn ${overdue.overdueDays} ngày (Hạn: ${overdue.deadlineFormatted})`}
                             >
                               <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
-                              <span>CHƯA BẮT ĐẦU</span>
-                            </span>
-                          )}
-
-                          {isOverdueNoReport && (
-                            <span
-                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-600 text-white font-black text-[9px] shadow-xs whitespace-nowrap hover:bg-amber-700 transition"
-                              title={`Quá hạn ${overdue.overdueDays} ngày (Hạn: ${overdue.deadlineFormatted}) — Kỹ sư đã bắt đầu nhưng chưa có báo cáo`}
-                            >
-                              <Clock className="w-2.5 h-2.5 shrink-0" />
-                              <span>CHƯA BÁO CÁO</span>
+                              <span>QUÁ HẠN</span>
                             </span>
                           )}
 
@@ -509,11 +483,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           </span>
           <span className="flex items-center gap-1.5 font-bold text-orange-700">
             <span className="w-2.5 h-2.5 rounded-sm bg-orange-100 border border-orange-500 ring-1 ring-orange-400" />
-            <span>Quá hạn (Chưa bắt đầu)</span>
-          </span>
-          <span className="flex items-center gap-1.5 font-bold text-amber-700">
-            <span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-500 ring-1 ring-amber-400" />
-            <span>Quá hạn (Chưa báo cáo)</span>
+            <span>Quá hạn</span>
           </span>
           <span className="flex items-center gap-1.5 font-bold text-blue-700">
             <span className="w-2.5 h-2.5 rounded-sm bg-blue-100 border border-blue-400 ring-1 ring-blue-400" />

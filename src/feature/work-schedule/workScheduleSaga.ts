@@ -23,6 +23,7 @@ import {
   orderPolesByChain,
   orderedPolesOfSegment,
   VERTEX_MATCH_METERS,
+  type OrderedPole,
 } from '../../utils/gis-map/segmentPoleOrder'
 import {
   calculateDistanceMeters,
@@ -408,8 +409,10 @@ function* handleFollowUpWorkOrder(
 ) {
   const { parentWorkOrderId, payload, nextPhaseLabel } = action.payload
   try {
-    // 1. Nếu mở từ ca khảo sát, tự động xác nhận toàn bộ ảnh cột đèn sang backend để tạo lỗi detected
-    yield call([workScheduleAPI, workScheduleAPI.confirmAllPendingPolePhotos], parentWorkOrderId)
+    // 1. Nếu mở từ ca khảo sát (chuyển tiếp sang inspection), tự động xác nhận toàn bộ ảnh cột đèn sang backend để tạo lỗi detected
+    if (payload.task_kind === 'inspection') {
+      yield call([workScheduleAPI, workScheduleAPI.confirmAllPendingPolePhotos], parentWorkOrderId)
+    }
 
     yield call(workScheduleAPI.followUpWorkOrder, parentWorkOrderId, payload)
     yield put(followUpWorkOrderSuccess())
@@ -458,59 +461,128 @@ function* handleVerifyWorkOrder(
     const beforePoles: PoleListItem[] = state.assets.poles || []
     const savedEdits: Record<string, SetPoleLocationRequest> =
       editedPoleLocations || state.workSchedule.editedGpsByWorkOrder?.[workOrderId] || {}
+    const savedOrderIds: string[] =
+      state.workSchedule.orderedGpsPolesByWorkOrder?.[workOrderId] || []
     const editEntries = Object.entries(savedEdits).filter(
       ([poleId, loc]) => Boolean(poleId) && typeof loc?.lat === 'number' && typeof loc?.lng === 'number'
     )
 
-    // 1. Tự động xác nhận ảnh khảo sát cột đèn (nếu có) để Backend kích hoạt chuyển cột thành 'out' và tạo fault 'detected'
-    yield call([workScheduleAPI, workScheduleAPI.confirmAllPendingPolePhotos], workOrderId)
+    // 1. Lấy chi tiết lệnh công tác hiện tại
+    const currentDetail: WorkOrderDetail =
+      state.workSchedule.workOrderDetail?.work_order_id === workOrderId
+        ? state.workSchedule.workOrderDetail
+        : yield call(workScheduleAPI.getWorkOrderDetail, workOrderId)
 
-    // 1b. Nếu Quản lý đã kéo thả tinh chỉnh tọa độ trong Xem GIS:
-    // - Bước A: Gọi PUT /assets/poles/{id}/location với tọa độ mới của Quản lý trước để Backend kiểm tra nghiêm ngặt hành lang 25m.
-    // - Bước B: Đồng bộ tạm geom_wkt theo tọa độ gốc kỹ sư nộp để hàm verify của Backend nhận diện cột đã được Quản lý xử lý (measured.Unchanged = true), tránh bị kẹt bởi tọa độ gốc sai của kỹ sư.
-    const stagedRollbackPoles: Array<{ poleMeta: PoleListItem; fallbackLoc: SetPoleLocationRequest }> = []
-    if (editEntries.length > 0) {
-      const currentDetail: WorkOrderDetail =
-        state.workSchedule.workOrderDetail?.work_order_id === workOrderId
-          ? state.workSchedule.workOrderDetail
-          : yield call(workScheduleAPI.getWorkOrderDetail, workOrderId)
+    // 1a. Tự động xác nhận ảnh khảo sát cột đèn (chỉ áp dụng cho phiếu survey) để Backend kích hoạt chuyển cột thành 'out' và tạo fault 'detected'
+    if (!currentDetail?.task_kind || currentDetail.task_kind === 'survey') {
+      yield call([workScheduleAPI, workScheduleAPI.confirmAllPendingPolePhotos], workOrderId)
+    }
 
-      let currentAssetPoles: PoleListItem[] = beforePoles
-      const missingAnyMeta = editEntries.some(
-        ([poleId]) => !currentAssetPoles.some((p) => p.pole_id === poleId)
+    // 1b. Với phiếu cập nhật vị trí cột (pole_gps_update) hoặc khi Quản lý có chỉnh sửa tọa độ:
+
+    const reportedPoleLocations = currentDetail?.pole_locations || []
+    const isPoleGpsOrderInitial =
+      currentDetail?.task_kind === 'pole_gps_update' ||
+      reportedPoleLocations.length > 0 ||
+      editEntries.length > 0
+
+    const stagedRollbackPoles: Array<{ poleMeta: PoleListItem; fallbackLoc?: SetPoleLocationRequest }> = []
+    let currentAssetPoles: PoleListItem[] = beforePoles
+
+    if (isPoleGpsOrderInitial && reportedPoleLocations.length > 0) {
+      const missingAnyMeta = reportedPoleLocations.some(
+        (rp) => rp.pole_id && !currentAssetPoles.some((p) => p.pole_id === rp.pole_id)
       )
       if (currentAssetPoles.length === 0 || missingAnyMeta) {
         currentAssetPoles = yield* fetchAllAssetPoles()
       }
 
-      for (const [poleId, loc] of editEntries) {
-        // Kiểm tra validate hành lang 25m của Backend cho tọa độ Quản lý đã tinh chỉnh (nếu vi phạm sẽ báo lỗi và dừng ngay tại đây)
-        yield call(assetAPI.setPoleLocation, poleId, { lat: loc.lat, lng: loc.lng })
+      // Kiểm tra chống dính cột (< 2m) giữa các cột báo cáo với nhau VÀ với các cột cũ đã có GPS trên cùng tuyến đường
+      const finalReportedCoords = reportedPoleLocations
+        .filter((rp) => rp.pole_id && typeof rp.lat === 'number' && typeof rp.lng === 'number')
+        .map((rp) => {
+          const pid = rp.pole_id!
+          const edited = savedEdits[pid]
+          const lat = typeof edited?.lat === 'number' ? edited.lat : rp.lat!
+          const lng = typeof edited?.lng === 'number' ? edited.lng : rp.lng!
+          return { id: pid, coord: [lng, lat] as [number, number] }
+        })
+      const reportedIdSet = new Set(finalReportedCoords.map((item) => item.id))
+      const checkSegmentId =
+        currentDetail?.segment_id || state.workSchedule.workOrderDetail?.segment_id
+      const existingSegmentPoles = checkSegmentId
+        ? currentAssetPoles
+            .filter(
+              (p) =>
+                p.segment_id === checkSegmentId &&
+                p.pole_id &&
+                !reportedIdSet.has(p.pole_id) &&
+                p.location &&
+                typeof p.location.lat === 'number' &&
+                typeof p.location.lng === 'number' &&
+                Number.isFinite(p.location.lat) &&
+                Number.isFinite(p.location.lng)
+            )
+            .map((p) => ({
+              id: p.external_ref || p.pole_id!,
+              coord: [p.location!.lng, p.location!.lat] as [number, number],
+            }))
+        : []
 
-        const reportedLoc = (currentDetail?.pole_locations || []).find((p) => p.pole_id === poleId)
-        const poleMeta = currentAssetPoles.find((p) => p.pole_id === poleId)
-        if (
-          reportedLoc &&
-          typeof reportedLoc.lat === 'number' &&
-          typeof reportedLoc.lng === 'number' &&
-          poleMeta
-        ) {
-          yield call(assetAPI.updatePole, poleId, {
-            external_ref: poleMeta.external_ref,
-            segment_id: poleMeta.segment_id,
-            feeder_id: poleMeta.feeder_id,
-            feeder_source: poleMeta.feeder_source,
-            geom_wkt: `POINT(${reportedLoc.lng} ${reportedLoc.lat})`,
-            near_sensitive_poi: poleMeta.near_sensitive_poi,
-            data_source: poleMeta.data_source,
-            note: poleMeta.note,
-          })
-          stagedRollbackPoles.push({ poleMeta, fallbackLoc: loc })
+      for (let i = 0; i < finalReportedCoords.length; i++) {
+        for (let j = i + 1; j < finalReportedCoords.length; j++) {
+          const dist = calculateDistanceMeters(
+            finalReportedCoords[i].coord,
+            finalReportedCoords[j].coord
+          )
+          if (dist < 2) {
+            const msg = `Cột ${finalReportedCoords[i].id} và ${finalReportedCoords[j].id} đang quá sát hoặc trùng vị trí (${dist.toFixed(1)} m < 2 m). Vui lòng mở "Xem GIS" để kéo tách vị trí từng cột trước khi Duyệt!`
+            yield put(verifyWorkOrderFailure(msg))
+            toast.error(msg)
+            return
+          }
         }
+        for (const existingPole of existingSegmentPoles) {
+          const dist = calculateDistanceMeters(finalReportedCoords[i].coord, existingPole.coord)
+          if (dist < 2) {
+            const msg = `Cột ${finalReportedCoords[i].id} đang quá sát hoặc trùng vị trí với cột ${existingPole.id} trên tuyến (${dist.toFixed(1)} m < 2 m). Vui lòng mở "Xem GIS" để kéo chỉnh lại vị trí trước khi Duyệt!`
+            yield put(verifyWorkOrderFailure(msg))
+            toast.error(msg)
+            return
+          }
+        }
+      }
+
+      for (const reportedLoc of reportedPoleLocations) {
+        const poleId = reportedLoc.pole_id
+        if (
+          !poleId ||
+          typeof reportedLoc.lat !== 'number' ||
+          typeof reportedLoc.lng !== 'number'
+        ) {
+          continue
+        }
+        const poleMeta = currentAssetPoles.find((p) => p.pole_id === poleId)
+        if (!poleMeta) continue
+
+        yield call(assetAPI.updatePole, poleId, {
+          external_ref: poleMeta.external_ref,
+          segment_id: poleMeta.segment_id,
+          feeder_id: poleMeta.feeder_id,
+          feeder_source: poleMeta.feeder_source,
+          geom_wkt: `POINT(${reportedLoc.lng} ${reportedLoc.lat})`,
+          near_sensitive_poi: poleMeta.near_sensitive_poi,
+          data_source: poleMeta.data_source,
+          note: poleMeta.note,
+        })
+        stagedRollbackPoles.push({
+          poleMeta,
+          fallbackLoc: savedEdits[poleId] || { lat: reportedLoc.lat, lng: reportedLoc.lng },
+        })
       }
     }
 
-    // 2. Nghiệm thu lệnh công tác trên Backend (nếu bị từ chối do còn cột khác trong phiếu chưa chỉnh, tự động hoàn tác vị trí các cột đã đồng bộ tạm ở bước 1b)
+    // 2. Nghiệm thu lệnh công tác trên Backend (nếu bị từ chối vì lý do khác, tự động hoàn tác vị trí các cột đã đồng bộ tạm ở bước 1b)
     let verifiedDetail: WorkOrderDetail
     try {
       verifiedDetail = yield call(workScheduleAPI.verifyWorkOrder, workOrderId, {
@@ -533,7 +605,7 @@ function* handleVerifyWorkOrder(
                 data_source: item.poleMeta.data_source,
                 note: item.poleMeta.note,
               })
-            } else {
+            } else if (item.fallbackLoc) {
               yield call(assetAPI.setPoleLocation, item.poleMeta.pole_id, {
                 lat: item.fallbackLoc.lat,
                 lng: item.fallbackLoc.lng,
@@ -547,27 +619,33 @@ function* handleVerifyWorkOrder(
       throw verifyErr
     }
 
-    // 3. Ghi chính thức tọa độ Quản lý đã tinh chỉnh lên từng cột đèn kèm bản ghi Audit
-    let adjustedCount = 0
-    const failedAdjustments: string[] = []
+    // 3. Nếu Quản lý có kéo thả tinh chỉnh tọa độ trong Xem GIS, cập nhật tạm bằng updatePole trước để tất cả cột nằm đúng trên đường tuyến mới khi gọi updateSegment
     for (const [poleId, loc] of editEntries) {
-      try {
-        yield call(assetAPI.setPoleLocation, poleId, { lat: loc.lat, lng: loc.lng })
-        adjustedCount += 1
-      } catch (locErr: unknown) {
-        const locMsg = extractApiErrorMessage(
-          locErr,
-          `Không thể áp dụng tọa độ tinh chỉnh cho cột ${poleId}`
-        )
-        failedAdjustments.push(`${poleId}: ${locMsg}`)
+      const poleMeta = currentAssetPoles.find((p) => p.pole_id === poleId)
+      if (poleMeta) {
+        try {
+          yield call(assetAPI.updatePole, poleId, {
+            external_ref: poleMeta.external_ref,
+            segment_id: poleMeta.segment_id,
+            feeder_id: poleMeta.feeder_id,
+            feeder_source: poleMeta.feeder_source,
+            geom_wkt: `POINT(${loc.lng} ${loc.lat})`,
+            near_sensitive_poi: poleMeta.near_sensitive_poi,
+            data_source: poleMeta.data_source,
+            note: poleMeta.note,
+          })
+        } catch {
+          // Bỏ qua nếu không cập nhật tạm được
+        }
       }
     }
 
-    // 4. Với phiếu cập nhật vị trí cột (pole_gps_update), tự động nối và cập nhật lại hình học tuyến đường (geom_wkt) theo các cột mới
+    // 4. Với phiếu cập nhật vị trí cột (pole_gps_update), tự động nối tuần tự từng cột theo thứ tự Quản lý đã chọn và cập nhật lại hình học tuyến đường (geom_wkt)
     const targetSegmentId =
-      verifiedDetail?.segment_id || state.workSchedule.workOrderDetail?.segment_id
+      verifiedDetail?.segment_id || currentDetail?.segment_id || state.workSchedule.workOrderDetail?.segment_id
     const isPoleGpsOrder =
       verifiedDetail?.task_kind === 'pole_gps_update' ||
+      currentDetail?.task_kind === 'pole_gps_update' ||
       state.workSchedule.workOrderDetail?.task_kind === 'pole_gps_update'
     if (isPoleGpsOrder && targetSegmentId) {
       try {
@@ -577,16 +655,32 @@ function* handleVerifyWorkOrder(
         ])
         const previous = orderedPolesOfSegment(beforePoles, targetSegmentId)
         const after = orderedPolesOfSegment(allAfterPoles, targetSegmentId)
+
+        // Xác định danh sách cột báo cáo theo đúng thứ tự tuần tự mà Quản lý đã chọn trong Xem GIS
+        const rawReportedIds = reportedPoleLocations
+          .map((rp) => rp.pole_id)
+          .filter((id): id is string => Boolean(id))
+        const orderedReportedIds =
+          savedOrderIds.length > 0
+            ? [
+                ...savedOrderIds.filter((id) => rawReportedIds.includes(id)),
+                ...rawReportedIds.filter((id) => !savedOrderIds.includes(id)),
+              ]
+            : rawReportedIds
+        const reportedSet = new Set(orderedReportedIds)
+
         const baseLine = parseLineStringWkt(segDetail.geom_wkt)
         let newCoords: [number, number][] = []
 
+        interface RouteNode {
+          id?: string
+          coord: [number, number]
+        }
+
+        let nodes: RouteNode[] = []
         if (baseLine.length >= 2) {
-          interface RouteNode {
-            id?: string
-            coord: [number, number]
-          }
           const usedPrevIds = new Set<string>()
-          let nodes: RouteNode[] = baseLine.map((vertex) => {
+          nodes = baseLine.map((vertex) => {
             const matchedPrev = previous.find(
               (p) =>
                 !usedPrevIds.has(p.id) &&
@@ -598,52 +692,129 @@ function* handleVerifyWorkOrder(
             }
             return { coord: vertex }
           })
+          nodes = nodes.filter((n) => !n.id || !reportedSet.has(n.id))
+        } else {
+          const staticAfter = after.filter((p) => !reportedSet.has(p.id))
+          if (staticAfter.length >= 2) {
+            nodes = orderPolesByChain(staticAfter).map((p) => ({ id: p.id, coord: p.coord }))
+          } else if (staticAfter.length === 1) {
+            nodes = [{ id: staticAfter[0].id, coord: staticAfter[0].coord }]
+          }
+        }
 
-          after.forEach((pole) => {
-            const existingIdx = nodes.findIndex((n) => n.id === pole.id)
-            if (existingIdx !== -1) {
-              nodes = nodes.filter((_, idx) => idx !== existingIdx)
-            }
-            if (nodes.length === 0) {
-              nodes = [{ id: pole.id, coord: pole.coord }]
-              return
-            }
-            if (nodes.length === 1) {
-              nodes = [...nodes, { id: pole.id, coord: pole.coord }]
-              return
-            }
-            let bestIdx = 0
-            let bestT = 0
-            let bestDist = Infinity
-            for (let i = 0; i < nodes.length - 1; i++) {
-              const proj = projectPointOnSegment(pole.coord, nodes[i].coord, nodes[i + 1].coord)
-              if (proj.dist < bestDist) {
-                bestDist = proj.dist
-                bestIdx = i
-                bestT = proj.t
+        // Lần lượt nối từng cột báo cáo theo đúng thứ tự tuần tự (Bước 1 -> Bước 2 -> ...)
+        const polesToInsert: OrderedPole[] =
+          orderedReportedIds.length > 0
+            ? orderedReportedIds
+                .map((pid) => after.find((p) => p.id === pid))
+                .filter((p): p is OrderedPole => Boolean(p))
+            : after
+
+        let chainDir: -1 | 1 = 1
+
+        polesToInsert.forEach((pole, stepIdx) => {
+          const existingIdx = nodes.findIndex((n) => n.id === pole.id)
+          if (existingIdx !== -1) {
+            nodes = nodes.filter((_, idx) => idx !== existingIdx)
+          }
+          if (nodes.length === 0) {
+            nodes = [{ id: pole.id, coord: pole.coord }]
+            return
+          }
+          if (nodes.length === 1) {
+            nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+            chainDir = 1
+            return
+          }
+
+          const prevStepPoleId = stepIdx > 0 ? polesToInsert[stepIdx - 1]?.id : null
+          const prevNodeIdx = prevStepPoleId ? nodes.findIndex((n) => n.id === prevStepPoleId) : -1
+
+          if (prevNodeIdx !== -1) {
+            if (stepIdx === 1) {
+              if (prevNodeIdx === nodes.length - 1) {
+                chainDir = 1
+              } else if (prevNodeIdx === 0) {
+                chainDir = -1
+              } else {
+                const prevPt = nodes[prevNodeIdx - 1].coord
+                const nextPt = nodes[prevNodeIdx + 1].coord
+                const costAfter =
+                  calculateDistanceMeters(nodes[prevNodeIdx].coord, pole.coord) +
+                  calculateDistanceMeters(pole.coord, nextPt) -
+                  calculateDistanceMeters(nodes[prevNodeIdx].coord, nextPt)
+                const costBefore =
+                  calculateDistanceMeters(prevPt, pole.coord) +
+                  calculateDistanceMeters(pole.coord, nodes[prevNodeIdx].coord) -
+                  calculateDistanceMeters(prevPt, nodes[prevNodeIdx].coord)
+                chainDir = costBefore < costAfter ? -1 : 1
               }
             }
-            const lastEdgeIdx = nodes.length - 2
-            if (bestIdx === 0 && bestT <= 0) {
-              nodes = [{ id: pole.id, coord: pole.coord }, ...nodes]
-            } else if (bestIdx === lastEdgeIdx && bestT >= 1) {
-              nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+
+            if (chainDir === -1) {
+              nodes = [
+                ...nodes.slice(0, prevNodeIdx),
+                { id: pole.id, coord: pole.coord },
+                ...nodes.slice(prevNodeIdx),
+              ]
             } else {
               nodes = [
-                ...nodes.slice(0, bestIdx + 1),
+                ...nodes.slice(0, prevNodeIdx + 1),
                 { id: pole.id, coord: pole.coord },
-                ...nodes.slice(bestIdx + 1),
+                ...nodes.slice(prevNodeIdx + 1),
               ]
             }
-          })
-          newCoords = nodes.map((n) => n.coord)
-        } else if (after.length >= 2) {
-          newCoords = orderPolesByChain(after).map((p) => p.coord)
-        }
+            return
+          }
+
+          let bestIdx = 0
+          let bestT = 0
+          let bestDist = Infinity
+          for (let i = 0; i < nodes.length - 1; i++) {
+            const proj = projectPointOnSegment(pole.coord, nodes[i].coord, nodes[i + 1].coord)
+            if (proj.dist < bestDist) {
+              bestDist = proj.dist
+              bestIdx = i
+              bestT = proj.t
+            }
+          }
+          const lastEdgeIdx = nodes.length - 2
+          const dStart = calculateDistanceMeters(pole.coord, nodes[0].coord)
+          const dEnd = calculateDistanceMeters(pole.coord, nodes[nodes.length - 1].coord)
+
+          if (bestIdx === 0 && bestT <= 0) {
+            nodes = [{ id: pole.id, coord: pole.coord }, ...nodes]
+            chainDir = -1
+          } else if (bestIdx === lastEdgeIdx && bestT >= 1) {
+            nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+            chainDir = 1
+          } else if (bestDist > 25 && (dStart <= dEnd ? bestIdx === 0 : bestIdx === lastEdgeIdx)) {
+            if (dStart < dEnd) {
+              nodes = [{ id: pole.id, coord: pole.coord }, ...nodes]
+              chainDir = -1
+            } else {
+              nodes = [...nodes, { id: pole.id, coord: pole.coord }]
+              chainDir = 1
+            }
+          } else {
+            nodes = [
+              ...nodes.slice(0, bestIdx + 1),
+              { id: pole.id, coord: pole.coord },
+              ...nodes.slice(bestIdx + 1),
+            ]
+            chainDir = 1
+          }
+        })
+
+        // Khử các đỉnh trùng nhau liên tiếp (< 0.05m) để LineString WKT luôn hợp lệ trong PostGIS / NetTopologySuite
+        const rawCoords = nodes.map((n) => n.coord)
+        newCoords = rawCoords.filter(
+          (pt, idx) => idx === 0 || calculateDistanceMeters(rawCoords[idx - 1], pt) >= 0.05
+        )
 
         if (newCoords.length >= 2) {
           const newWkt = `LINESTRING(${newCoords.map((c) => `${c[0]} ${c[1]}`).join(', ')})`
-          const newLengthM = calculateRouteLengthMeters(newCoords)
+          const newLengthM = Math.max(1, Math.round(calculateRouteLengthMeters(newCoords)))
           if (!isSameLine(newWkt, segDetail.geom_wkt)) {
             const seg = segDetail.segment
             yield call(assetAPI.updateSegment, targetSegmentId, {
@@ -661,7 +832,23 @@ function* handleVerifyWorkOrder(
       }
     }
 
-    if (editEntries.length > 0) {
+    // 5. Ghi chính thức tọa độ Quản lý đã tinh chỉnh lên từng cột đèn qua PUT /poles/{id}/location kèm bản ghi Audit (lúc này đường tuyến đã nối qua cột nên luôn thỏa mãn <= 25m)
+    let adjustedCount = 0
+    const failedAdjustments: string[] = []
+    for (const [poleId, loc] of editEntries) {
+      try {
+        yield call(assetAPI.setPoleLocation, poleId, { lat: loc.lat, lng: loc.lng })
+        adjustedCount += 1
+      } catch (locErr: unknown) {
+        const locMsg = extractApiErrorMessage(
+          locErr,
+          `Không thể áp dụng tọa độ tinh chỉnh cho cột ${poleId}`
+        )
+        failedAdjustments.push(`${poleId}: ${locMsg}`)
+      }
+    }
+
+    if (editEntries.length > 0 || savedOrderIds.length > 0) {
       yield put(clearEditedGpsLocations(workOrderId))
     }
 
@@ -670,7 +857,11 @@ function* handleVerifyWorkOrder(
       toast.warning(
         `Đã duyệt báo cáo nhưng không thể lưu tọa độ tinh chỉnh cho ${failedAdjustments.length} cột — ${failedAdjustments.join('; ')}`
       )
-    } else if (materials_note) {
+    } else if (
+      currentDetail?.task_kind === 'repair' ||
+      verifiedDetail?.task_kind === 'repair' ||
+      materials_note
+    ) {
       yield put(closeCaseDetail())
       toast.success('🎉 Đã duyệt nghiệm thu sửa chữa và gửi báo cáo lên Cấp trên thành công!')
     } else if (adjustedCount > 0) {

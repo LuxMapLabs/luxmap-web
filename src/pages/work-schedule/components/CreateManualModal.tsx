@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { X, Calendar, MapPin, User, FileText, Layers, Upload, FileCheck, Trash2, Cpu } from 'lucide-react'
+import { X, Calendar, MapPin, User, FileText, Layers, Upload, FileCheck, Trash2, Cpu, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import type { RootState } from '../../../redux/rootReducer'
 import { fetchAssetsRequest } from '../../../feature/assets/assetSlice'
@@ -44,6 +44,7 @@ interface CreateManualModalProps {
     assigneeName: string
     date: string
     notes?: string
+    materialsNote?: string
     poleIds?: string[]
     faultIds?: string[]
     qrPdfRawFiles?: File[]
@@ -100,6 +101,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || '')
   const [date, setDate] = useState(defaultDate || getTodayStr())
   const [notes, setNotes] = useState(initialNotes || '')
+  const [materialsNote, setMaterialsNote] = useState('')
 
   const isPrefillAppliedRef = React.useRef(false)
   const prevSegmentRef = React.useRef(segment)
@@ -156,6 +158,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       setSelectedCabinetId('__ALL__')
       setTitle(initialTitle || '')
       setNotes(initialNotes || '')
+      setMaterialsNote('')
       setSelectedPoleIds(initialPoleIds && initialPoleIds.length > 0 ? initialPoleIds : [])
       setSelectedFaultIds(initialFaultIds && initialFaultIds.length > 0 ? initialFaultIds : [])
       setQrPdfFiles([])
@@ -364,6 +367,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       assigneeName,
       date,
       notes: effectiveNotes,
+      materialsNote: initPhase === 'repair' && materialsNote.trim() ? materialsNote.trim() : undefined,
       poleIds: isIotCabinetFault ? [] : selectedPoleIds,
       faultIds: selectedFaultIds,
       qrPdfRawFiles: initPhase === 'pole_gps_update' ? qrPdfFiles.map((f) => f.rawFile) : undefined,
@@ -774,6 +778,23 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Ghi chú vật tư & thiết bị mang theo (dành cho giai đoạn Sửa chữa) */}
+            {initPhase === 'repair' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5 text-emerald-600" />
+                  Ghi chú thiết bị &amp; vật tư mang theo (Quản lý chỉ định):
+                </label>
+                <textarea
+                  rows={2}
+                  value={materialsNote}
+                  onChange={(e) => setMaterialsNote(e.target.value)}
+                  placeholder="Ví dụ: 02 bóng LED 100W, 01 aptomat 16A..."
+                  className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                />
               </div>
             )}
 

@@ -50,10 +50,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   const [date, setDate] = useState(getTodayStr())
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(defaultPoleIds)
   const [selectedFaultIds, setSelectedFaultIds] = useState<string[]>([])
-  const [materialsNote, setMaterialsNote] = useState(
-    '02 bóng LED 100W Rạng Đông, 01 aptomat 16A, 01 cuộn cáp mạ kẽm'
-  )
-  const [notes, setNotes] = useState('Thực hiện đúng quy chuẩn an toàn lao động và đo kiểm ban đêm.')
+  const [materialsNote, setMaterialsNote] = useState('')
+  const [notes, setNotes] = useState('')
 
   // Đồng bộ kỹ sư khi danh sách assignees tải xong từ API
   useEffect(() => {
@@ -72,6 +70,8 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
           : []
       setSelectedPoleIds(initialPoles)
       setSelectedFaultIds([])
+      setMaterialsNote('')
+      setNotes('')
     }
   }, [isOpen, caseCode, defaultPoleIds])
 
