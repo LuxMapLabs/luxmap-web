@@ -19,10 +19,9 @@ const INK = '#0f172a'
 const BODY = '#334155'
 const MUTED = '#64748b'
 const LINE = '#cbd5e1'
-const PLATE_LABEL = '#c7d3ea'
 
-const TEXT = '"Be Vietnam Pro", "Segoe UI", Roboto, Arial, sans-serif'
 const DISPLAY = '"Plus Jakarta Sans", "Segoe UI", Arial, sans-serif'
+const TEXT = DISPLAY
 
 /**
  * Tải ảnh từ data URL thành đối tượng HTMLImageElement
@@ -52,47 +51,115 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number):
 }
 
 /**
- * Tách và cắt ngắn văn bản theo số dòng tối đa trên Canvas
+ * Tìm cỡ chữ lớn nhất (từ maxSize xuống minSize) để văn bản vừa trong maxWidth.
+ * Trả về null nếu ngay cả minSize vẫn không vừa.
  */
-function wrapText(
+function fitFontSize(
   ctx: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number,
-  maxLines: number
-): string[] {
-  const trimmed = text.trim()
-  if (!trimmed) return []
+  weight: number,
+  family: string,
+  maxSize: number,
+  minSize: number,
+  maxWidth: number
+): number | null {
+  for (let size = maxSize; size >= minSize; size -= 2) {
+    ctx.font = `${weight} ${size}px ${family}`
+    if (ctx.measureText(text).width <= maxWidth) return size
+  }
+  return null
+}
 
-  const words = trimmed.split(/\s+/)
-  const lines: string[] = []
-  let currentLine = ''
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i]
-    const testLine = currentLine ? `${currentLine} ${word}` : word
-    if (ctx.measureText(testLine).width <= maxWidth) {
-      currentLine = testLine
-    } else {
-      if (lines.length + 1 === maxLines) {
-        const remaining = [currentLine, ...words.slice(i)].filter(Boolean).join(' ')
-        lines.push(fitText(ctx, remaining, maxWidth))
-        return lines
-      }
-      if (currentLine) {
-        lines.push(currentLine)
-        currentLine = word
-      } else {
-        lines.push(fitText(ctx, word, maxWidth))
-        currentLine = ''
-      }
+/**
+ * Tách mã dài thành 2 dòng cân đối, ưu tiên ngắt sau dấu gạch (- _ / .)
+ */
+function splitCode(ctx: CanvasRenderingContext2D, text: string, font: string): [string, string] {
+  ctx.font = font
+  const cuts: number[] = []
+  for (let i = 0; i < text.length - 1; i++) {
+    if ('-_/.'.includes(text[i])) cuts.push(i + 1)
+  }
+  if (cuts.length === 0) {
+    for (let i = 1; i < text.length; i++) cuts.push(i)
+  }
+  let best = cuts[0]
+  let bestWidth = Infinity
+  for (const cut of cuts) {
+    const w = Math.max(
+      ctx.measureText(text.slice(0, cut)).width,
+      ctx.measureText(text.slice(cut)).width
+    )
+    if (w < bestWidth) {
+      bestWidth = w
+      best = cut
     }
   }
+  return [text.slice(0, best), text.slice(best)]
+}
 
-  if (currentLine && lines.length < maxLines) {
-    lines.push(currentLine)
+/**
+ * Ngắt văn bản thành nhiều dòng vừa độ rộng, xuống dòng theo từ;
+ * từ nào dài hơn cả dòng thì ngắt theo ký tự. Không bao giờ cắt bớt chữ.
+ */
+function breakLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = []
+  let current = ''
+  for (const word of text.trim().split(/\s+/)) {
+    const test = current ? `${current} ${word}` : word
+    if (ctx.measureText(test).width <= maxWidth) {
+      current = test
+      continue
+    }
+    if (current) lines.push(current)
+    current = ''
+    let rest = word
+    while (ctx.measureText(rest).width > maxWidth) {
+      let cut = rest.length - 1
+      while (cut > 1 && ctx.measureText(rest.slice(0, cut)).width > maxWidth) cut--
+      lines.push(rest.slice(0, cut))
+      rest = rest.slice(cut)
+    }
+    current = rest
   }
-
+  if (current) lines.push(current)
   return lines
+}
+
+interface FittedValue {
+  size: number
+  lines: string[]
+}
+
+/**
+ * Chọn cỡ chữ và số dòng: ưu tiên 1 dòng (giảm cỡ dần đến minSize),
+ * không vừa thì xuống dòng (tối đa maxLines) ở cỡ minSize + 2.
+ */
+function fitValue(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  weight: number,
+  family: string,
+  maxSize: number,
+  minSize: number,
+  maxWidth: number,
+  maxLines: number
+): FittedValue {
+  const single = fitFontSize(ctx, text, weight, family, maxSize, minSize, maxWidth)
+  if (single) return { size: single, lines: [text] }
+  for (let size = minSize + 4; size >= minSize; size -= 2) {
+    ctx.font = `${weight} ${size}px ${family}`
+    const lines = breakLines(ctx, text, maxWidth)
+    if (lines.length <= maxLines) return { size, lines }
+  }
+  ctx.font = `${weight} ${minSize}px ${family}`
+  const lines = breakLines(ctx, text, maxWidth)
+  if (lines.length > maxLines) {
+    // Quá dài tuyệt đối: giữ maxLines dòng, dòng cuối rút gọn để không tràn khung
+    const kept = lines.slice(0, maxLines - 1)
+    kept.push(fitText(ctx, lines.slice(maxLines - 1).join(' '), maxWidth))
+    return { size: minSize, lines: kept }
+  }
+  return { size: minSize, lines }
 }
 
 /**
@@ -165,8 +232,9 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
   if (typeof document !== 'undefined' && document.fonts?.load) {
     try {
       await Promise.all([
-        document.fonts.load('600 32px "Be Vietnam Pro"'),
-        document.fonts.load('500 24px "Be Vietnam Pro"'),
+        document.fonts.load('500 24px "Plus Jakarta Sans"'),
+        document.fonts.load('600 24px "Plus Jakarta Sans"'),
+        document.fonts.load('700 32px "Plus Jakarta Sans"'),
         document.fonts.load('800 56px "Plus Jakarta Sans"'),
       ])
     } catch {
@@ -202,19 +270,17 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
   // Chữ CTA: Đèn không sáng? Quét mã QR để báo cho đơn vị quản lý, 600 28px TEXT, căn giữa, middle tại y=538
   ctx.save()
   ctx.fillStyle = NAVY
-  ctx.font = `600 28px ${TEXT}`
+  const ctaLabel = 'Đèn không sáng? Quét mã QR để báo cho đơn vị quản lý'
+  const ctaSize = fitFontSize(ctx, ctaLabel, 700, TEXT, 32, 22, 950) ?? 22
+  ctx.font = `700 ${ctaSize}px ${TEXT}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  const ctaText = fitText(
-    ctx,
-    'Đèn không sáng? Quét mã QR để báo cho đơn vị quản lý',
-    950
-  )
+  const ctaText = ctaLabel
   ctx.fillText(ctaText, 525, 538)
   ctx.restore()
 
   // 2. QR (trái): hộp roundRect(56, 56, 400, 400, 20) nền trắng, viền LINE 2px
-  roundRect(ctx, 56, 56, 400, 400, 20)
+  roundRect(ctx, 44, 52, 420, 420, 20)
   ctx.fillStyle = '#ffffff'
   ctx.fill()
   ctx.lineWidth = 2
@@ -225,7 +291,7 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
     try {
       const qrImg = await loadImage(data.qrDataUrl)
       ctx.imageSmoothingEnabled = false
-      ctx.drawImage(qrImg, 70, 70, 372, 372)
+      ctx.drawImage(qrImg, 58, 66, 392, 392)
       ctx.imageSmoothingEnabled = true
     } catch (err) {
       console.error('Lỗi khi vẽ mã QR lên canvas:', err)
@@ -233,80 +299,104 @@ export async function renderDecalToCanvas(data: DecalCanvasData): Promise<HTMLCa
   }
 
   // 3. Cột phải: x = 500, maxW = 494. Baseline alphabetic, căn trái trừ khi ghi khác
-  const x = 500
-  const maxW = 494
+  const x = 490
+  const maxW = 510
 
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
 
-  // - Thương hiệu: biểu tượng LuxMap cao 40px tại (500, 56)
+  // - Thương hiệu: biểu tượng + tên + mô tả trên một hàng
   try {
     const mark = await loadImage(luxmapMark)
-    ctx.drawImage(mark, 500, 56, 35.5, 40)
+    ctx.drawImage(mark, x, 52, 35.5, 40)
   } catch (err) {
     console.error('Lỗi khi vẽ logo lên canvas:', err)
   }
-
-  // Chữ LuxMap 800 28px DISPLAY NAVY tại (546, 86)
   ctx.fillStyle = NAVY
-  ctx.font = `800 28px ${DISPLAY}`
-  ctx.fillText('LuxMap', 546, 86)
-
-  // Ngay sau (đo width + 14px) chữ Chiếu sáng công cộng 500 22px TEXT MUTED cùng baseline 86
+  ctx.font = `800 34px ${DISPLAY}`
+  ctx.fillText('LuxMap', x + 48, 84)
   const luxMapWidth = ctx.measureText('LuxMap').width
   ctx.fillStyle = MUTED
   ctx.font = `500 22px ${TEXT}`
-  ctx.fillText('Chiếu sáng công cộng', 546 + luxMapWidth + 14, 86)
+  ctx.fillText('Chiếu sáng công cộng', x + 48 + luxMapWidth + 14, 84)
+  ctx.fillStyle = LINE
+  ctx.fillRect(x, 108, maxW, 2)
 
-  // - Biển mã cột: roundRect(500, 108, 494, 108, 14) nền NAVY
-  roundRect(ctx, 500, 108, 494, 108, 14)
-  ctx.fillStyle = NAVY
-  ctx.fill()
+  // - Các mục thông tin: tự co chữ / xuống dòng, dàn đều theo chiều dọc phần còn lại
+  const clean = (v?: string | null) => (v && v.trim() ? v.trim() : '-')
 
-  // Nhãn Mã cột 500 20px TEXT PLATE_LABEL tại (524, 140)
-  ctx.fillStyle = PLATE_LABEL
-  ctx.font = `500 20px ${TEXT}`
-  ctx.fillText('Mã cột', 524, 140)
+  // Mã cột: nằm ngang, 1 dòng nếu vừa; dài thì giảm cỡ rồi ngắt 2 dòng ở dấu gạch
+  const poleCodeValue = clean(data.poleCode)
+  let codeFit: FittedValue
+  const codeSingle = fitFontSize(ctx, poleCodeValue, 800, DISPLAY, 44, 30, maxW)
+  if (codeSingle) {
+    codeFit = { size: codeSingle, lines: [poleCodeValue] }
+  } else {
+    const [first, second] = splitCode(ctx, poleCodeValue, `800 32px ${DISPLAY}`)
+    const size = Math.min(
+      fitFontSize(ctx, first, 800, DISPLAY, 32, 18, maxW) ?? 18,
+      fitFontSize(ctx, second, 800, DISPLAY, 32, 18, maxW) ?? 18
+    )
+    codeFit = { size, lines: [fitText(ctx, first, maxW), fitText(ctx, second, maxW)] }
+  }
+  const infoRows = [
+    { label: 'Mã cột', icon: false, color: NAVY, weight: 800, family: DISPLAY, fit: codeFit },
+    {
+      label: 'Tuyến đường',
+      icon: false,
+      color: INK,
+      weight: 700,
+      family: TEXT,
+      fit: fitValue(ctx, clean(data.segmentName), 700, TEXT, 36, 22, maxW, 2),
+    },
+    {
+      label: 'Địa bàn',
+      icon: true,
+      color: INK,
+      weight: 700,
+      family: TEXT,
+      fit: fitValue(ctx, clean(data.communeName), 700, TEXT, 32, 20, maxW - 36, 2),
+    },
+    {
+      label: 'Ghi chú',
+      icon: false,
+      color: BODY,
+      weight: 500,
+      family: TEXT,
+      fit: fitValue(ctx, clean(data.note), 500, TEXT, 28, 18, maxW, 3),
+    },
+  ]
+  const LABEL_H = 30
+  const rowHeights = infoRows.map(
+    (r) => LABEL_H + r.fit.lines.length * Math.round(r.fit.size * 1.25)
+  )
+  const areaTop = 124
+  const areaBottom = 484
+  const slack = areaBottom - areaTop - rowHeights.reduce((a, b) => a + b, 0)
+  const pad = Math.max(4, Math.min(20, Math.floor(slack / 8)))
+  let cursor = areaTop + Math.max(0, Math.floor((slack - 6 * pad) / 2))
 
-  // Mã cột 800 56px DISPLAY trắng tại (524, 198), fitText tối đa 446px, rỗng thì -
-  const poleCodeValue = data.poleCode && data.poleCode.trim() ? data.poleCode.trim() : '-'
-  ctx.fillStyle = '#ffffff'
-  ctx.font = `800 56px ${DISPLAY}`
-  ctx.fillText(fitText(ctx, poleCodeValue, 446), 524, 198)
+  infoRows.forEach((r, i) => {
+    ctx.fillStyle = MUTED
+    ctx.font = `600 22px ${TEXT}`
+    ctx.fillText(r.label, x, cursor + 20)
 
-  // - Tuyến đường 500 20px TEXT MUTED tại (500, 258); giá trị 600 32px TEXT INK tại (500, 296), fitText maxW, rỗng -
-  ctx.fillStyle = MUTED
-  ctx.font = `500 20px ${TEXT}`
-  ctx.fillText('Tuyến đường', x, 258)
+    const lineH = Math.round(r.fit.size * 1.25)
+    const valueX = r.icon ? x + 36 : x
+    if (r.icon) drawMapPinIcon(ctx, x, cursor + LABEL_H + 2, 26, NAVY)
+    ctx.fillStyle = r.color
+    ctx.font = `${r.weight} ${r.fit.size}px ${r.family}`
+    r.fit.lines.forEach((line, li) => {
+      ctx.fillText(line, valueX, cursor + LABEL_H + r.fit.size + li * lineH)
+    })
 
-  const segmentValue = data.segmentName && data.segmentName.trim() ? data.segmentName.trim() : '-'
-  ctx.fillStyle = INK
-  ctx.font = `600 32px ${TEXT}`
-  ctx.fillText(fitText(ctx, segmentValue, maxW), x, 296)
-
-  // - Địa bàn nhãn 500 20px TEXT tại (500, 336); drawMapPinIcon(ctx, 500, 348, 26, NAVY); giá trị 500 28px TEXT INK tại (536, 372), fitText maxW - 36, rỗng -
-  ctx.fillStyle = MUTED
-  ctx.font = `500 20px ${TEXT}`
-  ctx.fillText('Địa bàn', x, 336)
-
-  drawMapPinIcon(ctx, x, 348, 26, NAVY)
-
-  const communeValue = data.communeName && data.communeName.trim() ? data.communeName.trim() : '-'
-  ctx.fillStyle = INK
-  ctx.font = `500 28px ${TEXT}`
-  ctx.fillText(fitText(ctx, communeValue, maxW - 36), 536, 372)
-
-  // - Ghi chú nhãn 500 20px TEXT tại (500, 412); giá trị 500 24px TEXT BODY, wrapText maxW tối đa 2 dòng, dòng 1 y=444, dòng 2 y=474. Rỗng/null/chỉ khoảng trắng thì -
-  ctx.fillStyle = MUTED
-  ctx.font = `500 20px ${TEXT}`
-  ctx.fillText('Ghi chú', x, 412)
-
-  const noteRaw = data.note && data.note.trim() ? data.note.trim() : '-'
-  ctx.fillStyle = BODY
-  ctx.font = `500 24px ${TEXT}`
-  const noteLines = wrapText(ctx, noteRaw, maxW, 2)
-  if (noteLines[0]) ctx.fillText(noteLines[0], x, 444)
-  if (noteLines[1]) ctx.fillText(noteLines[1], x, 474)
+    cursor += rowHeights[i]
+    if (i < infoRows.length - 1) {
+      ctx.fillStyle = LINE
+      ctx.fillRect(x, cursor + pad, maxW, 2)
+      cursor += 2 * pad
+    }
+  })
 
   // 4. Viền khung ngoài sau cùng (NAVY 6px) để viền nằm trên
   roundRect(ctx, 20, 20, 1010, 560, 28)
