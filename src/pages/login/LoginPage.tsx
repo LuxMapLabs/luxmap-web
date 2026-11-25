@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { loginRequest, googleLoginRequest } from '../../feature/auth/authSlice'
 import { GoogleSignInButton } from '../../components/GoogleSignInButton'
@@ -206,13 +206,12 @@ export const LoginPage: React.FC = () => {
                 </span>
               </label>
 
-              <button
-                type="button"
-                onClick={() => toast.info('Vui lòng liên hệ Quản trị viên hệ thống để được cấp lại mật khẩu.')}
+              <Link
+                to="/forgot-password"
                 className="text-xs font-semibold text-[#5fc4b0] hover:text-[#8fd9e8] transition-colors cursor-pointer"
               >
                 Quên mật khẩu?
-              </button>
+              </Link>
             </div>
 
             {/* Error Banner */}
