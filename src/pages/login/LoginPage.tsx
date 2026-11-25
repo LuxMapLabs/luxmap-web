@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import tokenStorage from '../../utils/tokenStorage'
 import loginBgHq from '../../assets/images/login-bg-hq.png'
+import luxmapIcon from '../../assets/images/luxmap-icon.svg'
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -97,13 +98,7 @@ export const LoginPage: React.FC = () => {
           <div className="space-y-7">
             {/* Logo LuxMap */}
             <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-none bg-[#11233e] border border-[#204273] shadow-md shadow-black/40 flex items-center justify-center p-2">
-                <div className="flex items-end justify-center gap-1.5 h-5 w-5">
-                  <div className="w-1.5 h-3.5 bg-[#5fc4b0] rounded-none" />
-                  <div className="w-1.5 h-5 bg-white rounded-none shadow-xs shadow-white" />
-                  <div className="w-1.5 h-3.5 bg-[#5fc4b0] rounded-none" />
-                </div>
-              </div>
+              <img src={luxmapIcon} alt="LuxMap" className="w-11 h-11 shrink-0 shadow-md shadow-black/40" />
               <div>
                 <span className="text-2xl font-black tracking-wider text-white uppercase leading-none block">
                   LUXMAP
