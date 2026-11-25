@@ -48,3 +48,17 @@ export const changePasswordSchema = z
   })
 
 export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>
+
+/**
+ * Schema gửi yêu cầu đặt lại mật khẩu qua email (POST /auth/password/forgot).
+ */
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Vui lòng nhập email')
+    .max(256, 'Email không được vượt quá 256 ký tự')
+    .email('Email không đúng định dạng'),
+})
+
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>

@@ -1,5 +1,10 @@
 import apiClient from '../../config/apiClient'
-import type { ChangePasswordRequest, SetPasswordRequest } from '../../types/auth/password'
+import type {
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
+  SetPasswordRequest,
+} from '../../types/auth/password'
 
 export const passwordAPI = {
   /**
@@ -16,6 +21,15 @@ export const passwordAPI = {
    */
   changePassword: async (data: ChangePasswordRequest): Promise<void> => {
     await apiClient.post('/auth/password/change', data)
+  },
+
+  /**
+   * Gửi yêu cầu đặt lại mật khẩu qua email (POST /api/v1/auth/password/forgot)
+   * Luôn trả 202 với cùng thông báo dù email có tài khoản hay không; 400 nếu email không hợp lệ, 429 nếu gửi quá nhiều.
+   */
+  forgotPassword: async (data: ForgotPasswordRequest): Promise<ForgotPasswordResponse> => {
+    const response = await apiClient.post<ForgotPasswordResponse>('/auth/password/forgot', data)
+    return response.data
   },
 }
 

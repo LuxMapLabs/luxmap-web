@@ -1,5 +1,9 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import type { ChangePasswordRequest, SetPasswordRequest } from '../../types/auth/password'
+import type {
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  SetPasswordRequest,
+} from '../../types/auth/password'
 
 interface PasswordState {
   isSubmitting: boolean
@@ -8,6 +12,9 @@ interface PasswordState {
   isChanging: boolean
   changeSuccess: boolean
   changeError: string | null
+  isRequestingReset: boolean
+  resetRequestSent: boolean
+  resetRequestError: string | null
 }
 
 const initialState: PasswordState = {
@@ -17,6 +24,9 @@ const initialState: PasswordState = {
   isChanging: false,
   changeSuccess: false,
   changeError: null,
+  isRequestingReset: false,
+  resetRequestSent: false,
+  resetRequestError: null,
 }
 
 const passwordSlice = createSlice({
@@ -53,6 +63,21 @@ const passwordSlice = createSlice({
       state.changeSuccess = false
       state.changeError = action.payload
     },
+    forgotPasswordRequest: (state, _action: PayloadAction<ForgotPasswordRequest>) => {
+      state.isRequestingReset = true
+      state.resetRequestSent = false
+      state.resetRequestError = null
+    },
+    forgotPasswordSuccess: (state) => {
+      state.isRequestingReset = false
+      state.resetRequestSent = true
+      state.resetRequestError = null
+    },
+    forgotPasswordFailure: (state, action: PayloadAction<string>) => {
+      state.isRequestingReset = false
+      state.resetRequestSent = false
+      state.resetRequestError = action.payload
+    },
     resetPasswordState: () => initialState,
   },
 })
@@ -64,6 +89,9 @@ export const {
   changePasswordRequest,
   changePasswordSuccess,
   changePasswordFailure,
+  forgotPasswordRequest,
+  forgotPasswordSuccess,
+  forgotPasswordFailure,
   resetPasswordState,
 } = passwordSlice.actions
 export default passwordSlice.reducer

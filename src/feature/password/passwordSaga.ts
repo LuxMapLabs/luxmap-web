@@ -2,7 +2,11 @@ import { all, call, put, takeLatest } from 'redux-saga/effects'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { toast } from 'sonner'
 import passwordAPI from './passwordAPI'
-import type { ChangePasswordRequest, SetPasswordRequest } from '../../types/auth/password'
+import type {
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  SetPasswordRequest,
+} from '../../types/auth/password'
 import {
   setPasswordRequest,
   setPasswordSuccess,
@@ -10,6 +14,9 @@ import {
   changePasswordRequest,
   changePasswordSuccess,
   changePasswordFailure,
+  forgotPasswordRequest,
+  forgotPasswordSuccess,
+  forgotPasswordFailure,
 } from './passwordSlice'
 import { logout } from '../auth/authSlice'
 
@@ -58,6 +65,24 @@ function getChangePasswordErrorMessage(error: unknown): string {
   return 'Không thể đổi mật khẩu. Vui lòng thử lại.'
 }
 
+function getForgotPasswordErrorMessage(error: unknown): string {
+  const err = error as { response?: { status?: number } }
+  const status = err?.response?.status
+  if (!err?.response) {
+    return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng rồi thử lại.'
+  }
+  if (status === 400) {
+    return 'Email không hợp lệ. Vui lòng kiểm tra lại.'
+  }
+  if (status === 429) {
+    return 'Bạn đã yêu cầu quá nhiều lần. Vui lòng đợi một lát rồi thử lại.'
+  }
+  if (typeof status === 'number' && status >= 500) {
+    return 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'
+  }
+  return 'Không thể gửi yêu cầu đặt lại mật khẩu. Vui lòng thử lại.'
+}
+
 function* handleSetPassword(action: PayloadAction<SetPasswordRequest>) {
   try {
     yield call(passwordAPI.setPassword, action.payload)
@@ -83,9 +108,22 @@ function* handleChangePassword(action: PayloadAction<ChangePasswordRequest>) {
   }
 }
 
+function* handleForgotPassword(action: PayloadAction<ForgotPasswordRequest>) {
+  try {
+    yield call(passwordAPI.forgotPassword, action.payload)
+    // Không bật toast khi thành công vì giao diện sẽ hiện màn hình đã gửi
+    yield put(forgotPasswordSuccess())
+  } catch (error: unknown) {
+    const message = getForgotPasswordErrorMessage(error)
+    // Lỗi hiển thị ngay trong thẻ form nên không bật thêm toast trùng nội dung
+    yield put(forgotPasswordFailure(message))
+  }
+}
+
 export default function* passwordSaga() {
   yield all([
     takeLatest(setPasswordRequest.type, handleSetPassword),
     takeLatest(changePasswordRequest.type, handleChangePassword),
+    takeLatest(forgotPasswordRequest.type, handleForgotPassword),
   ])
 }
