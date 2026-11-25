@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react'
 
 const GSI_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
+const DEFAULT_BUTTON_WIDTH = 320
+const MIN_BUTTON_WIDTH = 200
+const MAX_BUTTON_WIDTH = 400
+// Nút 'large' của Google cao 40px, rộng tối đa 400px; phóng 1.15 để cao 46px và rộng 460px bằng ô nhập
+const BUTTON_SCALE = 1.15
 
 interface GsiCredentialResponse {
   credential?: string
@@ -11,8 +16,8 @@ interface GsiButtonOptions {
   theme: 'outline' | 'filled_blue' | 'filled_black'
   size: 'large' | 'medium' | 'small'
   text: 'signin_with'
-  shape: 'rectangular'
-  logo_alignment: 'left'
+  shape: 'rectangular' | 'pill' | 'circle' | 'square'
+  logo_alignment: 'center'
   width: number
   locale: string
 }
@@ -63,9 +68,10 @@ interface GoogleSignInButtonProps {
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   onCredential,
   onLoadError,
-  width = 320,
+  width,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLDivElement>(null)
   const callbackRef = useRef(onCredential)
   const errorRef = useRef(onLoadError)
   const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()
@@ -81,21 +87,30 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 
     loadGsiScript()
       .then(() => {
-        if (cancelled || !containerRef.current || !window.google) return
+        if (cancelled || !containerRef.current || !buttonRef.current || !window.google) return
+        // Tự đo bề rộng khung chứa, chia cho tỉ lệ phóng rồi kẹp trong giới hạn của Google (200-400px)
+        const measuredWidth = containerRef.current.offsetWidth
+        buttonRef.current.style.zoom = String(BUTTON_SCALE)
+        const resolvedWidth =
+          width ??
+          (measuredWidth > 0
+            ? Math.min(MAX_BUTTON_WIDTH, Math.max(MIN_BUTTON_WIDTH, Math.floor(measuredWidth / BUTTON_SCALE)))
+            : DEFAULT_BUTTON_WIDTH)
+
         window.google.accounts.id.initialize({
           client_id: clientId,
           callback: (response) => {
             if (response.credential) callbackRef.current(response.credential)
           },
         })
-        window.google.accounts.id.renderButton(containerRef.current, {
+        window.google.accounts.id.renderButton(buttonRef.current, {
           type: 'standard',
           theme: 'outline',
           size: 'large',
           text: 'signin_with',
           shape: 'rectangular',
-          logo_alignment: 'left',
-          width,
+          logo_alignment: 'center',
+          width: resolvedWidth,
           locale: 'vi',
         })
       })
@@ -111,7 +126,15 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   // Chưa cấu hình Client ID thì ẩn hẳn tính năng
   if (!clientId) return null
 
-  return <div ref={containerRef} className="flex justify-center" data-testid="google-signin-button" />
+  return (
+    <div
+      ref={containerRef}
+      className="flex h-[46px] w-full max-w-full items-center justify-center overflow-hidden"
+      data-testid="google-signin-button"
+    >
+      <div ref={buttonRef} />
+    </div>
+  )
 }
 
 export default GoogleSignInButton

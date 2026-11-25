@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
-  Lightbulb,
   LayoutDashboard,
   Map,
   FileCheck2,
@@ -17,6 +16,7 @@ import { logout } from '../feature/auth/authSlice'
 import { SidebarAccount } from '../components/SidebarAccount'
 import { useModalEscape } from '../hooks/useModalEscape'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import luxmapMark from '../assets/images/luxmap-mark.svg'
 
 interface NavItem {
   to: string
@@ -111,10 +111,8 @@ export const SuperiorLayout: React.FC = () => {
         }`}
       >
         <div className={`flex items-center gap-2.5 pb-5 pt-1 ${collapsed ? 'justify-center' : 'px-2'}`}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-linear-to-br from-[#8FB8DA] to-[#4A7AA3] shadow-[0_8px_16px_-6px_rgba(74,122,163,0.6)]">
-            <Lightbulb className="h-[18px] w-[18px] fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-          </div>
-          {!collapsed && <span className="flex-1 text-[15px] font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
+          <img src={luxmapMark} alt="LuxMap" className="h-12 w-auto shrink-0" />
+          {!collapsed && <span className="flex-1 text-lg font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
           {isMobile && (
             <button
               type="button"

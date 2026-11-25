@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
-  Lightbulb,
   LayoutDashboard,
   ShieldCheck,
   Compass,
@@ -17,6 +16,7 @@ import type { RootState } from '../redux/rootReducer'
 import { logout } from '../feature/auth/authSlice'
 import { SidebarAccount } from '../components/SidebarAccount'
 import { useModalEscape } from '../hooks/useModalEscape'
+import luxmapMark from '../assets/images/luxmap-mark.svg'
 
 interface AdminNavItem {
   to: string
@@ -103,10 +103,8 @@ export const AdminLayout: React.FC = () => {
       >
         <div className={`flex items-center gap-2.5 pb-5 pt-5 ${collapsed ? 'justify-center' : 'px-5'}`}>
           <div className={`flex items-center gap-2.5 overflow-hidden cursor-default flex-1 ${collapsed ? 'justify-center' : ''}`}>
-            <div className="h-9 w-9 text-white flex items-center justify-center shrink-0 rounded-[12px] bg-linear-to-tr from-blue-600 via-blue-700 to-indigo-700 shadow-md shadow-blue-600/25">
-              <Lightbulb className="h-[18px] w-[18px] fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-            </div>
-            {!collapsed && <span className="flex-1 text-[15px] font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
+            <img src={luxmapMark} alt="LuxMap" className="h-12 w-auto shrink-0" />
+            {!collapsed && <span className="flex-1 text-lg font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
           </div>
         </div>
 

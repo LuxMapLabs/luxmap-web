@@ -1,22 +1,23 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { AlertCircle, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react'
 import { loginRequest, googleLoginRequest } from '../../feature/auth/authSlice'
 import { GoogleSignInButton } from '../../components/GoogleSignInButton'
-import { RootState } from '../../redux/rootReducer'
 import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  Loader2,
-  ArrowRight,
-  AlertCircle,
-} from 'lucide-react'
+  AuthPageShell,
+  INPUT_OK,
+  INPUT_WRAP,
+  PRIMARY_BUTTON,
+} from '../../components/AuthPageShell'
+import type { RootState } from '../../redux/rootReducer'
 import tokenStorage from '../../utils/tokenStorage'
-import loginBgHq from '../../assets/images/login-bg-hq.png'
-import luxmapIcon from '../../assets/images/luxmap-icon.svg'
+
+const INPUT_CLASS =
+  'h-full w-full min-w-0 bg-transparent pl-2.5 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50'
+
+const LOGIN_INPUT_WRAP = `${INPUT_WRAP} ${INPUT_OK} group/field`
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -55,7 +56,7 @@ export const LoginPage: React.FC = () => {
         emailOrPhone: email.trim(),
         password,
         rememberMe,
-      })
+      }),
     )
   }
 
@@ -64,208 +65,153 @@ export const LoginPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen w-full relative flex items-center justify-end overflow-hidden select-none font-sans bg-[#060c16]">
-      {/* 1. Background Image HD sắc nét nguyên bản (Không bị tối mờ, con đường và đèn nằm trọn vẹn ở bên trái) */}
-      <div
-        className="absolute inset-0 bg-cover bg-left lg:bg-center pointer-events-none transition-all duration-500"
-        style={{
-          backgroundImage: `url(${loginBgHq})`,
-        }}
-      />
+    <AuthPageShell>
+      <h1 className="mb-2 text-2xl font-extrabold leading-tight tracking-tight text-slate-900 md:text-[28px]">
+        Đăng nhập
+      </h1>
+      <p className="mb-5 text-balance text-sm leading-relaxed text-slate-600 [@media(max-height:659px)]:mb-3">
+        Sử dụng tài khoản nhân viên / cán bộ để tiếp tục.
+      </p>
 
-      {/* 2. Chỉ phủ lớp chuyển bóng rất nhẹ ở rìa phải để hỗ trợ tương phản cho Khung Login */}
-      <div className="absolute inset-0 bg-gradient-to-l from-black/50 via-black/15 to-transparent pointer-events-none" />
-
-
-      {/* 3. Khung đăng nhập Vuông vức (Không bo góc) kèm hiệu ứng Ambient Halo & Đổ bóng sâu - Nằm bên phải */}
-      <div className="relative z-20 w-full max-w-[490px] mx-auto lg:mx-0 lg:mr-16 xl:mr-24 2xl:mr-32 p-4 sm:p-6 my-auto group">
-        {/* [Mục 4] Ambient Halo phát sáng nhẹ phía sau thẻ */}
-        <div className="absolute -inset-1.5 bg-gradient-to-r from-[#5fc4b0]/15 via-blue-500/10 to-[#5fc4b0]/10 blur-2xl -z-10 opacity-60 group-hover:opacity-95 transition-opacity duration-700 pointer-events-none" />
-
-        <div className="w-full rounded-none p-8 sm:p-11 border border-white/15 hover:border-white/30 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85),0_0_40px_rgba(0,0,0,0.6)] hover:shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95),0_0_50px_rgba(95,196,176,0.22)] backdrop-blur-2xl bg-gradient-to-br from-[#0c182a]/95 via-[#09121f]/90 to-[#060e1a]/95 text-white transition-all duration-500 animate-login-card relative overflow-hidden">
-          {/* [Mục 4] Subtle Top Accent Line with Ambient Glow & Hover Highlight */}
-          <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden">
-            <div className="h-full w-full bg-gradient-to-r from-transparent via-[#5fc4b0] to-transparent shadow-[0_0_15px_rgba(95,196,176,0.7)] group-hover:shadow-[0_0_25px_rgba(95,196,176,1)] transition-all duration-500" />
-          </div>
-
-          {/* 4 Corner Tech Brackets (Điểm nhấn kỹ thuật GIS sắc sảo) */}
-          <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-[#5fc4b0]/80 transition-all duration-300 group-hover:border-[#5fc4b0] group-hover:scale-105" />
-          <div className="absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-[#5fc4b0]/80 transition-all duration-300 group-hover:border-[#5fc4b0] group-hover:scale-105" />
-          <div className="absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-[#5fc4b0]/50 transition-all duration-300 group-hover:border-[#5fc4b0] group-hover:scale-105" />
-          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-[#5fc4b0]/50 transition-all duration-300 group-hover:border-[#5fc4b0] group-hover:scale-105" />
-
-          {/* Header: Logo & Title (Tinh giản & Hiện đại) */}
-          <div className="space-y-7">
-            {/* Logo LuxMap */}
-            <div className="flex items-center gap-3.5">
-              <img src={luxmapIcon} alt="LuxMap" className="w-11 h-11 shrink-0 shadow-md shadow-black/40" />
-              <div>
-                <span className="text-2xl font-black tracking-wider text-white uppercase leading-none block">
-                  LUXMAP
-                </span>
-                <span className="text-[11px] text-slate-400 font-medium tracking-wide">
-                  Chiếu sáng Nông thôn Thông minh
-                </span>
-              </div>
-            </div>
-
-            {/* Title */}
-            <div className="space-y-1.5">
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                Đăng nhập
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-400 font-normal">
-                Sử dụng tài khoản nhân viên / cán bộ để tiếp tục.
-              </p>
+      <form onSubmit={handleSubmit} className="space-y-5 [@media(max-height:759px)]:space-y-4 [@media(max-height:659px)]:space-y-3">
+        {/* Banner lỗi đăng nhập từ máy chủ */}
+        {error ? (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div className="space-y-0.5">
+              <p className="font-semibold">Không thể đăng nhập</p>
+              <p className="leading-relaxed">{error}</p>
             </div>
           </div>
+        ) : null}
 
-          {/* Form Login (Vuông vức, tinh giản, sắc sảo) */}
-          <form onSubmit={handleSubmit} className="login-form space-y-5 pt-7">
-            {/* Field: Tài khoản / Email */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 block">
-                Tài khoản / Email
-              </label>
-              <div className="relative flex items-center rounded-none border border-slate-700/70 bg-[var(--login-input-background)] px-3.5 py-3 group/field focus-within:border-[#5fc4b0] focus-within:ring-1 focus-within:ring-[#5fc4b0]/40 transition-all duration-200">
-                {/* [Mục 2] Icon sáng xanh ngọc khi focus */}
-                <Mail className="w-4.5 h-4.5 text-slate-400 group-focus-within/field:text-[#5fc4b0] transition-colors duration-200 shrink-0" />
-                <input
-                  type="text"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Nhập tên đăng nhập hoặc email"
-                  disabled={loading}
-                  autoComplete="username"
-                  spellCheck={false}
-                  className="login-input w-full min-w-0 text-sm font-medium outline-none bg-transparent pl-3 pr-2 text-white placeholder-slate-500 disabled:opacity-50"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Field: Mật khẩu */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 block">
-                Mật khẩu
-              </label>
-              <div className="relative flex items-center rounded-none border border-slate-700/70 bg-[var(--login-input-background)] px-3.5 py-3 group/field focus-within:border-[#5fc4b0] focus-within:ring-1 focus-within:ring-[#5fc4b0]/40 transition-all duration-200">
-                {/* [Mục 2] Icon sáng xanh ngọc khi focus */}
-                <Lock className="w-4.5 h-4.5 text-slate-400 group-focus-within/field:text-[#5fc4b0] transition-colors duration-200 shrink-0" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => setCapsLockActive(e.getModifierState('CapsLock'))}
-                  onKeyUp={(e) => setCapsLockActive(e.getModifierState('CapsLock'))}
-                  placeholder="••••••••"
-                  disabled={loading}
-                  autoComplete="current-password"
-                  spellCheck={false}
-                  className="login-input w-full min-w-0 text-sm font-medium outline-none bg-transparent pl-3 pr-2 text-white placeholder-slate-500 disabled:opacity-50"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                  className="p-1 text-slate-400 hover:text-slate-200 transition-colors focus:outline-none cursor-pointer shrink-0"
-                  tabIndex={-1}
-                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* [Mục 2] Cảnh báo Caps Lock tự động */}
-              {capsLockActive && (
-                <div className="flex items-center gap-1.5 text-[11px] text-amber-400/90 pt-0.5 animate-in fade-in duration-200">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  <span>Caps Lock đang bật</span>
-                </div>
-              )}
-            </div>
-
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between pt-1.5">
-              <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  disabled={loading}
-                  className="w-4 h-4 rounded-none text-[#1f3864] border-slate-600 bg-slate-900/80 focus:ring-[#5fc4b0] cursor-pointer transition-all"
-                />
-                <span className="text-xs font-medium text-slate-300">
-                  Duy trì đăng nhập
-                </span>
-              </label>
-
-              <Link
-                to="/forgot-password"
-                className="text-xs font-semibold text-[#5fc4b0] hover:text-[#8fd9e8] transition-colors cursor-pointer"
-              >
-                Quên mật khẩu?
-              </Link>
-            </div>
-
-            {/* Error Banner */}
-            {error && (
-              <div className="rounded-none p-3.5 text-xs border border-red-500/30 bg-red-500/10 text-red-300 flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-                <div className="space-y-0.5">
-                  <p className="font-semibold text-red-300">Không thể đăng nhập</p>
-                  <p className="leading-relaxed text-red-200">{error}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Submit Button (Hiệu ứng Shimmer ánh sáng lướt qua + Glow xanh ngọc + Mũi tên trượt tương tác) */}
-            <button
-              type="submit"
+        {/* Tài khoản / Email */}
+        <div>
+          <label htmlFor="login-email" className="mb-2 block text-sm font-semibold text-slate-700">
+            Tài khoản / Email
+          </label>
+          <div className={LOGIN_INPUT_WRAP}>
+            <Mail
+              className="pointer-events-none ml-3.5 h-4 w-4 shrink-0 text-slate-400 transition-colors group-focus-within/field:text-primary motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+            <input
+              id="login-email"
+              type="text"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Nhập tên đăng nhập hoặc email"
               disabled={loading}
-              className="group relative w-full py-3.5 px-6 rounded-none font-bold text-sm shadow-xl transition-all duration-300 flex items-center justify-center gap-2.5 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-65 cursor-pointer bg-gradient-to-r from-[#1b345d] via-[#274880] to-[#1b345d] hover:from-[#214175] hover:via-[#315799] hover:to-[#214175] text-white border border-blue-400/30 hover:border-[#5fc4b0]/70 hover:shadow-[0_0_25px_rgba(95,196,176,0.35)] mt-3 overflow-hidden"
-            >
-              {/* Vệt ánh sáng Shimmer lướt qua khi rê chuột */}
-              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
-
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin text-[#5fc4b0]" />
-                  <span>Đang xác thực...</span>
-                </>
-              ) : (
-                <>
-                  <span className="tracking-wide">Đăng nhập</span>
-                  <ArrowRight className="w-4 h-4 text-[#5fc4b0] transition-transform duration-300 group-hover:translate-x-1.5 group-hover:text-white shrink-0" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Đăng nhập bằng Google (ẩn nếu chưa cấu hình VITE_GOOGLE_CLIENT_ID) */}
-          {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
-            <div className="pt-5">
-              <div className="flex items-center gap-3 text-[11px] text-slate-400 select-none">
-                <span className="h-px flex-1 bg-white/10" />
-                <span>hoặc</span>
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
-              <div className={`mt-4 ${loading ? 'pointer-events-none opacity-60' : ''}`}>
-                <GoogleSignInButton
-                  onCredential={handleGoogleCredential}
-                  onLoadError={() => toast.error('Không tải được đăng nhập Google. Vui lòng thử lại sau.')}
-                />
-              </div>
-            </div>
-          )}
-
-          <p className="pt-5 mt-5 border-t border-white/10 text-center text-[11px] leading-relaxed select-none text-slate-400">
-            Nền tảng GIS quản lý tài sản và sự cố chiếu sáng đường giao thông nông thôn
-          </p>
+              autoComplete="username"
+              spellCheck={false}
+              className={`${INPUT_CLASS} pr-3.5`}
+              required
+            />
+          </div>
         </div>
-      </div>
-    </div>
+
+        {/* Mật khẩu */}
+        <div>
+          <label htmlFor="login-password" className="mb-2 block text-sm font-semibold text-slate-700">
+            Mật khẩu
+          </label>
+          <div className={LOGIN_INPUT_WRAP}>
+            <Lock
+              className="pointer-events-none ml-3.5 h-4 w-4 shrink-0 text-slate-400 transition-colors group-focus-within/field:text-primary motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => setCapsLockActive(e.getModifierState('CapsLock'))}
+              onKeyUp={(e) => setCapsLockActive(e.getModifierState('CapsLock'))}
+              placeholder="••••••••"
+              disabled={loading}
+              autoComplete="current-password"
+              spellCheck={false}
+              className={`${INPUT_CLASS} pr-11`}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              disabled={loading}
+              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              className="absolute right-1.5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] text-slate-500 transition-colors hover:bg-slate-900/5 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+
+          {/* Cảnh báo Caps Lock tự động */}
+          {capsLockActive ? (
+            <div className="mt-2 flex items-center gap-1.5 text-[13px] text-amber-800">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-600 motion-reduce:animate-none" />
+              <span>Caps Lock đang bật</span>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Duy trì đăng nhập & Quên mật khẩu */}
+        <div className="flex items-center justify-between gap-2">
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 whitespace-nowrap select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              disabled={loading}
+              className="h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <span className="text-sm font-semibold text-slate-700">
+              Duy trì đăng nhập
+            </span>
+          </label>
+
+          <Link
+            to="/forgot-password"
+            className="inline-flex min-h-11 items-center whitespace-nowrap rounded text-sm font-semibold text-primary transition-colors hover:text-primary/80 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none"
+          >
+            Quên mật khẩu?
+          </Link>
+        </div>
+
+        {/* Nút đăng nhập */}
+        <button type="submit" disabled={loading} className={PRIMARY_BUTTON}>
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+              <span>Đang xác thực...</span>
+            </>
+          ) : (
+            <span>Đăng nhập</span>
+          )}
+        </button>
+      </form>
+
+      {/* Đăng nhập bằng Google (ẩn nếu chưa cấu hình VITE_GOOGLE_CLIENT_ID) */}
+      {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
+        <div className="mt-4 [@media(max-height:659px)]:mt-3">
+          <div className="flex items-center gap-3 text-[13px] text-slate-600 select-none">
+            <span className="h-px flex-1 bg-slate-900/10" />
+            <span>hoặc</span>
+            <span className="h-px flex-1 bg-slate-900/10" />
+          </div>
+          {/* Từ xl phóng 1.1 để nút Google (giới hạn 400px) bằng bề rộng ô nhập 440px */}
+          <div className={`mt-4 [@media(max-height:659px)]:mt-3 ${loading ? 'pointer-events-none opacity-60' : ''}`}>
+            <GoogleSignInButton
+              onCredential={handleGoogleCredential}
+              onLoadError={() => toast.error('Không tải được đăng nhập Google. Vui lòng thử lại sau.')}
+            />
+          </div>
+        </div>
+      ) : null}
+    </AuthPageShell>
   )
 }
 

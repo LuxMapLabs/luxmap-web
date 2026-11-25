@@ -1,11 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  MapPin,
   Home,
-  Lightbulb,
   ArrowLeft,
   Map as MapIcon,
 } from 'lucide-react'
+import luxmapMark from '../../assets/images/luxmap-mark.svg'
 
 export const NotFoundPage: React.FC = () => {
   const navigate = useNavigate()
@@ -33,17 +32,15 @@ export const NotFoundPage: React.FC = () => {
       </div>
 
       {/* 1. Full-Width Top Navbar */}
-      <header className="relative z-20 h-16 w-full bg-white/85 backdrop-blur-md border-b border-slate-200/90 px-6 sm:px-12 flex items-center justify-between shrink-0 shadow-2xs">
+      <header className="relative z-20 h-20 w-full bg-white/85 backdrop-blur-md border-b border-slate-200/90 px-6 sm:px-12 flex items-center justify-between shrink-0 shadow-2xs">
         <div
           onClick={() => navigate('/')}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <div className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shadow-md shadow-primary/20 transition-transform duration-200 group-hover:scale-105">
-            <Lightbulb className="w-5 h-5 text-amber-300 fill-amber-300" />
-          </div>
+          <img src={luxmapMark} alt="" className="h-14 w-auto shrink-0 transition-transform duration-200 group-hover:scale-105" />
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-base tracking-wider text-slate-900 uppercase">LuxMap</span>
+              <span className="font-extrabold text-xl tracking-wider text-slate-900 uppercase">LuxMap</span>
               <span className="text-[10px] font-bold px-1.5 py-0.2 bg-blue-100 text-primary rounded-md border border-blue-200">
                 GIS SYSTEM
               </span>
@@ -69,9 +66,7 @@ export const NotFoundPage: React.FC = () => {
             <div className="w-24 h-24 rounded-full bg-blue-500/10 absolute inset-0 animate-ping [animation-duration:3s]" />
             
             <div className="w-24 h-24 rounded-3xl bg-linear-to-br from-white to-blue-50/80 border border-blue-100 shadow-xl shadow-slate-200/80 flex items-center justify-center relative">
-              <div className="w-14 h-14 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30 animate-bounce [animation-duration:2.5s]">
-                <MapPin className="w-7 h-7 text-amber-300 fill-amber-300" />
-              </div>
+              <img src={luxmapMark} alt="" className="h-16 w-auto animate-bounce [animation-duration:2.5s] motion-reduce:animate-none" />
               <span className="absolute -top-1.5 -right-1.5 px-2 py-0.5 bg-rose-500 text-white font-mono font-bold text-[10px] rounded-full shadow ring-2 ring-white">
                 404
               </span>

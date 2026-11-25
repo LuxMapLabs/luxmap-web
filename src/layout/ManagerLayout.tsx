@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
-  Lightbulb,
   LayoutDashboard,
   Map,
   CalendarDays,
@@ -26,6 +25,7 @@ import { DownloadIcon } from '../components/ops/DownloadIcon'
 import { UploadIcon } from '../components/ops/UploadIcon'
 import { useModalEscape } from '../hooks/useModalEscape'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import luxmapMark from '../assets/images/luxmap-mark.svg'
 
 type TabId = 'dashboard' | 'gis-map' | 'work-schedule' | 'assets' | 'reports' | 'citizen-reports'
 
@@ -124,10 +124,8 @@ export const ManagerLayout: React.FC = () => {
         }`}
       >
         <div className={`flex items-center gap-2.5 pb-5 pt-1 ${collapsed ? 'justify-center' : 'px-2'}`}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-linear-to-br from-teal-400 to-teal-600 shadow-[0_8px_16px_-6px_rgba(47,85,144,0.55)]">
-            <Lightbulb className="h-[18px] w-[18px] fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-          </div>
-          {!collapsed && <span className="flex-1 text-[15px] font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
+          <img src={luxmapMark} alt="LuxMap" className="h-12 w-auto shrink-0" />
+          {!collapsed && <span className="flex-1 text-lg font-extrabold tracking-wide text-slate-900">LUXMAP</span>}
           {isMobile && (
             <button
               type="button"
