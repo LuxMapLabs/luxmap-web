@@ -468,14 +468,23 @@ export const workScheduleAPI = {
    * GET /api/v1/survey-schedules/recurring
    */
   async getRecurringSurveySchedules(communeId?: string): Promise<SurveyRecurringItemPagedResult> {
-    const params: Record<string, any> = { page_size: 100 }
-    if (communeId) params.commune_id = communeId
-
-    const response = await apiClient.get<SurveyRecurringItemPagedResult>(
-      '/survey-schedules/recurring',
-      { params }
-    )
-    return response.data || { items: [], total: 0, page: 1, page_size: 100 }
+    // Tải hết mọi trang: lưới tuần cần đủ lịch để không tạo trùng (409 SURVEY_SCHEDULE_EXISTS).
+    const pageSize = 200
+    const items: SurveyRecurringItem[] = []
+    let total = 0
+    for (let page = 1; ; page++) {
+      const params: Record<string, any> = { page, page_size: pageSize }
+      if (communeId) params.commune_id = communeId
+      const response = await apiClient.get<SurveyRecurringItemPagedResult>(
+        '/survey-schedules/recurring',
+        { params }
+      )
+      const batch = response.data?.items ?? []
+      total = response.data?.total ?? batch.length
+      items.push(...batch)
+      if (batch.length < pageSize || items.length >= total) break
+    }
+    return { items, total, page: 1, page_size: items.length }
   },
 
   /**
