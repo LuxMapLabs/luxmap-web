@@ -28,6 +28,12 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>26/11/2026 — Dashboard Quản lý: báo cáo QR của người dân và sàng lọc bằng CV (backend ST-14)</dt>
+        <dd>Khối mới trên <code>/dashboard</code> đọc <code>GET /statistics/citizen-screening</code> (30 đêm gần nhất, theo tuyến đang lọc): số báo cáo / lượt gửi / gửi từ xa cột, hàng chờ theo trạng thái, kết luận CV ON/OFF từng báo cáo (tắt / sáng / không kết luận / chưa phân tích / không ảnh), nghi báo nhầm (dân báo tắt, ảnh thấy sáng), mức khớp CV ↔ quyết định Quản lý theo từng lớp, biểu đồ theo đêm, 10 cột bị báo nhiều nhất, cảnh báo khi lẫn phiên bản model. Mọi số đếm và tỉ lệ do backend tính; FE chỉ lấp đêm trống và định dạng. <code>src/types/statistics/citizen-screening.ts</code> + <code>CitizenClaim</code> sinh từ spec backend (giữ nguyên <code>iot/feeders.ts</code> viết tay).</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/dashboard/components/CitizenScreeningCard.tsx</code> (mới); <code>src/utils/dashboard/citizenScreening.ts</code> (mới); <code>src/pages/dashboard/ManagerDashboardPage.tsx</code>; <code>src/feature/dashboard/{dashboardAPI,dashboardSaga,dashboardSlice}.ts</code>; <code>src/types/statistics/citizen-screening.ts</code> (mới); <code>src/types/common/enums.ts</code>; <code>src/test/02-fault-handling/citizenScreening.test.ts</code> (mới); <code>tracking.html</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>tsc</code>, eslint (0 lỗi), build, <code>vitest</code> 938/938 (5 test mới). Xem trên Chrome với API nhánh <code>feat/STAT-CITIZEN-AI</code> + DB <code>luxmap_e2e</code> (14 báo cáo gửi qua form QR thật, CV chạy thật): số trên khối khớp truy vấn SQL độc lập. Nhánh <code>feat/DASHBOARD-citizen-ai</code>, <b>chưa commit</b> (chờ chủ dự án).</dd>
         <dt>26/11/2026 — Lux đo đứng yên: hiện kết luận độ sáng của backend (LUX-BASELINE, Contract v1.24)</dt>
         <dd>Mỗi cột trong phiếu khảo sát hiện nhãn kết luận backend chấm cho số lux ("MỜ · 70% baseline", "Sáng bình thường · 102% baseline", "Chưa đủ baseline (cần 3 đêm)", "Chưa đánh giá độ sáng"); FE không tự tính tỉ lệ. "Kỹ sư: Đèn sáng bình thường" đổi thành "Kỹ sư: Đèn bật" (kỹ sư chỉ xác nhận ON/OFF). Bỏ trung bình / min / max lux giữa các cột (lux chỉ so từng cột với chính nó); tiêu đề phiếu thêm "· N cột mờ". <code>src/types/</code> sinh lại từ spec backend (chỉ giữ phần lux).</dd>
         <dt>File thay đổi</dt>

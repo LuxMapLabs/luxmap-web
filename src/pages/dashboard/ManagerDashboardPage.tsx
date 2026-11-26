@@ -6,6 +6,7 @@ import {
   fetchDashboardDataRequest,
   fetchDashboardIotRequest,
   fetchFeederHistoryRequest,
+  fetchCitizenScreeningRequest,
   setIncludeCalibrationRig,
 } from '../../feature/dashboard/dashboardSlice'
 import type { FaultItem } from '../../types/faults/faults'
@@ -18,6 +19,7 @@ import { FaultsTableCard, getFaultProgressInfo } from './components/FaultsTableC
 import { UrgentFaultsCard } from './components/UrgentFaultsCard'
 import { FaultDetailModal } from './components/FaultDetailModal'
 import { IotDiagnosticsCard } from './components/IotDiagnosticsCard'
+import { CitizenScreeningCard } from './components/CitizenScreeningCard'
 
 export const ManagerDashboardPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
@@ -43,6 +45,8 @@ export const ManagerDashboardPage: React.FC = () => {
     selectedFeederHistory,
     selectedFeederHistoryLoading,
     iotLastUpdated,
+    citizenScreening,
+    citizenScreeningLoading,
     loading,
   } = useSelector((state: RootState) => state.dashboard)
 
@@ -99,6 +103,11 @@ export const ManagerDashboardPage: React.FC = () => {
   useEffect(() => {
     dispatch(fetchDashboardDataRequest())
   }, [dispatch])
+
+  // Khối báo cáo QR tải riêng, theo tuyến đang lọc (backend lọc theo tuyến của cột)
+  useEffect(() => {
+    dispatch(fetchCitizenScreeningRequest(selectedSegment === 'all' ? null : selectedSegment))
+  }, [dispatch, selectedSegment])
 
   // Tự động làm mới nhẹ dữ liệu IoT mỗi 30 giây khi tab đang hiển thị
   useEffect(() => {
@@ -401,6 +410,14 @@ export const ManagerDashboardPage: React.FC = () => {
             onToggleCalibrationRig={(checked) => dispatch(setIncludeCalibrationRig(checked))}
           />
         </div>
+
+        {/* 4.2. Báo cáo QR của người dân và kết quả CV ON/OFF trên ảnh */}
+        <CitizenScreeningCard
+          stats={citizenScreening}
+          loading={citizenScreeningLoading}
+          selectedSegment={selectedSegment}
+          segmentNameMap={segmentNameMap}
+        />
 
         {/* 4.5. Giám sát thiết bị IoT (1 Card gọn: Donut + Biểu đồ đường) */}
         <IotDiagnosticsCard

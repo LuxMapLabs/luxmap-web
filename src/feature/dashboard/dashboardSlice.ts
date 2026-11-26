@@ -6,6 +6,7 @@ import type { FixtureStatusRow } from '../../types/statistics/fixture-status'
 import type { IotDiagnosticSummaryItem } from '../../types/iot/diagnostics'
 import type { IotServerStatus } from '../../types/iot/servers'
 import type { IotFeederHistorySample } from '../../types/iot/feeders'
+import type { CitizenScreeningStatistics } from '../../types/statistics/citizen-screening'
 
 export interface DashboardState {
   loading: boolean
@@ -32,6 +33,9 @@ export interface DashboardState {
   selectedFeederHistoryLoading: boolean
   iotLastUpdated: string | null
   lastUpdated: string | null
+  /** statistics/citizen-screening (ST-14): báo cáo QR và kết luận CV, 30 đêm gần nhất; null khi chưa tải được */
+  citizenScreening: CitizenScreeningStatistics | null
+  citizenScreeningLoading: boolean
 }
 
 const initialState: DashboardState = {
@@ -58,6 +62,8 @@ const initialState: DashboardState = {
   selectedFeederHistoryLoading: false,
   iotLastUpdated: null,
   lastUpdated: null,
+  citizenScreening: null,
+  citizenScreeningLoading: false,
 }
 
 export interface FetchDashboardSuccessPayload {
@@ -132,6 +138,14 @@ const dashboardSlice = createSlice({
       state.selectedFeederHistory = action.payload
       state.selectedFeederHistoryLoading = false
     },
+    /** payload: segment_id đang lọc, `null` = toàn địa bàn */
+    fetchCitizenScreeningRequest: (state, _action: PayloadAction<string | null>) => {
+      state.citizenScreeningLoading = true
+    },
+    fetchCitizenScreeningSuccess: (state, action: PayloadAction<CitizenScreeningStatistics | null>) => {
+      state.citizenScreening = action.payload
+      state.citizenScreeningLoading = false
+    },
     resetDashboardState: () => initialState,
   },
 })
@@ -146,6 +160,8 @@ export const {
   updateFaultsListSuccess,
   fetchFeederHistoryRequest,
   fetchFeederHistorySuccess,
+  fetchCitizenScreeningRequest,
+  fetchCitizenScreeningSuccess,
   resetDashboardState,
 } = dashboardSlice.actions
 
