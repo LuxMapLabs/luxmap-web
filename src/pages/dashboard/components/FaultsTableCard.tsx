@@ -81,6 +81,16 @@ export function getFaultProgressInfo(fault: FaultItem): {
   }
 
   if (status === 'rejected') {
+    if (fault.recovered_at) {
+      return {
+        key: 'all',
+        label: 'Đã tự phục hồi',
+        bgClass: 'bg-teal-50',
+        textClass: 'text-teal-700',
+        borderClass: 'border-teal-200/70',
+        dotClass: 'bg-teal-500',
+      }
+    }
     return {
       key: 'all',
       label: 'Đã từ chối',
@@ -151,7 +161,7 @@ export const FaultsTableCard: React.FC<FaultsTableCardProps> = ({
     <OpsCard
       index={3}
       className="h-full relative z-20"
-      title="Sự cố bóng đèn"
+      title="Tổng hợp sự cố vận hành"
       description="Tổng hợp từ xe quét AI, khảo sát, cảm biến IoT và người dân quét QR"
       actions={
         <div className="flex flex-wrap items-center gap-2.5">

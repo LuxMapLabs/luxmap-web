@@ -40,7 +40,10 @@ import {
   checkScheduleModificationAllowed,
   getPhaseOverdueInfo,
 } from '../../../utils/work-schedule/scheduleRules'
-import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleUtils'
+import {
+  formatSegmentDisplay,
+  segmentLabelFromIds,
+} from '../../../utils/work-schedule/workScheduleUtils'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import { faultAPI } from '../../../feature/faults/faultAPI'
 import { EvidenceImage } from './EvidenceImage'
@@ -116,6 +119,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const dispatch = useDispatch()
   // Dữ liệu chi tiết lệnh công tác từ máy chủ
   const workOrderDetail = useSelector((state: RootState) => state.workSchedule.workOrderDetail)
+  const segmentNames = useSelector((state: RootState) => state.workSchedule.segmentNames)
   const editedGpsByWorkOrder = useSelector((state: RootState) => state.workSchedule.editedGpsByWorkOrder)
   const orderedGpsPolesByWorkOrder = useSelector(
     (state: RootState) => state.workSchedule.orderedGpsPolesByWorkOrder
@@ -846,14 +850,35 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               {/* Thẻ thông tin cơ bản của bước (Bố cục 2x2: Tuyến đường hoặc Tủ điện khi là phiếu IoT) */}
               <div className="grid grid-cols-2 gap-3">
                 {(() => {
-                  const normalizedSeg = (caseItem.segment || '').trim()
+                  const detailForCurrentPhase =
+                    workOrderDetail && workOrderDetail.work_order_id === currentPhase.workOrderId
+                      ? workOrderDetail
+                      : null
+                  const detailSegmentLabel = detailForCurrentPhase
+                    ? segmentLabelFromIds(
+                        [
+                          detailForCurrentPhase.segment_id,
+                          ...(detailForCurrentPhase.segment_ids ?? []),
+                          ...(detailForCurrentPhase.faults || []).map((f) => f.segment_id),
+                        ],
+                        segmentNames
+                      )
+                    : null
+                  const phaseSegmentLabel = currentPhase.segmentId
+                    ? segmentLabelFromIds([currentPhase.segmentId], segmentNames)
+                    : null
+                  const resolvedSegment = formatSegmentDisplay(
+                    detailSegmentLabel ||
+                      phaseSegmentLabel ||
+                      (caseItem.segment && caseItem.segment !== '-' ? caseItem.segment : undefined),
+                    detailForCurrentPhase?.title || caseItem.title,
+                    segmentNames
+                  )
+                  const normalizedSeg = (resolvedSegment || '').trim()
                   const hasSegment = Boolean(
                     normalizedSeg && normalizedSeg !== '-' && normalizedSeg !== '—'
                   )
-                  const detailFaults =
-                    workOrderDetail && workOrderDetail.work_order_id === currentPhase.workOrderId
-                      ? workOrderDetail.faults || []
-                      : []
+                  const detailFaults = detailForCurrentPhase?.faults || []
                   const iotCabinets = Array.from(
                     new Set(
                       detailFaults
@@ -861,10 +886,13 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         .filter((v): v is string => Boolean(v))
                     )
                   )
+                  const isSurveyOrPolePhase =
+                    currentPhase.phaseType === 'survey' ||
+                    currentPhase.phaseType === 'pole_gps_update'
                   return (
                     <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                       <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                        {hasSegment ? (
+                        {hasSegment || isSurveyOrPolePhase || iotCabinets.length === 0 ? (
                           <>
                             <MapPin className="w-3 h-3 text-slate-400" />
                             Tuyến đường thực hiện
@@ -878,7 +906,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                       </div>
                       <div className="text-xs font-bold text-slate-800 mt-1 font-mono">
                         {hasSegment
-                          ? formatSegmentDisplay(caseItem.segment)
+                          ? resolvedSegment
                           : iotCabinets.length > 0
                             ? iotCabinets.join(', ')
                             : '-'}

@@ -181,6 +181,19 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
     [selectedNode?.feeder_id, feederHistory]
   )
 
+  const formatSampleDateTime = (iso?: string | null) => {
+    if (!iso) return '-'
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return '-'
+    return d.toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+    })
+  }
+
   const chartData = useMemo(
     () =>
       activeHistory.map((item) => {
@@ -194,15 +207,9 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
               second: '2-digit',
             })
           : '-'
-        const fullTimeLabel = validDate
-          ? validDate.toLocaleString('vi-VN', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              day: '2-digit',
-              month: '2-digit',
-            })
-          : '-'
+        const fullTimeLabel = formatSampleDateTime(ts)
+        const measuredLabel = formatSampleDateTime(item.measured_at)
+        const receivedLabel = formatSampleDateTime(item.received_at)
         const val =
           metric === 'power'
             ? item.power_mw
@@ -212,10 +219,24 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
         return {
           timeLabel,
           fullTimeLabel,
+          measuredLabel,
+          receivedLabel,
+          receptionType: item.reception_type ?? null,
+          lampCommand: item.lamp_command ?? null,
           value: typeof val === 'number' && Number.isFinite(val) ? val : null,
         }
       }),
     [activeHistory, metric]
+  )
+
+  const hasBackfillSamples = useMemo(
+    () => chartData.some((item) => item.receptionType === 'backfill'),
+    [chartData]
+  )
+
+  const latestSample = useMemo(
+    () => (activeHistory.length > 0 ? activeHistory[activeHistory.length - 1] : null),
+    [activeHistory]
   )
 
   const latestVal = useMemo(() => {
@@ -280,7 +301,7 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
           Giám sát thiết bị IoT
         </span>
       }
-      description="Tình trạng kết nối toàn mạng lưới và biến động thông số điện 30 giây của Node đang chọn"
+      description="Tình trạng kết nối toàn mạng lưới và biến động từng mẫu điện theo giờ đo của Node đang chọn"
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {servers.length > 0 && (
@@ -441,6 +462,26 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                     {elecBadge.label}
                   </span>
                 )}
+                {latestSample?.lamp_command && (
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                      latestSample.lamp_command.toUpperCase() === 'ON'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    Đèn: {latestSample.lamp_command.toUpperCase()}
+                  </span>
+                )}
+                {hasBackfillSamples && (
+                  <span
+                    title="Có mẫu điện được node lưu thẻ nhớ khi mất kết nối và gửi bù lại sau theo giờ đo gốc"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-50 text-violet-700 border border-violet-200"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-violet-600" />
+                    Có mẫu gửi bù
+                  </span>
+                )}
                 {selectedNode?.anomaly_codes && selectedNode.anomaly_codes.length > 0 && (
                   <span
                     title={selectedNode.anomaly_codes.map((c) => iotAnomalyLabel(c)).join(' • ')}
@@ -533,7 +574,7 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                       tickLine={false}
                       minTickGap={22}
                       label={{
-                        value: 'Thời gian mẫu 30s (HH:mm:ss)',
+                        value: 'Thời gian đo mẫu (HH:mm:ss)',
                         position: 'insideBottom',
                         offset: -12,
                         fontSize: 10.5,
@@ -564,15 +605,39 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                         fontSize: '11px',
                         color: '#ffffff',
                       }}
-                      formatter={(val: unknown) => [
-                        typeof val === 'number' ? `${val.toFixed(meta.digits)} ${meta.unit}` : '-',
-                        meta.label,
-                      ]}
+                      formatter={(val: unknown, _name: unknown, item: { payload?: { receptionType?: 'live' | 'backfill' | null; lampCommand?: string | null; measuredLabel?: string; receivedLabel?: string } }) => {
+                        const valueText =
+                          typeof val === 'number' ? `${val.toFixed(meta.digits)} ${meta.unit}` : '-'
+                        const p = item?.payload
+                        const receptionText =
+                          p?.receptionType === 'backfill'
+                            ? 'Gửi bù từ thẻ nhớ'
+                            : p?.receptionType === 'live'
+                            ? 'Trực tiếp'
+                            : null
+                        const lampText = p?.lampCommand ? `Đèn ${p.lampCommand}` : null
+                        const extra = [receptionText, lampText].filter(Boolean).join(' · ')
+                        return [extra ? `${valueText} (${extra})` : valueText, meta.label]
+                      }}
                       labelFormatter={(lbl, payload) => {
                         const first = payload?.[0]?.payload as
-                          | { fullTimeLabel?: string }
+                          | {
+                              fullTimeLabel?: string
+                              measuredLabel?: string
+                              receivedLabel?: string
+                              receptionType?: 'live' | 'backfill' | null
+                            }
                           | undefined
-                        return `Mẫu ${first?.fullTimeLabel || lbl}`
+                        if (!first) return `Mẫu ${lbl}`
+                        if (
+                          first.receptionType === 'backfill' &&
+                          first.measuredLabel &&
+                          first.receivedLabel &&
+                          first.measuredLabel !== first.receivedLabel
+                        ) {
+                          return `Giờ đo: ${first.measuredLabel} · Nhận: ${first.receivedLabel}`
+                        }
+                        return `Giờ đo: ${first.measuredLabel && first.measuredLabel !== '-' ? first.measuredLabel : first.fullTimeLabel || lbl}`
                       }}
                     />
                     <Area
@@ -582,7 +647,22 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                       strokeWidth={2.5}
                       fill="url(#iotAreaGrad)"
                       connectNulls
-                      dot={{ r: 2.5, fill: strokeColor, strokeWidth: 0 }}
+                      dot={(props: { cx?: number; cy?: number; index?: number; payload?: { receptionType?: 'live' | 'backfill' | null } }) => {
+                        const { cx, cy, index, payload } = props
+                        if (typeof cx !== 'number' || typeof cy !== 'number') return <g key={`dot-empty-${index}`} />
+                        const isBackfill = payload?.receptionType === 'backfill'
+                        return (
+                          <circle
+                            key={`dot-${index}`}
+                            cx={cx}
+                            cy={cy}
+                            r={isBackfill ? 3.5 : 2.5}
+                            fill={isBackfill ? '#7c3aed' : strokeColor}
+                            stroke={isBackfill ? '#ffffff' : 'none'}
+                            strokeWidth={isBackfill ? 1 : 0}
+                          />
+                        )
+                      }}
                       activeDot={{ r: 5, fill: '#ffffff', stroke: strokeColor, strokeWidth: 2.5 }}
                     />
                   </AreaChart>

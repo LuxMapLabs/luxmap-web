@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { X, Calendar, MapPin, User, FileText, Layers, Upload, FileCheck, Trash2, Cpu, Wrench } from 'lucide-react'
+import { X, Calendar, MapPin, User, FileText, Layers, Upload, FileCheck, Trash2, Cpu, Wrench, Download, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import type { RootState } from '../../../redux/rootReducer'
 import { fetchAssetsRequest } from '../../../feature/assets/assetSlice'
@@ -244,6 +244,57 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
 
   const handleRemovePdfFile = (id: string) => {
     setQrPdfFiles((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  // Mở xem trước file PDF trong tab mới của trình duyệt
+  const handlePreviewPdfFile = (file: File) => {
+    const blobUrl = URL.createObjectURL(file)
+    const win = window.open(blobUrl, '_blank', 'noopener,noreferrer')
+    if (!win) {
+      // Nếu trình duyệt chặn popup thì tự động tải xuống
+      handleDownloadPdfFile(file)
+    }
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+  }
+
+  // Tải file PDF đã đính kèm về máy tính để Quản lý kiểm tra
+  const handleDownloadPdfFile = (file: File) => {
+    const blobUrl = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = file.name || 'Tem_QR.pdf'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1500)
+  }
+
+  // Nhận file PDF mã QR được tạo trực tiếp từ nút "In QR" trên từng cột hoặc nút gộp trong GpsPoleSelector
+  const handleAttachGeneratedQrPdfFile = (file: File) => {
+    const MAX_FILES = 10
+    setQrPdfFiles((prev) => {
+      // Nếu file cùng tên đã tồn tại thì ghi đè bản mới nhất để tránh trùng lặp
+      const existingIndex = prev.findIndex((item) => item.rawFile.name === file.name)
+      if (existingIndex >= 0) {
+        const next = [...prev]
+        next[existingIndex] = {
+          id: `${Date.now()}-replaced-${file.name}`,
+          rawFile: file,
+        }
+        return next
+      }
+      if (prev.length >= MAX_FILES) {
+        toast.warning(`Tối đa ${MAX_FILES} file PDF cho mỗi lệnh cập nhật vị trí cột.`)
+        return prev
+      }
+      return [
+        ...prev,
+        {
+          id: `${Date.now()}-gen-${file.name}`,
+          rawFile: file,
+        },
+      ]
+    })
   }
 
   // Điều kiện vô hiệu hóa nút "+ Tạo sự vụ":
@@ -521,7 +572,9 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                   </span>
                   {initialIotTarget?.faultId && (
                     <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-white text-indigo-700 border border-indigo-200">
-                      {initialIotTarget.faultId}
+                      {selectedFaultIds.length > 1
+                        ? `${selectedFaultIds.length} sự cố (${selectedFaultIds.join(', ')})`
+                        : initialIotTarget.faultId}
                     </span>
                   )}
                 </div>
@@ -643,8 +696,11 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 {initPhase === 'pole_gps_update' && (
                   <GpsPoleSelector
                     segmentId={extractSegmentId(segment)}
+                    segmentName={segment}
                     selectedPoleIds={selectedPoleIds}
                     onChange={setSelectedPoleIds}
+                    onAttachQrPdfFile={handleAttachGeneratedQrPdfFile}
+                    attachedFileNames={qrPdfFiles.map((f) => f.rawFile.name)}
                   />
                 )}
 
@@ -759,21 +815,48 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                         key={file.id}
                         className="px-3 py-2 rounded-xl bg-white border border-violet-200 flex items-center justify-between gap-2 text-xs shadow-2xs"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => handlePreviewPdfFile(file.rawFile)}
+                          className="flex items-center gap-2 min-w-0 text-left group cursor-pointer"
+                          title="Bấm để mở xem trước file PDF trong tab mới"
+                        >
                           <FileCheck className="w-4 h-4 text-violet-600 shrink-0" />
-                          <span className="font-bold text-slate-800 truncate">{file.rawFile.name}</span>
+                          <span className="font-bold text-slate-800 group-hover:text-violet-700 group-hover:underline truncate">
+                            {file.rawFile.name}
+                          </span>
                           <span className="text-[10px] text-slate-400 shrink-0">
                             ({formatFileSize(file.rawFile.size)})
                           </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePdfFile(file.id)}
-                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                          title="Xóa file"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handlePreviewPdfFile(file.rawFile)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-violet-700 hover:text-violet-900 bg-violet-50 hover:bg-violet-100 rounded-lg transition cursor-pointer"
+                            title="Mở xem trước file PDF"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Xem</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPdfFile(file.rawFile)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer"
+                            title="Tải file PDF về máy"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Tải về</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePdfFile(file.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                            title="Xóa file"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

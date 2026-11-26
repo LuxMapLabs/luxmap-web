@@ -79,12 +79,50 @@ export const ManagerDashboardPage: React.FC = () => {
     warrantyTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Điều hướng sang trang tạo WorkOrder (hỗ trợ cả sự cố cột/tuyến lẫn sự cố từ IoT)
+  // Điều hướng sang trang tạo WorkOrder (hỗ trợ cả sự cố cột/tuyến lẫn tự động gom các sự cố IoT chưa phân lịch của cùng Node)
   const handleNavigateToCreateSchedule = (fault: FaultItem) => {
     if (!fault.pole_id && !fault.segment_id && !fault.origin_node_id && !fault.feeder_id) {
       setSelectedFault(fault)
       return
     }
+
+    const isIotNodeFault = !fault.pole_id && !fault.segment_id && Boolean(fault.origin_node_id)
+    const groupedIotFaults = isIotNodeFault
+      ? faultsList.filter(
+          (f) =>
+            !f.pole_id &&
+            !f.segment_id &&
+            f.origin_node_id === fault.origin_node_id &&
+            (!fault.feeder_id || f.feeder_id === fault.feeder_id) &&
+            f.fault_status === 'detected' &&
+            !f.work_order_id &&
+            Boolean(f.fault_id)
+        )
+      : []
+
+    const groupedFaultIds =
+      groupedIotFaults.length > 0
+        ? Array.from(
+            new Set(
+              [
+                ...(fault.fault_status === 'detected' && !fault.work_order_id && fault.fault_id
+                  ? [fault.fault_id]
+                  : []),
+                ...groupedIotFaults.map((f) => f.fault_id).filter((id): id is string => Boolean(id)),
+              ]
+            )
+          )
+        : fault.fault_id
+        ? [fault.fault_id]
+        : []
+
+    const combinedNote =
+      groupedIotFaults.length > 1
+        ? groupedIotFaults
+            .map((f) => f.note || f.review_note || f.iot_anomaly_code || '')
+            .filter(Boolean)
+            .join(' | ')
+        : fault.note || fault.review_note || ''
 
     navigate('/work-schedule', {
       state: {
@@ -93,8 +131,9 @@ export const ManagerDashboardPage: React.FC = () => {
         prefillFault: fault,
         prefillSegmentId: fault.segment_id,
         prefillPoleId: fault.pole_id,
-        prefillFaultId: fault.fault_id,
-        prefillNote: fault.note || fault.review_note || '',
+        prefillFaultId: groupedFaultIds[0] || fault.fault_id,
+        prefillFaultIds: groupedFaultIds,
+        prefillNote: combinedNote,
       },
     })
   }
@@ -306,15 +345,40 @@ export const ManagerDashboardPage: React.FC = () => {
     }).length
   }, [segmentFaults])
 
-  const unassignedFaults = useMemo(
-    () =>
-      segmentFaults.filter(
+  const unassignedFaults = useMemo(() => {
+    const severityRank = (sev?: FaultItem['severity']) =>
+      sev === 'critical' ? 3 : sev === 'high' ? 2 : sev === 'medium' ? 1 : 0
+
+    return segmentFaults
+      .filter(
         (f) =>
           getFaultProgressInfo(f).key === 'unassigned' &&
           Boolean(f.pole_id || f.segment_id || f.origin_node_id || f.feeder_id)
-      ),
-    [segmentFaults]
-  )
+      )
+      .sort((a, b) => {
+        // 1. Theo mức độ nghiêm trọng giảm dần (-severity: critical -> high -> medium -> low) đúng chuẩn BE
+        const sevDiff = severityRank(b.severity) - severityRank(a.severity)
+        if (sevDiff !== 0) return sevDiff
+
+        // 2. Theo điểm ưu tiên giảm dần (nếu có, null xếp sau)
+        const aHasScore = typeof a.priority_score === 'number' && Number.isFinite(a.priority_score)
+        const bHasScore = typeof b.priority_score === 'number' && Number.isFinite(b.priority_score)
+        if (aHasScore !== bHasScore) return bHasScore ? 1 : -1
+        if (aHasScore && bHasScore && a.priority_score !== b.priority_score) {
+          return (b.priority_score as number) - (a.priority_score as number)
+        }
+
+        // 3. Cùng mức ưu tiên: sự cố nào phát hiện trước (chờ lâu nhất) ưu tiên lên trước
+        const ta = a.detected_at ? Date.parse(a.detected_at) : Number.MAX_SAFE_INTEGER
+        const tb = b.detected_at ? Date.parse(b.detected_at) : Number.MAX_SAFE_INTEGER
+        if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return ta - tb
+
+        // 4. Tiebreak theo độ dài mã và mã sự cố tăng dần
+        const idA = a.fault_id || ''
+        const idB = b.fault_id || ''
+        return idA.length - idB.length || idA.localeCompare(idB)
+      })
+  }, [segmentFaults])
 
   const unlocatedPoleCount = useMemo(() => {
     if (selectedSegment === 'all') return unlocatedPoleSegments.length

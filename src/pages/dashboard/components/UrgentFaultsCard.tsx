@@ -153,13 +153,18 @@ export const UrgentFaultsCard: React.FC<UrgentFaultsCardProps> = ({
                     <AlertTriangle className="h-[18px] w-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
+                    <span className="flex flex-wrap items-center gap-1.5">
                       <span className="truncate text-[13px] font-bold text-slate-900">{primaryText}</span>
                       <span
                         className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${typeBadgeClass}`}
                       >
                         {typeLabel}
                       </span>
+                      {fault.recovered_at && (
+                        <span className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border-emerald-200/70">
+                          Đã tự phục hồi
+                        </span>
+                      )}
                     </span>
                     <span className="block truncate text-xs text-slate-400 mt-0.5" title={secondaryText}>
                       {secondaryText}

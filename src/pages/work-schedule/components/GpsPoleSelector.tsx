@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   Search,
@@ -11,7 +11,11 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  QrCode,
+  FileCheck,
 } from 'lucide-react'
+import QRCode from 'qrcode'
+import { jsPDF } from 'jspdf'
 import { toast } from 'sonner'
 import type { RootState } from '../../../redux/rootReducer'
 import { fetchAssetsRequest } from '../../../feature/assets/assetSlice'
@@ -19,12 +23,17 @@ import {
   fetchBusyGpsPolesRequest,
   clearBusyGpsPoles,
 } from '../../../feature/work-schedule/workScheduleSlice'
+import { ensurePoleQrCodesRequest } from '../../../feature/qr-code/qrCodeSlice'
+import { renderDecalToCanvas } from '../../../utils/assets/decalCanvas'
 import type { PoleListItem } from '../../../types/assets/poles'
 
 interface GpsPoleSelectorProps {
   segmentId: string
+  segmentName?: string
   selectedPoleIds: string[]
   onChange: (poleIds: string[]) => void
+  onAttachQrPdfFile?: (file: File) => void
+  attachedFileNames?: string[]
 }
 
 function hasPoleGps(pole: PoleListItem): boolean {
@@ -37,18 +46,33 @@ function hasPoleGps(pole: PoleListItem): boolean {
 
 export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
   segmentId,
+  segmentName = '',
   selectedPoleIds,
   onChange,
+  onAttachQrPdfFile,
+  attachedFileNames = [],
 }) => {
   const dispatch = useDispatch()
-  const { poles, isLoadingAssets, loadAssetsError } = useSelector(
+  const { poles, segments: storeSegments, isLoadingAssets, loadAssetsError } = useSelector(
     (state: RootState) => state.assets
   )
   const { busyGpsPoleIds, isLoadingBusyGpsPoles: isLoadingBusyPoles } = useSelector(
     (state: RootState) => state.workSchedule
   )
+  const {
+    activeCodesByPoleId,
+    isEnsuringPoleQrs,
+    lastEnsuredBatchId,
+  } = useSelector((state: RootState) => state.qrCode)
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [generatingKey, setGeneratingKey] = useState<string | null>(null)
+  const pendingQrBatchRef = useRef<{
+    batchId: string
+    targetPoles: PoleListItem[]
+    mode: 'single' | 'bulk'
+  } | null>(null)
 
   useEffect(() => {
     if (poles.length === 0 && !isLoadingAssets && !loadAssetsError) {
@@ -162,6 +186,220 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
     }
   }
 
+  const resolvedSegmentName = useMemo(() => {
+    if (segmentName) {
+      return segmentName.replace(/\s*\(SEG-[A-Za-z0-9_-]+\)\s*$/i, '').trim()
+    }
+    const found = storeSegments.find((s) => s.segment_id === segmentId)
+    return found?.segment_name || segmentId || ''
+  }, [segmentName, storeSegments, segmentId])
+
+  // Khi Saga đảm bảo mã QR cho các cột xong, tiến hành vẽ decal & tạo đối tượng File PDF đính kèm xuống form
+  useEffect(() => {
+    const pending = pendingQrBatchRef.current
+    if (!pending || isEnsuringPoleQrs) return
+    if (lastEnsuredBatchId !== pending.batchId) return
+
+    pendingQrBatchRef.current = null
+    let isCancelled = false
+
+    const buildAndAttachPdf = async () => {
+      try {
+        const targetPoles = pending.targetPoles
+        if (targetPoles.length === 0) return
+
+        if (pending.mode === 'single') {
+          const pole = targetPoles[0]
+          const poleId = pole.pole_id || ''
+          const poleCode = pole.external_ref || poleId
+          const qrItem = activeCodesByPoleId[poleId]
+          if (!qrItem?.url) {
+            toast.error(`Không tìm thấy đường dẫn mã QR của cột ${poleId}.`)
+            return
+          }
+
+          const qrDataUrl = await QRCode.toDataURL(qrItem.url, {
+            width: 360,
+            margin: 1,
+            color: { dark: '#0f172a', light: '#ffffff' },
+            errorCorrectionLevel: 'M',
+          })
+
+          const canvas = await renderDecalToCanvas({
+            poleCode,
+            segmentName: resolvedSegmentName,
+            communeName: pole.commune_name || '',
+            note: pole.note || '',
+            qrDataUrl,
+          })
+
+          if (isCancelled) return
+          const imgData = canvas.toDataURL('image/png')
+          const doc = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a6',
+          })
+          const pageWidth = 148
+          const pageHeight = 105
+          const decalWidthMm = 126
+          const decalHeightMm = (canvas.height * decalWidthMm) / canvas.width
+          const posX = (pageWidth - decalWidthMm) / 2
+          const posY = (pageHeight - decalHeightMm) / 2
+          doc.addImage(imgData, 'PNG', posX, posY, decalWidthMm, decalHeightMm, undefined, 'FAST')
+
+          const pdfBlob = doc.output('blob')
+          const fileName = `Tem_QR_${poleId}.pdf`
+          const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' })
+          onAttachQrPdfFile?.(pdfFile)
+          toast.success(`Đã tạo & đính kèm file ${fileName} xuống mục gửi cho kỹ sư!`)
+        } else {
+          // Chế độ gộp nhiều cột vào 1 file PDF A4 (2x4 = 8 tem/trang)
+          const decalDataUrls: string[] = []
+          for (const pole of targetPoles) {
+            const poleId = pole.pole_id || ''
+            const poleCode = pole.external_ref || poleId
+            const qrItem = activeCodesByPoleId[poleId]
+            if (!qrItem?.url) continue
+
+            const qrDataUrl = await QRCode.toDataURL(qrItem.url, {
+              width: 400,
+              margin: 1,
+              color: { dark: '#0f172a', light: '#ffffff' },
+              errorCorrectionLevel: 'M',
+            })
+
+            const canvas = await renderDecalToCanvas({
+              poleCode,
+              segmentName: resolvedSegmentName,
+              communeName: pole.commune_name || '',
+              note: pole.note || '',
+              qrDataUrl,
+            })
+            decalDataUrls.push(canvas.toDataURL('image/png'))
+          }
+
+          if (isCancelled) return
+          if (decalDataUrls.length === 0) {
+            toast.error('Không thể tạo tem QR cho các cột đã chọn.')
+            return
+          }
+
+          const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+          })
+          const cols = 2
+          const rows = 4
+          const itemsPerPage = cols * rows
+          const cardWidth = 92
+          const cardHeight = (cardWidth * 600) / 1050
+          const marginX = 9
+          const marginY = 12
+          const gapX = 8
+          const gapY = 8
+
+          decalDataUrls.forEach((dataUrl, index) => {
+            const indexOnPage = index % itemsPerPage
+            const col = indexOnPage % cols
+            const row = Math.floor(indexOnPage / cols)
+            if (index > 0 && indexOnPage === 0) {
+              doc.addPage()
+            }
+            const x = marginX + col * (cardWidth + gapX)
+            const y = marginY + row * (cardHeight + gapY)
+            doc.addImage(dataUrl, 'PNG', x, y, cardWidth, cardHeight, undefined, 'FAST')
+          })
+
+          const pdfBlob = doc.output('blob')
+          const fileName =
+            decalDataUrls.length === 1 && targetPoles[0]?.pole_id
+              ? `Tem_QR_${targetPoles[0].pole_id}.pdf`
+              : `Danh_Sach_Tem_QR_${decalDataUrls.length}_Cot_${segmentId || 'Tuyen'}.pdf`
+          const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' })
+          onAttachQrPdfFile?.(pdfFile)
+          toast.success(
+            `Đã tạo & đính kèm file ${fileName} (${decalDataUrls.length} cột) xuống mục gửi cho kỹ sư!`
+          )
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Lỗi không xác định'
+        toast.error(`Không thể tạo file PDF mã QR (${msg})`)
+      } finally {
+        if (!isCancelled) {
+          setGeneratingKey(null)
+        }
+      }
+    }
+
+    buildAndAttachPdf()
+    return () => {
+      isCancelled = true
+    }
+  }, [
+    isEnsuringPoleQrs,
+    lastEnsuredBatchId,
+    activeCodesByPoleId,
+    resolvedSegmentName,
+    segmentId,
+    onAttachQrPdfFile,
+  ])
+
+  // Nếu quá trình gọi API gặp lỗi thì mở khóa trạng thái nút ngay lập tức
+  useEffect(() => {
+    if (!isEnsuringPoleQrs && pendingQrBatchRef.current && lastEnsuredBatchId !== pendingQrBatchRef.current.batchId) {
+      pendingQrBatchRef.current = null
+      setGeneratingKey(null)
+    }
+  }, [isEnsuringPoleQrs, lastEnsuredBatchId])
+
+  const handleGeneratePoleQrPdf = (e: React.MouseEvent, pole: PoleListItem) => {
+    e.stopPropagation()
+    const poleId = pole.pole_id
+    if (!poleId || !onAttachQrPdfFile) return
+
+    // Tự động tích chọn cột nếu cột chưa được tích
+    if (!selectedPoleIds.includes(poleId)) {
+      if (selectedPoleIds.length >= MAX_POLES_PER_ORDER) {
+        toast.warning(`Mỗi phiếu cập nhật vị trí cột chỉ được chọn tối đa ${MAX_POLES_PER_ORDER} cột.`)
+        return
+      }
+      onChange([...selectedPoleIds, poleId])
+    }
+
+    const batchId = `single-${poleId}-${Date.now()}`
+    setGeneratingKey(poleId)
+    pendingQrBatchRef.current = {
+      batchId,
+      targetPoles: [pole],
+      mode: 'single',
+    }
+    dispatch(ensurePoleQrCodesRequest({ batchId, poleIds: [poleId] }))
+  }
+
+  const handleGenerateBulkSelectedQrPdf = () => {
+    if (selectedPoleIds.length === 0 || !onAttachQrPdfFile) return
+    const selectedPoleItems = sortedSegmentPoles.filter(
+      (p) => p.pole_id && selectedPoleIds.includes(p.pole_id)
+    )
+    if (selectedPoleItems.length === 0) return
+
+    const batchId = `bulk-${Date.now()}`
+    setGeneratingKey('__BULK__')
+    pendingQrBatchRef.current = {
+      batchId,
+      targetPoles: selectedPoleItems,
+      mode: selectedPoleItems.length === 1 ? 'single' : 'bulk',
+    }
+    dispatch(
+      ensurePoleQrCodesRequest({
+        batchId,
+        poleIds: selectedPoleItems.map((p) => p.pole_id as string),
+      })
+    )
+  }
+
   return (
     <div className="flex flex-col gap-2.5 p-3.5 bg-violet-50/40 border border-violet-200/90 rounded-2xl">
       {/* Header */}
@@ -178,18 +416,42 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsDropdownOpen((prev) => !prev)}
-          className="px-2.5 py-1 text-[11px] font-bold text-violet-700 bg-white hover:bg-violet-100/70 border border-violet-200 rounded-lg transition flex items-center gap-1 cursor-pointer"
-        >
-          <span>{isDropdownOpen ? 'Thu gọn danh sách' : 'Mở danh sách cột'}</span>
-          {isDropdownOpen ? (
-            <ChevronUp className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {onAttachQrPdfFile && selectedPoleIds.length > 0 && (
+            <button
+              type="button"
+              disabled={Boolean(generatingKey) || isEnsuringPoleQrs}
+              onClick={handleGenerateBulkSelectedQrPdf}
+              className="px-2.5 py-1 text-[11px] font-extrabold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg shadow-2xs transition flex items-center gap-1 cursor-pointer"
+              title="Tự động lấy mã QR của các cột đã chọn, xuất thành file PDF và đính kèm thẳng xuống mục File PDF gửi cho kỹ sư"
+            >
+              {generatingKey === '__BULK__' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang tạo PDF QR...</span>
+                </>
+              ) : (
+                <>
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>In QR gộp ({selectedPoleIds.length} cột) → PDF</span>
+                </>
+              )}
+            </button>
           )}
-        </button>
+
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen((prev) => !prev)}
+            className="px-2.5 py-1 text-[11px] font-bold text-violet-700 bg-white hover:bg-violet-100/70 border border-violet-200 rounded-lg transition flex items-center gap-1 cursor-pointer"
+          >
+            <span>{isDropdownOpen ? 'Thu gọn danh sách' : 'Mở danh sách cột'}</span>
+            {isDropdownOpen ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </div>
       </div>
 
       <p className="text-[11px] text-slate-500">
@@ -294,49 +556,84 @@ export const GpsPoleSelector: React.FC<GpsPoleSelectorProps> = ({
                 const poleId = pole.pole_id as string
                 const isSelected = selectedPoleIds.includes(poleId)
                 const hasGps = hasPoleGps(pole)
+                const isThisGenerating = generatingKey === poleId
+                const isAlreadyAttached = attachedFileNames.includes(`Tem_QR_${poleId}.pdf`)
 
                 return (
                   <div
                     key={poleId}
                     onClick={() => handleTogglePole(poleId)}
-                    className={`px-3 py-2 flex items-start gap-2.5 cursor-pointer transition select-none ${
+                    className={`px-3 py-2 flex items-center justify-between gap-2.5 cursor-pointer transition select-none ${
                       isSelected ? 'bg-violet-50/80' : 'hover:bg-slate-50'
                     }`}
                   >
-                    <div className="mt-0.5 shrink-0">
-                      {isSelected ? (
-                        <CheckSquare className="w-4 h-4 text-violet-600" />
-                      ) : (
-                        <Square className="w-4 h-4 text-slate-300" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-mono font-black text-xs text-slate-900">
-                          {poleId}
-                        </span>
-                        {pole.external_ref && (
-                          <span className="font-mono text-[10px] font-semibold text-slate-500">
-                            ({pole.external_ref})
-                          </span>
-                        )}
-                        {!hasGps ? (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
-                            Chưa có GPS
-                          </span>
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="mt-0.5 shrink-0">
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-violet-600" />
                         ) : (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 font-mono">
-                            {pole.location.lat?.toFixed(5)}, {pole.location.lng?.toFixed(5)}
-                          </span>
+                          <Square className="w-4 h-4 text-slate-300" />
                         )}
                       </div>
-                      {pole.note && (
-                        <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                          {pole.note}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono font-black text-xs text-slate-900">
+                            {poleId}
+                          </span>
+                          {pole.external_ref && (
+                            <span className="font-mono text-[10px] font-semibold text-slate-500">
+                              ({pole.external_ref})
+                            </span>
+                          )}
+                          {!hasGps ? (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
+                              Chưa có GPS
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 font-mono">
+                              {pole.location.lat?.toFixed(5)}, {pole.location.lng?.toFixed(5)}
+                            </span>
+                          )}
                         </div>
-                      )}
+                        {pole.note && (
+                          <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {pole.note}
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {onAttachQrPdfFile && (
+                      <button
+                        type="button"
+                        disabled={Boolean(generatingKey) || isEnsuringPoleQrs}
+                        onClick={(e) => handleGeneratePoleQrPdf(e, pole)}
+                        title={`Tạo file PDF mã QR cho cột ${poleId} và đính kèm thẳng xuống ô File PDF gửi cho kỹ sư`}
+                        className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition cursor-pointer disabled:opacity-50 ${
+                          isAlreadyAttached
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                            : 'bg-white text-violet-700 border-violet-200 hover:bg-violet-100/80 hover:border-violet-300 shadow-2xs'
+                        }`}
+                      >
+                        {isThisGenerating ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin text-violet-600" />
+                            <span>Đang tạo...</span>
+                          </>
+                        ) : isAlreadyAttached ? (
+                          <>
+                            <FileCheck className="w-3 h-3 text-emerald-600" />
+                            <span>Đã đính kèm QR</span>
+                          </>
+                        ) : (
+                          <>
+                            <QrCode className="w-3 h-3 text-violet-600" />
+                            <span>In QR</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )
               })

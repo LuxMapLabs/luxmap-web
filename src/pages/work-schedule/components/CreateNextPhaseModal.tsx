@@ -78,6 +78,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
   if (!isOpen) return null
 
   const isRepair = targetNextPhaseType === 'repair'
+  const effectivePoleIds = selectedPoleIds.length > 0 ? selectedPoleIds : defaultPoleIds
   const normalizedSegment = (segment || '').trim()
   const hasSegment = Boolean(
     normalizedSegment && normalizedSegment !== '-' && normalizedSegment !== '—'
@@ -92,8 +93,9 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
     new Set(faults.map((f) => f.origin_node_id).filter((v): v is string => Boolean(v)))
   )
   const isIotTarget =
-    (!hasSegment && selectedPoleIds.length === 0) ||
-    (iotNodes.length > 0 && selectedPoleIds.length === 0)
+    effectivePoleIds.length === 0 &&
+    !hasSegment &&
+    (iotNodes.length > 0 || iotCabinets.length > 0 || iotFeeders.length > 0)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -185,7 +187,7 @@ export const CreateNextPhaseModal: React.FC<CreateNextPhaseModalProps> = ({
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-700">Tuyến đường:</label>
               <div className="px-3 py-2 bg-slate-100 rounded-xl text-xs font-semibold text-slate-800">
-                {formatSegmentDisplay(segment)}
+                {formatSegmentDisplay(segment, caseTitle)}
               </div>
             </div>
 

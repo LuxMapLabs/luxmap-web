@@ -31,9 +31,13 @@ import { CreateNextPhaseModal } from './components/CreateNextPhaseModal'
 import { CreateManualModal } from './components/CreateManualModal'
 import { AutoDispatchModal } from './components/AutoDispatchModal'
 import { RecurringSurveyModal } from './components/RecurringSurveyModal'
-import { fetchFaultsList } from '../../feature/dashboard/dashboardAPI'
+import { ALL_FAULT_DATA_SOURCES, fetchFaultsList } from '../../feature/dashboard/dashboardAPI'
 import { NOTIFICATION_TARGET_PARAMS } from '../../utils/notifications/notificationRoute'
 import { extractSegmentId } from '../../utils/work-schedule/poleUtils'
+import {
+  formatSegmentDisplay,
+  segmentLabelFromIds,
+} from '../../utils/work-schedule/workScheduleUtils'
 import type { SurveyRecurringItem } from '../../types/survey-schedules/recurring'
 
 export const WorkSchedulePage: React.FC = () => {
@@ -47,10 +51,12 @@ export const WorkSchedulePage: React.FC = () => {
     selectedCaseCode,
     viewingPhaseIndex,
     workOrderDetail,
+    segmentNames,
     isLoadingWorkOrders,
     isSubmitting,
     actionError,
   } = useSelector((state: RootState) => state.workSchedule)
+  const storePoles = useSelector((state: RootState) => state.assets.poles)
   const currentUser = useSelector((state: RootState) => state.auth.user)
   const activeCommuneId =
     currentUser?.communes?.[0]?.commune_id ||
@@ -125,6 +131,7 @@ export const WorkSchedulePage: React.FC = () => {
         commune_id: activeCommuneId || undefined,
         status: 'detected',
         page_size: 100,
+        data_source: ALL_FAULT_DATA_SOURCES,
       })
       const unassigned = faults.filter((f) => !f.work_order_id && f.fault_status === 'detected')
       setUnassignedFaultsCount(unassigned.length)
@@ -179,6 +186,12 @@ export const WorkSchedulePage: React.FC = () => {
       const fault = state.prefillFault
       const poleId = state.prefillPoleId || fault?.pole_id
       const faultId = state.prefillFaultId || fault?.fault_id
+      const faultIds: string[] =
+        Array.isArray(state.prefillFaultIds) && state.prefillFaultIds.length > 0
+          ? state.prefillFaultIds
+          : faultId
+          ? [faultId]
+          : []
       const segmentId = state.prefillSegmentId || fault?.segment_id
       const note = state.prefillNote || fault?.note || fault?.review_note || ''
       const isIotFault = !poleId && !segmentId && Boolean(fault?.origin_node_id || fault?.cabinet_id || fault?.feeder_id)
@@ -207,7 +220,7 @@ export const WorkSchedulePage: React.FC = () => {
         initialPhase: 'inspection',
         initialSegmentId: segmentId,
         initialPoleIds: poleId ? [poleId] : [],
-        initialFaultIds: faultId ? [faultId] : [],
+        initialFaultIds: faultIds,
         initialTitle: suggestedTitle,
         initialNotes: prefillNotes,
         initialIotTarget: isIotFault
@@ -390,6 +403,44 @@ export const WorkSchedulePage: React.FC = () => {
     )
   }
 
+  // Phân giải tên tuyến đường đầy đủ cho sự vụ (kể cả khi bước 1 là Khảo sát lưu ở segment_ids[])
+  const resolveCaseSegmentDisplay = (
+    targetCase: typeof selectedCase,
+    targetPhase?: NonNullable<typeof selectedCase>['phases'][number],
+    candidatePoleIds: string[] = []
+  ): string => {
+    const existingSeg = (targetCase?.segment || '').trim()
+    if (existingSeg && existingSeg !== '-' && existingSeg !== '—') {
+      return formatSegmentDisplay(existingSeg, targetCase?.title, segmentNames)
+    }
+
+    const poleSegIds = candidatePoleIds
+      .map((pid) => storePoles.find((p) => p.pole_id === pid)?.segment_id)
+      .filter((id): id is string => Boolean(id))
+
+    const phaseSegIds = (targetCase?.phases || [])
+      .map((p) => p.segmentId)
+      .filter((id): id is string => Boolean(id))
+
+    const detailSegLabel = segmentLabelFromIds(
+      [
+        workOrderDetail?.segment_id,
+        ...(workOrderDetail?.segment_ids ?? []),
+        ...(workOrderDetail?.faults || []).map((f) => f.segment_id),
+        targetPhase?.segmentId,
+        ...phaseSegIds,
+        ...poleSegIds,
+      ],
+      segmentNames
+    )
+
+    return formatSegmentDisplay(
+      detailSegLabel,
+      workOrderDetail?.title || targetCase?.title,
+      segmentNames
+    )
+  }
+
   // Xử lý mở giai đoạn tiếp theo (gọi API /follow-up trên máy chủ)
   const handleOpenCreateNextPhase = (
     code: string,
@@ -409,11 +460,16 @@ export const WorkSchedulePage: React.FC = () => {
         : selectedCase?.poleIds ||
           currentPhase?.poleIds ||
           []
+    const resolvedSegment = resolveCaseSegmentDisplay(
+      selectedCase,
+      currentPhase,
+      effectivePoleIds
+    )
 
     setNextPhaseContext({
       caseCode: effectiveCaseCode,
       parentWorkOrderId: effectiveParentWorkOrderId,
-      segment: selectedCase?.segment || '',
+      segment: resolvedSegment,
       targetNextPhaseType: phaseType,
       poleIds: effectivePoleIds,
     })
@@ -739,7 +795,16 @@ export const WorkSchedulePage: React.FC = () => {
         isOpen={isNextPhaseModalOpen}
         caseCode={nextPhaseContext?.caseCode || selectedCaseCode || ''}
         caseTitle={selectedCase?.title || ''}
-        segment={nextPhaseContext?.segment || selectedCase?.segment || ''}
+        segment={
+          (nextPhaseContext?.segment && nextPhaseContext.segment !== '-'
+            ? nextPhaseContext.segment
+            : resolveCaseSegmentDisplay(
+                selectedCase,
+                selectedCase?.phases[viewingPhaseIndex] ||
+                  selectedCase?.phases[selectedCase.currentPhaseIndex],
+                nextPhaseContext?.poleIds
+              )) || ''
+        }
         faults={
           (nextPhaseContext?.targetNextPhaseType || targetNextPhaseType) === 'repair' &&
           (workOrderDetail?.faults || []).some((f) => Boolean(f.inspection_outcome))
