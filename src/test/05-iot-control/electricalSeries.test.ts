@@ -18,6 +18,7 @@ import {
   summarizeMetric,
   toElectricalPoint,
   findBackfillRanges,
+  isLoneBackfill,
   type ElectricalPoint,
 } from '../../utils/iot/electricalSeries'
 
@@ -117,6 +118,28 @@ describe('electricalSeries', () => {
       expect(flat.domain[0]).toBeLessThan(5)
       expect(flat.domain[1]).toBeGreaterThan(5)
       expect(electricalYAxisScale(pts([0, 0]), 'power')!.domain[0]).toBe(0)
+    })
+  })
+
+  describe('isLoneBackfill (mẫu gửi bù đứng lẻ cần chấm riêng)', () => {
+    const series = (receptions: ('live' | 'backfill')[]) =>
+      bucketElectricalPoints(
+        receptions.map((reception, i) => makePoint({ time: i * 1000, power: 400, reception })),
+        0
+      )
+
+    it('mẫu gửi bù kẹp giữa hai mẫu trực tiếp là lẻ', () => {
+      const s = series(['live', 'backfill', 'live'])
+      expect(isLoneBackfill(s, 0)).toBe(false)
+      expect(isLoneBackfill(s, 1)).toBe(true)
+    })
+
+    it('hai mẫu gửi bù liền nhau không lẻ (đã có nét đứt); ở mép dãy vẫn tính lẻ', () => {
+      const s = series(['backfill', 'backfill', 'live', 'backfill'])
+      expect(isLoneBackfill(s, 0)).toBe(false)
+      expect(isLoneBackfill(s, 1)).toBe(false)
+      expect(isLoneBackfill(s, 3)).toBe(true)
+      expect(isLoneBackfill(s, 9)).toBe(false)
     })
   })
 
