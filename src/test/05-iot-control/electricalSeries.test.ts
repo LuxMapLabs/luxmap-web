@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ELECTRICAL_RANGES,
-  ELECTRICAL_RANGE_KEYS,
   ELECTRICAL_HISTORY_MS,
+  ELECTRICAL_MAX_WINDOW_MS,
+  electricalBucketForWindow,
+  electricalTickStepForWindow,
+  formatWindowDuration,
+  parseWindowInput,
   RAW_GAP_THRESHOLD_MS,
   sliceWindow,
   bucketElectricalPoints,
@@ -32,18 +35,51 @@ const makePoint = (opts: Partial<ElectricalPoint> & { time: number }): Electrica
 })
 
 describe('electricalSeries', () => {
-  describe('ELECTRICAL_RANGES', () => {
-    it('định nghĩa đủ 3 khoảng 1h, 6h, 12h và ELECTRICAL_HISTORY_MS là 24h', () => {
-      expect(ELECTRICAL_RANGE_KEYS).toEqual(['1h', '6h', '12h'])
-      expect(ELECTRICAL_RANGES['1h'].windowMs).toBe(3_600_000)
-      expect(ELECTRICAL_RANGES['1h'].bucketMs).toBe(0)
-      expect(ELECTRICAL_RANGES['6h'].windowMs).toBe(21_600_000)
-      expect(ELECTRICAL_RANGES['6h'].bucketMs).toBe(60_000)
-      expect(ELECTRICAL_RANGES['12h'].label).toBe('12 giờ')
-      expect(ELECTRICAL_RANGES['12h'].windowMs).toBe(43_200_000)
-      expect(ELECTRICAL_RANGES['12h'].bucketMs).toBe(300_000)
-      expect(ELECTRICAL_RANGES['12h'].hint).toBe('Trung bình mỗi 5 phút')
+  describe('độ dài khung xem', () => {
+    const MIN = 60_000
+    const HOUR = 3_600_000
+
+    it('ELECTRICAL_HISTORY_MS và khung dài nhất là 24 giờ', () => {
       expect(ELECTRICAL_HISTORY_MS).toBe(86_400_000)
+      expect(ELECTRICAL_MAX_WINDOW_MS).toBe(86_400_000)
+    })
+
+    it('electricalBucketForWindow giữ đúng ngưỡng cũ của 1h, 6h, 12h', () => {
+      expect(electricalBucketForWindow(15 * MIN)).toEqual({ bucketMs: 0, hint: 'Từng mẫu (mỗi giây một mẫu)' })
+      expect(electricalBucketForWindow(HOUR).bucketMs).toBe(0)
+      expect(electricalBucketForWindow(90 * MIN)).toEqual({ bucketMs: 60_000, hint: 'Trung bình mỗi phút' })
+      expect(electricalBucketForWindow(6 * HOUR).bucketMs).toBe(60_000)
+      expect(electricalBucketForWindow(12 * HOUR)).toEqual({ bucketMs: 300_000, hint: 'Trung bình mỗi 5 phút' })
+    })
+
+    it('electricalTickStepForWindow chọn bước nhỏ nhất cho tối đa 8 khoảng', () => {
+      expect(electricalTickStepForWindow(5 * MIN)).toBe(MIN)
+      expect(electricalTickStepForWindow(15 * MIN)).toBe(2 * MIN)
+      expect(electricalTickStepForWindow(HOUR)).toBe(10 * MIN)
+      expect(electricalTickStepForWindow(6 * HOUR)).toBe(HOUR)
+      expect(electricalTickStepForWindow(12 * HOUR)).toBe(2 * HOUR)
+      expect(electricalTickStepForWindow(24 * HOUR)).toBe(3 * HOUR)
+    })
+
+    it('formatWindowDuration', () => {
+      expect(formatWindowDuration(5 * MIN)).toBe('5 phút')
+      expect(formatWindowDuration(45 * MIN)).toBe('45 phút')
+      expect(formatWindowDuration(HOUR)).toBe('1 giờ')
+      expect(formatWindowDuration(90 * MIN)).toBe('1 giờ 30 phút')
+      expect(formatWindowDuration(24 * HOUR)).toBe('24 giờ')
+    })
+
+    it('parseWindowInput nhận phút, giờ thập phân và từ chối ngoài [5 phút, max]', () => {
+      const max = 24 * HOUR
+      expect(parseWindowInput('90', 'minute', max)).toBe(90 * MIN)
+      expect(parseWindowInput(' 1,5 ', 'hour', max)).toBe(90 * MIN)
+      expect(parseWindowInput('5', 'minute', max)).toBe(5 * MIN)
+      expect(parseWindowInput('24', 'hour', max)).toBe(max)
+      expect(parseWindowInput('2', 'minute', max)).toBeNull()
+      expect(parseWindowInput('25', 'hour', max)).toBeNull()
+      expect(parseWindowInput('', 'minute', max)).toBeNull()
+      expect(parseWindowInput('abc', 'minute', max)).toBeNull()
+      expect(parseWindowInput('-10', 'minute', max)).toBeNull()
     })
   })
 

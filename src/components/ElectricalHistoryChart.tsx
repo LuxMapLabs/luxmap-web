@@ -1,5 +1,5 @@
 /** Biểu đồ lịch sử điện từng mẫu dùng chung: hỗ trợ chế độ Gần nhất và Theo ngày (tải theo khúc 6 giờ). */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Activity } from 'lucide-react'
 import {
   Area,
@@ -17,20 +17,22 @@ import { ELECTRICAL_POLL_MS, type ElectricalTimeBasis } from '../feature/iot/iot
 import {
   ELECTRICAL_METRICS,
   ELECTRICAL_METRIC_KEYS,
-  ELECTRICAL_RANGES,
-  ELECTRICAL_RANGE_KEYS,
   ELECTRICAL_HISTORY_MS,
+  ELECTRICAL_WINDOW_PRESETS,
   bucketElectricalPoints,
   buildAxisTicks,
   clampWindowEnd,
+  electricalBucketForWindow,
+  electricalTickStepForWindow,
   findBackfillRanges,
   formatRecentAxisTick,
+  formatWindowDuration,
   insertElectricalGaps,
+  parseWindowInput,
   summarizeMetric,
   formatMetric,
   type ElectricalChunkDirection,
   type ElectricalMetric,
-  type ElectricalRange,
   type ElectricalBucketPoint,
 } from '../utils/iot/electricalSeries'
 import { ElectricalWindowSlider } from './ElectricalWindowSlider'
@@ -50,15 +52,6 @@ const METRIC_TONE: Record<ElectricalMetric, { active: string }> = {
 /** Màu mẫu gửi bù (tím) tách khỏi ba màu chỉ số xanh lá, xanh dương, vàng. */
 const BACKFILL_COLOR = '#7c3aed'
 const BACKFILL_LABEL = 'Gửi bù từ thẻ nhớ'
-
-const RANGE_ORDER: Record<ElectricalRange, number> = { '1h': 1, '6h': 2, '12h': 3 }
-
-/** Bước chia nhãn trục X cố định cho từng khoảng thời gian. */
-const RANGE_TICK_STEP_MS: Record<ElectricalRange, number> = {
-  '1h': 10 * 60_000,      // mỗi 10 phút
-  '6h': 60 * 60_000,      // mỗi 1 giờ
-  '12h': 2 * 60 * 60_000, // mỗi 2 giờ
-}
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
@@ -195,41 +188,127 @@ const CustomTooltip: React.FC<{
   )
 }
 
+type WindowUnit = 'minute' | 'hour'
+
+/** Số hiện trong ô nhập: chia hết cho 1 giờ thì hiện theo giờ, còn lại theo phút. */
+const toWindowDraft = (ms: number): { text: string; unit: WindowUnit } =>
+  ms % 3_600_000 === 0
+    ? { text: String(ms / 3_600_000), unit: 'hour' }
+    : { text: String(Math.round(ms / 60_000)), unit: 'minute' }
+
+/** Chọn độ dài khung xem: nút chọn nhanh và ô nhập số phút/giờ. */
 export const ElectricalRangeToggle: React.FC<{
-  value: ElectricalRange
-  onChange: (r: ElectricalRange) => void
-}> = ({ value, onChange }) => (
-  <div
-    role="group"
-    aria-label="Khoảng thời gian"
-    className="inline-flex shrink-0 items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800"
-  >
-    {ELECTRICAL_RANGE_KEYS.map((k) => (
-      <button
-        key={k}
-        type="button"
-        aria-pressed={value === k}
-        onClick={() => onChange(k)}
-        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
-          value === k
-            ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-        }`}
+  value: number
+  onChange: (ms: number) => void
+  maxMs: number
+}> = ({ value, onChange, maxMs }) => {
+  const inputId = useId()
+  const errorId = useId()
+  const [draft, setDraft] = useState(() => toWindowDraft(value))
+  const [invalid, setInvalid] = useState(false)
+  const [syncedValue, setSyncedValue] = useState(value)
+  if (syncedValue !== value) {
+    setSyncedValue(value)
+    setDraft(toWindowDraft(value))
+    setInvalid(false)
+  }
+
+  const commit = (text: string, unit: WindowUnit) => {
+    const ms = parseWindowInput(text, unit, maxMs)
+    if (ms === null) {
+      setInvalid(true)
+      return
+    }
+    setInvalid(false)
+    if (ms !== value) onChange(ms)
+    else setDraft(toWindowDraft(ms))
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <div
+        role="group"
+        aria-label="Khoảng thời gian"
+        className="inline-flex shrink-0 items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800"
       >
-        {ELECTRICAL_RANGES[k].label}
-      </button>
-    ))}
-  </div>
-)
+        {ELECTRICAL_WINDOW_PRESETS.filter((p) => p.ms <= maxMs).map((p) => (
+          <button
+            key={p.ms}
+            type="button"
+            aria-pressed={value === p.ms}
+            onClick={() => onChange(p.ms)}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
+              value === p.ms
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="relative inline-flex shrink-0 items-center gap-1.5">
+        <label htmlFor={inputId} className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          Tùy chọn
+        </label>
+        <div
+          className={`inline-flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 ring-1 ${
+            invalid ? 'ring-red-500' : 'ring-transparent'
+          }`}
+        >
+          <input
+            id={inputId}
+            type="text"
+            inputMode="decimal"
+            value={draft.text}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? errorId : undefined}
+            onChange={(e) => {
+              setDraft({ ...draft, text: e.target.value })
+              setInvalid(false)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit(draft.text, draft.unit)
+            }}
+            onBlur={() => commit(draft.text, draft.unit)}
+            className="w-11 px-1.5 py-1 rounded-md bg-white dark:bg-slate-900 text-[11px] font-semibold text-right text-slate-900 dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500"
+          />
+          <select
+            aria-label="Đơn vị"
+            value={draft.unit}
+            onChange={(e) => {
+              const unit = e.target.value as WindowUnit
+              setDraft({ ...draft, unit })
+              commit(draft.text, unit)
+            }}
+            className="pl-1 pr-0.5 py-1 bg-transparent text-[11px] font-semibold text-slate-600 dark:text-slate-300 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500 rounded-md"
+          >
+            <option value="minute">phút</option>
+            <option value="hour">giờ</option>
+          </select>
+        </div>
+        {invalid && (
+          <p
+            id={errorId}
+            role="alert"
+            className="absolute right-0 top-full mt-1 z-10 whitespace-nowrap text-[10.5px] font-medium text-red-600 dark:text-red-400"
+          >
+            Nhập từ 5 phút đến {formatWindowDuration(maxMs)}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 /** Khung biểu đồ và thẻ chỉ số của mạch đang chọn */
 export const ElectricalHistoryChart: React.FC<{
   feederId: string
   live: boolean
-  range: ElectricalRange
+  windowMs: number
   timeBasis?: ElectricalTimeBasis
   dateRange?: { from: Date; to: Date } | null
-}> = ({ feederId, live, range, timeBasis = 'measured_at', dateRange = null }) => {
+}> = ({ feederId, live, windowMs, timeBasis = 'measured_at', dateRange = null }) => {
   const boundsFrom = dateRange ? dateRange.from.getTime() : null
   const boundsTo = dateRange ? dateRange.to.getTime() : null
   const bounds = useMemo(
@@ -266,8 +345,6 @@ export const ElectricalHistoryChart: React.FC<{
     }
   }, [feederId, timeBasis, boundsFrom, boundsTo])
 
-  const windowMs = ELECTRICAL_RANGES[range].windowMs
-
   // Chế độ Theo ngày: track phủ toàn bộ [bounds.from, bounds.to]; chế độ Gần nhất: 24 giờ gần nhất.
   const trackStart = bounds ? bounds.from : nowMs - ELECTRICAL_HISTORY_MS
   const trackEnd = bounds ? bounds.to : nowMs
@@ -284,7 +361,7 @@ export const ElectricalHistoryChart: React.FC<{
       : clampWindowEnd(pinnedEnd, minWindowEnd, maxWindowEnd)
   const windowStart = windowEnd - effectiveWindowMs
 
-  // Khi đổi 1h/6h/12h: giữ mốc cuối đang xem và kẹp lại trong phạm vi track.
+  // Khi đổi độ dài khung: giữ mốc cuối đang xem và kẹp lại trong phạm vi track.
   useEffect(() => {
     if (bounds) {
       setWindowEndMs((prev) => clampWindowEnd(prev, minWindowEnd, maxWindowEnd))
@@ -293,7 +370,7 @@ export const ElectricalHistoryChart: React.FC<{
         prev === null ? null : clampWindowEnd(prev, minWindowEnd, maxWindowEnd)
       )
     }
-  }, [range, bounds, minWindowEnd, maxWindowEnd])
+  }, [windowMs, bounds, minWindowEnd, maxWindowEnd])
 
   // Hợp nhất cả hai chế độ vào useElectricalChunks (chế độ Theo ngày truyền live = false, track = bounds, bounds).
   const { points, latest, viewLoading } = useElectricalChunks(feederId, {
@@ -348,7 +425,7 @@ export const ElectricalHistoryChart: React.FC<{
     [points, windowStart, windowEnd]
   )
 
-  const bucketMs = ELECTRICAL_RANGES[range].bucketMs
+  const { bucketMs, hint } = electricalBucketForWindow(effectiveWindowMs)
 
   const series = useMemo(
     () => insertElectricalGaps(bucketElectricalPoints(rangePoints, bucketMs), bucketMs),
@@ -371,15 +448,15 @@ export const ElectricalHistoryChart: React.FC<{
   const backfillRanges = useMemo(() => findBackfillRanges(series, bucketMs), [series, bucketMs])
 
   const xTicks = useMemo(
-    () => buildAxisTicks(windowStart, windowEnd, RANGE_TICK_STEP_MS[range]),
-    [windowStart, windowEnd, range]
+    () => buildAxisTicks(windowStart, windowEnd, electricalTickStepForWindow(effectiveWindowMs)),
+    [windowStart, windowEnd, effectiveWindowMs]
   )
 
-  const prevRangeRef = useRef<ElectricalRange | null>(null)
-  const isInitialMount = prevRangeRef.current === null
+  const prevWindowMsRef = useRef<number | null>(null)
+  const prevWindowMs = prevWindowMsRef.current
   const swapFrom =
-    !isInitialMount && prevRangeRef.current !== range
-      ? RANGE_ORDER[range] < RANGE_ORDER[prevRangeRef.current!]
+    prevWindowMs !== null && prevWindowMs !== windowMs
+      ? windowMs < prevWindowMs
         ? 0.6
         : 1.4
       : undefined
@@ -387,8 +464,8 @@ export const ElectricalHistoryChart: React.FC<{
   const swapStyle = swapFrom ? ({ ['--swap-from' as string]: swapFrom } as React.CSSProperties) : undefined
 
   useEffect(() => {
-    prevRangeRef.current = range
-  }, [range])
+    prevWindowMsRef.current = windowMs
+  }, [windowMs])
 
   return (
     <div className="flex-1 min-h-0 p-4 sm:p-5 flex flex-col md:flex-row gap-4">
@@ -438,7 +515,7 @@ export const ElectricalHistoryChart: React.FC<{
             />
             {latest ? <>Mẫu gần nhất {fullDateTime(latest.time)}</> : 'Chưa có mẫu'}
           </p>
-          <p>{`${rangePoints.length} mẫu trong ${ELECTRICAL_RANGES[range].label}`}</p>
+          <p>{`${rangePoints.length} mẫu trong ${formatWindowDuration(effectiveWindowMs)}`}</p>
           {isDateRange ? (
             <p>Xem theo khoảng ngày, không tự cập nhật</p>
           ) : live ? (
@@ -470,10 +547,10 @@ export const ElectricalHistoryChart: React.FC<{
             <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
               {bounds ? (
                 <>
-                  Khoảng đã chọn {fullTime(bounds.from)} – {fullTime(bounds.to)} · {ELECTRICAL_RANGES[range].hint}
+                  Khoảng đã chọn {fullTime(bounds.from)} – {fullTime(bounds.to)} · {hint}
                 </>
               ) : (
-                ELECTRICAL_RANGES[range].hint
+                hint
               )}
             </p>
           </div>
@@ -556,7 +633,7 @@ export const ElectricalHistoryChart: React.FC<{
             <div
               className={`flex-1 min-h-0 ${swapClass}`}
               style={swapStyle}
-              key={bounds ? `${bounds.from}-${bounds.to}-${range}` : range}
+              key={bounds ? `${bounds.from}-${bounds.to}-${windowMs}` : windowMs}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ top: 20, right: 36, bottom: 0, left: 0 }}>
