@@ -53,6 +53,7 @@ import {
 } from '../../../utils/gis-map/segmentPoleOrder'
 import { EvidenceImage } from './EvidenceImage'
 import { PolePhotoImage } from './PolePhotoImage'
+import LuxVerdictBadge from './LuxVerdictBadge'
 import { PoleVideoPlayer } from './PoleVideoPlayer'
 
 const BACKEND_CORRIDOR_LIMIT_M = 25
@@ -1468,6 +1469,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                             >
                               ☀ {selectedVideoPhoto.lux_value.toFixed(1)} lux
                             </span>
+                            <LuxVerdictBadge photo={selectedVideoPhoto} />
                           </>
                         )}
                         {(() => {
@@ -1493,7 +1495,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                       : 'text-amber-700'
                                   }
                                 >
-                                  {isOut ? 'Mất sáng (Cần kiểm tra)' : isNormal ? 'Đèn sáng bình thường' : 'Chưa chốt trạng thái'}
+                                  {isOut ? 'Mất sáng (Cần kiểm tra)' : isNormal ? 'Đèn bật' : 'Chưa chốt trạng thái'}
                                 </strong>
                               </span>
                               {isOverride && (
@@ -1725,7 +1727,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                   : 'bg-amber-600/90 text-white border-amber-400/30'
                               }`}
                             >
-                              {isOut ? 'MẤT SÁNG (LỖI)' : isNormal ? 'ĐẠT CHUẨN' : 'CHƯA RÕ'}
+                              {isOut ? 'MẤT SÁNG (LỖI)' : isNormal ? 'ĐÈN BẬT' : 'CHƯA RÕ'}
                             </span>
 
                             {/* Mã cột, nhãn có video & số đo Lux thực địa */}
@@ -1815,7 +1817,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                     {photo.final_cv_state === 'off'
                                       ? 'Đèn tắt (Mất sáng)'
                                       : photo.final_cv_state === 'on'
-                                      ? 'Đèn sáng bình thường'
+                                      ? 'Đèn bật'
                                       : isOut
                                       ? 'Đèn tắt (Theo AI)'
                                       : isNormal
@@ -1892,6 +1894,11 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                               )}
                             </div>
 
+                            {!isRejected && typeof photo.lux_value === 'number' && (
+                              <div className="mb-1.5 flex items-center gap-1.5 text-[10.5px] text-slate-500 font-medium">
+                                Độ sáng: <LuxVerdictBadge photo={photo} />
+                              </div>
+                            )}
                             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10.5px] text-slate-500 font-medium">
                               <span>
                                 Đánh giá:{' '}
@@ -2080,7 +2087,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                 {isOut
                                   ? 'Kỹ sư: Báo mất sáng (Cần kiểm tra)'
                                   : isNormal
-                                  ? 'Kỹ sư: Đèn sáng bình thường'
+                                  ? 'Kỹ sư: Đèn bật'
                                   : 'Chưa chốt trạng thái (Cần yêu cầu làm lại)'}
                               </span>
                               {aiLabel && (
@@ -2106,6 +2113,7 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                                   ☀ {photo.lux_value.toFixed(1)} lux
                                 </span>
                               )}
+                              {!isRejected && <LuxVerdictBadge photo={photo} />}
                               {typeof photo.video?.sampled_frames === 'number' && (
                                 <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 font-mono text-[10px] font-semibold">
                                   Video: {photo.video.on_frames ?? 0}/{photo.video.sampled_frames} frame sáng
@@ -2296,36 +2304,27 @@ export const FieldReportDetailModal: React.FC<FieldReportDetailModalProps> = ({
                   <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-2">
                     <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
                       <Gauge className="w-3.5 h-3.5 text-blue-600" />
-                      Độ rọi mặt đường đo thực tế (ESP32C3_LUX)
+                      Số đo lux từng cột (so với baseline của chính cột)
                     </span>
                     {(() => {
+                      // Lux chỉ so từng cột với chính nó qua các đêm (D-R29): không gộp trung bình giữa các cột.
                       const validLuxPhotos = polePhotos.filter(
                         (p) => p.decision !== 'reject' && typeof p.lux_value === 'number'
                       )
                       if (validLuxPhotos.length > 0) {
-                        const luxNums = validLuxPhotos.map((p) => p.lux_value as number)
-                        const avgLux =
-                          luxNums.reduce((acc, v) => acc + v, 0) / luxNums.length
-                        const minLux = Math.min(...luxNums)
-                        const maxLux = Math.max(...luxNums)
                         return (
                           <div className="flex flex-col gap-2">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className="text-2xl font-black text-blue-700 font-mono">
-                                TB: {avgLux.toFixed(1)} lux
-                              </span>
-                              <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-mono">
-                                Min {minLux.toFixed(1)} – Max {maxLux.toFixed(1)} lux
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <span className="text-[11px] font-bold text-slate-600">
+                              {validLuxPhotos.length} ảnh có số đo
+                            </span>
+                            <div className="flex flex-col gap-1.5">
                               {validLuxPhotos.map((p, idx) => (
-                                <span
-                                  key={p.photo_id || idx}
-                                  className="px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-900 font-mono text-[10.5px] font-bold"
-                                >
-                                  {p.pole_id || `Cột #${idx + 1}`}: {(p.lux_value as number).toFixed(1)} lux
-                                </span>
+                                <div key={p.photo_id || idx} className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-900 font-mono text-[10.5px] font-bold">
+                                    {p.pole_id || `Cột #${idx + 1}`}: {(p.lux_value as number).toFixed(1)} lux
+                                  </span>
+                                  <LuxVerdictBadge photo={p} />
+                                </div>
                               ))}
                             </div>
                           </div>

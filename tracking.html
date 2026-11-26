@@ -28,6 +28,12 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>26/11/2026 — Lux đo đứng yên: hiện kết luận độ sáng của backend (LUX-BASELINE, Contract v1.24)</dt>
+        <dd>Mỗi cột trong phiếu khảo sát hiện nhãn kết luận backend chấm cho số lux ("MỜ · 70% baseline", "Sáng bình thường · 102% baseline", "Chưa đủ baseline (cần 3 đêm)", "Chưa đánh giá độ sáng"); FE không tự tính tỉ lệ. "Kỹ sư: Đèn sáng bình thường" đổi thành "Kỹ sư: Đèn bật" (kỹ sư chỉ xác nhận ON/OFF). Bỏ trung bình / min / max lux giữa các cột (lux chỉ so từng cột với chính nó); tiêu đề phiếu thêm "· N cột mờ". <code>src/types/</code> sinh lại từ spec backend (chỉ giữ phần lux).</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/pages/work-schedule/components/LuxVerdictBadge.tsx</code> (mới); <code>src/utils/work-schedule/luxVerdict.ts</code> (mới); <code>src/pages/work-schedule/components/CaseDetailModal.tsx</code>; <code>src/pages/work-schedule/components/FieldReportDetailModal.tsx</code>; <code>src/types/workorders/orders.ts</code>; <code>src/types/luxreadings/readings.ts</code>; <code>src/types/map/poles.ts</code>; <code>src/test/lux-baseline/luxVerdict.test.ts</code> (mới); <code>tracking.html</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>tsc</code>, eslint (0 lỗi), build, <code>vitest</code> 6/6 test mới. Nhánh <code>feat/LUX-BASELINE-ui</code>, <b>chưa commit</b> (chờ chủ dự án).</dd>
         <dt>25/11/2026 — Nhận diện: gắn bộ icon LuxMap</dt>
         <dd>Thay chữ "C" (Civic Flow) của boilerplate bằng bộ icon LuxMap từ backend <code>assets/branding/icon/</code> (PR luxmap_backend #301). Favicon <code>.ico</code> + <code>.svg</code> và <code>apple-touch-icon</code> trong <code>index.html</code>; Sidebar dùng biểu tượng ghim + đèn (<code>luxmap-mark.svg</code>) thay ô bóng đèn Lucide; trang Đăng nhập dùng ô icon nền trắng (<code>luxmap-icon.svg</code>) vì biểu tượng navy chìm trên nền tối.</dd>
         <dt>File thay đổi</dt>
