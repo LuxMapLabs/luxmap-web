@@ -17,15 +17,55 @@ export const ELECTRICAL_METRICS: Record<ElectricalMetric, { label: string; unit:
 
 export const ELECTRICAL_METRIC_KEYS = Object.keys(ELECTRICAL_METRICS) as ElectricalMetric[]
 
-export type ElectricalRange = '1h' | '6h' | '12h'
-export const ELECTRICAL_RANGES: Record<ElectricalRange, { label: string; windowMs: number; bucketMs: number; hint: string }> = {
-  '1h':  { label: '1 giờ',  windowMs: 3_600_000,       bucketMs: 0,       hint: 'Từng mẫu (mỗi giây một mẫu)' },
-  '6h':  { label: '6 giờ',  windowMs: 6 * 3_600_000,   bucketMs: 60_000,  hint: 'Trung bình mỗi phút' },
-  '12h': { label: '12 giờ', windowMs: 12 * 3_600_000,  bucketMs: 300_000, hint: 'Trung bình mỗi 5 phút' },
-}
-export const ELECTRICAL_RANGE_KEYS = Object.keys(ELECTRICAL_RANGES) as ElectricalRange[]
 /** Cửa sổ lớn nhất cần tải (24 giờ). */
 export const ELECTRICAL_HISTORY_MS = 24 * 3_600_000
+
+const MINUTE_MS = 60_000
+const HOUR_MS = 3_600_000
+
+/** Khung xem ngắn nhất (5 phút). */
+export const ELECTRICAL_MIN_WINDOW_MS = 5 * MINUTE_MS
+/** Khung xem dài nhất (24 giờ), cũng là trần ở chế độ Theo ngày để không tải quá nhiều mẫu. */
+export const ELECTRICAL_MAX_WINDOW_MS = ELECTRICAL_HISTORY_MS
+export const ELECTRICAL_DEFAULT_WINDOW_MS = 6 * HOUR_MS
+/** Nút chọn nhanh độ dài khung xem. */
+export const ELECTRICAL_WINDOW_PRESETS: { label: string; ms: number }[] = [
+  { label: '1 giờ', ms: HOUR_MS },
+  { label: '6 giờ', ms: 6 * HOUR_MS },
+  { label: '12 giờ', ms: 12 * HOUR_MS },
+]
+
+/** Cách vẽ theo độ dài khung: ≤ 1 giờ vẽ từng mẫu, ≤ 6 giờ trung bình mỗi phút, dài hơn trung bình mỗi 5 phút. */
+export function electricalBucketForWindow(windowMs: number): { bucketMs: number; hint: string } {
+  if (windowMs <= HOUR_MS) return { bucketMs: 0, hint: 'Từng mẫu (mỗi giây một mẫu)' }
+  if (windowMs <= 6 * HOUR_MS) return { bucketMs: MINUTE_MS, hint: 'Trung bình mỗi phút' }
+  return { bucketMs: 5 * MINUTE_MS, hint: 'Trung bình mỗi 5 phút' }
+}
+
+const TICK_STEPS_MS = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360].map((m) => m * MINUTE_MS)
+
+/** Bước nhãn trục X nhỏ nhất sao cho khung có tối đa 8 khoảng. */
+export function electricalTickStepForWindow(windowMs: number): number {
+  return TICK_STEPS_MS.find((step) => windowMs / step <= 8) ?? TICK_STEPS_MS[TICK_STEPS_MS.length - 1]
+}
+
+/** Độ dài khung dạng `45 phút`, `1 giờ`, `1 giờ 30 phút` (làm tròn phút). */
+export function formatWindowDuration(ms: number): string {
+  const totalMinutes = Math.round(ms / MINUTE_MS)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours === 0) return `${minutes} phút`
+  return minutes === 0 ? `${hours} giờ` : `${hours} giờ ${minutes} phút`
+}
+
+/** Đổi số người dùng nhập (phút hoặc giờ, nhận cả dấu phẩy thập phân) sang ms làm tròn phút; ngoài [5 phút, maxMs] trả null. */
+export function parseWindowInput(raw: string, unit: 'minute' | 'hour', maxMs: number): number | null {
+  const text = raw.trim().replace(',', '.')
+  if (!/^\d+(\.\d+)?$/.test(text)) return null
+  const minutes = Math.round(Number(text) * (unit === 'hour' ? 60 : 1))
+  const ms = minutes * MINUTE_MS
+  return ms >= ELECTRICAL_MIN_WINDOW_MS && ms <= maxMs ? ms : null
+}
 /** Ngưỡng khoảng trống mặc định (30 giây) khi không gom ô (chế độ 1 giờ, bucketMs = 0). */
 export const RAW_GAP_THRESHOLD_MS = 30_000
 /** Độ dài một khúc tải lịch sử điện (6 giờ), căn theo bội số của epoch ms. */
@@ -593,6 +633,49 @@ export function pickPreemptibleChunk({
     })
 
   return candidates.slice(0, toCancelCount).map((item) => item.start)
+}
+
+/** Số vạch chia tối đa trên trục Y. */
+const Y_MAX_INTERVALS = 6
+
+/**
+ * Thang trục Y theo đúng các mẫu trong khung: thấp nhất/cao nhất của chỉ số, làm tròn ra vạch gần nhất
+ * (bước 1, 2, 2.5, 5 × 10ⁿ, tối đa 6 khoảng). Khung không có mẫu thì trả null.
+ */
+export function electricalYAxisScale(
+  points: ElectricalPoint[],
+  metric: ElectricalMetric
+): { domain: [number, number]; ticks: number[]; digits: number } | null {
+  let min = Infinity
+  let max = -Infinity
+  for (const p of points) {
+    const v = p[metric]
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null
+  if (min === max) {
+    // Mọi mẫu bằng nhau: nới 5% (hoặc 1 nếu bằng 0) cho đường không dính mép; không xuống dưới 0 nếu số đo không âm.
+    const pad = min !== 0 ? Math.abs(min) * 0.05 : 1
+    min = min >= 0 ? Math.max(0, min - pad) : min - pad
+    max = max + pad
+  }
+
+  const magnitude = 10 ** Math.floor(Math.log10((max - min) / Y_MAX_INTERVALS))
+  let step = magnitude
+  let lo = min
+  let hi = max
+  for (const factor of [1, 2, 2.5, 5, 10]) {
+    step = factor * magnitude
+    lo = Math.floor(min / step + 1e-9) * step
+    hi = Math.ceil(max / step - 1e-9) * step
+    if (Math.round((hi - lo) / step) <= Y_MAX_INTERVALS) break
+  }
+  const digits = (String(Number(step.toPrecision(3))).split('.')[1] ?? '').length
+  const count = Math.round((hi - lo) / step)
+  const ticks = Array.from({ length: count + 1 }, (_, i) => Number((lo + i * step).toFixed(digits)))
+  return { domain: [ticks[0], ticks[ticks.length - 1]], ticks, digits }
 }
 
 export const formatMetric = (value: number | null, metric: ElectricalMetric) =>
