@@ -167,11 +167,26 @@ function* handleFetchDashboardData() {
 }
 
 function* handleFetchDashboardIot() {
-  const [iotSummary, iotServers]: [IotDiagnosticSummaryItem[], IotServerStatus[]] = yield all([
+  const includeRig: boolean = yield select(
+    (state: RootState) => state.dashboard.includeCalibrationRig
+  )
+  const [iotSummary, iotServers, faults]: [
+    IotDiagnosticSummaryItem[],
+    IotServerStatus[],
+    FaultItem[]
+  ] = yield all([
     call(fetchIotSummarySafe),
     call(fetchIotServersSafe),
+    call(fetchFaultsList, {
+      sort: '-detected_at',
+      page_size: 100,
+      data_source: includeRig ? ALL_FAULT_DATA_SOURCES : undefined,
+    }),
   ])
   yield put(fetchDashboardIotSuccess({ iotSummary, iotServers }))
+  if (faults) {
+    yield put(updateFaultsListSuccess(faults))
+  }
 }
 
 function* handleToggleCalibrationRig(action: ReturnType<typeof setIncludeCalibrationRig>) {
@@ -185,12 +200,19 @@ function* handleToggleCalibrationRig(action: ReturnType<typeof setIncludeCalibra
 }
 
 function* handleFetchFeederHistory(action: ReturnType<typeof fetchFeederHistoryRequest>) {
+  const requestedFeederId = action.payload
   try {
     const res: IotFeederHistoryResult = yield call(
       iotAPI.getFeederElectricalHistory,
-      action.payload,
+      requestedFeederId,
       { page: 1, page_size: 20, sort_by: 'measured_at' }
     )
+    const activeFeederId: string | null = yield select(
+      (state: RootState) => state.dashboard.selectedFeederId
+    )
+    if (activeFeederId && activeFeederId !== requestedFeederId) {
+      return
+    }
     const items: IotFeederHistorySample[] = [...(res?.items || [])].sort((a, b) => {
       const ta = Date.parse(a.measured_at || a.received_at || '')
       const tb = Date.parse(b.measured_at || b.received_at || '')
@@ -199,7 +221,15 @@ function* handleFetchFeederHistory(action: ReturnType<typeof fetchFeederHistoryR
     })
     yield put(fetchFeederHistorySuccess(items))
   } catch {
-    yield put(fetchFeederHistorySuccess([]))
+    const activeFeederId: string | null = yield select(
+      (state: RootState) => state.dashboard.selectedFeederId
+    )
+    if (!activeFeederId || activeFeederId === requestedFeederId) {
+      const existing: IotFeederHistorySample[] = yield select(
+        (state: RootState) => state.dashboard.selectedFeederHistory
+      )
+      yield put(fetchFeederHistorySuccess(existing))
+    }
   }
 }
 

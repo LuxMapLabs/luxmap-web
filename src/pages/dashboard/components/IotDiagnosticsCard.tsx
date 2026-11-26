@@ -131,12 +131,24 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
     [sortedNodes, selectedNodeId]
   )
 
-  // Tải lịch sử điện 30s khi đổi mạch HOẶC mỗi khi polling 30s cập nhật (iotLastUpdated)
+  // Tải lịch sử điện ngay khi đổi mạch VÀ tự động cập nhật liên tục mỗi 1 giây (1000ms) để biểu đồ nhảy real-time
+  const historyLoadingRef = React.useRef(seriesLoading)
+  historyLoadingRef.current = seriesLoading
+
   useEffect(() => {
-    if (selectedNode?.feeder_id) {
-      onSelectFeeder(selectedNode.feeder_id)
-    }
-  }, [selectedNode?.feeder_id, iotLastUpdated, onSelectFeeder])
+    const feederId = selectedNode?.feeder_id
+    if (!feederId) return
+
+    onSelectFeeder(feederId)
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && !historyLoadingRef.current) {
+        onSelectFeeder(feederId)
+      }
+    }, 1_000)
+
+    return () => window.clearInterval(timer)
+  }, [selectedNode?.feeder_id, onSelectFeeder])
 
   const donutData = useMemo(() => {
     const counts: Record<DonutGroupKey, number> = {
@@ -647,6 +659,7 @@ export const IotDiagnosticsCard: React.FC<IotDiagnosticsCardProps> = ({
                       strokeWidth={2.5}
                       fill="url(#iotAreaGrad)"
                       connectNulls
+                      isAnimationActive={false}
                       dot={(props: { cx?: number; cy?: number; index?: number; payload?: { receptionType?: 'live' | 'backfill' | null } }) => {
                         const { cx, cy, index, payload } = props
                         if (typeof cx !== 'number' || typeof cy !== 'number') return <g key={`dot-empty-${index}`} />

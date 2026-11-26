@@ -148,13 +148,13 @@ export const ManagerDashboardPage: React.FC = () => {
     dispatch(fetchCitizenScreeningRequest(selectedSegment === 'all' ? null : selectedSegment))
   }, [dispatch, selectedSegment])
 
-  // Tự động làm mới nhẹ dữ liệu IoT mỗi 30 giây khi tab đang hiển thị
+  // Tự động làm mới trạng thái chẩn đoán IoT và danh sách sự cố mỗi 5 giây (khớp với chu kỳ 5s của IotDiagnosticJob trên Backend)
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
         dispatch(fetchDashboardIotRequest())
       }
-    }, 30_000)
+    }, 5_000)
     return () => window.clearInterval(timer)
   }, [dispatch])
 

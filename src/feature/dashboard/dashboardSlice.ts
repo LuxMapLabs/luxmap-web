@@ -28,7 +28,9 @@ export interface DashboardState {
   polesCapped: boolean
   /** Kèm dữ liệu bộ thử (calibration_rig) trong danh sách sự cố */
   includeCalibrationRig: boolean
-  /** Lịch sử điện 30s của mạch đang chọn trên biểu đồ IoT */
+  /** Mã mạch đang chọn để hiển thị lịch sử điện trên biểu đồ IoT */
+  selectedFeederId: string | null
+  /** Lịch sử điện của mạch đang chọn trên biểu đồ IoT */
   selectedFeederHistory: IotFeederHistorySample[]
   selectedFeederHistoryLoading: boolean
   iotLastUpdated: string | null
@@ -58,6 +60,7 @@ const initialState: DashboardState = {
   unlocatedPoleSegments: [],
   polesCapped: false,
   includeCalibrationRig: false,
+  selectedFeederId: null,
   selectedFeederHistory: [],
   selectedFeederHistoryLoading: false,
   iotLastUpdated: null,
@@ -131,11 +134,34 @@ const dashboardSlice = createSlice({
     updateFaultsListSuccess: (state, action: PayloadAction<FaultItem[]>) => {
       state.faultsList = action.payload
     },
-    fetchFeederHistoryRequest: (state, _action: PayloadAction<string>) => {
-      state.selectedFeederHistoryLoading = true
+    fetchFeederHistoryRequest: (state, action: PayloadAction<string>) => {
+      const nextFeederId = action.payload
+      if (state.selectedFeederId !== nextFeederId) {
+        state.selectedFeederId = nextFeederId
+        state.selectedFeederHistory = []
+        state.selectedFeederHistoryLoading = true
+      } else if (state.selectedFeederHistory.length === 0) {
+        state.selectedFeederHistoryLoading = true
+      }
     },
     fetchFeederHistorySuccess: (state, action: PayloadAction<IotFeederHistorySample[]>) => {
-      state.selectedFeederHistory = action.payload
+      const incoming = action.payload
+      const current = state.selectedFeederHistory
+      const isSameSeries =
+        current.length > 0 &&
+        current.length === incoming.length &&
+        current[0]?.measured_at === incoming[0]?.measured_at &&
+        current[0]?.received_at === incoming[0]?.received_at &&
+        current[current.length - 1]?.measured_at === incoming[incoming.length - 1]?.measured_at &&
+        current[current.length - 1]?.received_at === incoming[incoming.length - 1]?.received_at &&
+        current[current.length - 1]?.power_mw === incoming[incoming.length - 1]?.power_mw &&
+        current[current.length - 1]?.current_ma === incoming[incoming.length - 1]?.current_ma &&
+        current[current.length - 1]?.voltage === incoming[incoming.length - 1]?.voltage
+
+      if (!isSameSeries) {
+        state.selectedFeederHistory = incoming
+        state.iotLastUpdated = new Date().toISOString()
+      }
       state.selectedFeederHistoryLoading = false
     },
     /** payload: segment_id đang lọc, `null` = toàn địa bàn */
