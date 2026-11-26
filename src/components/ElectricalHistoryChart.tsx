@@ -29,6 +29,7 @@ import {
   formatRecentAxisTick,
   formatWindowDuration,
   insertElectricalGaps,
+  isLoneBackfill,
   parseWindowInput,
   summarizeMetric,
   formatMetric,
@@ -450,6 +451,8 @@ export const ElectricalHistoryChart: React.FC<{
   )
 
   const backfillRanges = useMemo(() => findBackfillRanges(series, bucketMs), [series, bucketMs])
+  // Nền tím rộng tối thiểu 1/200 khung (~3px) để mẫu gửi bù lẻ vẫn thấy vị trí.
+  const minBackfillMs = effectiveWindowMs / 200
 
   const xTicks = useMemo(
     () => buildAxisTicks(windowStart, windowEnd, electricalTickStepForWindow(effectiveWindowMs)),
@@ -669,17 +672,20 @@ export const ElectricalHistoryChart: React.FC<{
                     stroke="#94a3b8"
                     fontSize={10}
                   />
-                  {backfillRanges.map((r) => (
-                    <ReferenceArea
-                      key={`backfill-${r.start}`}
-                      x1={Math.max(r.start, windowStart)}
-                      x2={Math.min(r.end, windowEnd)}
-                      fill={BACKFILL_COLOR}
-                      fillOpacity={0.12}
-                      stroke="none"
-                      ifOverflow="hidden"
-                    />
-                  ))}
+                  {backfillRanges.map((r) => {
+                    const pad = Math.max(0, (minBackfillMs - (r.end - r.start)) / 2)
+                    return (
+                      <ReferenceArea
+                        key={`backfill-${r.start}`}
+                        x1={Math.max(r.start - pad, windowStart)}
+                        x2={Math.min(r.end + pad, windowEnd)}
+                        fill={BACKFILL_COLOR}
+                        fillOpacity={0.12}
+                        stroke="none"
+                        ifOverflow="hidden"
+                      />
+                    )
+                  })}
                   {bucketMs > 0 && (
                     <Area
                       type="monotone"
@@ -706,7 +712,14 @@ export const ElectricalHistoryChart: React.FC<{
                     stroke={BACKFILL_COLOR}
                     strokeWidth={2}
                     strokeDasharray="4 3"
-                    dot={false}
+                    // Mẫu gửi bù đứng lẻ: chấm tím đè lên đường trực tiếp.
+                    dot={({ cx, cy, index }: { cx?: number; cy?: number; index?: number }) =>
+                      typeof cx === 'number' && typeof cy === 'number' && index !== undefined && isLoneBackfill(series, index) ? (
+                        <circle key={`lone-backfill-${index}`} cx={cx} cy={cy} r={3} fill={BACKFILL_COLOR} stroke="#fff" strokeWidth={1} />
+                      ) : (
+                        <g key={`lone-backfill-${index}`} />
+                      )
+                    }
                     activeDot={false}
                     connectNulls={false}
                     isAnimationActive={false}

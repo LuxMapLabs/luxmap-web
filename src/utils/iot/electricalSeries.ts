@@ -393,6 +393,15 @@ export function findBackfillRanges(
 }
 
 /** Kẹp mốc kết thúc khung trong phạm vi hợp lệ của dải 24 giờ. */
+/** Điểm có mẫu gửi bù mà hai điểm kề đều không có: nét đứt không vẽ được nên cần chấm riêng để vẫn thấy. */
+export function isLoneBackfill(points: ElectricalBucketPoint[], index: number): boolean {
+  const p = points[index]
+  if (!p || p.backfillCount === 0) return false
+  const prev = points[index - 1]
+  const next = points[index + 1]
+  return (!prev || prev.backfillCount === 0) && (!next || next.backfillCount === 0)
+}
+
 export const clampWindowEnd = (value: number, minEnd: number, maxEnd: number): number => {
   if (minEnd >= maxEnd) return maxEnd
   return Math.min(maxEnd, Math.max(minEnd, value))
