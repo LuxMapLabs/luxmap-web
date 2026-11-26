@@ -7,6 +7,8 @@
  * mạch chưa rõ → giữ "bình thường". `dim`, `out`, `unknown` luôn theo `fixture_status`, mạch thế nào cũng vậy.
  * Đây là trạng thái HIỂN THỊ: thống kê / bộ lọc vẫn đếm theo `fixture_status`.
  */
+import type { FeederHealthState, FeederPowerState } from '../../types/common/enums'
+
 export type PoleLampState = 'on' | 'off' | 'normal' | 'dim' | 'out' | 'unknown'
 
 export function poleLampState(fixtureStatus?: string | null, powerState?: string | null): PoleLampState {
@@ -68,30 +70,50 @@ export const POLE_LAMP_UI: Record<PoleLampState, LampStateUi> = {
 export const poleFeatureLampState = (p?: { fixture_status?: string | null; power_state?: string | null } | null) =>
   poleLampState(p?.fixture_status, p?.power_state)
 
-export type FeederLineStatus = 'fault' | 'warn' | 'off' | 'active' | 'unknown'
-
-/** Màu đường feeder (lõi + quầng) và nhãn ngắn trong mục "Mạch điện" của chú giải. */
-export const FEEDER_LINE_UI: Record<FeederLineStatus, { label: string; color: string; glow: string }> = {
-  active: { label: 'Có điện', color: '#10b981', glow: '#059669' },
-  // Trắng như cột đang tắt: nét tối chìm mất trên mặt đường của ảnh vệ tinh
-  off: { label: 'Đang tắt', color: '#f8fafc', glow: '#0f172a' },
-  fault: { label: 'Sự cố', color: '#ef4444', glow: '#dc2626' },
-  // Lỗi phần cứng node / dữ liệu điện quá hạn / node mất liên lạc: thiết bị đo có vấn đề, chưa chắc đèn hỏng
-  warn: { label: 'Cảnh báo', color: '#f59e0b', glow: '#d97706' },
-  unknown: { label: 'Chưa rõ', color: '#94a3b8', glow: '#64748b' },
-}
-
 /**
- * Trạng thái đường feeder: sự cố (tủ / mạch / cạnh `status = fault`) trước, rồi `power_state`.
- * Chẩn đoán IoT (`diagnosticLevel`) chen giữa: lỗi điện = sự cố, lỗi phần cứng / mất liên lạc = cảnh báo.
- * Mạch `off` là mạch đang tắt (rơ-le OFF), KHÔNG tô như sự cố; chỉ `on` mới xanh.
+ * Sức khỏe mạch = `power_state` của GET /assets/feeders (FEEDER-HEALTH-1), backend tự tính.
+ * Màu đường feeder (lõi + quầng), nhãn và badge chỉ theo trường này; bật/tắt là `lamp_state`, tách riêng.
  */
-export function feederLineStyle(isFault: boolean, powerState?: string | null, diagnosticLevel?: 'fault' | 'warn' | null) {
-  const status: FeederLineStatus =
-    isFault || diagnosticLevel === 'fault'
-      ? 'fault'
-      : diagnosticLevel === 'warn'
-        ? 'warn'
-        : powerState === 'off' ? 'off' : powerState === 'on' ? 'active' : 'unknown'
-  return { status, ...FEEDER_LINE_UI[status] }
+export const FEEDER_HEALTH_UI: Record<FeederHealthState, { label: string; color: string; glow: string; badge: string }> = {
+  normal: {
+    label: 'Bình thường',
+    color: '#10b981',
+    glow: '#059669',
+    badge: GREEN_BADGE,
+  },
+  warning: {
+    label: 'Cảnh báo',
+    color: '#f59e0b',
+    glow: '#d97706',
+    badge: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800',
+  },
+  incident: {
+    label: 'Sự cố',
+    color: '#ef4444',
+    glow: '#dc2626',
+    badge: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800',
+  },
+  offline: {
+    label: 'Mất kết nối IoT',
+    color: '#475569',
+    glow: '#1e293b',
+    badge: 'bg-slate-200 text-slate-800 border-slate-400 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-500',
+  },
+  unknown: {
+    label: 'Chưa có IoT',
+    color: '#94a3b8',
+    glow: '#64748b',
+    badge: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
+  },
 }
+
+/** Bật/tắt quan sát được = `lamp_state` của GET /assets/feeders. */
+export const FEEDER_LAMP_LABEL: Record<FeederPowerState, string> = { on: 'Đang bật', off: 'Đang tắt', unknown: 'Chưa rõ' }
+
+/** UI sức khỏe mạch; API chưa trả (hoặc mạch không có trong danh sách) thì `null`: chữ ghi '-', đường tô xám như "Chưa có IoT". */
+export const feederHealthUi = (state?: string | null) =>
+  state && state in FEEDER_HEALTH_UI ? FEEDER_HEALTH_UI[state as FeederHealthState] : null
+
+/** Nhãn bật/tắt; API chưa trả thì '-'. */
+export const feederLampLabel = (state?: string | null) =>
+  state && state in FEEDER_LAMP_LABEL ? FEEDER_LAMP_LABEL[state as FeederPowerState] : '-'

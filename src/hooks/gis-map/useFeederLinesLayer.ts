@@ -6,8 +6,7 @@ import type { SegmentInfo } from '../../pages/gis-map/GisMapPage'
 import { getFeederTooltipHtml, getRoadSegmentTooltipHtml } from '../../utils/gis-map/tooltipUtils'
 import { fetchCabinetTopologyRequest, clearCabinetTopology } from '../../feature/map/mapSlice'
 import { findByIdOrRef } from '../../utils/assets/findByIdOrRef'
-import { feederLineStyle } from '../../utils/gis-map/poleLampState'
-import { buildFeederDiagnosticLevels } from '../../utils/gis-map/feederDiagnostics'
+import { FEEDER_HEALTH_UI, feederHealthUi } from '../../utils/gis-map/poleLampState'
 
 interface UseFeederLinesLayerProps {
   map: maplibregl.Map | null
@@ -42,7 +41,7 @@ export function useFeederLinesLayer({
   onSelectFeeder,
 }: UseFeederLinesLayerProps) {
   const dispatch = useDispatch<AppDispatch>()
-  const { cabinetTopologyEdges, allTopologyEdges, cabinets: mapCabinets, feederDiagnostics } = useSelector((state: RootState) => state.map)
+  const { cabinetTopologyEdges, allTopologyEdges } = useSelector((state: RootState) => state.map)
   const {
     cabinets: assetCabinets,
     feeders: assetFeeders,
@@ -112,19 +111,15 @@ export function useFeederLinesLayer({
 
     // B. Electrical Feeder & Topology Edges (Sơ đồ cấp nguồn Trụ → Cột 100% từ Backend PostGIS, thanh mảnh nằm ĐÈ LÊN TRÊN tuyến đường)
     const rawInitialFeeders = allTopologyEdges && allTopologyEdges.length > 0 ? allTopologyEdges : (feederLinesData || filteredSegmentsData || [])
-    const initialFeeders = rawInitialFeeders.map((feat: any) => {
-      const p = feat.properties || {}
-      const isFault = p.status === 'fault'
-      return {
-        ...feat,
-        properties: {
-          ...p,
-          status: isFault ? 'fault' : 'active',
-          color: isFault ? '#ef4444' : '#10b981',
-          glow_color: isFault ? '#dc2626' : '#059669',
-        },
-      }
-    })
+    // Chưa có sức khỏe mạch từ API: tô xám "Chưa có IoT", effect bên dưới tô lại theo power_state
+    const initialFeeders = rawInitialFeeders.map((feat: any) => ({
+      ...feat,
+      properties: {
+        ...(feat.properties || {}),
+        color: FEEDER_HEALTH_UI.unknown.color,
+        glow_color: FEEDER_HEALTH_UI.unknown.glow,
+      },
+    }))
 
     if (!map.getSource('feeder-lines')) {
       map.addSource('feeder-lines', {
@@ -146,7 +141,7 @@ export function useFeederLinesLayer({
           'line-color': [
             'coalesce',
             ['get', 'glow_color'],
-            ['case', ['==', ['get', 'status'], 'fault'], '#dc2626', '#059669'],
+            FEEDER_HEALTH_UI.unknown.glow,
           ],
           'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2.0, 12, 3.5, 16, 5.0],
           'line-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 11.0, 0.45],
@@ -165,20 +160,20 @@ export function useFeederLinesLayer({
           'line-color': [
             'coalesce',
             ['get', 'color'],
-            ['case', ['==', ['get', 'status'], 'fault'], '#ef4444', '#10b981'],
+            FEEDER_HEALTH_UI.unknown.color,
           ],
           'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.2, 12, 1.8, 16, 2.6],
           'line-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 11.0, 0.95],
         },
       })
 
-      // Mạch có lỗi nhưng đang TẮT: vạch trắng đứt đè lên màu lỗi, để không chỉ dựa vào màu (đỏ/cam vẫn đọc được "đang tắt")
+      // Mạch đang TẮT (lamp_state = off): vạch trắng đứt đè lên màu sức khỏe, để màu vẫn đọc được "đang tắt"
       map.addLayer({
         id: 'feeder-lines-alert-off',
         type: 'line',
         source: 'feeder-lines',
         minzoom: 8.5,
-        filter: ['all', ['in', ['get', 'status'], ['literal', ['fault', 'warn']]], ['==', ['get', 'power_state'], 'off']],
+        filter: ['==', ['get', 'lamp_state'], 'off'],
         layout: { 'line-join': 'round', 'line-cap': 'butt' },
         paint: {
           'line-color': '#ffffff',
@@ -372,67 +367,38 @@ export function useFeederLinesLayer({
       return
     }
 
-    // Bản đồ trạng thái Tủ điện (Cabinet):
-    const cabinetStatusMap = new Map<string, string>()
-    if (assetCabinets && assetCabinets.length > 0) {
-      assetCabinets.forEach((cab: any) => {
-        if (cab.cabinet_id) {
-          cabinetStatusMap.set(cab.cabinet_id, cab.status || 'active')
-        }
-      })
-    }
-    if (mapCabinets && mapCabinets.length > 0) {
-      mapCabinets.forEach((cab: any) => {
-        const cabId = cab.properties?.cabinet_id
-        if (cabId) {
-          cabinetStatusMap.set(cabId, cab.properties?.status || 'active')
-        }
-      })
-    }
-    if (selectedCabinet?.cabinet_id) {
-      cabinetStatusMap.set(selectedCabinet.cabinet_id, selectedCabinet.status || 'active')
-    }
-
-    // Bản đồ Feeder -> Cabinet, Feeder status, power_state và control_mode
+    // Feeder -> Cabinet, sức khỏe (power_state), bật/tắt (lamp_state) và control_mode: đọc nguyên từ GET /assets/feeders
     const feederToCabinetMap = new Map<string, string>()
-    const feederStatusMap = new Map<string, string>()
-    const diagnosticLevels = buildFeederDiagnosticLevels(feederDiagnostics ?? [])
-    const feederPowerStateMap = new Map<string, string>()
+    const feederHealthMap = new Map<string, string>()
+    const feederLampMap = new Map<string, string>()
     const feederControlModeMap = new Map<string, string>()
+
+    if (selectedCabinet?.feeders && Array.isArray(selectedCabinet.feeders)) {
+      // GET /map/cabinets: power_state ở đây là bật/tắt (on/off/unknown), chỉ dùng khi danh sách feeder chưa có lamp_state
+      selectedCabinet.feeders.forEach((cf: any) => {
+        if (cf.feeder_id) {
+          if (cf.power_state) feederLampMap.set(cf.feeder_id, cf.power_state)
+          if (cf.control_mode) feederControlModeMap.set(cf.feeder_id, cf.control_mode)
+        }
+      })
+    }
 
     if (assetFeeders && assetFeeders.length > 0) {
       assetFeeders.forEach((fdr: any) => {
         if (fdr.feeder_id) {
           if (fdr.cabinet?.cabinet_id) {
             feederToCabinetMap.set(fdr.feeder_id, fdr.cabinet.cabinet_id)
-          } else if (fdr.cabinet_id) {
-            feederToCabinetMap.set(fdr.feeder_id, fdr.cabinet_id)
           }
-          if (fdr.power_state) {
-            feederPowerStateMap.set(fdr.feeder_id, fdr.power_state)
-          }
-          if (fdr.control?.control_mode) {
+          if (fdr.power_state) feederHealthMap.set(fdr.feeder_id, fdr.power_state)
+          if (fdr.lamp_state) feederLampMap.set(fdr.feeder_id, fdr.lamp_state)
+          if (fdr.control?.control_mode && !feederControlModeMap.has(fdr.feeder_id)) {
             feederControlModeMap.set(fdr.feeder_id, fdr.control.control_mode)
           }
-          if (fdr.status) {
-            feederStatusMap.set(fdr.feeder_id, fdr.status)
-          }
         }
       })
     }
 
-    if (selectedCabinet?.feeders && Array.isArray(selectedCabinet.feeders)) {
-      selectedCabinet.feeders.forEach((cf: any) => {
-        if (cf.feeder_id) {
-          if (cf.power_state) feederPowerStateMap.set(cf.feeder_id, cf.power_state)
-          if (cf.control_mode) feederControlModeMap.set(cf.feeder_id, cf.control_mode)
-        }
-      })
-    }
-
-    // Phân loại chỉ 2 màu:
-    // - Xanh lá cây (#10b981): Đang cấp điện bình thường (active)
-    // - Đỏ (#ef4444): Sự cố / Ngắt nguồn (fault) theo Tủ điện hoặc Feeder
+    // Màu đường chỉ theo power_state (sức khỏe); lamp_state = off thêm vạch trắng đứt (lớp feeder-lines-alert-off)
     const features = sourceEdges.map((feat: any) => {
       const p = feat.properties || {}
       const feederId = p.feeder_id
@@ -446,26 +412,9 @@ export function useFeederLinesLayer({
         (selectedCabinet?.cabinet_id === linkedCabinetId ? selectedCabinet.cabinet_name : null) ||
         (linkedCabinetId ? `Tủ ${linkedCabinetId}` : undefined)
 
-      const cabinetStatus = linkedCabinetId ? cabinetStatusMap.get(linkedCabinetId) : null
-      const feederStatus = feederId ? feederStatusMap.get(feederId) : null
-
-      const backendMode = feederId ? feederControlModeMap.get(feederId) : null
-      const powerState = feederId ? feederPowerStateMap.get(feederId) : null
-
-      const isFault =
-        p.status === 'fault' ||
-        feederStatus === 'fault' ||
-        cabinetStatus === 'fault' ||
-        (selectedCabinet?.cabinet_id &&
-          (selectedCabinet.cabinet_id === linkedCabinetId ||
-            selectedCabinet.cabinet_id === p.cabinet_id) &&
-          selectedCabinet.status === 'fault')
-
-      const { status: lineStatus, color: lineColor, glow: glowColor } = feederLineStyle(
-        Boolean(isFault),
-        powerState,
-        feederId ? diagnosticLevels.get(feederId) : null
-      )
+      const powerState = feederId ? feederHealthMap.get(feederId) : undefined
+      const lampState = feederId ? feederLampMap.get(feederId) : undefined
+      const health = feederHealthUi(powerState) ?? FEEDER_HEALTH_UI.unknown
 
       return {
         ...feat,
@@ -474,10 +423,10 @@ export function useFeederLinesLayer({
           cabinet_id: linkedCabinetId,
           cabinet_name: linkedCabinetName,
           power_state: powerState,
-          control_mode: backendMode,
-          status: lineStatus,
-          color: lineColor,
-          glow_color: glowColor,
+          lamp_state: lampState,
+          control_mode: feederId ? feederControlModeMap.get(feederId) : undefined,
+          color: health.color,
+          glow_color: health.glow,
         },
       }
     })
@@ -492,10 +441,7 @@ export function useFeederLinesLayer({
     selectedCabinet,
     cabinetTopologyEdges,
     allTopologyEdges,
-    mapCabinets,
-    assetCabinets,
     assetFeeders,
-    feederDiagnostics,
     selectedSegment,
   ])
 

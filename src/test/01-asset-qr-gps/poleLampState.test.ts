@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getPoleTooltipHtml } from '../../utils/gis-map/tooltipUtils'
 import type { PoleFeature } from '../../pages/gis-map/GisMapPage'
-import { FEEDER_LINE_UI, POLE_LAMP_UI, feederLineStyle, poleLampState } from '../../utils/gis-map/poleLampState'
+import { FEEDER_HEALTH_UI, POLE_LAMP_UI, feederHealthUi, feederLampLabel, poleLampState } from '../../utils/gis-map/poleLampState'
 
 describe('poleLampState', () => {
   it('normal follows the feeder: off → off, on → on, unknown → normal', () => {
@@ -30,18 +30,28 @@ describe('poleLampState', () => {
   })
 })
 
-describe('feederLineStyle', () => {
-  it('an OFF feeder is off, not a fault', () => {
-    expect(feederLineStyle(false, 'off').status).toBe('off')
-    expect(feederLineStyle(false, 'off').color).not.toBe(FEEDER_LINE_UI.fault.color)
+describe('feeder health / lamp labels', () => {
+  it('maps every power_state from the API, missing stays null', () => {
+    expect(feederHealthUi('normal')?.label).toBe('Bình thường')
+    expect(feederHealthUi('warning')?.label).toBe('Cảnh báo')
+    expect(feederHealthUi('incident')?.label).toBe('Sự cố')
+    expect(feederHealthUi('offline')?.label).toBe('Mất kết nối IoT')
+    expect(feederHealthUi('unknown')?.label).toBe('Chưa có IoT')
+    expect(feederHealthUi(undefined)).toBeNull()
+    // Giá trị bật/tắt cũ không phải sức khỏe mạch
+    expect(feederHealthUi('on')).toBeNull()
   })
 
-  it('a fault wins over any power_state; only on is green', () => {
-    expect(feederLineStyle(true, 'on').status).toBe('fault')
-    expect(feederLineStyle(true, 'off').status).toBe('fault')
-    expect(feederLineStyle(false, 'on').status).toBe('active')
-    expect(feederLineStyle(false, 'unknown').status).toBe('unknown')
-    expect(feederLineStyle(false, null).status).toBe('unknown')
+  it('five health colours are distinct', () => {
+    const colors = Object.values(FEEDER_HEALTH_UI).map((ui) => ui.color)
+    expect(new Set(colors).size).toBe(colors.length)
+  })
+
+  it('lamp_state labels; missing is "-"', () => {
+    expect(feederLampLabel('on')).toBe('Đang bật')
+    expect(feederLampLabel('off')).toBe('Đang tắt')
+    expect(feederLampLabel('unknown')).toBe('Chưa rõ')
+    expect(feederLampLabel(null)).toBe('-')
   })
 })
 
