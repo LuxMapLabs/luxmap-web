@@ -6,16 +6,15 @@ import {
   MapPin,
   User,
   FileText,
-  Upload,
-  FileCheck,
-  Trash2,
   Cpu,
   Wrench,
   Download,
-  ExternalLink,
+  Eye,
+  QrCode,
   ScanLine,
   ClipboardCheck,
   MapPinned,
+  Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { RootState } from '../../../redux/rootReducer'
@@ -30,6 +29,7 @@ import { extractSegmentId } from '../../../utils/work-schedule/poleUtils'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 import { LateNightScheduleWarning } from './LateNightScheduleWarning'
 import { iotAnomalyLabel } from '../../../constants/iot'
+import { usePoleQrLabelsPdf } from '../../../hooks/work-schedule/usePoleQrLabelsPdf'
 
 const PHASE_ICONS: Partial<Record<TaskKind, React.ReactNode>> = {
   survey: <ScanLine className="w-3.5 h-3.5" />,
@@ -74,20 +74,21 @@ interface CreateManualModalProps {
   }) => void
 }
 
-interface SelectedPdfFile {
-  id: string
-  rawFile: File
-}
-
 const getTodayStr = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+// Tải file về máy tính
+const downloadFile = (file: File) => {
+  const blobUrl = URL.createObjectURL(file)
+  const link = document.createElement('a')
+  link.href = blobUrl
+  link.download = file.name
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1500)
 }
 
 export const CreateManualModal: React.FC<CreateManualModalProps> = ({
@@ -106,6 +107,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
 }) => {
   const dispatch = useDispatch()
   const {
+    poles: storePoles,
     segments: storeSegments,
     cabinets: storeCabinets,
     isLoadingAssets,
@@ -120,7 +122,6 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   const [segment, setSegment] = useState('')
   const [selectedPoleIds, setSelectedPoleIds] = useState<string[]>(initialPoleIds || [])
   const [selectedFaultIds, setSelectedFaultIds] = useState<string[]>(initialFaultIds || [])
-  const [qrPdfFiles, setQrPdfFiles] = useState<SelectedPdfFile[]>([])
   const [assigneeId, setAssigneeId] = useState((assignees || [])[0]?.user_id || '')
   const [date, setDate] = useState(defaultDate || getTodayStr())
   const [notes, setNotes] = useState(initialNotes || '')
@@ -129,6 +130,9 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   const isPrefillAppliedRef = React.useRef(false)
   const prevSegmentRef = React.useRef(segment)
   const prevPhaseRef = React.useRef(initPhase)
+  // PDF tem QR đã tạo cho đúng bộ cột đang chọn: bản xem trước cũng là bản được đính kèm khi tạo sự vụ
+  const qrPdfCacheRef = React.useRef<{ key: string; file: File } | null>(null)
+  const { generate: generateQrLabelsPdf, isGenerating: isGeneratingQrPdf } = usePoleQrLabelsPdf()
 
   const segmentsList = useMemo(() => {
     if (storeSegments.length > 0) {
@@ -184,7 +188,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       setMaterialsNote('')
       setSelectedPoleIds(initialPoleIds && initialPoleIds.length > 0 ? initialPoleIds : [])
       setSelectedFaultIds(initialFaultIds && initialFaultIds.length > 0 ? initialFaultIds : [])
-      setQrPdfFiles([])
+      qrPdfCacheRef.current = null
       if (initialSegmentId && segmentsList.length > 0) {
         const found = segmentsList.find((s) => s.includes(initialSegmentId))
         if (found) {
@@ -223,107 +227,53 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
     if (prevSegmentRef.current !== segment || prevPhaseRef.current !== initPhase) {
       setSelectedPoleIds([])
       setSelectedFaultIds([])
-      if (prevPhaseRef.current !== initPhase && initPhase !== 'pole_gps_update') {
-        setQrPdfFiles([])
-      }
       prevSegmentRef.current = segment
       prevPhaseRef.current = initPhase
     }
   }, [segment, initPhase])
 
-  const handlePdfFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
+  // PDF tem QR luôn suy ra từ các cột đang chọn; chỉ tạo lại khi bộ cột hoặc tuyến thay đổi
+  const getQrLabelsPdf = async (): Promise<File | null> => {
+    const segmentId = extractSegmentId(segment)
+    const key = `${segmentId}|${[...selectedPoleIds].sort().join(',')}`
+    if (qrPdfCacheRef.current?.key === key) return qrPdfCacheRef.current.file
 
-    const MAX_FILES = 10
-    const MAX_BYTES = 20 * 1024 * 1024
-
-    const validPdfs = files.filter(
-      (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
-    )
-    if (validPdfs.length < files.length) {
-      toast.warning('Chỉ hỗ trợ đính kèm file định dạng PDF (.pdf).')
-    }
-
-    const sizeValidPdfs = validPdfs.filter((f) => f.size > 0 && f.size <= MAX_BYTES)
-    if (sizeValidPdfs.length < validPdfs.length) {
-      toast.warning('File PDF không được rỗng (0 byte) và mỗi file không vượt quá 20 MiB.')
-    }
-
-    const remainingSlots = Math.max(0, MAX_FILES - qrPdfFiles.length)
-    if (sizeValidPdfs.length > remainingSlots) {
-      toast.warning(`Tối đa ${MAX_FILES} file PDF cho mỗi lệnh cập nhật vị trí cột.`)
-    }
-
-    const accepted = sizeValidPdfs.slice(0, remainingSlots)
-    const mapped: SelectedPdfFile[] = accepted.map((file, idx) => ({
-      id: `${Date.now()}-${idx}-${file.name}`,
-      rawFile: file,
-    }))
-
-    setQrPdfFiles((prev) => [...prev, ...mapped])
-    e.target.value = ''
+    const file = await generateQrLabelsPdf({
+      poles: storePoles.filter((p) => p.pole_id && selectedPoleIds.includes(p.pole_id)),
+      segmentId,
+      segmentName: segment.split(' (')[0],
+    })
+    if (file) qrPdfCacheRef.current = { key, file }
+    return file
   }
 
-  const handleRemovePdfFile = (id: string) => {
-    setQrPdfFiles((prev) => prev.filter((item) => item.id !== id))
-  }
-
-  // Mở xem trước file PDF trong tab mới của trình duyệt
-  const handlePreviewPdfFile = (file: File) => {
-    const blobUrl = URL.createObjectURL(file)
-    const win = window.open(blobUrl, '_blank', 'noopener,noreferrer')
+  // Mở tab trống ngay khi bấm (còn trong thao tác người dùng nên không bị chặn popup), tạo PDF xong mới nạp vào
+  const handlePreviewQrPdf = async () => {
+    const win = window.open('', '_blank')
+    if (win) win.opener = null
+    const file = await getQrLabelsPdf()
+    if (!file) {
+      win?.close()
+      return
+    }
     if (!win) {
-      // Nếu trình duyệt chặn popup thì tự động tải xuống
-      handleDownloadPdfFile(file)
+      downloadFile(file)
+      return
     }
+    const blobUrl = URL.createObjectURL(file)
+    win.location.href = blobUrl
     window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
   }
 
-  // Tải file PDF đã đính kèm về máy tính để Quản lý kiểm tra
-  const handleDownloadPdfFile = (file: File) => {
-    const blobUrl = URL.createObjectURL(file)
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = file.name || 'Tem_QR.pdf'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1500)
-  }
-
-  // Nhận file PDF mã QR được tạo trực tiếp từ nút "In QR" trên từng cột hoặc nút gộp trong GpsPoleSelector
-  const handleAttachGeneratedQrPdfFile = (file: File) => {
-    const MAX_FILES = 10
-    setQrPdfFiles((prev) => {
-      // Nếu file cùng tên đã tồn tại thì ghi đè bản mới nhất để tránh trùng lặp
-      const existingIndex = prev.findIndex((item) => item.rawFile.name === file.name)
-      if (existingIndex >= 0) {
-        const next = [...prev]
-        next[existingIndex] = {
-          id: `${Date.now()}-replaced-${file.name}`,
-          rawFile: file,
-        }
-        return next
-      }
-      if (prev.length >= MAX_FILES) {
-        toast.warning(`Tối đa ${MAX_FILES} file PDF cho mỗi lệnh cập nhật vị trí cột.`)
-        return prev
-      }
-      return [
-        ...prev,
-        {
-          id: `${Date.now()}-gen-${file.name}`,
-          rawFile: file,
-        },
-      ]
-    })
+  const handleDownloadQrPdf = async () => {
+    const file = await getQrLabelsPdf()
+    if (file) downloadFile(file)
   }
 
   // Điều kiện vô hiệu hóa nút "+ Tạo sự vụ":
   // - Sửa chữa: Bắt buộc phải chọn ít nhất 01 sự cố
   // - Kiểm tra: Bắt buộc phải chọn ít nhất 01 cột có sự cố
-  // - Cập nhật vị trí cột: Bắt buộc chọn tuyến, ít nhất 01 cột và ít nhất 01 file PDF QR
+  // - Cập nhật vị trí cột: Bắt buộc chọn tuyến và ít nhất 01 cột (tem QR tự tạo khi bấm Tạo sự vụ)
   // - Khảo sát: Cho phép tạo bình thường vì đi rà quét tìm lỗi mới trên toàn tuyến
   const isPrefilledIotTarget = Boolean(
     initialIotTarget && selectedFaultIds.length > 0 && selectedPoleIds.length === 0
@@ -335,16 +285,16 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
   const isIotCabinetFault = isPrefilledIotTarget || isManualIotMode
 
   const isSubmitDisabled =
+    isGeneratingQrPdf ||
     (!isIotCabinetFault && !segment) ||
     (isManualIotMode && selectedFaultIds.length === 0) ||
     (initPhase === 'repair' && selectedFaultIds.length === 0) ||
     (initPhase === 'inspection' && !isIotCabinetFault && selectedPoleIds.length === 0) ||
-    (initPhase === 'pole_gps_update' &&
-      (selectedPoleIds.length === 0 || qrPdfFiles.length === 0))
+    (initPhase === 'pole_gps_update' && selectedPoleIds.length === 0)
 
   if (!isOpen) return null
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     const todayStr = getTodayStr()
@@ -370,15 +320,14 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       return
     }
 
+    let qrLabelsPdf: File | null = null
     if (initPhase === 'pole_gps_update') {
       if (selectedPoleIds.length === 0) {
         toast.warning('Vui lòng chọn ít nhất 01 cột cần cập nhật vị trí GPS!')
         return
       }
-      if (qrPdfFiles.length === 0) {
-        toast.warning('Vui lòng chọn ít nhất 01 file PDF chứa mã QR để gửi cho kỹ sư!')
-        return
-      }
+      qrLabelsPdf = await getQrLabelsPdf()
+      if (!qrLabelsPdf) return
     }
 
     const selectedAssignee = assignees.find((a) => a.user_id === assigneeId)
@@ -444,7 +393,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
       materialsNote: initPhase === 'repair' && materialsNote.trim() ? materialsNote.trim() : undefined,
       poleIds: isIotCabinetFault ? [] : selectedPoleIds,
       faultIds: selectedFaultIds,
-      qrPdfRawFiles: initPhase === 'pole_gps_update' ? qrPdfFiles.map((f) => f.rawFile) : undefined,
+      qrPdfRawFiles: qrLabelsPdf ? [qrLabelsPdf] : undefined,
     })
   }
 
@@ -727,11 +676,8 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 {initPhase === 'pole_gps_update' && (
                   <GpsPoleSelector
                     segmentId={extractSegmentId(segment)}
-                    segmentName={segment}
                     selectedPoleIds={selectedPoleIds}
                     onChange={setSelectedPoleIds}
-                    onAttachQrPdfFile={handleAttachGeneratedQrPdfFile}
-                    attachedFileNames={qrPdfFiles.map((f) => f.rawFile.name)}
                   />
                 )}
 
@@ -812,86 +758,51 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               />
             </div>
 
-            {/* File PDF chứa mã QR gửi xuống cho kỹ sư (riêng cho Cập nhật vị trí cột) */}
+            {/* Tem QR gửi kỹ sư (riêng cho Cập nhật vị trí cột): tự tạo từ các cột đã chọn, đính kèm khi bấm Tạo sự vụ */}
             {initPhase === 'pole_gps_update' && (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5 text-violet-600" />
-                  File PDF chứa mã QR của cột gửi cho kỹ sư (*):
+                  <QrCode className="w-3.5 h-3.5 text-violet-600" />
+                  Tem QR gửi kỹ sư:
                 </label>
-
-                <label className="border-2 border-dashed border-violet-300 hover:border-violet-500 bg-violet-50/40 hover:bg-violet-50/70 rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition text-center">
-                  <div className="w-9 h-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center">
-                    <Upload className="w-4 h-4" />
+                <div className="px-3 py-2.5 rounded-xl bg-violet-50/40 border border-violet-200 flex items-center justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-800">
+                      {selectedPoleIds.length > 0
+                        ? `Tem QR · ${selectedPoleIds.length} cột`
+                        : 'Chưa chọn cột nào'}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {isGeneratingQrPdf
+                        ? 'Đang tạo file PDF tem QR...'
+                        : 'Tự tạo từ các cột đã chọn và đính kèm vào phiếu khi bấm Tạo sự vụ'}
+                    </div>
                   </div>
-                  <span className="text-xs font-extrabold text-slate-800">
-                    Bấm để chọn file PDF mã QR của cột
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    Hỗ trợ chọn 1 hoặc nhiều file .pdf
-                  </span>
-                  <input
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    multiple
-                    onChange={handlePdfFilesChange}
-                    className="hidden"
-                  />
-                </label>
-
-                {qrPdfFiles.length > 0 && (
-                  <div className="flex flex-col gap-1.5">
-                    {qrPdfFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="px-3 py-2 rounded-xl bg-white border border-violet-200 flex items-center justify-between gap-2 text-xs shadow-2xs"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handlePreviewPdfFile(file.rawFile)}
-                          className="flex items-center gap-2 min-w-0 text-left group cursor-pointer"
-                          title="Bấm để mở xem trước file PDF trong tab mới"
-                        >
-                          <FileCheck className="w-4 h-4 text-violet-600 shrink-0" />
-                          <span className="font-bold text-slate-800 group-hover:text-violet-700 group-hover:underline truncate">
-                            {file.rawFile.name}
-                          </span>
-                          <span className="text-[10px] text-slate-400 shrink-0">
-                            ({formatFileSize(file.rawFile.size)})
-                          </span>
-                        </button>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handlePreviewPdfFile(file.rawFile)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-violet-700 hover:text-violet-900 bg-violet-50 hover:bg-violet-100 rounded-lg transition cursor-pointer"
-                            title="Mở xem trước file PDF"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Xem</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadPdfFile(file.rawFile)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer"
-                            title="Tải file PDF về máy"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Tải về</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePdfFile(file.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                            title="Xóa file"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handlePreviewQrPdf}
+                      disabled={selectedPoleIds.length === 0 || isGeneratingQrPdf}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-violet-700 hover:text-violet-900 bg-white hover:bg-violet-100 border border-violet-200 rounded-lg transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGeneratingQrPdf ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5" />
+                      )}
+                      <span>Xem trước</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadQrPdf}
+                      disabled={selectedPoleIds.length === 0 || isGeneratingQrPdf}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-violet-700 hover:text-violet-900 bg-white hover:bg-violet-100 border border-violet-200 rounded-lg transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Tải về</span>
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -946,7 +857,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                   : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer active:scale-98'
               }`}
             >
-              + Tạo sự vụ
+              {isGeneratingQrPdf ? 'Đang tạo tem QR...' : '+ Tạo sự vụ'}
             </button>
           </div>
         </form>
