@@ -651,6 +651,8 @@ export const ElectricalHistoryChart: React.FC<{
                     allowDataOverflow
                     height={34}
                     tick={<ElectricalXAxisTick firstTick={xTicks[0]} />}
+                    // Cho Recharts đo độ rộng nhãn theo chữ giờ "HH:mm" thay vì số ms thô, để không bỏ bớt nhãn.
+                    tickFormatter={(v: number) => formatRecentAxisTick(v, false).clock}
                     minTickGap={24}
                     stroke="#94a3b8"
                     fontSize={10}
