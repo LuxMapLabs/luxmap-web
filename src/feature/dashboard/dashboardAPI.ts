@@ -3,6 +3,7 @@ import type { FixtureStatusStatistics } from '../../types/statistics/fixture-sta
 import type { RepairTimelinessStatistics } from '../../types/statistics/repair-timeliness'
 import type { WarrantyList, WarrantyItem } from '../../types/statistics/warranty'
 import type { CitizenFeedbackStatistics } from '../../types/statistics/citizen-feedback'
+import type { CitizenScreeningStatistics } from '../../types/statistics/citizen-screening'
 import type { WorkOrderStatusStatistics } from '../../types/statistics/work-orders'
 import type { FaultItem, FaultItemPagedResult } from '../../types/faults/faults'
 
@@ -207,6 +208,30 @@ export async function fetchCitizenFeedbackStatistics(params: {
   } catch (error) {
     console.warn('[DashboardAPI] Fetch citizen feedback failed:', error)
     return { as_of: new Date().toISOString(), group_by: [], rows: [] }
+  }
+}
+
+/**
+ * 5b. CV ON/OFF sàng lọc báo cáo QR của người dân (drift ST-14)
+ * GET /api/v1/statistics/citizen-screening — chỉ đọc gợi ý đã lưu, không chạy model.
+ * Trả `null` khi lỗi để khối dashboard báo "không tải được" thay vì hiện toàn số 0.
+ */
+export async function fetchCitizenScreeningStatistics(params: {
+  segment_id?: string
+  from?: string
+  to?: string
+}): Promise<CitizenScreeningStatistics | null> {
+  try {
+    const cleanParams: Record<string, string> = {}
+    if (params.segment_id) cleanParams.segment_id = params.segment_id
+    if (params.from) cleanParams.from = params.from
+    if (params.to) cleanParams.to = params.to
+
+    const res = await apiClient.get<CitizenScreeningStatistics>('/statistics/citizen-screening', { params: cleanParams })
+    return res.data?.sources ? res.data : null
+  } catch (error) {
+    console.warn('[DashboardAPI] Fetch citizen screening failed:', error)
+    return null
   }
 }
 

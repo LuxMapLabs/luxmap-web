@@ -7,6 +7,8 @@ export type AgendaFlag = 'in_progress' | 'scheduled_tonight' | 'carried_over' | 
 
 export type CancellationRequestStatus = 'none' | 'pending' | 'rejected'
 
+export type CitizenClaim = 'lamp_out' | 'lamp_dim' | 'other'
+
 export type CitizenPhotoHint = 'lamp_on' | 'lamp_off' | 'inconclusive'
 
 export type CitizenReportKind = 'lamp_out' | 'lamp_dim' | 'pole_damaged' | 'other'

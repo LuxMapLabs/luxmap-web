@@ -6,6 +6,7 @@ import {
   fetchFaultsList,
   fetchFixtureStatusStatistics,
   fetchDashboardPoles,
+  fetchCitizenScreeningStatistics,
 } from './dashboardAPI'
 import type { SegmentListItem } from '../../types/assets/segments'
 import type { WarrantyList } from '../../types/statistics/warranty'
@@ -16,6 +17,8 @@ import type { IotDiagnosticSummaryItem } from '../../types/iot/diagnostics'
 import type { IotServerStatus } from '../../types/iot/servers'
 import type { IotFeederHistorySample, IotFeederHistoryResult } from '../../types/iot/feeders'
 import type { RootState } from '../../redux/store'
+import type { CitizenScreeningStatistics } from '../../types/statistics/citizen-screening'
+import { screeningWindow } from '../../utils/dashboard/citizenScreening'
 import iotAPI from '../iot/iotAPI'
 import {
   fetchDashboardDataRequest,
@@ -27,6 +30,8 @@ import {
   updateFaultsListSuccess,
   fetchFeederHistoryRequest,
   fetchFeederHistorySuccess,
+  fetchCitizenScreeningRequest,
+  fetchCitizenScreeningSuccess,
 } from './dashboardSlice'
 
 const ALL_FAULT_DATA_SOURCES = 'field,public_imagery,simulated,calibration_rig'
@@ -175,9 +180,18 @@ function* handleFetchFeederHistory(action: ReturnType<typeof fetchFeederHistoryR
   }
 }
 
+function* handleFetchCitizenScreening(action: ReturnType<typeof fetchCitizenScreeningRequest>) {
+  const stats: CitizenScreeningStatistics | null = yield call(fetchCitizenScreeningStatistics, {
+    ...screeningWindow(new Date()),
+    segment_id: action.payload ?? undefined,
+  })
+  yield put(fetchCitizenScreeningSuccess(stats))
+}
+
 export default function* dashboardSaga() {
   yield takeLatest(fetchDashboardDataRequest.type, handleFetchDashboardData)
   yield takeLatest(fetchDashboardIotRequest.type, handleFetchDashboardIot)
   yield takeLatest(setIncludeCalibrationRig.type, handleToggleCalibrationRig)
   yield takeLatest(fetchFeederHistoryRequest.type, handleFetchFeederHistory)
+  yield takeLatest(fetchCitizenScreeningRequest.type, handleFetchCitizenScreening)
 }
