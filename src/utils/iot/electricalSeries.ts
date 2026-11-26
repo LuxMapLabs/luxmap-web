@@ -687,5 +687,19 @@ export function electricalYAxisScale(
   return { domain: [ticks[0], ticks[ticks.length - 1]], ticks, digits }
 }
 
+/** Độ trễ từ lúc đo tới lúc hệ thống nhận: `14 giây`, `3 phút 5 giây`, `2 giờ 10 phút`. */
+export function formatReceiveDelay(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000))
+  if (total < 60) return `${total} giây`
+  const minutes = Math.floor(total / 60)
+  if (minutes < 60) {
+    const seconds = total % 60
+    return seconds === 0 ? `${minutes} phút` : `${minutes} phút ${seconds} giây`
+  }
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest === 0 ? `${hours} giờ` : `${hours} giờ ${rest} phút`
+}
+
 export const formatMetric = (value: number | null, metric: ElectricalMetric) =>
   value !== null ? `${value.toFixed(ELECTRICAL_METRICS[metric].digits)} ${ELECTRICAL_METRICS[metric].unit}` : '—'

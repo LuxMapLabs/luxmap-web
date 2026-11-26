@@ -26,6 +26,7 @@ import {
   electricalTickStepForWindow,
   electricalYAxisScale,
   findBackfillRanges,
+  formatReceiveDelay,
   formatRecentAxisTick,
   formatWindowDuration,
   insertElectricalGaps,
@@ -129,6 +130,16 @@ const formatSpan = (from: number | null, to: number | null) => {
   return `${fullDateTime(from)} – ${pad2(end.getHours())}:${pad2(end.getMinutes())}:${pad2(end.getSeconds())}`
 }
 
+/** Khoảng giờ của một ô gom: `từ 15:10:11 đến 15:14:37` (ngày đã có ở đầu tooltip); thiếu → '-'. */
+const formatClockRange = (from: number | null, to: number | null) => {
+  if (from === null || to === null) return '-'
+  const clock = (t: number) => {
+    const d = new Date(t)
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+  }
+  return from === to ? `lúc ${clock(from)}` : `từ ${clock(from)} đến ${clock(to)}`
+}
+
 const CustomTooltip: React.FC<{
   active?: boolean
   payload?: Array<{ payload: ChartDataPoint }>
@@ -149,7 +160,7 @@ const CustomTooltip: React.FC<{
   } else {
     const endD = new Date(point.time + bucketMs)
     const endTimeStr = `${pad2(endD.getHours())}:${pad2(endD.getMinutes())}`
-    timeDisplay = `${dateStr} ${timeStr} – ${endTimeStr}`
+    timeDisplay = `${dateStr} ${timeStr} – ${endTimeStr} · gom ${formatWindowDuration(bucketMs)}`
   }
 
   const val = point[metric]
@@ -165,25 +176,39 @@ const CustomTooltip: React.FC<{
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs p-2.5 shadow-lg text-xs space-y-1 z-50">
       <p className="font-mono text-slate-500 dark:text-slate-400 font-semibold">{timeDisplay}</p>
       <p className="font-semibold text-slate-800 dark:text-slate-100">
-        {point.count <= 1 ? 'Giá trị' : 'Trung bình'}: <span className="font-mono">{valStr}</span>
+        {point.count <= 1 ? 'Giá trị' : `Trung bình ${point.count} mẫu`}: <span className="font-mono">{valStr}</span>
       </p>
-      <p className="text-slate-600 dark:text-slate-300">
-        Giờ đo: <span className="font-mono">{formatSpan(point.measuredFrom, point.measuredTo)}</span>
-      </p>
-      <p className="text-slate-600 dark:text-slate-300">
-        Giờ nhận: <span className="font-mono">{formatSpan(point.receivedFrom, point.receivedTo)}</span>
-      </p>
+      {point.count > 1 && minMaxStr && (
+        <p className="text-slate-600 dark:text-slate-300">
+          Thấp – cao: <span className="font-mono">{minMaxStr}</span>
+        </p>
+      )}
+      {point.count <= 1 ? (
+        <>
+          <p className="text-slate-600 dark:text-slate-300">
+            Giờ đo: <span className="font-mono">{formatSpan(point.measuredFrom, point.measuredTo)}</span>
+          </p>
+          <p className="text-slate-600 dark:text-slate-300">
+            Giờ nhận: <span className="font-mono">{formatSpan(point.receivedFrom, point.receivedTo)}</span>
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-slate-600 dark:text-slate-300">
+            Giờ đo: {formatClockRange(point.measuredFrom, point.measuredTo)}
+          </p>
+          <p className="text-slate-600 dark:text-slate-300">
+            Giờ nhận: {formatClockRange(point.receivedFrom, point.receivedTo)}
+          </p>
+        </>
+      )}
       {point.backfillCount > 0 && (
         <p className="font-semibold" style={{ color: BACKFILL_COLOR }}>
           {point.count <= 1
-            ? `${BACKFILL_LABEL} (node mất kết nối, gửi lại sau)`
-            : `${point.backfillCount}/${point.count} mẫu là ${BACKFILL_LABEL.toLowerCase()}`}
-        </p>
-      )}
-      {point.count > 1 && (
-        <p className="text-slate-600 dark:text-slate-300">
-          {minMaxStr && <>Dao động: <span className="font-mono">{minMaxStr}</span> · </>}
-          <span>{point.count} mẫu</span>
+            ? point.measuredFrom !== null && point.receivedFrom !== null
+              ? `${BACKFILL_LABEL} · đã nhận, trễ ${formatReceiveDelay(point.receivedFrom - point.measuredFrom)}`
+              : `${BACKFILL_LABEL} · đã nhận`
+            : `${point.backfillCount}/${point.count} mẫu là ${BACKFILL_LABEL.toLowerCase()}, đã nhận`}
         </p>
       )}
     </div>
