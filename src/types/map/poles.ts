@@ -30,6 +30,8 @@ export interface PoleMapDetail {
     luminance_baseline?: PoleMapBaseline
     luminance_baselines: PoleMapBaseline[]
     luminance_history: PoleMapHistoryPoint[]
+    stationary_luminance_baseline?: PoleMapStationaryBaseline
+    stationary_luminance_history?: PoleMapStationaryPoint[]
     runtime_history: PoleMapRuntimePoint[]
     open_faults: PoleMapOpenFault[]
     recent_frames: PoleMapFrame[]
@@ -94,6 +96,26 @@ export interface PoleMapRuntimePoint {
     on_at?: string | null
     off_at?: string | null
     source: string | null
+}
+
+export interface PoleMapStationaryBaseline {
+    value?: number
+    member_count?: number
+    member_cv?: number
+    stable?: boolean
+    computed_at?: string | null
+}
+
+export interface PoleMapStationaryPoint {
+    lux_id: string | null
+    photo_id: string | null
+    measured_at?: string | null
+    lux_value?: number
+    baseline_ratio?: number
+    classified_as?: FixtureStatus
+    dim_threshold_ratio?: number
+    expected_ratio?: number
+    reason_codes: string[]
 }
 
 export interface PoleMapStatus {

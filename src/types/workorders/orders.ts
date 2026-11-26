@@ -196,6 +196,9 @@ export interface PolePhotoItem {
     lux_id?: string | null
     lux_value?: number
     lux_measured_at?: string | null
+    lux_classified_as?: string | null
+    lux_baseline_ratio?: number
+    lux_reason_codes?: string[]
 }
 
 export interface PolePhotoItemPagedResult {

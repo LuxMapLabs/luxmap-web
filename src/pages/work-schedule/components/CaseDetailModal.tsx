@@ -44,6 +44,8 @@ import { formatSegmentDisplay } from '../../../utils/work-schedule/workScheduleU
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import { faultAPI } from '../../../feature/faults/faultAPI'
 import { EvidenceImage } from './EvidenceImage'
+import LuxVerdictBadge from './LuxVerdictBadge'
+import { luxAwaitingVerdict, luxVerdict } from '../../../utils/work-schedule/luxVerdict'
 
 interface CaseDetailModalProps {
   isOpen: boolean
@@ -1480,6 +1482,12 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                 : surveyPolePhotos.length > 0
                                 ? 'Không phát hiện cột mất sáng'
                                 : 'Toàn tuyến'}
+                              {(() => {
+                                const dimCount = surveyPolePhotos.filter(
+                                  (p) => p.decision === 'confirm' && luxVerdict(p)?.tone === 'dim'
+                                ).length
+                                return dimCount > 0 ? ` · ${dimCount} cột mờ` : null
+                              })()}
                             </span>
                           </div>
                         </div>
@@ -1497,6 +1505,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                 const isNormal = effectiveState === 'on'
                                 const isRejected = photo.decision === 'reject'
                                 const isConfirmed = photo.decision === 'confirm'
+                                const isDim = !isRejected && luxVerdict(photo)?.tone === 'dim'
                                 const isEngineerOverride = Boolean(
                                   photo.final_cv_state &&
                                     photo.cv_state &&
@@ -1528,6 +1537,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                         ? 'bg-slate-100/80 border-slate-300 opacity-75'
                                         : isOut
                                         ? 'bg-rose-50/70 border-rose-200/90'
+                                        : isDim
+                                        ? 'bg-orange-50/80 border-orange-300/90'
                                         : isNormal
                                         ? 'bg-emerald-50/70 border-emerald-200/90'
                                         : 'bg-amber-50/70 border-amber-200/90'
@@ -1550,6 +1561,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                             ☀ {photo.lux_value.toFixed(1)} lux
                                           </span>
                                         )}
+                                        {!isRejected && <LuxVerdictBadge photo={photo} />}
                                         {aiStateLabel && (
                                           <span className="px-1.5 py-0.5 bg-white/90 text-slate-600 border border-slate-200 font-semibold text-[10px] rounded-md">
                                             {aiStateLabel}
@@ -1598,7 +1610,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                                           {isOut
                                             ? 'Kỹ sư: Mất sáng (Cần kiểm tra)'
                                             : isNormal
-                                            ? 'Kỹ sư: Đèn sáng bình thường'
+                                            ? 'Kỹ sư: Đèn bật'
                                             : 'Chưa chốt trạng thái (Cần yêu cầu làm lại)'}
                                         </span>
                                       </div>
@@ -1701,21 +1713,17 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
 
                     {/* Đo độ rọi Luxmeter từ cảm biến BLE hiện trường (nếu có) */}
                     {(() => {
-                      const luxValues = surveyPolePhotos
-                        .filter((p) => p.decision !== 'reject' && typeof p.lux_value === 'number')
-                        .map((p) => p.lux_value as number)
-                      if (luxValues.length > 0) {
-                        const avgLux =
-                          luxValues.reduce((acc, v) => acc + v, 0) / luxValues.length
-                        const minLux = Math.min(...luxValues)
-                        const maxLux = Math.max(...luxValues)
+                      // Lux chỉ so từng cột với baseline của chính nó (D-R29): không gộp trung bình giữa các cột.
+                      const reported = surveyPolePhotos.filter((p) => p.decision !== 'reject')
+                      const measured = reported.filter((p) => typeof p.lux_value === 'number')
+                      if (measured.length > 0) {
+                        const awaiting = measured.filter(luxAwaitingVerdict).length
                         return (
                           <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs flex items-center justify-between flex-wrap gap-2">
-                            <span className="font-semibold text-slate-700">
-                              ☀ Độ rọi đo thực địa (ESP32C3_LUX tại {luxValues.length} cột):
-                            </span>
+                            <span className="font-semibold text-slate-700">☀ Số đo lux thực địa:</span>
                             <span className="font-black text-blue-800 font-mono bg-blue-100 px-2.5 py-0.5 rounded-md">
-                              TB: {avgLux.toFixed(1)} lux (Min {minLux.toFixed(1)} – Max {maxLux.toFixed(1)} lux)
+                              {measured.length}/{reported.length} ảnh có số đo
+                              {awaiting > 0 ? ` · ${awaiting} số đo chưa đánh giá được độ sáng` : ''}
                             </span>
                           </div>
                         )
