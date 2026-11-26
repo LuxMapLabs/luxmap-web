@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Activity, Minus } from 'lucide-react'
-import { FEEDER_LINE_UI, POLE_LAMP_UI, type FeederLineStatus, type PoleLampState } from '../../../utils/gis-map/poleLampState'
+import { FEEDER_HEALTH_UI, POLE_LAMP_UI, type PoleLampState } from '../../../utils/gis-map/poleLampState'
+import type { FeederHealthState } from '../../../types/common/enums'
 
 // Thứ tự chú giải cột: 'on' và 'normal' cùng màu nên gộp một dòng
 const LEGEND_POLES: { status: PoleLampState; label: string }[] = [
@@ -15,7 +16,7 @@ const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   <div className="col-span-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{children}</div>
 )
 
-const LEGEND_LINES: FeederLineStatus[] = ['active', 'off', 'fault', 'warn', 'unknown']
+const LEGEND_LINES: FeederHealthState[] = ['normal', 'warning', 'incident', 'offline', 'unknown']
 
 interface PoleLegendIconProps {
   status: PoleLampState
@@ -221,13 +222,13 @@ export const GisMapLegend: React.FC = () => {
           <div key={status} className="flex items-center gap-2">
             <span
               className="w-4 h-[3px] rounded-full shrink-0 ring-1 ring-slate-400/70"
-              style={{ background: FEEDER_LINE_UI[status].color }}
+              style={{ background: FEEDER_HEALTH_UI[status].color }}
             />
-            <span className="font-medium text-slate-700">{FEEDER_LINE_UI[status].label}</span>
+            <span className="font-medium text-slate-700">{FEEDER_HEALTH_UI[status].label}</span>
           </div>
         ))}
         <div className="col-span-2 w-0 min-w-full text-[10.5px] text-slate-500 leading-snug">
-          Sự cố / Cảnh báo có vạch trắng đứt: mạch đang tắt. Không có vạch: mạch đang bật hoặc chưa rõ.
+          Màu: sức khỏe mạch. Vạch trắng đứt: mạch đang tắt. Không có vạch: mạch đang bật hoặc chưa rõ.
         </div>
 
         <div className="col-span-2 border-t border-slate-200 mt-1" />

@@ -12,7 +12,6 @@ import {
   type SearchResultItem,
 } from '../../utils/gis-map/gisSearchUtils'
 import { fetchMapLayersRequest } from '../../feature/map/mapSlice'
-import { refreshFeederDiagnosticsRequest } from '../../feature/map/mapSlice'
 import { fetchAssetsRequest, refreshFeedersRequest } from '../../feature/assets/assetSlice'
 import { fetchDashboardDataRequest } from '../../feature/dashboard/dashboardSlice'
 import { toBboxParam } from '../../utils/gis-map/mapUtils'
@@ -54,7 +53,6 @@ export function useElectricalCascade({
   const boundsKey = useSelector((state: RootState) => toBboxParam(state.auth.user?.map_bounds?.bbox) ?? '')
   useEffect(() => {
     dispatch(fetchMapLayersRequest())
-    dispatch(refreshFeederDiagnosticsRequest())
   }, [dispatch, boundsKey])
 
   // Giữ màu chấm cột / mạch đúng với trạng thái mới: làm mới nền định kỳ khi tab đang mở (không bật loading, không chớp map)
@@ -64,10 +62,7 @@ export function useElectricalCascade({
       if (visible()) dispatch(refreshFeedersRequest())
     }, GIS_FEEDER_REFRESH_MS)
     const mapTimer = window.setInterval(() => {
-      if (visible()) {
-        dispatch(fetchMapLayersRequest())
-        dispatch(refreshFeederDiagnosticsRequest())
-      }
+      if (visible()) dispatch(fetchMapLayersRequest())
     }, GIS_MAP_REFRESH_MS)
     return () => {
       window.clearInterval(feederTimer)
@@ -155,8 +150,9 @@ export function useElectricalCascade({
           ...p,
           external_ref: externalRef,
           feeder_id: feederId,
-          // Cùng nguồn với màu đường feeder (useFeederLinesLayer đọc /assets/feeders) để cột và đường không lệch nhau
-          power_state: assetFeeder?.power_state ?? p.power_state,
+          // Bật/tắt của mạch: lamp_state cùng nguồn với đường feeder (/assets/feeders) để cột và đường không lệch nhau.
+          // power_state của /assets/feeders là sức khỏe mạch, KHÔNG dùng cho cột.
+          power_state: assetFeeder?.lamp_state ?? p.power_state,
           feeder_external_ref: feederExternalRef,
           feeder_name: feederName,
           cabinet_id: rawCabinetId,

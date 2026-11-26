@@ -27,6 +27,8 @@ export type FaultType = 'lamp_out' | 'lamp_dim' | 'segment_outage' | 'node_offli
 
 export type FeederControlMode = 'on' | 'off' | 'auto'
 
+export type FeederHealthState = 'unknown' | 'normal' | 'warning' | 'incident' | 'offline'
+
 export type FeederPowerState = 'unknown' | 'on' | 'off'
 
 export type FixtureStatus = 'normal' | 'dim' | 'out' | 'unknown'

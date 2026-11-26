@@ -4,8 +4,6 @@ import type { MapBounds } from '../../types/auth/me'
 import { toBboxParam } from '../../utils/gis-map/mapUtils'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import mapAPI from './mapAPI'
-import iotAPI from '../iot/iotAPI'
-import type { IotDiagnosticSummaryItem } from '../../types/iot/diagnostics'
 import type {
   CabinetPropertiesFeatureCollection,
   CabinetTopology,
@@ -27,8 +25,6 @@ import {
   fetchPoleDetailRequest,
   fetchPoleDetailSuccess,
   fetchPoleDetailFailure,
-  refreshFeederDiagnosticsRequest,
-  refreshFeederDiagnosticsSuccess,
 } from './mapSlice'
 
 /**
@@ -165,29 +161,7 @@ function* handleFetchCommuneBoundaries() {
   }
 }
 
-const DIAGNOSTICS_PAGE_SIZE = 200
-const DIAGNOSTICS_MAX_PAGES = 10
-
-export function* handleRefreshFeederDiagnostics() {
-  try {
-    const items: IotDiagnosticSummaryItem[] = []
-    for (let page = 1; page <= DIAGNOSTICS_MAX_PAGES; page++) {
-      const res: Awaited<ReturnType<typeof iotAPI.getDiagnosticsSummary>> = yield call(iotAPI.getDiagnosticsSummary, {
-        page,
-        page_size: DIAGNOSTICS_PAGE_SIZE,
-      })
-      const pageItems = res.items ?? []
-      items.push(...pageItems)
-      if (pageItems.length < DIAGNOSTICS_PAGE_SIZE || items.length >= (res.total ?? 0)) break
-    }
-    yield put(refreshFeederDiagnosticsSuccess(items))
-  } catch {
-    // Chạy ngầm: giữ dữ liệu cũ, không toast
-  }
-}
-
 export default function* mapSaga() {
-  yield takeLatest(refreshFeederDiagnosticsRequest.type, handleRefreshFeederDiagnostics)
   yield takeLatest(fetchCommuneBoundariesRequest.type, handleFetchCommuneBoundaries)
   yield takeLatest(fetchMapLayersRequest.type, handleFetchMapLayers)
   yield takeLatest(fetchCabinetTopologyRequest.type, handleFetchCabinetTopology)
