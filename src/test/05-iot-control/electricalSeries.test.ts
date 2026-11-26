@@ -19,6 +19,7 @@ import {
   toElectricalPoint,
   findBackfillRanges,
   isLoneBackfill,
+  formatReceiveDelay,
   type ElectricalPoint,
 } from '../../utils/iot/electricalSeries'
 
@@ -140,6 +141,16 @@ describe('electricalSeries', () => {
       expect(isLoneBackfill(s, 1)).toBe(false)
       expect(isLoneBackfill(s, 3)).toBe(true)
       expect(isLoneBackfill(s, 9)).toBe(false)
+    })
+  })
+
+  describe('formatReceiveDelay (độ trễ nhận mẫu gửi bù)', () => {
+    it('giây, phút, giờ', () => {
+      expect(formatReceiveDelay(14_000)).toBe('14 giây')
+      expect(formatReceiveDelay(180_000)).toBe('3 phút')
+      expect(formatReceiveDelay(185_000)).toBe('3 phút 5 giây')
+      expect(formatReceiveDelay(2 * 3_600_000 + 600_000)).toBe('2 giờ 10 phút')
+      expect(formatReceiveDelay(-5_000)).toBe('0 giây')
     })
   })
 
