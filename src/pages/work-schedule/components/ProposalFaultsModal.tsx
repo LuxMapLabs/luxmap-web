@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { faultAPI } from '../../../feature/faults/faultAPI'
 import type { FaultItem } from '../../../types/faults/faults'
+import { iotAnomalyLabel } from '../../../constants/iot'
 
 interface ProposalFaultsModalProps {
   isOpen: boolean
@@ -260,19 +261,42 @@ export const ProposalFaultsModal: React.FC<ProposalFaultsModalProps> = ({
                   key={f.fault_id || idx}
                   className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-ops transition space-y-3"
                 >
-                  {/* Hàng 1: Mã lỗi, Mã cột, Mức nghiêm trọng */}
+                  {/* Hàng 1: Mã lỗi, Mã cột hoặc Thiết bị IoT, Mức nghiêm trọng */}
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-700 font-mono text-[11px] font-bold flex items-center justify-center">
                         #{idx + 1}
                       </span>
                       <strong className="font-mono text-xs font-extrabold text-slate-900">
                         {f.fault_id}
                       </strong>
-                      <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60">
-                        <MapPin className="w-3 h-3 text-teal-600" />
-                        Cột {f.pole_id || 'Chưa gán'}
-                      </span>
+                      {f.pole_id ? (
+                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60">
+                          <MapPin className="w-3 h-3 text-teal-600" />
+                          Cột {f.pole_id}
+                        </span>
+                      ) : f.origin_node_id || f.cabinet_id || f.feeder_id ? (
+                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/80">
+                          <Cpu className="w-3 h-3 text-indigo-600" />
+                          {[
+                            f.origin_node_id && `Node ${f.origin_node_id}`,
+                            f.cabinet_id && `Tủ ${f.cabinet_id}`,
+                            f.feeder_id && `Mạch ${f.feeder_id}`,
+                          ]
+                            .filter(Boolean)
+                            .join(' • ')}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60">
+                          <MapPin className="w-3 h-3 text-teal-600" />
+                          Cột Chưa gán
+                        </span>
+                      )}
+                      {f.recovered_at && (
+                        <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Đã tự phục hồi
+                        </span>
+                      )}
                     </div>
 
                     <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${sevBadge.className}`}>
@@ -282,11 +306,16 @@ export const ProposalFaultsModal: React.FC<ProposalFaultsModalProps> = ({
 
                   {/* Hàng 2: Hiện trạng & Nguồn phát hiện */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-slate-400 font-medium shrink-0">Loại lỗi:</span>
                       <span className={`px-2 py-0.5 rounded-md font-semibold border text-[11px] ${typeInfo.bg}`}>
                         {typeInfo.label}
                       </span>
+                      {f.iot_anomaly_code && (
+                        <span className="px-2 py-0.5 rounded-md font-semibold border text-[11px] bg-amber-50 text-amber-800 border-amber-200">
+                          {iotAnomalyLabel(f.iot_anomaly_code)}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">

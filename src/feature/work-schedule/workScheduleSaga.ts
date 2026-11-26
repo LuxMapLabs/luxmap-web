@@ -414,7 +414,14 @@ function* handleFollowUpWorkOrder(
       yield call([workScheduleAPI, workScheduleAPI.confirmAllPendingPolePhotos], parentWorkOrderId)
     }
 
-    yield call(workScheduleAPI.followUpWorkOrder, parentWorkOrderId, payload)
+    const followUpDetail: WorkOrderDetail = yield call(
+      workScheduleAPI.followUpWorkOrder,
+      parentWorkOrderId,
+      payload
+    )
+    if (followUpDetail && followUpDetail.work_order_id) {
+      yield put(fetchWorkOrderDetailSuccess(followUpDetail))
+    }
     yield put(followUpWorkOrderSuccess())
     yield put(closeCaseDetail())
     toast.success(`✓ Đã mở tiếp ${nextPhaseLabel || 'giai đoạn tiếp theo'} cho mã lệnh công tác trên máy chủ!`)

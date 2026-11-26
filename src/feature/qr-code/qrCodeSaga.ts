@@ -15,6 +15,9 @@ import {
   fetchQrCodesRequest,
   fetchQrCodesSuccess,
   fetchQrCodesFailure,
+  ensurePoleQrCodesRequest,
+  ensurePoleQrCodesSuccess,
+  ensurePoleQrCodesFailure,
 } from './qrCodeSlice'
 import type {
   IssueQrCodeRequest,
@@ -112,9 +115,57 @@ function* handleFetchQrCodes(action: PayloadAction<QrCodeListQuery | undefined>)
   }
 }
 
+/**
+ * Worker: Đảm bảo các cột đèn được chọn đều có mã QR active (nếu chưa có thì tự động cấp mới)
+ */
+function* handleEnsurePoleQrCodes(
+  action: PayloadAction<{ batchId: string; poleIds: string[] }>
+) {
+  const { batchId, poleIds } = action.payload
+  try {
+    const itemsByPoleId: Record<string, QrCodeItem> = {}
+    for (const poleId of poleIds) {
+      if (!poleId) continue
+      const listRes: QrCodeItemPagedResult = yield call(qrCodeAPI.getQrCodes, {
+        pole_id: poleId,
+        active: true,
+        page: 1,
+        page_size: 1,
+      })
+
+      if (listRes.items && listRes.items.length > 0 && listRes.items[0]?.url) {
+        itemsByPoleId[poleId] = listRes.items[0]
+      } else {
+        const issued: QrCodeItem = yield call(qrCodeAPI.issueQrCode, {
+          pole_id: poleId,
+        })
+        if (issued && issued.url) {
+          itemsByPoleId[poleId] = issued
+        }
+      }
+    }
+
+    yield put(
+      ensurePoleQrCodesSuccess({
+        batchId,
+        itemsByPoleId,
+      })
+    )
+  } catch (error: unknown) {
+    const errObj = error as { response?: { data?: { message?: string } }; message?: string }
+    const message =
+      errObj?.response?.data?.message ||
+      errObj?.message ||
+      'Không thể lấy hoặc cấp mã QR cho cột đèn.'
+    yield put(ensurePoleQrCodesFailure(message))
+    toast.error(message)
+  }
+}
+
 export default function* qrCodeSaga() {
   yield takeLatest(fetchPoleQrRequest.type, handleFetchPoleQr)
   yield takeLatest(issueQrCodeRequest.type, handleIssueQrCode)
   yield takeLatest(revokeQrCodeRequest.type, handleRevokeQrCode)
   yield takeLatest(fetchQrCodesRequest.type, handleFetchQrCodes)
+  yield takeLatest(ensurePoleQrCodesRequest.type, handleEnsurePoleQrCodes)
 }

@@ -28,20 +28,44 @@ export function segmentLabelFromIds(
 }
 
 /**
- * Định dạng tên hiển thị tuyến đường từ dữ liệu API
+ * Định dạng tên hiển thị tuyến đường từ dữ liệu API.
+ * Nếu lệnh công tác (như Khảo sát) chỉ có segment_id = null ở API danh sách nhưng tiêu đề chứa tên tuyến,
+ * tự động đối chiếu với bảng tên tuyến segmentNames để giữ nguyên tên tuyến đường.
  */
 export function formatSegmentDisplay(
   segIdOrName?: string | null,
-  fallbackTitle?: string | null
+  fallbackTitle?: string | null,
+  segmentNames?: SegmentNameMap
 ): string {
-  if (segIdOrName && segIdOrName !== 'Tuyến chiếu sáng phụ trách') {
+  if (
+    segIdOrName &&
+    segIdOrName !== '-' &&
+    segIdOrName !== '—' &&
+    segIdOrName !== 'Tuyến chiếu sáng phụ trách'
+  ) {
+    if (segmentNames && segmentNames[segIdOrName]) {
+      return segmentNames[segIdOrName]
+    }
     return segIdOrName
   }
 
   if (fallbackTitle) {
     const match = fallbackTitle.match(/SEG-[A-Za-z0-9_-]+/i)
     if (match) {
-      return match[0].toUpperCase()
+      const matchedId = match[0].toUpperCase()
+      return (segmentNames && segmentNames[matchedId]) || matchedId
+    }
+
+    if (segmentNames) {
+      const normalizedTitle = fallbackTitle.toLowerCase()
+      const matchedNames = Object.values(segmentNames).filter(
+        (name) => Boolean(name) && normalizedTitle.includes(name.toLowerCase())
+      )
+      if (matchedNames.length > 0) {
+        // Ưu tiên tên tuyến dài nhất khớp trong tiêu đề để tránh khớp chuỗi con ngắn
+        matchedNames.sort((a, b) => b.length - a.length)
+        return matchedNames[0]
+      }
     }
   }
 
@@ -93,7 +117,7 @@ export function mapWorkOrdersToScheduleCases(
     const title = raw.title || 'Lệnh công tác'
     const segmentLabel =
       raw.segment_name || segmentLabelFromIds([raw.segment_id, ...(raw.segment_ids ?? [])], segmentNames)
-    const segment = formatSegmentDisplay(segmentLabel, title)
+    const segment = formatSegmentDisplay(segmentLabel, title, segmentNames)
     const rawKind = String(raw.task_kind || 'inspection').toLowerCase()
     const woStatus = String(raw.wo_status || 'open').toLowerCase()
     const assignedTo = raw.assigned_to || ''
@@ -116,8 +140,8 @@ export function mapWorkOrdersToScheduleCases(
         phases: [],
       }
     } else {
-      if (segmentLabel) {
-        casesMap[caseKey].segment = formatSegmentDisplay(segmentLabel, title)
+      if (segment && segment !== '-') {
+        casesMap[caseKey].segment = segment
       }
       if (Boolean(endReason)) {
         casesMap[caseKey].isTerminated = true

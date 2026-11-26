@@ -292,7 +292,12 @@ export const workScheduleSlice = createSlice({
             c.poleIds = poleIds
           }
           if (segmentLabel) {
-            c.segment = formatSegmentDisplay(segmentLabel, detail.title)
+            c.segment = formatSegmentDisplay(segmentLabel, detail.title, state.segmentNames)
+          } else if (!c.segment || c.segment === '-') {
+            const fallbackSeg = formatSegmentDisplay(undefined, detail.title, state.segmentNames)
+            if (fallbackSeg !== '-') {
+              c.segment = fallbackSeg
+            }
           }
         }
       })

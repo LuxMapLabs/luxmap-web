@@ -1,18 +1,20 @@
 import { all, call, put, select, takeLatest } from 'redux-saga/effects'
 import { toast } from 'sonner'
 import {
+  ALL_FAULT_DATA_SOURCES,
   fetchSegmentsList,
   fetchWarrantyStatistics,
   fetchFaultsList,
   fetchFixtureStatusStatistics,
   fetchDashboardPoles,
+  fetchDashboardUnlocatedPoles,
   fetchCitizenScreeningStatistics,
 } from './dashboardAPI'
 import type { SegmentListItem } from '../../types/assets/segments'
 import type { WarrantyList } from '../../types/statistics/warranty'
 import type { FaultItem } from '../../types/faults/faults'
 import type { FixtureStatusStatistics } from '../../types/statistics/fixture-status'
-import type { PoleListItem } from '../../types/assets/poles'
+import type { PoleListItem, PoleListItemPagedResult } from '../../types/assets/poles'
 import type { IotDiagnosticSummaryItem } from '../../types/iot/diagnostics'
 import type { IotServerStatus } from '../../types/iot/servers'
 import type { IotFeederHistorySample, IotFeederHistoryResult } from '../../types/iot/feeders'
@@ -33,8 +35,6 @@ import {
   fetchCitizenScreeningRequest,
   fetchCitizenScreeningSuccess,
 } from './dashboardSlice'
-
-const ALL_FAULT_DATA_SOURCES = 'field,public_imagery,simulated,calibration_rig'
 
 async function fetchIotSummarySafe(): Promise<IotDiagnosticSummaryItem[]> {
   try {
@@ -77,12 +77,22 @@ function* handleFetchDashboardData() {
       (state: RootState) => state.dashboard.includeCalibrationRig
     )
 
-    const [segments, warrantyRes, faultsRes, fixtureStatusRes, poles, iotSummary, iotServers]: [
+    const [
+      segments,
+      warrantyRes,
+      faultsRes,
+      fixtureStatusRes,
+      poles,
+      unlocatedPolesRes,
+      iotSummary,
+      iotServers,
+    ]: [
       SegmentListItem[],
       WarrantyList,
       FaultItem[],
       FixtureStatusStatistics,
       PoleListItem[],
+      PoleListItemPagedResult,
       IotDiagnosticSummaryItem[],
       IotServerStatus[]
     ] = yield all([
@@ -99,6 +109,7 @@ function* handleFetchDashboardData() {
       }),
       call(fetchFixtureStatusStatistics, { group_by: 'segment' }),
       call(fetchDashboardPoles),
+      call(fetchDashboardUnlocatedPoles),
       call(fetchIotSummarySafe),
       call(fetchIotServersSafe),
     ])
@@ -114,15 +125,22 @@ function* handleFetchDashboardData() {
     }
 
     const poleList = poles || []
-    const unlocatedPoleSegments = poleList
-      .filter(
-        (pole) =>
-          !pole.location ||
-          typeof pole.location.lat !== 'number' ||
-          typeof pole.location.lng !== 'number'
-      )
-      .map((pole) => pole.segment_id ?? null)
-    const polesCapped = poleList.length >= 200
+    const isMissingGps = (pole: PoleListItem) =>
+      !pole.location ||
+      typeof pole.location.lat !== 'number' ||
+      typeof pole.location.lng !== 'number'
+
+    const rawUnlocatedItems = (unlocatedPolesRes?.items || []).filter(isMissingGps)
+    const fallbackUnlocatedItems =
+      rawUnlocatedItems.length > 0 ? rawUnlocatedItems : poleList.filter(isMissingGps)
+
+    const unlocatedPoleSegments = fallbackUnlocatedItems.map((pole) => pole.segment_id ?? null)
+    const unlocatedTotal =
+      typeof unlocatedPolesRes?.total === 'number' && unlocatedPolesRes.total > 0
+        ? unlocatedPolesRes.total
+        : unlocatedPoleSegments.length
+    const polesCapped =
+      unlocatedTotal > unlocatedPoleSegments.length || unlocatedPoleSegments.length >= 200
 
     yield put(
       fetchDashboardDataSuccess({
@@ -171,9 +189,14 @@ function* handleFetchFeederHistory(action: ReturnType<typeof fetchFeederHistoryR
     const res: IotFeederHistoryResult = yield call(
       iotAPI.getFeederElectricalHistory,
       action.payload,
-      { page: 1, page_size: 20 }
+      { page: 1, page_size: 20, sort_by: 'measured_at' }
     )
-    const items: IotFeederHistorySample[] = [...(res?.items || [])].reverse()
+    const items: IotFeederHistorySample[] = [...(res?.items || [])].sort((a, b) => {
+      const ta = Date.parse(a.measured_at || a.received_at || '')
+      const tb = Date.parse(b.measured_at || b.received_at || '')
+      if (Number.isFinite(ta) && Number.isFinite(tb)) return ta - tb
+      return 0
+    })
     yield put(fetchFeederHistorySuccess(items))
   } catch {
     yield put(fetchFeederHistorySuccess([]))

@@ -346,9 +346,12 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
                           title="Bấm để xem chi tiết danh sách lỗi trong ca này"
                         >
                           <span>
-                            {item.pole_count === 0 && (item.fault_ids?.length || 0) > 0
+                            {((item.pole_ids?.length || 0) === 0 &&
+                              (Boolean(item.cabinet_id && !item.segment_id) ||
+                                item.pole_count === 0)) &&
+                            (item.fault_ids?.length || 0) > 0
                               ? `Sự cố IoT • ${item.fault_ids?.length || 0} lỗi`
-                              : `${item.pole_count} cột • ${item.fault_ids?.length || 0} lỗi`}
+                              : `${(item.pole_ids?.length || 0) > 0 ? item.pole_ids!.length : item.pole_count} cột • ${item.fault_ids?.length || 0} lỗi`}
                           </span>
                           <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-teal-600 transition-colors" />
                         </button>
@@ -492,16 +495,6 @@ export const AutoDispatchModal: React.FC<AutoDispatchModalProps> = ({
                   </div>
                 )
               })}
-
-              {/* Báo cáo nếu có sự cố bị bỏ qua */}
-              {preview?.skipped && preview.skipped.length > 0 && (
-                <div className="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-xs text-amber-800 flex items-start gap-2.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">Lưu ý:</span> Có {preview.skipped.length} sự cố không được xếp lịch tự động (do chưa gắn tuyến đường hoặc vượt giới hạn xử lý đợt này).
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>

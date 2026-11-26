@@ -16,6 +16,9 @@ export interface QrCodeState {
   isFetching: boolean
   isIssuing: boolean
   isRevoking: boolean
+  isEnsuringPoleQrs: boolean
+  ensuringPoleIds: string[]
+  lastEnsuredBatchId: string | null
   error: string | null
 }
 
@@ -29,6 +32,9 @@ const initialState: QrCodeState = {
   isFetching: false,
   isIssuing: false,
   isRevoking: false,
+  isEnsuringPoleQrs: false,
+  ensuringPoleIds: [],
+  lastEnsuredBatchId: null,
   error: null,
 }
 
@@ -137,6 +143,36 @@ export const qrCodeSlice = createSlice({
       state.currentPoleQr = null
       state.error = null
     },
+
+    // 6. Tra cứu hoặc tự động cấp mới mã QR đang hiệu lực cho 1 hoặc nhiều cột đèn (dùng khi in/đính kèm PDF QR)
+    ensurePoleQrCodesRequest: (
+      state,
+      action: PayloadAction<{ batchId: string; poleIds: string[] }>
+    ) => {
+      state.isEnsuringPoleQrs = true
+      state.ensuringPoleIds = action.payload.poleIds
+      state.error = null
+    },
+    ensurePoleQrCodesSuccess: (
+      state,
+      action: PayloadAction<{
+        batchId: string
+        itemsByPoleId: Record<string, QrCodeItem>
+      }>
+    ) => {
+      state.isEnsuringPoleQrs = false
+      state.ensuringPoleIds = []
+      state.lastEnsuredBatchId = action.payload.batchId
+      Object.entries(action.payload.itemsByPoleId).forEach(([poleId, qrItem]) => {
+        state.activeCodesByPoleId[poleId] = qrItem
+      })
+      state.error = null
+    },
+    ensurePoleQrCodesFailure: (state, action: PayloadAction<string>) => {
+      state.isEnsuringPoleQrs = false
+      state.ensuringPoleIds = []
+      state.error = action.payload
+    },
   },
 })
 
@@ -154,6 +190,9 @@ export const {
   fetchQrCodesSuccess,
   fetchQrCodesFailure,
   clearCurrentPoleQr,
+  ensurePoleQrCodesRequest,
+  ensurePoleQrCodesSuccess,
+  ensurePoleQrCodesFailure,
 } = qrCodeSlice.actions
 
 export default qrCodeSlice.reducer

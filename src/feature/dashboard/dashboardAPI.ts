@@ -135,6 +135,8 @@ export async function fetchWarrantyStatistics(params: {
  * 4. Lấy danh sách bóng đèn đang gặp sự cố
  * GET /api/v1/faults
  */
+export const ALL_FAULT_DATA_SOURCES = 'field,public_imagery,simulated,calibration_rig'
+
 export async function fetchFaultsList(params: {
   commune_id?: string
   segment_id?: string
@@ -176,6 +178,34 @@ export async function fetchDashboardPoles(): Promise<PoleListItem[]> {
   } catch (error) {
     console.warn('[DashboardAPI] Fetch poles failed:', error)
     return []
+  }
+}
+
+/**
+ * Lấy danh sách toàn bộ các cột chưa có tọa độ GPS (missing_location=true)
+ * GET /api/v1/assets/poles?missing_location=true
+ */
+export async function fetchDashboardUnlocatedPoles(): Promise<PoleListItemPagedResult> {
+  try {
+    const res = await apiClient.get<PoleListItemPagedResult>('/assets/poles', {
+      params: { page: 1, page_size: 200, missing_location: true },
+    })
+    return (
+      res.data || {
+        page: 1,
+        page_size: 200,
+        total: 0,
+        items: [],
+      }
+    )
+  } catch (error) {
+    console.warn('[DashboardAPI] Fetch unlocated poles failed:', error)
+    return {
+      page: 1,
+      page_size: 200,
+      total: 0,
+      items: [],
+    }
   }
 }
 
