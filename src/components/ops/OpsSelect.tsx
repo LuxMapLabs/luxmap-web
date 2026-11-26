@@ -14,6 +14,8 @@ export interface OpsSelectOption {
   dotColor?: string
   /** Icon riêng cho từng mục chọn (nếu không dùng chấm tròn) */
   icon?: React.ReactNode
+  /** Màu nền & màu icon của ô icon (ví dụ: 'bg-amber-50 text-amber-600'); khi có thì thay màu xanh/xám mặc định */
+  iconClassName?: string
 }
 
 export interface OpsSelectProps {
@@ -214,9 +216,11 @@ export const OpsSelect: React.FC<OpsSelectProps> = ({
                     ) : (
                       <div
                         className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                          isSelected
-                            ? 'bg-blue-600 text-white shadow-2xs'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                          opt.iconClassName
+                            ? opt.iconClassName
+                            : isSelected
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                         }`}
                       >
                         {opt.icon || icon || <Filter className="w-3.5 h-3.5" />}
