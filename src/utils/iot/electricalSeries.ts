@@ -635,5 +635,48 @@ export function pickPreemptibleChunk({
   return candidates.slice(0, toCancelCount).map((item) => item.start)
 }
 
+/** Số vạch chia tối đa trên trục Y. */
+const Y_MAX_INTERVALS = 6
+
+/**
+ * Thang trục Y theo đúng các mẫu trong khung: thấp nhất/cao nhất của chỉ số, làm tròn ra vạch gần nhất
+ * (bước 1, 2, 2.5, 5 × 10ⁿ, tối đa 6 khoảng). Khung không có mẫu thì trả null.
+ */
+export function electricalYAxisScale(
+  points: ElectricalPoint[],
+  metric: ElectricalMetric
+): { domain: [number, number]; ticks: number[]; digits: number } | null {
+  let min = Infinity
+  let max = -Infinity
+  for (const p of points) {
+    const v = p[metric]
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null
+  if (min === max) {
+    // Mọi mẫu bằng nhau: nới 5% (hoặc 1 nếu bằng 0) cho đường không dính mép; không xuống dưới 0 nếu số đo không âm.
+    const pad = min !== 0 ? Math.abs(min) * 0.05 : 1
+    min = min >= 0 ? Math.max(0, min - pad) : min - pad
+    max = max + pad
+  }
+
+  const magnitude = 10 ** Math.floor(Math.log10((max - min) / Y_MAX_INTERVALS))
+  let step = magnitude
+  let lo = min
+  let hi = max
+  for (const factor of [1, 2, 2.5, 5, 10]) {
+    step = factor * magnitude
+    lo = Math.floor(min / step + 1e-9) * step
+    hi = Math.ceil(max / step - 1e-9) * step
+    if (Math.round((hi - lo) / step) <= Y_MAX_INTERVALS) break
+  }
+  const digits = (String(Number(step.toPrecision(3))).split('.')[1] ?? '').length
+  const count = Math.round((hi - lo) / step)
+  const ticks = Array.from({ length: count + 1 }, (_, i) => Number((lo + i * step).toFixed(digits)))
+  return { domain: [ticks[0], ticks[ticks.length - 1]], ticks, digits }
+}
+
 export const formatMetric = (value: number | null, metric: ElectricalMetric) =>
   value !== null ? `${value.toFixed(ELECTRICAL_METRICS[metric].digits)} ${ELECTRICAL_METRICS[metric].unit}` : '—'

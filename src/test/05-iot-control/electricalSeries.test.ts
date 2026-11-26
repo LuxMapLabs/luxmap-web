@@ -4,6 +4,7 @@ import {
   ELECTRICAL_MAX_WINDOW_MS,
   electricalBucketForWindow,
   electricalTickStepForWindow,
+  electricalYAxisScale,
   formatWindowDuration,
   parseWindowInput,
   RAW_GAP_THRESHOLD_MS,
@@ -80,6 +81,42 @@ describe('electricalSeries', () => {
       expect(parseWindowInput('', 'minute', max)).toBeNull()
       expect(parseWindowInput('abc', 'minute', max)).toBeNull()
       expect(parseWindowInput('-10', 'minute', max)).toBeNull()
+    })
+  })
+
+  describe('electricalYAxisScale (thang trục Y theo mẫu trong khung)', () => {
+    const pts = (values: (number | null)[]) => values.map((power, i) => makePoint({ time: i * 1000, power }))
+
+    it('khung không có mẫu thì trả null', () => {
+      expect(electricalYAxisScale([], 'power')).toBeNull()
+      expect(electricalYAxisScale(pts([null, null]), 'power')).toBeNull()
+    })
+
+    it('0–465 mW thành 0–500, không đẩy lên 600', () => {
+      expect(electricalYAxisScale(pts([0, 442.1, 465.7]), 'power')).toEqual({
+        domain: [0, 500],
+        ticks: [0, 100, 200, 300, 400, 500],
+        digits: 0,
+      })
+    })
+
+    it('chỉ dao động 420–465 thì trục bám sát 420–470, không kéo về 0', () => {
+      const scale = electricalYAxisScale(pts([421.3, 465.7, 440]), 'power')!
+      expect(scale.domain).toEqual([420, 470])
+      expect(scale.ticks.length).toBeLessThanOrEqual(7)
+    })
+
+    it('điện áp quanh 5 V có số lẻ và mọi mẫu bằng nhau vẫn có khoảng', () => {
+      const v = (values: number[]) => values.map((voltage, i) => makePoint({ time: i * 1000, voltage }))
+      const scale = electricalYAxisScale(v([5.08, 5.104, 5.12]), 'voltage')!
+      expect(scale.domain[0]).toBeLessThanOrEqual(5.08)
+      expect(scale.domain[1]).toBeGreaterThanOrEqual(5.12)
+      expect(scale.digits).toBeGreaterThan(0)
+
+      const flat = electricalYAxisScale(v([5, 5]), 'voltage')!
+      expect(flat.domain[0]).toBeLessThan(5)
+      expect(flat.domain[1]).toBeGreaterThan(5)
+      expect(electricalYAxisScale(pts([0, 0]), 'power')!.domain[0]).toBe(0)
     })
   })
 

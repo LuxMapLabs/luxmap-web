@@ -24,6 +24,7 @@ import {
   clampWindowEnd,
   electricalBucketForWindow,
   electricalTickStepForWindow,
+  electricalYAxisScale,
   findBackfillRanges,
   formatRecentAxisTick,
   formatWindowDuration,
@@ -425,6 +426,9 @@ export const ElectricalHistoryChart: React.FC<{
     [points, windowStart, windowEnd]
   )
 
+  // Trục Y theo thấp nhất/cao nhất của các mẫu trong khung đang xem.
+  const yScale = useMemo(() => electricalYAxisScale(rangePoints, metric), [rangePoints, metric])
+
   const { bucketMs, hint } = electricalBucketForWindow(effectiveWindowMs)
 
   const series = useMemo(
@@ -653,10 +657,11 @@ export const ElectricalHistoryChart: React.FC<{
                   />
                   <YAxis
                     width={56}
-                    domain={['auto', 'auto']}
+                    domain={yScale ? yScale.domain : ['auto', 'auto']}
+                    ticks={yScale ? yScale.ticks : undefined}
                     tickFormatter={(val) => {
                       if (!Number.isFinite(val)) return ''
-                      const digits = metric === 'voltage' ? 2 : 0
+                      const digits = yScale ? yScale.digits : metric === 'voltage' ? 2 : 0
                       return Number(val).toFixed(digits)
                     }}
                     stroke="#94a3b8"
