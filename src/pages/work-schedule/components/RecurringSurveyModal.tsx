@@ -1,28 +1,26 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import {
-  X,
-  RotateCcw,
-  Calendar,
-  Route,
-  User,
-  Plus,
-  Trash2,
-  CheckCircle2,
-  Loader2,
-  Clock,
-  ToggleLeft,
-  ToggleRight,
-  Sparkles,
-  AlertTriangle,
-} from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { X, RotateCcw, Loader2, User, ChevronDown, Pause, Play, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { workScheduleAPI } from '../../../feature/work-schedule/workScheduleAPI'
 import { fetchSegmentsList } from '../../../feature/dashboard/dashboardAPI'
-import { assetAPI } from '../../../feature/assets/assetAPI'
 import type { SurveyRecurringItem } from '../../../types/survey-schedules/recurring'
 import type { SegmentListItem } from '../../../types/assets/segments'
 import type { WorkOrderAssignee } from '../../../types/workorders/orders'
-import { OpsSelect } from '../../../components/ops/OpsSelect'
+import {
+  WEEK_DAYS,
+  buildBaseline,
+  cellKey,
+  dayLabel,
+  executeSave,
+  gridFromBaseline,
+  planSave,
+  toggleCell,
+  updateCell,
+  type Baseline,
+  type GridCell,
+  type GridState,
+  type ScheduleError,
+} from '../../../utils/work-schedule/recurringGrid'
 
 interface RecurringSurveyModalProps {
   isOpen: boolean
@@ -32,15 +30,26 @@ interface RecurringSurveyModalProps {
   assignees?: WorkOrderAssignee[]
 }
 
-const DAYS_OF_WEEK = [
-  { value: 1, label: 'Thứ Hai' },
-  { value: 2, label: 'Thứ Ba' },
-  { value: 3, label: 'Thứ Tư' },
-  { value: 4, label: 'Thứ Năm' },
-  { value: 5, label: 'Thứ Sáu' },
-  { value: 6, label: 'Thứ Bảy' },
-  { value: 7, label: 'Chủ Nhật' },
-]
+interface GridRow {
+  segmentId: string
+  name: string
+  poleCount: number | null
+  segmentCommuneId: string | null
+}
+
+const formatDate = (iso: string | null | undefined) => {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-')
+  return d && m && y ? `${d}/${m}/${y}` : iso
+}
+
+/** Lần chạy đầu tiên của ô: `first_occurrence_date` của lịch đã lưu đúng thứ đó, nếu lịch còn chạy. */
+function firstRunText(cell: GridCell, saved: SurveyRecurringItem | undefined): string {
+  if (!cell.isActive) return 'Đang tạm dừng — không sinh phiếu'
+  if (!saved) return 'Hệ thống tính khi lưu'
+  if (saved.is_active === false) return 'Tính lại khi lưu (bật lại lịch)'
+  return formatDate(saved.first_occurrence_date) || '—'
+}
 
 export const RecurringSurveyModal: React.FC<RecurringSurveyModalProps> = ({
   isOpen,
@@ -49,742 +58,430 @@ export const RecurringSurveyModal: React.FC<RecurringSurveyModalProps> = ({
   communeId,
   assignees = [],
 }) => {
-  const [activeTab, setActiveTab] = useState<'list' | 'create'>('list')
-  const [loading, setLoading] = useState<boolean>(true)
-  const [submitting, setSubmitting] = useState<boolean>(false)
-  const [schedules, setSchedules] = useState<SurveyRecurringItem[]>([])
+  const scopedCommune = communeId && communeId !== '*' ? communeId : undefined
+
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [segments, setSegments] = useState<SegmentListItem[]>([])
-  const [engineers, setEngineers] = useState<WorkOrderAssignee[]>(assignees)
+  const [baseline, setBaseline] = useState<Baseline>({})
+  const [grid, setGrid] = useState<GridState>({})
+  const [engineersByCommune, setEngineersByCommune] = useState<Record<string, WorkOrderAssignee[]>>({})
+  const [errors, setErrors] = useState<Record<string, ScheduleError>>({})
+  const [expanded, setExpanded] = useState<string | null>(null)
 
-  // Form State tạo mới - Hỗ trợ chọn nhiều ngày trong tuần
-  const [selectedSegmentId, setSelectedSegmentId] = useState<string>('')
-  const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState<number[]>([5]) // Mặc định Thứ Sáu
-  const [selectedAssignee, setSelectedAssignee] = useState<string>('')
-  const [note, setNote] = useState<string>('Khảo sát camera AI ban đêm theo chu kỳ định kỳ tuần.')
-
-  // State xác nhận xóa cấu hình (thay thế window.confirm)
-  const [deleteTarget, setDeleteTarget] = useState<SurveyRecurringItem | null>(null)
-  const [isDeleting, setIsDeleting] = useState<boolean>(false)
-
-  // Đồng bộ kỹ sư từ props khi có thay đổi
-  useEffect(() => {
-    if (assignees && assignees.length > 0) {
-      setEngineers(assignees)
-    }
-  }, [assignees])
-
-  // Tải danh sách lịch định kỳ, tuyến đường và kỹ sư
   const loadData = async () => {
     setLoading(true)
+    setErrors({})
+    setExpanded(null)
     try {
-      const targetCommune = communeId && communeId !== '*' ? communeId : undefined
-
-      const [schedResult, segsResult, engsResult] = await Promise.allSettled([
-        workScheduleAPI.getRecurringSurveySchedules(targetCommune),
-        fetchSegmentsList(targetCommune),
-        targetCommune ? workScheduleAPI.getAssignees(targetCommune) : Promise.resolve({ items: [] }),
+      const [schedules, segs] = await Promise.all([
+        workScheduleAPI.getRecurringSurveySchedules(scopedCommune),
+        fetchSegmentsList(scopedCommune),
       ])
+      const items = schedules.items ?? []
+      const nextBaseline = buildBaseline(items)
+      setSegments(segs)
+      setBaseline(nextBaseline)
+      setGrid(gridFromBaseline(nextBaseline))
 
-      if (schedResult.status === 'fulfilled') {
-        setSchedules(schedResult.value.items || [])
-      }
-
-      let loadedSegments: SegmentListItem[] = []
-      if (segsResult.status === 'fulfilled' && segsResult.value && segsResult.value.length > 0) {
-        loadedSegments = segsResult.value
-      } else {
-        // Fallback sang assetAPI.getSegments nếu fetchSegmentsList chưa có kết quả
-        try {
-          const segsRes = await assetAPI.getSegments({ page_size: 100 })
-          loadedSegments = segsRes?.items || []
-        } catch (e) {
-          console.warn('[RecurringSurveyModal] Fallback assetAPI.getSegments failed:', e)
-        }
-      }
-      setSegments(loadedSegments)
-
-      if (loadedSegments.length > 0 && !selectedSegmentId) {
-        setSelectedSegmentId(loadedSegments[0].segment_id || '')
-      }
-
-      if (engsResult.status === 'fulfilled' && (engsResult.value as any)?.items?.length > 0) {
-        setEngineers((engsResult.value as any).items)
-      } else if (assignees && assignees.length > 0) {
-        setEngineers(assignees)
-      }
+      const communes = new Set<string>()
+      if (scopedCommune) communes.add(scopedCommune)
+      segs.forEach((s) => s.commune_id && communes.add(s.commune_id))
+      items.forEach((s) => s.commune_id && communes.add(s.commune_id))
+      const lists = await Promise.allSettled(
+        [...communes].map(async (c) => [c, (await workScheduleAPI.getAssignees(c)).items ?? []] as const)
+      )
+      const byCommune: Record<string, WorkOrderAssignee[]> = {}
+      lists.forEach((r) => {
+        if (r.status === 'fulfilled') byCommune[r.value[0]] = r.value[1]
+      })
+      setEngineersByCommune(byCommune)
     } catch (err) {
       console.error('[RecurringSurveyModal] Load failed:', err)
-      toast.error('Không thể tải danh sách khảo sát định kỳ.')
+      toast.error('Không thể tải lịch khảo sát định kỳ.')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (isOpen) {
-      loadData()
-    }
+    if (isOpen) loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, communeId])
 
-  // Khi người dùng chọn tuyến, tự động nạp kỹ sư của xã tương ứng với tuyến đó
-  useEffect(() => {
-    if (!selectedSegmentId || segments.length === 0) return
-    const currentSeg = segments.find((s) => s.segment_id === selectedSegmentId)
-    if (currentSeg?.commune_id && currentSeg.commune_id !== '*') {
-      workScheduleAPI
-        .getAssignees(currentSeg.commune_id)
-        .then((res) => {
-          if (res?.items && res.items.length > 0) {
-            setEngineers(res.items)
-          }
-        })
-        .catch(() => {
-          // Bỏ qua lỗi và giữ danh sách kỹ sư hiện tại
-        })
-    }
-  }, [selectedSegmentId, segments])
-
-  // Tính toán thời gian áp dụng thực tế theo Quy tắc Mốc 17:00 Thứ Năm
-  const previewEffectiveInfo = useMemo(() => {
-    const now = new Date()
-    const currentDay = now.getDay() // 0 = Chủ Nhật, 1 = T2, 4 = T5
-    const currentHour = now.getHours()
-
-    // Kiểm tra xem hiện tại đã qua mốc 17:00 Thứ Năm của tuần này chưa
-    const isPastThursdayCutoff =
-      currentDay > 4 || (currentDay === 4 && currentHour >= 17) || currentDay === 0
-
-    // Tính thứ Hai của tuần kế tiếp (hoặc tuần kế tiếp + 1)
-    const weeksToAdd = isPastThursdayCutoff ? 2 : 1
-    const nextWeekDate = new Date()
-    // Tìm thứ 2 tuần tới
-    const daysUntilNextMonday = ((8 - currentDay) % 7 || 7) + (weeksToAdd - 1) * 7
-    nextWeekDate.setDate(now.getDate() + daysUntilNextMonday)
-
-    // Tính ngày chạy đầu tiên cho từng thứ đã chọn
-    const occurrences = selectedDaysOfWeek.map((dayNum) => {
-      const targetDate = new Date(nextWeekDate)
-      targetDate.setDate(nextWeekDate.getDate() + (dayNum - 1))
-      const label = DAYS_OF_WEEK.find((d) => d.value === dayNum)?.label || `Thứ ${dayNum}`
-      const dateStr = targetDate.toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
+  // Hàng = tuyến của xã; thêm tuyến chỉ có trong lịch (vd. tuyến liên xã) để không bị ẩn.
+  const rows = useMemo<GridRow[]>(() => {
+    const list: GridRow[] = segments
+      .filter((s) => s.segment_id)
+      .map((s) => ({
+        segmentId: s.segment_id!,
+        name: s.segment_name || s.segment_id!,
+        poleCount: s.pole_count ?? null,
+        segmentCommuneId: s.commune_id,
+      }))
+    const known = new Set(list.map((r) => r.segmentId))
+    for (const [segmentId, row] of Object.entries(baseline)) {
+      if (known.has(segmentId)) continue
+      const item = row.primary ?? row.extras[0]
+      list.push({
+        segmentId,
+        name: item?.segment_name || segmentId,
+        poleCount: null,
+        segmentCommuneId: item?.commune_id ?? null,
       })
-      return `${label} (${dateStr})`
-    })
-
-    return {
-      isPastThursdayCutoff,
-      occurrencesText: occurrences.join(', ') || 'Chưa chọn thứ',
-      cutoffDesc: isPastThursdayCutoff
-        ? 'Hiện đã qua mốc 17:00 Thứ Năm, các ca khảo sát sẽ bắt đầu áp dụng sau 2 tuần để chuẩn bị nhân sự.'
-        : 'Thiết lập trước mốc 17:00 Thứ Năm, các ca khảo sát sẽ bắt đầu áp dụng ngay từ tuần tới.',
     }
-  }, [selectedDaysOfWeek])
+    return list
+  }, [segments, baseline])
 
-  // Xử lý tạo mới cấu hình lịch định kỳ (hỗ trợ tạo đa ngày)
-  const handleCreateSchedule = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedSegmentId) {
-      toast.error('Vui lòng chọn tuyến đường khảo sát.')
-      return
-    }
-    if (selectedDaysOfWeek.length === 0) {
-      toast.error('Vui lòng chọn ít nhất một thứ trong tuần.')
-      return
-    }
-
-    const currentSeg = segments.find((s) => s.segment_id === selectedSegmentId)
-    // Ưu tiên chuẩn xác mã xã của chính tuyến đường được chọn để tránh lỗi CROSS_COMMUNE_REFERENCE
-    const targetCommuneId =
-      currentSeg?.commune_id ||
-      (communeId && communeId !== '*' ? communeId : undefined)
-
-    if (!targetCommuneId) {
-      toast.error('Không xác định được địa bàn xã của tuyến đường được chọn. Vui lòng thử chọn lại tuyến.')
-      return
-    }
-
-    setSubmitting(true)
-    let successCount = 0
-    const conflictDays: string[] = []
-    const errors: string[] = []
-
-    for (const day of selectedDaysOfWeek) {
-      const dayLabel = DAYS_OF_WEEK.find((d) => d.value === day)?.label || `Thứ ${day}`
-      try {
-        await workScheduleAPI.createRecurringSurveySchedule({
-          commune_id: targetCommuneId,
-          segment_id: selectedSegmentId,
-          day_of_week: Number(day),
-          assigned_to: selectedAssignee ? selectedAssignee : undefined,
-          note: note.trim() || undefined,
-        })
-        successCount++
-      } catch (err: any) {
-        const errData = err?.response?.data
-        const errObj = errData?.error
-        const errorCode = errObj?.code || errData?.code || ''
-        const errorMsg =
-          errObj?.message ||
-          errData?.message ||
-          errData?.detail ||
-          errData?.title ||
-          err?.message ||
-          'Không thể tạo'
-
-        // Nhận diện lỗi trùng lịch lặp 409 SURVEY_SCHEDULE_EXISTS
-        const isConflict =
-          errorCode === 'SURVEY_SCHEDULE_EXISTS' ||
-          (err?.response?.status === 409 && (!errorCode || errorCode === 'SURVEY_SCHEDULE_EXISTS'))
-
-        if (isConflict) {
-          conflictDays.push(dayLabel)
-        } else {
-          let userFriendlyMsg = errorMsg
-          if (errorCode === 'ROLE_FORBIDDEN' || err?.response?.status === 403) {
-            userFriendlyMsg = 'Tài khoản không có quyền tạo/quản lý lịch làm việc (Chỉ Quản lý - Manager mới có quyền này).'
-          } else if (errorCode === 'COMMUNE_FORBIDDEN') {
-            userFriendlyMsg = 'Địa bàn xã nằm ngoài phạm vi quản lý của tài khoản.'
-          } else if (errorCode === 'CROSS_COMMUNE_REFERENCE') {
-            userFriendlyMsg = 'Tuyến đường không thuộc địa bàn xã chỉ định.'
-          } else if (errorCode === 'ASSET_NOT_FOUND' || err?.response?.status === 404) {
-            userFriendlyMsg = 'Không tìm thấy dữ liệu tuyến đường trên hệ thống.'
-          } else if (errorCode === 'ASSIGNEE_NOT_ELIGIBLE') {
-            userFriendlyMsg = 'Kỹ sư được chọn không phụ trách tuyến này hoặc không đủ điều kiện.'
-          }
-
-          const detailStr =
-            errObj?.details && Object.keys(errObj.details).length > 0
-              ? ` (${Object.entries(errObj.details).map(([k, v]) => `${k}: ${v}`).join(', ')})`
-              : ''
-          errors.push(`${dayLabel}: ${userFriendlyMsg}${detailStr}${errorCode ? ` [${errorCode}]` : ''}`)
-        }
-      }
-    }
-
-    setSubmitting(false)
-
-    if (successCount > 0) {
-      toast.success(
-        `Đã tạo thành công ${successCount} lịch định kỳ cho ${currentSeg?.segment_name || selectedSegmentId}!`
-      )
-      // Reset form sau khi tạo thành công để tránh bấm nhầm gây lỗi trùng lặp
-      setSelectedSegmentId(segments.length > 0 ? segments[0].segment_id || '' : '')
-      setSelectedDaysOfWeek([5])
-      setSelectedAssignee('')
-      setNote('Khảo sát camera AI ban đêm theo chu kỳ định kỳ tuần.')
-
-      setActiveTab('list')
-      loadData()
-      onSuccess()
-    }
-
-    if (conflictDays.length > 0) {
-      toast.warning(`Tuyến này đã có lịch lặp vào ${conflictDays.join(', ')} từ trước (bỏ qua trùng).`)
-    }
-
-    if (errors.length > 0 && successCount === 0) {
-      toast.error(errors.join('\n'))
-    }
+  const savedItems = (segmentId: string): SurveyRecurringItem[] => {
+    const row = baseline[segmentId]
+    if (!row) return []
+    return row.primary ? [row.primary, ...row.extras] : row.extras
   }
 
-  // Bật/Tắt trạng thái hoạt động của lịch định kỳ
-  const handleToggleActive = async (item: SurveyRecurringItem) => {
-    if (!item.schedule_id) return
-    try {
-      const newStatus = !item.is_active
-      await workScheduleAPI.patchRecurringSurveySchedule(item.schedule_id, {
-        is_active: newStatus,
-      })
+  const communeOf = (segmentId: string): string | undefined =>
+    savedItems(segmentId)[0]?.commune_id ||
+    scopedCommune ||
+    rows.find((r) => r.segmentId === segmentId)?.segmentCommuneId ||
+    undefined
 
-      setSchedules((prev) =>
-        prev.map((s) =>
-          s.schedule_id === item.schedule_id ? { ...s, is_active: newStatus } : s
-        )
-      )
-      toast.success(
-        newStatus
-          ? `Đã kích hoạt lại lịch định kỳ cho ${item.segment_name || item.segment_id}`
-          : `Đã tạm dừng lịch định kỳ cho ${item.segment_name || item.segment_id}`
-      )
-      onSuccess()
-    } catch (err: any) {
-      console.error('[RecurringSurveyModal] Toggle active failed:', err)
-      const errObj = err?.response?.data?.error
-      const msg =
-        errObj?.message ||
-        err?.response?.data?.message ||
-        (err?.response?.status === 403
-          ? 'Tài khoản không có quyền sửa lịch (Chỉ Quản lý - Manager mới có quyền).'
-          : 'Không thể cập nhật trạng thái lịch định kỳ.')
-      toast.error(msg)
+  const ops = useMemo(
+    () => planSave(baseline, grid, communeOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseline, grid, rows, scopedCommune]
+  )
+  const dirtySegments = useMemo(() => new Set(ops.map((o) => o.segmentId)), [ops])
+  const summaryText = useMemo(() => {
+    const count = { added: 0, moved: 0, changed: 0, removed: 0 }
+    for (const op of ops) {
+      if (op.kind === 'create') count[op.replacesScheduleId ? 'moved' : 'added']++
+      else if (op.kind === 'patch') count.changed++
+      else count.removed++
     }
+    const parts = [
+      count.added && `${count.added} thêm`,
+      count.moved && `${count.moved} chuyển ngày`,
+      count.changed && `${count.changed} sửa`,
+      count.removed && `${count.removed} bỏ`,
+    ].filter(Boolean)
+    return parts.length > 0 ? `Chưa lưu: ${parts.join(' · ')}` : 'Không có thay đổi.'
+  }, [ops])
+
+  const clearRowErrors = (segmentId: string) =>
+    setErrors((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith(`${segmentId}:`)))
+    )
+
+  const handleCellClick = (segmentId: string, day: number) => {
+    const turningOn = grid[segmentId]?.day !== day
+    setGrid((prev) => toggleCell(prev, segmentId, day))
+    clearRowErrors(segmentId)
+    if (turningOn) setExpanded(segmentId)
+    else if (expanded === segmentId) setExpanded(null)
   }
 
-  // Xác nhận xóa cấu hình lịch định kỳ
-  const confirmDeleteSchedule = async () => {
-    if (!deleteTarget?.schedule_id) return
-    setIsDeleting(true)
+  const handleCellEdit = (segmentId: string, patch: Partial<Omit<GridCell, 'day'>>) => {
+    setGrid((prev) => updateCell(prev, segmentId, patch))
+    clearRowErrors(segmentId)
+  }
+
+  const handleSave = async () => {
+    if (ops.length === 0) return
+    setSaving(true)
     try {
-      await workScheduleAPI.deleteRecurringSurveySchedule(deleteTarget.schedule_id)
-      setSchedules((prev) => prev.filter((s) => s.schedule_id !== deleteTarget.schedule_id))
-      toast.success(
-        `Đã xóa cấu hình lịch khảo sát định kỳ cho ${
-          deleteTarget.segment_name || deleteTarget.segment_id
-        }!`
-      )
-      setDeleteTarget(null)
-      onSuccess()
-    } catch (err: any) {
-      console.error('[RecurringSurveyModal] Delete failed:', err)
-      const errObj = err?.response?.data?.error
-      const msg =
-        errObj?.message ||
-        err?.response?.data?.message ||
-        (err?.response?.status === 403
-          ? 'Tài khoản không có quyền xóa lịch (Chỉ Quản lý - Manager mới có quyền).'
-          : 'Không thể xóa cấu hình lịch định kỳ.')
-      toast.error(msg)
+      const result = await executeSave(ops, {
+        create: (body) => workScheduleAPI.createRecurringSurveySchedule(body),
+        patch: (id, body) => workScheduleAPI.patchRecurringSurveySchedule(id, body),
+        remove: (id) => workScheduleAPI.deleteRecurringSurveySchedule(id),
+      })
+      const fresh = await workScheduleAPI.getRecurringSurveySchedules(scopedCommune)
+      const nextBaseline = buildBaseline(fresh.items ?? [])
+      const nextGrid = gridFromBaseline(nextBaseline)
+      // Hàng lỗi giữ lựa chọn của người dùng để sửa rồi lưu lại.
+      result.failedSegments.forEach((seg) => {
+        nextGrid[seg] = grid[seg] ?? null
+      })
+      setBaseline(nextBaseline)
+      setGrid(nextGrid)
+      setErrors(result.errors)
+
+      const failed = Object.keys(result.errors).length
+      if (failed === 0) toast.success('Đã lưu lịch khảo sát định kỳ.')
+      else toast.error(`${failed} ô chưa lưu được — xem các ô viền đỏ trên lưới.`)
+      if (result.succeeded > 0) onSuccess()
+    } catch (err) {
+      console.error('[RecurringSurveyModal] Save failed:', err)
+      toast.error('Không thể lưu lịch khảo sát định kỳ.')
     } finally {
-      setIsDeleting(false)
+      setSaving(false)
     }
+  }
+
+  const handleReset = () => {
+    setGrid(gridFromBaseline(baseline))
+    setErrors({})
   }
 
   if (!isOpen) return null
 
+  const savedFor = (segmentId: string, day: number) =>
+    savedItems(segmentId).find((s) => s.day_of_week === day)
+
+  const engineersFor = (segmentId: string) => engineersByCommune[communeOf(segmentId) ?? ''] ?? assignees
+
+  const engineerName = (segmentId: string, userId: string | null) => {
+    if (!userId) return 'Tự động'
+    return (
+      engineersFor(segmentId).find((e) => e.user_id === userId)?.full_name ||
+      savedItems(segmentId).find((s) => s.assigned_to === userId)?.assigned_to_name ||
+      userId
+    )
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/90 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+      <div
+        role="dialog"
+        aria-label="Lịch khảo sát định kỳ tuần"
+        className="w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden rounded-3xl border border-white/70 bg-white/85 backdrop-blur-xl shadow-[0_24px_64px_-16px_rgba(11,114,217,0.35)] animate-in zoom-in-95"
+      >
         {/* HEADER */}
-        <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-linear-to-r from-blue-50/70 to-slate-50 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-blue-500/15 text-blue-700 flex items-center justify-center shrink-0 shadow-xs">
-              <RotateCcw className="w-6 h-6 text-blue-600" />
+        <div className="px-4 py-4 sm:px-6 border-b border-sky-100/80 flex items-start justify-between gap-3 bg-linear-to-r from-sky-50/80 to-white/40 shrink-0">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-[#0B72D9]/10 text-[#0B72D9] flex items-center justify-center shrink-0">
+              <RotateCcw className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
-                  Lịch Khảo Sát Định Kỳ Tuần
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                  Recurring Survey
-                </span>
-              </div>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900">Lịch Khảo Sát Định Kỳ Tuần</h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Thiết lập chu kỳ quét camera AI / đo đêm tự động theo tuần (Mốc chốt 17:00 Thứ Năm).
+                Mỗi tuyến khảo sát một đêm mỗi tuần. Bấm ô để bật / tắt; bấm ô khác cùng hàng để chuyển ngày.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl hover:bg-slate-200/70 text-slate-400 hover:text-slate-700 flex items-center justify-center transition cursor-pointer"
+            aria-label="Đóng"
+            className="w-9 h-9 rounded-xl hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 flex items-center justify-center transition cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* TABS SWITCHER */}
-        <div className="px-6 pt-3 bg-white border-b border-slate-200/70 flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => setActiveTab('list')}
-            className={`pb-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'list'
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <span>Danh sách cấu hình</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-700 font-mono">
-              {schedules.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('create')}
-            className={`pb-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'create'
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Thêm cấu hình mới</span>
-          </button>
-        </div>
-
         {/* BODY */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar bg-slate-50/50">
+        <div className="flex-1 overflow-auto custom-scrollbar">
           {loading ? (
             <div className="py-16 flex flex-col items-center justify-center gap-3 text-slate-500">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              <span className="text-xs font-semibold">Đang tải danh sách lịch định kỳ...</span>
+              <Loader2 className="w-7 h-7 animate-spin text-[#0B72D9]" />
+              <span className="text-xs font-semibold">Đang tải lịch khảo sát định kỳ...</span>
             </div>
-          ) : activeTab === 'list' ? (
-            schedules.length === 0 ? (
-              <div className="py-16 flex flex-col items-center justify-center gap-3 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Calendar className="w-8 h-8" />
-                </div>
-                <h3 className="text-sm font-bold text-slate-800">Chưa có lịch khảo sát định kỳ nào</h3>
-                <p className="text-xs text-slate-500 max-w-md">
-                  Hãy tạo cấu hình định kỳ để hệ thống tự động sinh các ca khảo sát camera AI hàng tuần cho các tuyến đường.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('create')}
-                  className="mt-2 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tạo lịch định kỳ đầu tiên</span>
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {schedules.map((item) => {
-                  const dayObj = DAYS_OF_WEEK.find((d) => d.value === item.day_of_week)
-                  const dayName = dayObj ? dayObj.label : `Thứ ${item.day_of_week}`
-
-                  return (
-                    <div
-                      key={item.schedule_id}
-                      className={`bg-white rounded-2xl p-4 sm:p-5 border transition-all duration-200 shadow-ops flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                        item.is_active ? 'border-slate-200/90' : 'border-slate-200/60 opacity-60 bg-slate-50/80'
-                      }`}
+          ) : rows.length === 0 ? (
+            <div className="py-16 px-6 text-center text-sm text-slate-500">
+              Xã chưa có tuyến đường nào để lập lịch khảo sát.
+            </div>
+          ) : (
+            <table className="w-full min-w-[720px] table-fixed border-separate border-spacing-0 text-xs">
+              <thead className="sticky top-0 z-10">
+                <tr>
+                  <th className="sticky left-0 z-20 bg-white/95 backdrop-blur px-4 py-2.5 text-left font-bold text-slate-600 border-b border-slate-200/70 w-[220px]">
+                    Tuyến đường
+                  </th>
+                  {WEEK_DAYS.map((d) => (
+                    <th
+                      key={d.value}
+                      className="bg-white/95 backdrop-blur px-1 py-2.5 text-center font-bold text-slate-600 border-b border-slate-200/70"
                     >
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-bold font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
-                            {item.schedule_id}
-                          </span>
-                          <h4 className="text-sm font-bold text-slate-900 truncate">
-                            {item.segment_name || item.segment_id}
-                          </h4>
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200/60">
-                            Hàng tuần vào {dayName}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <User className="w-3.5 h-3.5 text-slate-400" />
-                            Phụ trách: <strong className="text-slate-800 font-semibold">{item.assigned_to_name || item.assigned_to || 'Tự động phân bổ'}</strong>
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            Lần chạy đầu: <strong className="text-blue-700 font-mono font-bold">{item.first_occurrence_date}</strong>
-                          </span>
-                        </div>
-
-                        {item.note && (
-                          <p className="text-[11.5px] text-slate-600 italic bg-slate-50 p-2 rounded-xl border border-slate-100">
-                            {item.note}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        {/* Nút Bật / Tắt */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleActive(item)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                            item.is_active
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                          }`}
-                          title={item.is_active ? 'Bấm để tạm dừng lịch này' : 'Bấm để kích hoạt lại lịch này'}
-                        >
-                          {item.is_active ? (
-                            <>
-                              <ToggleRight className="w-4 h-4 text-emerald-600" />
-                              <span>Đang bật</span>
-                            </>
-                          ) : (
-                            <>
-                              <ToggleLeft className="w-4 h-4 text-slate-500" />
-                              <span>Tạm dừng</span>
-                            </>
+                      {d.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const cell = grid[row.segmentId] ?? null
+                  const rowErrors = Object.entries(errors).filter(([k]) => k.startsWith(`${row.segmentId}:`))
+                  const extras = baseline[row.segmentId]?.extras ?? []
+                  const isExpanded = expanded === row.segmentId && cell !== null
+                  const engineers = engineersFor(row.segmentId)
+                  return (
+                    <React.Fragment key={row.segmentId}>
+                      <tr data-testid={`row-${row.segmentId}`}>
+                        <td className="sticky left-0 z-[5] bg-white/95 backdrop-blur px-4 py-2 border-b border-slate-100 align-middle">
+                          <button
+                            type="button"
+                            disabled={!cell}
+                            onClick={() => setExpanded(isExpanded ? null : row.segmentId)}
+                            className="w-full flex items-center gap-1.5 text-left disabled:cursor-default cursor-pointer"
+                            aria-expanded={isExpanded}
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-800 truncate">{row.name}</span>
+                                {dirtySegments.has(row.segmentId) && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Chưa lưu" />
+                                )}
+                              </span>
+                              <span className="block text-[10.5px] text-slate-400 font-mono">
+                                {row.segmentId}
+                                {row.poleCount !== null ? ` · ${row.poleCount} cột` : ''}
+                              </span>
+                            </span>
+                            {cell && (
+                              <ChevronDown
+                                className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition ${isExpanded ? 'rotate-180' : ''}`}
+                              />
+                            )}
+                          </button>
+                          {extras.length > 0 && (
+                            <p className="mt-1 text-[10.5px] text-amber-700">
+                              Lịch thừa {extras.map((e) => dayLabel(e.day_of_week ?? 0)).join(', ')} — sẽ xoá khi lưu
+                            </p>
                           )}
-                        </button>
-
-                        {/* Nút Xóa */}
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(item)}
-                          className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition flex items-center justify-center cursor-pointer"
-                          title="Xóa cấu hình lịch này"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                          {rowErrors.map(([k, e]) => (
+                            <p key={k} className="mt-1 text-[10.5px] text-rose-600 flex items-start gap-1">
+                              <AlertCircle className="w-3 h-3 mt-px shrink-0" />
+                              <span>
+                                {dayLabel(Number(k.split(':').pop()))}: {e.message}
+                              </span>
+                            </p>
+                          ))}
+                        </td>
+                        {WEEK_DAYS.map((d) => {
+                          const on = cell?.day === d.value
+                          const error = errors[cellKey(row.segmentId, d.value)]
+                          const saved = on ? savedFor(row.segmentId, d.value) : undefined
+                          const firstRun =
+                            on && cell!.isActive && saved?.is_active !== false
+                              ? formatDate(saved?.first_occurrence_date)
+                              : ''
+                          return (
+                            <td key={d.value} className="px-1 py-1.5 border-b border-slate-100 align-middle">
+                              <button
+                                type="button"
+                                aria-pressed={on}
+                                aria-label={`${row.name} – ${d.label}`}
+                                title={error ? error.message : undefined}
+                                onClick={() => handleCellClick(row.segmentId, d.value)}
+                                className={`w-full h-12 rounded-xl px-1 flex flex-col items-center justify-center gap-0.5 transition cursor-pointer border ${
+                                  on
+                                    ? cell!.isActive
+                                      ? 'bg-[#0B72D9] border-[#0B72D9] text-white shadow-[0_6px_16px_-6px_rgba(11,114,217,0.7)]'
+                                      : 'bg-sky-50/80 border-dashed border-[#0B72D9]/50 text-[#0B72D9]'
+                                    : 'bg-white/50 border-slate-200/70 hover:bg-sky-50 hover:border-sky-200'
+                                } ${error ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
+                              >
+                                {on ? (
+                                  <>
+                                    <span className="text-[11px] font-bold truncate max-w-full flex items-center gap-1">
+                                      {!cell!.isActive && <Pause className="w-3 h-3" />}
+                                      {cell!.isActive ? engineerName(row.segmentId, cell!.assignedTo) : 'Tạm dừng'}
+                                    </span>
+                                    {firstRun && <span className="text-[10px] opacity-80 font-mono">từ {firstRun}</span>}
+                                  </>
+                                ) : error ? (
+                                  <AlertCircle className="w-4 h-4 text-rose-500" />
+                                ) : null}
+                              </button>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                      {isExpanded && cell && (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-3 border-b border-slate-100 bg-sky-50/50">
+                            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] items-end">
+                              <div className="flex flex-col gap-1">
+                                <label
+                                  htmlFor={`engineer-${row.segmentId}`}
+                                  className="text-[11px] font-bold text-slate-600 flex items-center gap-1"
+                                >
+                                  <User className="w-3.5 h-3.5" /> Kỹ sư phụ trách ({dayLabel(cell.day)})
+                                </label>
+                                {/* select gốc: popover của OpsSelect bị khung cuộn của lưới cắt mất */}
+                                <select
+                                  id={`engineer-${row.segmentId}`}
+                                  value={cell.assignedTo ?? ''}
+                                  onChange={(e) => handleCellEdit(row.segmentId, { assignedTo: e.target.value || null })}
+                                  className="w-full min-h-[38px] text-xs font-semibold text-slate-800 bg-white/80 border border-slate-200 rounded-xl px-3 outline-none focus:border-[#0B72D9] cursor-pointer"
+                                >
+                                  <option value="">Để trống — tự chọn kỹ sư ít việc nhất</option>
+                                  {cell.assignedTo && !engineers.some((e) => e.user_id === cell.assignedTo) && (
+                                    <option value={cell.assignedTo}>{engineerName(row.segmentId, cell.assignedTo)}</option>
+                                  )}
+                                  {engineers.map((eng) => (
+                                    <option key={eng.user_id} value={eng.user_id || ''}>
+                                      {eng.full_name || eng.user_id}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label htmlFor={`note-${row.segmentId}`} className="text-[11px] font-bold text-slate-600">
+                                  Ghi chú
+                                </label>
+                                <input
+                                  id={`note-${row.segmentId}`}
+                                  value={cell.note}
+                                  maxLength={1000}
+                                  onChange={(e) => handleCellEdit(row.segmentId, { note: e.target.value })}
+                                  placeholder="Ghi chú cho phiếu khảo sát..."
+                                  className="w-full min-h-[38px] text-xs text-slate-800 bg-white/80 border border-slate-200 rounded-xl px-3 outline-none focus:border-[#0B72D9]"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleCellEdit(row.segmentId, { isActive: !cell.isActive })}
+                                className={`min-h-[38px] px-3 rounded-xl text-xs font-bold border flex items-center gap-1.5 cursor-pointer transition ${
+                                  cell.isActive
+                                    ? 'bg-white/80 border-slate-200 text-slate-700 hover:bg-white'
+                                    : 'bg-[#0B72D9] border-[#0B72D9] text-white'
+                                }`}
+                              >
+                                {cell.isActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                {cell.isActive ? 'Tạm dừng' : 'Chạy lại'}
+                              </button>
+                            </div>
+                            <p className="mt-2 text-[11px] text-slate-500">
+                              Lần chạy đầu tiên:{' '}
+                              <strong className="text-[#0B72D9] font-mono">
+                                {firstRunText(cell, savedFor(row.segmentId, cell.day))}
+                              </strong>
+                            </p>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   )
                 })}
-              </div>
-            )
-          ) : (
-            /* FORM TẠO MỚI */
-            <form onSubmit={handleCreateSchedule} className="space-y-4 max-w-xl mx-auto py-2">
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-ops space-y-4">
-                {/* Chọn Tuyến đường */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <Route className="w-4 h-4 text-blue-600" />
-                    Tuyến đường khảo sát: <span className="text-rose-500">*</span>
-                  </label>
-                  <OpsSelect
-                    value={selectedSegmentId}
-                    onChange={(val) => setSelectedSegmentId(val)}
-                    icon={<Route className="w-3.5 h-3.5" />}
-                    headerLabel="Tuyến đường khảo sát"
-                    headerBadge={`${segments.length} tuyến`}
-                    ariaLabel="Tuyến đường khảo sát"
-                    className="w-full"
-                    triggerClassName="w-full min-h-[42px] px-3 py-2"
-                    popoverClassName="w-full"
-                    showTriggerBadge={false}
-                    options={[
-                      { value: '', label: '-- Chọn tuyến đường --' },
-                      ...segments.map((seg) => ({
-                        value: seg.segment_id || '',
-                        label: `${seg.segment_name || seg.segment_id} (${seg.pole_count || 0} cột)`,
-                        nativeLabel: `${seg.segment_name || seg.segment_id} (${seg.pole_count || 0} cột)`,
-                        badge: `${seg.pole_count || 0} cột`,
-                        dotColor: 'bg-teal-500',
-                      })),
-                    ]}
-                  />
-                </div>
-
-                {/* Chọn Thứ trong tuần (Hỗ trợ đa chọn Multi-select) */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-blue-600" />
-                      Thứ trong tuần (Chu kỳ lặp): <span className="text-rose-500">*</span>
-                    </label>
-                    <span className="text-[11px] font-medium text-slate-400">
-                      Có thể chọn nhiều thứ (đã chọn {selectedDaysOfWeek.length} ngày)
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-                    {DAYS_OF_WEEK.map((d) => {
-                      const isSelected = selectedDaysOfWeek.includes(d.value)
-                      return (
-                        <button
-                          key={d.value}
-                          type="button"
-                          onClick={() => {
-                            setSelectedDaysOfWeek((prev) => {
-                              if (prev.includes(d.value)) {
-                                if (prev.length === 1) {
-                                  toast.info('Cần chọn ít nhất một ngày trong tuần cho chu kỳ lặp.')
-                                  return prev
-                                }
-                                return prev.filter((v) => v !== d.value)
-                              }
-                              return [...prev, d.value].sort((a, b) => a - b)
-                            })
-                          }}
-                          className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition cursor-pointer border ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-400/30'
-                              : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100'
-                          }`}
-                        >
-                          {d.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* Chọn Kỹ sư phụ trách */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <User className="w-4 h-4 text-blue-600" />
-                    Kỹ sư phụ trách (Tùy chọn):
-                  </label>
-                  <OpsSelect
-                    value={selectedAssignee}
-                    onChange={(val) => setSelectedAssignee(val)}
-                    icon={<User className="w-3.5 h-3.5" />}
-                    headerLabel="Kỹ sư hiện trường"
-                    headerBadge={`${engineers.length} kỹ sư`}
-                    ariaLabel="Kỹ sư phụ trách"
-                    className="w-full"
-                    triggerClassName="w-full min-h-[42px] px-3 py-2"
-                    popoverClassName="w-full"
-                    showTriggerBadge={false}
-                    options={[
-                      {
-                        value: '',
-                        label: '-- Để trống (Tự động chọn kỹ sư ít việc nhất) --',
-                      },
-                      ...engineers.map((eng) => ({
-                        value: eng.user_id || '',
-                        label: eng.full_name || eng.user_id || '',
-                        nativeLabel: eng.full_name || eng.user_id || '',
-                        dotColor: 'bg-blue-500',
-                      })),
-                    ]}
-                  />
-                  <p className="text-[11px] text-slate-400">
-                    Nếu để trống, hệ thống sẽ tự động chỉ định kỹ sư có ít ca nhất trong tuần chạy khảo sát.
-                  </p>
-                </div>
-
-                {/* Ghi chú */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-700">Ghi chú / Yêu cầu thiết bị:</label>
-                  <textarea
-                    rows={2}
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Nhập ghi chú cho ca khảo sát..."
-                    className="w-full text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200/90 rounded-xl p-3 outline-none focus:border-blue-500 focus:bg-white transition"
-                  />
-                </div>
-
-                {/* KHUNG THÔNG BÁO THỜI ĐIỂM HIỆU LỰC (QUY TẮC MỐC 17:00 THỨ NĂM) */}
-                <div className="p-3.5 bg-linear-to-r from-blue-50 to-teal-50 border border-blue-200/80 rounded-2xl flex items-start gap-3 text-xs">
-                  <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <div className="font-bold text-blue-950 flex flex-wrap items-center gap-1.5">
-                      <span>Lần chạy đầu tiên:</span>
-                      <strong className="text-blue-700 font-mono text-[12.5px]">
-                        {previewEffectiveInfo.occurrencesText}
-                      </strong>
-                    </div>
-                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
-                      {previewEffectiveInfo.cutoffDesc}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2.5 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('list')}
-                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-                  >
-                    Quay lại danh sách
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting || !selectedSegmentId || selectedDaysOfWeek.length === 0}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Đang lưu ({selectedDaysOfWeek.length} lịch)...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Lưu {selectedDaysOfWeek.length > 1 ? `${selectedDaysOfWeek.length} ` : ''}lịch định kỳ</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </form>
+              </tbody>
+            </table>
           )}
         </div>
-      </div>
 
-      {/* POPUP XÁC NHẬN XÓA TÙY BIẾN HIỆN ĐẠI (THAY THẾ WINDOW.CONFIRM) */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 px-6 border-b border-slate-100 bg-rose-50/50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200 shadow-xs">
-                  <Trash2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                    Xác Nhận Xóa Lịch Định Kỳ
-                  </h3>
-                  <p className="text-[11px] font-mono text-slate-500">
-                    {deleteTarget.schedule_id}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => !isDeleting && setDeleteTarget(null)}
-                disabled={isDeleting}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition cursor-pointer disabled:opacity-50"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6 space-y-4">
-              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                <div className="text-xs text-rose-900 space-y-1">
-                  <p className="font-bold">Cảnh báo thao tác:</p>
-                  <p className="text-[11.5px] leading-relaxed text-rose-800">
-                    Bạn có chắc chắn muốn xóa lịch khảo sát định kỳ của tuyến{' '}
-                    <strong className="font-semibold text-rose-950">
-                      {deleteTarget.segment_name || deleteTarget.segment_id}
-                    </strong>{' '}
-                    vào{' '}
-                    <strong className="font-semibold text-rose-950">
-                      {DAYS_OF_WEEK.find((d) => d.value === deleteTarget.day_of_week)?.label ||
-                        `Thứ ${deleteTarget.day_of_week}`}
-                    </strong>
-                    ?
-                  </p>
-                  <p className="text-[11px] text-rose-700/90 pt-1">
-                    Hệ thống sẽ ngừng tự động sinh phiếu khảo sát hàng tuần cho tuyến này. Các phiếu khảo sát đã được sinh trước đây vẫn được lưu trữ an toàn.
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(null)}
-                  disabled={isDeleting}
-                  className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 transition cursor-pointer disabled:opacity-50"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDeleteSchedule}
-                  disabled={isDeleting}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isDeleting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Đang xóa...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      <span>Xác nhận xóa</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+        {/* FOOTER */}
+        <div className="px-4 py-3 sm:px-6 border-t border-slate-200/70 bg-white/70 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <span className="text-xs text-slate-500">{summaryText}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={ops.length === 0 || saving}
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer disabled:opacity-40 disabled:cursor-default"
+            >
+              Hoàn tác
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={ops.length === 0 || saving || loading}
+              className="flex items-center gap-2 px-5 py-2 bg-[#0B72D9] hover:bg-[#0961b8] text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer disabled:opacity-40 disabled:cursor-default"
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving ? 'Đang lưu...' : `Lưu ${ops.length > 0 ? `${ops.length} ` : ''}thay đổi`}
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
