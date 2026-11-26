@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { X, Calendar, MapPin, User, FileText, Layers, Upload, FileCheck, Trash2, Cpu, Wrench, Download, ExternalLink } from 'lucide-react'
+import {
+  X,
+  Calendar,
+  MapPin,
+  User,
+  FileText,
+  Upload,
+  FileCheck,
+  Trash2,
+  Cpu,
+  Wrench,
+  Download,
+  ExternalLink,
+  ScanLine,
+  ClipboardCheck,
+  MapPinned,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import type { RootState } from '../../../redux/rootReducer'
 import { fetchAssetsRequest } from '../../../feature/assets/assetSlice'
@@ -14,6 +30,13 @@ import { extractSegmentId } from '../../../utils/work-schedule/poleUtils'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 import { LateNightScheduleWarning } from './LateNightScheduleWarning'
 import { iotAnomalyLabel } from '../../../constants/iot'
+
+const PHASE_ICONS: Partial<Record<TaskKind, React.ReactNode>> = {
+  survey: <ScanLine className="w-3.5 h-3.5" />,
+  inspection: <ClipboardCheck className="w-3.5 h-3.5" />,
+  repair: <Wrench className="w-3.5 h-3.5" />,
+  pole_gps_update: <MapPinned className="w-3.5 h-3.5" />,
+}
 
 interface IotWorkOrderTarget {
   cabinetId?: string | null
@@ -460,7 +483,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               <OpsSelect
                 value={initPhase}
                 onChange={(val) => setInitPhase(val as TaskKind)}
-                icon={<Layers className="w-3.5 h-3.5" />}
+                icon={PHASE_ICONS[initPhase] || <ScanLine className="w-3.5 h-3.5" />}
                 headerLabel="Giai đoạn khởi động"
                 headerBadge="4 loại"
                 ariaLabel="Khởi động tại giai đoạn"
@@ -471,31 +494,39 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                 options={[
                   {
                     value: 'survey',
-                    label: '1. Khảo sát',
-                    nativeLabel: '🟡 1. Khảo sát',
+                    label: 'Khảo sát',
+                    nativeLabel: 'Khảo sát (Bước 1)',
                     subLabel: 'Rà quét camera AI & đo kiểm toàn tuyến ban đêm',
-                    dotColor: 'bg-amber-400',
+                    badge: 'Bước 1',
+                    icon: PHASE_ICONS.survey,
+                    iconClassName: 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400',
                   },
                   {
                     value: 'inspection',
-                    label: '2. Kiểm tra',
-                    nativeLabel: '🔵 2. Kiểm tra',
+                    label: 'Kiểm tra',
+                    nativeLabel: 'Kiểm tra (Bước 2)',
                     subLabel: 'Kiểm tra xác minh thực địa các cột có sự cố',
-                    dotColor: 'bg-blue-500',
+                    badge: 'Bước 2',
+                    icon: PHASE_ICONS.inspection,
+                    iconClassName: 'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
                   },
                   {
                     value: 'repair',
-                    label: '3. Sửa chữa',
-                    nativeLabel: '🟢 3. Sửa chữa',
+                    label: 'Sửa chữa',
+                    nativeLabel: 'Sửa chữa (Bước 3)',
                     subLabel: 'Khắc phục & thay thế thiết bị cho sự cố đã xác nhận',
-                    dotColor: 'bg-emerald-500',
+                    badge: 'Bước 3',
+                    icon: PHASE_ICONS.repair,
+                    iconClassName: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400',
                   },
                   {
                     value: 'pole_gps_update',
                     label: 'Cập nhật vị trí cột',
-                    nativeLabel: '🟣 Cập nhật vị trí cột (Độc lập)',
-                    subLabel: 'Giai đoạn độc lập: Gửi PDF QR & thu thập tọa độ GPS cột',
-                    dotColor: 'bg-violet-500',
+                    nativeLabel: 'Cập nhật vị trí cột (Độc lập)',
+                    subLabel: 'Dán tem QR & thu thập tọa độ GPS cột',
+                    badge: 'Độc lập',
+                    icon: PHASE_ICONS.pole_gps_update,
+                    iconClassName: 'bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400',
                   },
                 ]}
               />
