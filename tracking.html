@@ -28,6 +28,14 @@
     <section>
       <h2>Đã hoàn thành</h2>
       <dl>
+        <dt>26/11/2026 — Báo cáo QR công dân: gửi toạ độ bằng dấu chấm thập phân</dt>
+        <dd>Mọi báo cáo QR có vị trí đều 400 trên VPS (<code>lat and lng come together, as finite WGS 84 degrees</code>). <code>submitReport</code> đổi <code>.</code> thành <code>,</code> cho máy Windows vi-VN; VPS (culture invariant) đọc phẩy là phân cách hàng nghìn → <code>10,82</code> thành 1082. Giờ gửi <code>String(lat)</code> / <code>String(lng)</code>. Backend cùng lúc ghim culture invariant cho mọi request (<code>fix/FORM-invariant-culture</code>) nên máy dev Windows cũng đọc dấu chấm đúng.</dd>
+        <dt>File thay đổi</dt>
+        <dd><code>src/feature/citizen-report/citizenReportAPI.ts</code>; <code>tracking.html</code>.</dd>
+        <dt>Commit</dt>
+        <dd><code>fix(citizen-report): send coordinates with a decimal point</code> — nhánh <code>fix/citizen-report-decimal-point</code>.</dd>
+        <dt>Kiểm chứng</dt>
+        <dd>✅ <code>tsc</code>, eslint (0 lỗi, file sửa không cảnh báo), build, <code>vitest</code> 965/965. Nguyên nhân xác nhận bằng log VPS (5 lần 400 lúc 13:45–13:47 UTC) và parse thử. ⚠️ Chưa gửi báo cáo thật trên trình duyệt.</dd>
         <dt>26/11/2026 — Khảo sát định kỳ: lưới tuần, mỗi tuyến một ngày</dt>
         <dd>Modal "Lịch Khảo Sát Định Kỳ Tuần" bỏ form "1 tuyến + nhiều thứ" và tab "Danh sách cấu hình", thay bằng lưới: mỗi hàng một tuyến của xã, 7 cột Thứ Hai → Chủ Nhật. Bấm ô để bật / tắt; mỗi hàng bật tối đa một ô, bấm ô khác là chuyển ngày (job backend chỉ sinh một phiếu khảo sát cho một tuyến mỗi tuần, nên thứ thứ hai không bao giờ ra phiếu). Mở hàng để chọn kỹ sư (trống = tự chọn kỹ sư ít việc nhất), sửa ghi chú, tạm dừng (<code>is_active=false</code>); ô hiện "từ dd/mm" theo <code>first_occurrence_date</code>. Lưu theo diff: ô mới → POST, đổi kỹ sư / ghi chú / tạm dừng → PATCH, bỏ ô → DELETE; chuyển ngày → POST ngày mới rồi DELETE lịch cũ (PATCH backend không nhận <code>day_of_week</code>), lịch cũ chỉ xoá khi tạo được lịch mới. Lỗi (409 <code>SURVEY_SCHEDULE_EXISTS</code>, <code>CROSS_COMMUNE_REFERENCE</code>, <code>ASSIGNEE_NOT_ELIGIBLE</code>…) hiện viền đỏ đúng ô và dòng lỗi dưới tên tuyến; hàng lỗi giữ lựa chọn để sửa và lưu lại. Tuyến có nhiều lịch từ form cũ hiện "Lịch thừa … — sẽ xoá khi lưu". <code>getRecurringSurveySchedules</code> tải hết mọi trang (200/trang). Nút "Phân lịch tự động" không đổi.</dd>
         <dt>File thay đổi</dt>
