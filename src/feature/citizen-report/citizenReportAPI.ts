@@ -46,9 +46,9 @@ export const citizenReportAPI = {
       typeof payload.lng === 'number' &&
       Number.isFinite(payload.lng)
     ) {
-      // Chuyển dấu '.' thành ',' để phù hợp với Culture vi-VN của ASP.NET Core trên Windows local
-      formData.append('lat', payload.lat.toString().replace('.', ','))
-      formData.append('lng', payload.lng.toString().replace('.', ','))
+      // Luôn dấu chấm thập phân: BE đọc form theo culture invariant trên mọi máy, dấu phẩy là phân cách hàng nghìn (10,82 → 1082 → 400)
+      formData.append('lat', String(payload.lat))
+      formData.append('lng', String(payload.lng))
     }
     const clientOpId =
       payload.client_op_id ||
