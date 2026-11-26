@@ -373,7 +373,8 @@ export const ManagerDashboardPage: React.FC = () => {
         />
 
         {/* 3. Tình trạng chiếu sáng cạnh danh sách sự cố cần xử lý ngay */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-4 items-stretch">
+        {/* minmax(0, …): a long unbroken line in "Cần xử lý ngay" must truncate, not widen its column past 1.7 : 1 */}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] gap-4 items-stretch">
           <div ref={chartsRef} id="dashboard-charts" className="scroll-mt-4">
             <LightingStatusCard
               barChartData={barChartData}
