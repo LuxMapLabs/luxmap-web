@@ -11,9 +11,6 @@ import {
   Download,
   Eye,
   QrCode,
-  ScanLine,
-  ClipboardCheck,
-  MapPinned,
   Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -30,13 +27,7 @@ import { OpsSelect } from '../../../components/ops/OpsSelect'
 import { LateNightScheduleWarning } from './LateNightScheduleWarning'
 import { iotAnomalyLabel } from '../../../constants/iot'
 import { usePoleQrLabelsPdf } from '../../../hooks/work-schedule/usePoleQrLabelsPdf'
-
-const PHASE_ICONS: Partial<Record<TaskKind, React.ReactNode>> = {
-  survey: <ScanLine className="w-3.5 h-3.5" />,
-  inspection: <ClipboardCheck className="w-3.5 h-3.5" />,
-  repair: <Wrench className="w-3.5 h-3.5" />,
-  pole_gps_update: <MapPinned className="w-3.5 h-3.5" />,
-}
+import { phaseOptionIcon } from '../../../constants/workSchedule'
 
 interface IotWorkOrderTarget {
   cabinetId?: string | null
@@ -432,7 +423,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
               <OpsSelect
                 value={initPhase}
                 onChange={(val) => setInitPhase(val as TaskKind)}
-                icon={PHASE_ICONS[initPhase] || <ScanLine className="w-3.5 h-3.5" />}
+                icon={phaseOptionIcon(initPhase).icon}
                 headerLabel="Giai đoạn khởi động"
                 headerBadge="4 loại"
                 ariaLabel="Khởi động tại giai đoạn"
@@ -447,8 +438,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                     nativeLabel: 'Khảo sát (Bước 1)',
                     subLabel: 'Rà quét camera AI & đo kiểm toàn tuyến ban đêm',
                     badge: 'Bước 1',
-                    icon: PHASE_ICONS.survey,
-                    iconClassName: 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400',
+                    ...phaseOptionIcon('survey'),
                   },
                   {
                     value: 'inspection',
@@ -456,8 +446,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                     nativeLabel: 'Kiểm tra (Bước 2)',
                     subLabel: 'Kiểm tra xác minh thực địa các cột có sự cố',
                     badge: 'Bước 2',
-                    icon: PHASE_ICONS.inspection,
-                    iconClassName: 'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
+                    ...phaseOptionIcon('inspection'),
                   },
                   {
                     value: 'repair',
@@ -465,8 +454,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                     nativeLabel: 'Sửa chữa (Bước 3)',
                     subLabel: 'Khắc phục & thay thế thiết bị cho sự cố đã xác nhận',
                     badge: 'Bước 3',
-                    icon: PHASE_ICONS.repair,
-                    iconClassName: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400',
+                    ...phaseOptionIcon('repair'),
                   },
                   {
                     value: 'pole_gps_update',
@@ -474,8 +462,7 @@ export const CreateManualModal: React.FC<CreateManualModalProps> = ({
                     nativeLabel: 'Cập nhật vị trí cột (Độc lập)',
                     subLabel: 'Dán tem QR & thu thập tọa độ GPS cột',
                     badge: 'Độc lập',
-                    icon: PHASE_ICONS.pole_gps_update,
-                    iconClassName: 'bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400',
+                    ...phaseOptionIcon('pole_gps_update'),
                   },
                 ]}
               />

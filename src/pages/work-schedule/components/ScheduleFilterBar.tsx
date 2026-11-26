@@ -8,10 +8,12 @@ import {
   ChevronRight,
   ChevronDown,
   Zap,
+  CircleCheckBig,
 } from 'lucide-react'
 import { WorkScheduleState, ScheduleCase } from '../../../feature/work-schedule/workScheduleSlice'
 import { OpsSelect } from '../../../components/ops/OpsSelect'
 import { getPhaseOverdueInfo, getLocalTodayYmd } from '../../../utils/work-schedule/scheduleRules'
+import { phaseOptionIcon } from '../../../constants/workSchedule'
 
 interface ScheduleFilterBarProps {
   currentMonth: number
@@ -300,43 +302,44 @@ export const ScheduleFilterBar: React.FC<ScheduleFilterBarProps> = ({
             },
             {
               value: 'survey',
-              label: '1. Khảo sát',
-              nativeLabel: '🟡 1. Khảo sát',
+              label: 'Khảo sát',
+              nativeLabel: `Khảo sát (${metrics.survey})`,
               subLabel: 'Ca quét camera AI & thu thập dữ liệu',
-              dotColor: 'bg-amber-400',
               badge: metrics.survey,
+              ...phaseOptionIcon('survey'),
             },
             {
               value: 'inspection',
-              label: '2. Kiểm tra',
-              nativeLabel: '🔵 2. Kiểm tra',
+              label: 'Kiểm tra',
+              nativeLabel: `Kiểm tra (${metrics.inspection})`,
               subLabel: 'Ca kiểm tra xác minh sự cố hiện trường',
-              dotColor: 'bg-blue-500',
               badge: metrics.inspection,
+              ...phaseOptionIcon('inspection'),
             },
             {
               value: 'repair',
-              label: '3. Sửa chữa',
-              nativeLabel: '🟢 3. Sửa chữa',
+              label: 'Sửa chữa',
+              nativeLabel: `Sửa chữa (${metrics.repair})`,
               subLabel: 'Ca khắc phục & thay thế thiết bị',
-              dotColor: 'bg-emerald-500',
               badge: metrics.repair,
+              ...phaseOptionIcon('repair'),
             },
             {
               value: 'pole_gps_update',
               label: 'Cập nhật vị trí cột',
-              nativeLabel: '🟣 Cập nhật vị trí cột',
+              nativeLabel: `Cập nhật vị trí cột (${metrics.poleGpsUpdate})`,
               subLabel: 'Giai đoạn độc lập: Gắn QR & cập nhật GPS cột',
-              dotColor: 'bg-violet-500',
               badge: metrics.poleGpsUpdate,
+              ...phaseOptionIcon('pole_gps_update'),
             },
             {
               value: 'ended',
               label: 'Đã kết thúc',
-              nativeLabel: `⚪ Đã kết thúc (${metrics.ended})`,
+              nativeLabel: `Đã kết thúc (${metrics.ended})`,
               subLabel: 'Ca đã hoàn thành hoặc đóng hồ sơ',
-              dotColor: 'bg-slate-400',
               badge: metrics.ended,
+              icon: <CircleCheckBig className="w-3.5 h-3.5" />,
+              iconClassName: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
             },
           ]}
         />
