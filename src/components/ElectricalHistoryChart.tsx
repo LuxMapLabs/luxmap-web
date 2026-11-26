@@ -1,5 +1,5 @@
 /** Biểu đồ lịch sử điện từng mẫu dùng chung: hỗ trợ chế độ Gần nhất và Theo ngày (tải theo khúc 6 giờ). */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Activity } from 'lucide-react'
 import {
   Area,
@@ -17,20 +17,25 @@ import { ELECTRICAL_POLL_MS, type ElectricalTimeBasis } from '../feature/iot/iot
 import {
   ELECTRICAL_METRICS,
   ELECTRICAL_METRIC_KEYS,
-  ELECTRICAL_RANGES,
-  ELECTRICAL_RANGE_KEYS,
   ELECTRICAL_HISTORY_MS,
+  ELECTRICAL_WINDOW_PRESETS,
   bucketElectricalPoints,
   buildAxisTicks,
   clampWindowEnd,
+  electricalBucketForWindow,
+  electricalTickStepForWindow,
+  electricalYAxisScale,
   findBackfillRanges,
+  formatReceiveDelay,
   formatRecentAxisTick,
+  formatWindowDuration,
   insertElectricalGaps,
+  isLoneBackfill,
+  parseWindowInput,
   summarizeMetric,
   formatMetric,
   type ElectricalChunkDirection,
   type ElectricalMetric,
-  type ElectricalRange,
   type ElectricalBucketPoint,
 } from '../utils/iot/electricalSeries'
 import { ElectricalWindowSlider } from './ElectricalWindowSlider'
@@ -50,15 +55,6 @@ const METRIC_TONE: Record<ElectricalMetric, { active: string }> = {
 /** Màu mẫu gửi bù (tím) tách khỏi ba màu chỉ số xanh lá, xanh dương, vàng. */
 const BACKFILL_COLOR = '#7c3aed'
 const BACKFILL_LABEL = 'Gửi bù từ thẻ nhớ'
-
-const RANGE_ORDER: Record<ElectricalRange, number> = { '1h': 1, '6h': 2, '12h': 3 }
-
-/** Bước chia nhãn trục X cố định cho từng khoảng thời gian. */
-const RANGE_TICK_STEP_MS: Record<ElectricalRange, number> = {
-  '1h': 10 * 60_000,      // mỗi 10 phút
-  '6h': 60 * 60_000,      // mỗi 1 giờ
-  '12h': 2 * 60 * 60_000, // mỗi 2 giờ
-}
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
@@ -134,6 +130,16 @@ const formatSpan = (from: number | null, to: number | null) => {
   return `${fullDateTime(from)} – ${pad2(end.getHours())}:${pad2(end.getMinutes())}:${pad2(end.getSeconds())}`
 }
 
+/** Khoảng giờ của một ô gom: `từ 15:10:11 đến 15:14:37` (ngày đã có ở đầu tooltip); thiếu → '-'. */
+const formatClockRange = (from: number | null, to: number | null) => {
+  if (from === null || to === null) return '-'
+  const clock = (t: number) => {
+    const d = new Date(t)
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+  }
+  return from === to ? `lúc ${clock(from)}` : `từ ${clock(from)} đến ${clock(to)}`
+}
+
 const CustomTooltip: React.FC<{
   active?: boolean
   payload?: Array<{ payload: ChartDataPoint }>
@@ -154,7 +160,7 @@ const CustomTooltip: React.FC<{
   } else {
     const endD = new Date(point.time + bucketMs)
     const endTimeStr = `${pad2(endD.getHours())}:${pad2(endD.getMinutes())}`
-    timeDisplay = `${dateStr} ${timeStr} – ${endTimeStr}`
+    timeDisplay = `${dateStr} ${timeStr} – ${endTimeStr} · gom ${formatWindowDuration(bucketMs)}`
   }
 
   const val = point[metric]
@@ -170,66 +176,166 @@ const CustomTooltip: React.FC<{
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs p-2.5 shadow-lg text-xs space-y-1 z-50">
       <p className="font-mono text-slate-500 dark:text-slate-400 font-semibold">{timeDisplay}</p>
       <p className="font-semibold text-slate-800 dark:text-slate-100">
-        {point.count <= 1 ? 'Giá trị' : 'Trung bình'}: <span className="font-mono">{valStr}</span>
+        {point.count <= 1 ? 'Giá trị' : `Trung bình ${point.count} mẫu`}: <span className="font-mono">{valStr}</span>
       </p>
-      <p className="text-slate-600 dark:text-slate-300">
-        Giờ đo: <span className="font-mono">{formatSpan(point.measuredFrom, point.measuredTo)}</span>
-      </p>
-      <p className="text-slate-600 dark:text-slate-300">
-        Giờ nhận: <span className="font-mono">{formatSpan(point.receivedFrom, point.receivedTo)}</span>
-      </p>
+      {point.count > 1 && minMaxStr && (
+        <p className="text-slate-600 dark:text-slate-300">
+          Thấp – cao: <span className="font-mono">{minMaxStr}</span>
+        </p>
+      )}
+      {point.count <= 1 ? (
+        <>
+          <p className="text-slate-600 dark:text-slate-300">
+            Giờ đo: <span className="font-mono">{formatSpan(point.measuredFrom, point.measuredTo)}</span>
+          </p>
+          <p className="text-slate-600 dark:text-slate-300">
+            Giờ nhận: <span className="font-mono">{formatSpan(point.receivedFrom, point.receivedTo)}</span>
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-slate-600 dark:text-slate-300">
+            Giờ đo: {formatClockRange(point.measuredFrom, point.measuredTo)}
+          </p>
+          <p className="text-slate-600 dark:text-slate-300">
+            Giờ nhận: {formatClockRange(point.receivedFrom, point.receivedTo)}
+          </p>
+        </>
+      )}
       {point.backfillCount > 0 && (
         <p className="font-semibold" style={{ color: BACKFILL_COLOR }}>
           {point.count <= 1
-            ? `${BACKFILL_LABEL} (node mất kết nối, gửi lại sau)`
-            : `${point.backfillCount}/${point.count} mẫu là ${BACKFILL_LABEL.toLowerCase()}`}
-        </p>
-      )}
-      {point.count > 1 && (
-        <p className="text-slate-600 dark:text-slate-300">
-          {minMaxStr && <>Dao động: <span className="font-mono">{minMaxStr}</span> · </>}
-          <span>{point.count} mẫu</span>
+            ? point.measuredFrom !== null && point.receivedFrom !== null
+              ? `${BACKFILL_LABEL} · đã nhận, trễ ${formatReceiveDelay(point.receivedFrom - point.measuredFrom)}`
+              : `${BACKFILL_LABEL} · đã nhận`
+            : `${point.backfillCount}/${point.count} mẫu là ${BACKFILL_LABEL.toLowerCase()}, đã nhận`}
         </p>
       )}
     </div>
   )
 }
 
+type WindowUnit = 'minute' | 'hour'
+
+/** Số hiện trong ô nhập: chia hết cho 1 giờ thì hiện theo giờ, còn lại theo phút. */
+const toWindowDraft = (ms: number): { text: string; unit: WindowUnit } =>
+  ms % 3_600_000 === 0
+    ? { text: String(ms / 3_600_000), unit: 'hour' }
+    : { text: String(Math.round(ms / 60_000)), unit: 'minute' }
+
+/** Chọn độ dài khung xem: nút chọn nhanh và ô nhập số phút/giờ. */
 export const ElectricalRangeToggle: React.FC<{
-  value: ElectricalRange
-  onChange: (r: ElectricalRange) => void
-}> = ({ value, onChange }) => (
-  <div
-    role="group"
-    aria-label="Khoảng thời gian"
-    className="inline-flex shrink-0 items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800"
-  >
-    {ELECTRICAL_RANGE_KEYS.map((k) => (
-      <button
-        key={k}
-        type="button"
-        aria-pressed={value === k}
-        onClick={() => onChange(k)}
-        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
-          value === k
-            ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-        }`}
+  value: number
+  onChange: (ms: number) => void
+  maxMs: number
+}> = ({ value, onChange, maxMs }) => {
+  const inputId = useId()
+  const errorId = useId()
+  const [draft, setDraft] = useState(() => toWindowDraft(value))
+  const [invalid, setInvalid] = useState(false)
+  const [syncedValue, setSyncedValue] = useState(value)
+  if (syncedValue !== value) {
+    setSyncedValue(value)
+    setDraft(toWindowDraft(value))
+    setInvalid(false)
+  }
+
+  const commit = (text: string, unit: WindowUnit) => {
+    const ms = parseWindowInput(text, unit, maxMs)
+    if (ms === null) {
+      setInvalid(true)
+      return
+    }
+    setInvalid(false)
+    if (ms !== value) onChange(ms)
+    else setDraft(toWindowDraft(ms))
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <div
+        role="group"
+        aria-label="Khoảng thời gian"
+        className="inline-flex shrink-0 items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800"
       >
-        {ELECTRICAL_RANGES[k].label}
-      </button>
-    ))}
-  </div>
-)
+        {ELECTRICAL_WINDOW_PRESETS.filter((p) => p.ms <= maxMs).map((p) => (
+          <button
+            key={p.ms}
+            type="button"
+            aria-pressed={value === p.ms}
+            onClick={() => onChange(p.ms)}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
+              value === p.ms
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="relative inline-flex shrink-0 items-center gap-1.5">
+        <label htmlFor={inputId} className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          Tùy chọn
+        </label>
+        <div
+          className={`inline-flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 ring-1 ${
+            invalid ? 'ring-red-500' : 'ring-transparent'
+          }`}
+        >
+          <input
+            id={inputId}
+            type="text"
+            inputMode="decimal"
+            value={draft.text}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? errorId : undefined}
+            onChange={(e) => {
+              setDraft({ ...draft, text: e.target.value })
+              setInvalid(false)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit(draft.text, draft.unit)
+            }}
+            onBlur={() => commit(draft.text, draft.unit)}
+            className="w-11 px-1.5 py-1 rounded-md bg-white dark:bg-slate-900 text-[11px] font-semibold text-right text-slate-900 dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500"
+          />
+          <select
+            aria-label="Đơn vị"
+            value={draft.unit}
+            onChange={(e) => {
+              const unit = e.target.value as WindowUnit
+              setDraft({ ...draft, unit })
+              commit(draft.text, unit)
+            }}
+            className="pl-1 pr-0.5 py-1 bg-transparent text-[11px] font-semibold text-slate-600 dark:text-slate-300 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500 rounded-md"
+          >
+            <option value="minute">phút</option>
+            <option value="hour">giờ</option>
+          </select>
+        </div>
+        {invalid && (
+          <p
+            id={errorId}
+            role="alert"
+            className="absolute right-0 top-full mt-1 z-10 whitespace-nowrap text-[10.5px] font-medium text-red-600 dark:text-red-400"
+          >
+            Nhập từ 5 phút đến {formatWindowDuration(maxMs)}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 /** Khung biểu đồ và thẻ chỉ số của mạch đang chọn */
 export const ElectricalHistoryChart: React.FC<{
   feederId: string
   live: boolean
-  range: ElectricalRange
+  windowMs: number
   timeBasis?: ElectricalTimeBasis
   dateRange?: { from: Date; to: Date } | null
-}> = ({ feederId, live, range, timeBasis = 'measured_at', dateRange = null }) => {
+}> = ({ feederId, live, windowMs, timeBasis = 'measured_at', dateRange = null }) => {
   const boundsFrom = dateRange ? dateRange.from.getTime() : null
   const boundsTo = dateRange ? dateRange.to.getTime() : null
   const bounds = useMemo(
@@ -266,8 +372,6 @@ export const ElectricalHistoryChart: React.FC<{
     }
   }, [feederId, timeBasis, boundsFrom, boundsTo])
 
-  const windowMs = ELECTRICAL_RANGES[range].windowMs
-
   // Chế độ Theo ngày: track phủ toàn bộ [bounds.from, bounds.to]; chế độ Gần nhất: 24 giờ gần nhất.
   const trackStart = bounds ? bounds.from : nowMs - ELECTRICAL_HISTORY_MS
   const trackEnd = bounds ? bounds.to : nowMs
@@ -284,7 +388,7 @@ export const ElectricalHistoryChart: React.FC<{
       : clampWindowEnd(pinnedEnd, minWindowEnd, maxWindowEnd)
   const windowStart = windowEnd - effectiveWindowMs
 
-  // Khi đổi 1h/6h/12h: giữ mốc cuối đang xem và kẹp lại trong phạm vi track.
+  // Khi đổi độ dài khung: giữ mốc cuối đang xem và kẹp lại trong phạm vi track.
   useEffect(() => {
     if (bounds) {
       setWindowEndMs((prev) => clampWindowEnd(prev, minWindowEnd, maxWindowEnd))
@@ -293,7 +397,7 @@ export const ElectricalHistoryChart: React.FC<{
         prev === null ? null : clampWindowEnd(prev, minWindowEnd, maxWindowEnd)
       )
     }
-  }, [range, bounds, minWindowEnd, maxWindowEnd])
+  }, [windowMs, bounds, minWindowEnd, maxWindowEnd])
 
   // Hợp nhất cả hai chế độ vào useElectricalChunks (chế độ Theo ngày truyền live = false, track = bounds, bounds).
   const { points, latest, viewLoading } = useElectricalChunks(feederId, {
@@ -348,7 +452,10 @@ export const ElectricalHistoryChart: React.FC<{
     [points, windowStart, windowEnd]
   )
 
-  const bucketMs = ELECTRICAL_RANGES[range].bucketMs
+  // Trục Y theo thấp nhất/cao nhất của các mẫu trong khung đang xem.
+  const yScale = useMemo(() => electricalYAxisScale(rangePoints, metric), [rangePoints, metric])
+
+  const { bucketMs, hint } = electricalBucketForWindow(effectiveWindowMs)
 
   const series = useMemo(
     () => insertElectricalGaps(bucketElectricalPoints(rangePoints, bucketMs), bucketMs),
@@ -369,17 +476,19 @@ export const ElectricalHistoryChart: React.FC<{
   )
 
   const backfillRanges = useMemo(() => findBackfillRanges(series, bucketMs), [series, bucketMs])
+  // Nền tím rộng tối thiểu 1/200 khung (~3px) để mẫu gửi bù lẻ vẫn thấy vị trí.
+  const minBackfillMs = effectiveWindowMs / 200
 
   const xTicks = useMemo(
-    () => buildAxisTicks(windowStart, windowEnd, RANGE_TICK_STEP_MS[range]),
-    [windowStart, windowEnd, range]
+    () => buildAxisTicks(windowStart, windowEnd, electricalTickStepForWindow(effectiveWindowMs)),
+    [windowStart, windowEnd, effectiveWindowMs]
   )
 
-  const prevRangeRef = useRef<ElectricalRange | null>(null)
-  const isInitialMount = prevRangeRef.current === null
+  const prevWindowMsRef = useRef<number | null>(null)
+  const prevWindowMs = prevWindowMsRef.current
   const swapFrom =
-    !isInitialMount && prevRangeRef.current !== range
-      ? RANGE_ORDER[range] < RANGE_ORDER[prevRangeRef.current!]
+    prevWindowMs !== null && prevWindowMs !== windowMs
+      ? windowMs < prevWindowMs
         ? 0.6
         : 1.4
       : undefined
@@ -387,8 +496,8 @@ export const ElectricalHistoryChart: React.FC<{
   const swapStyle = swapFrom ? ({ ['--swap-from' as string]: swapFrom } as React.CSSProperties) : undefined
 
   useEffect(() => {
-    prevRangeRef.current = range
-  }, [range])
+    prevWindowMsRef.current = windowMs
+  }, [windowMs])
 
   return (
     <div className="flex-1 min-h-0 p-4 sm:p-5 flex flex-col md:flex-row gap-4">
@@ -438,7 +547,7 @@ export const ElectricalHistoryChart: React.FC<{
             />
             {latest ? <>Mẫu gần nhất {fullDateTime(latest.time)}</> : 'Chưa có mẫu'}
           </p>
-          <p>{`${rangePoints.length} mẫu trong ${ELECTRICAL_RANGES[range].label}`}</p>
+          <p>{`${rangePoints.length} mẫu trong ${formatWindowDuration(effectiveWindowMs)}`}</p>
           {isDateRange ? (
             <p>Xem theo khoảng ngày, không tự cập nhật</p>
           ) : live ? (
@@ -470,10 +579,10 @@ export const ElectricalHistoryChart: React.FC<{
             <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
               {bounds ? (
                 <>
-                  Khoảng đã chọn {fullTime(bounds.from)} – {fullTime(bounds.to)} · {ELECTRICAL_RANGES[range].hint}
+                  Khoảng đã chọn {fullTime(bounds.from)} – {fullTime(bounds.to)} · {hint}
                 </>
               ) : (
-                ELECTRICAL_RANGES[range].hint
+                hint
               )}
             </p>
           </div>
@@ -556,7 +665,7 @@ export const ElectricalHistoryChart: React.FC<{
             <div
               className={`flex-1 min-h-0 ${swapClass}`}
               style={swapStyle}
-              key={bounds ? `${bounds.from}-${bounds.to}-${range}` : range}
+              key={bounds ? `${bounds.from}-${bounds.to}-${windowMs}` : windowMs}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ top: 20, right: 36, bottom: 0, left: 0 }}>
@@ -570,32 +679,38 @@ export const ElectricalHistoryChart: React.FC<{
                     allowDataOverflow
                     height={34}
                     tick={<ElectricalXAxisTick firstTick={xTicks[0]} />}
+                    // Cho Recharts đo độ rộng nhãn theo chữ giờ "HH:mm" thay vì số ms thô, để không bỏ bớt nhãn.
+                    tickFormatter={(v: number) => formatRecentAxisTick(v, false).clock}
                     minTickGap={24}
                     stroke="#94a3b8"
                     fontSize={10}
                   />
                   <YAxis
                     width={56}
-                    domain={['auto', 'auto']}
+                    domain={yScale ? yScale.domain : ['auto', 'auto']}
+                    ticks={yScale ? yScale.ticks : undefined}
                     tickFormatter={(val) => {
                       if (!Number.isFinite(val)) return ''
-                      const digits = metric === 'voltage' ? 2 : 0
+                      const digits = yScale ? yScale.digits : metric === 'voltage' ? 2 : 0
                       return Number(val).toFixed(digits)
                     }}
                     stroke="#94a3b8"
                     fontSize={10}
                   />
-                  {backfillRanges.map((r) => (
-                    <ReferenceArea
-                      key={`backfill-${r.start}`}
-                      x1={Math.max(r.start, windowStart)}
-                      x2={Math.min(r.end, windowEnd)}
-                      fill={BACKFILL_COLOR}
-                      fillOpacity={0.12}
-                      stroke="none"
-                      ifOverflow="hidden"
-                    />
-                  ))}
+                  {backfillRanges.map((r) => {
+                    const pad = Math.max(0, (minBackfillMs - (r.end - r.start)) / 2)
+                    return (
+                      <ReferenceArea
+                        key={`backfill-${r.start}`}
+                        x1={Math.max(r.start - pad, windowStart)}
+                        x2={Math.min(r.end + pad, windowEnd)}
+                        fill={BACKFILL_COLOR}
+                        fillOpacity={0.12}
+                        stroke="none"
+                        ifOverflow="hidden"
+                      />
+                    )
+                  })}
                   {bucketMs > 0 && (
                     <Area
                       type="monotone"
@@ -622,7 +737,14 @@ export const ElectricalHistoryChart: React.FC<{
                     stroke={BACKFILL_COLOR}
                     strokeWidth={2}
                     strokeDasharray="4 3"
-                    dot={false}
+                    // Mẫu gửi bù đứng lẻ: chấm tím đè lên đường trực tiếp.
+                    dot={({ cx, cy, index }: { cx?: number; cy?: number; index?: number }) =>
+                      typeof cx === 'number' && typeof cy === 'number' && index !== undefined && isLoneBackfill(series, index) ? (
+                        <circle key={`lone-backfill-${index}`} cx={cx} cy={cy} r={3} fill={BACKFILL_COLOR} stroke="#fff" strokeWidth={1} />
+                      ) : (
+                        <g key={`lone-backfill-${index}`} />
+                      )
+                    }
                     activeDot={false}
                     connectNulls={false}
                     isAnimationActive={false}

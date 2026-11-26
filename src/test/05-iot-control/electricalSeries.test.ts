@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ELECTRICAL_RANGES,
-  ELECTRICAL_RANGE_KEYS,
   ELECTRICAL_HISTORY_MS,
+  ELECTRICAL_MAX_WINDOW_MS,
+  electricalBucketForWindow,
+  electricalTickStepForWindow,
+  electricalYAxisScale,
+  formatWindowDuration,
+  parseWindowInput,
   RAW_GAP_THRESHOLD_MS,
   sliceWindow,
   bucketElectricalPoints,
@@ -14,6 +18,8 @@ import {
   summarizeMetric,
   toElectricalPoint,
   findBackfillRanges,
+  isLoneBackfill,
+  formatReceiveDelay,
   type ElectricalPoint,
 } from '../../utils/iot/electricalSeries'
 
@@ -32,18 +38,119 @@ const makePoint = (opts: Partial<ElectricalPoint> & { time: number }): Electrica
 })
 
 describe('electricalSeries', () => {
-  describe('ELECTRICAL_RANGES', () => {
-    it('định nghĩa đủ 3 khoảng 1h, 6h, 12h và ELECTRICAL_HISTORY_MS là 24h', () => {
-      expect(ELECTRICAL_RANGE_KEYS).toEqual(['1h', '6h', '12h'])
-      expect(ELECTRICAL_RANGES['1h'].windowMs).toBe(3_600_000)
-      expect(ELECTRICAL_RANGES['1h'].bucketMs).toBe(0)
-      expect(ELECTRICAL_RANGES['6h'].windowMs).toBe(21_600_000)
-      expect(ELECTRICAL_RANGES['6h'].bucketMs).toBe(60_000)
-      expect(ELECTRICAL_RANGES['12h'].label).toBe('12 giờ')
-      expect(ELECTRICAL_RANGES['12h'].windowMs).toBe(43_200_000)
-      expect(ELECTRICAL_RANGES['12h'].bucketMs).toBe(300_000)
-      expect(ELECTRICAL_RANGES['12h'].hint).toBe('Trung bình mỗi 5 phút')
+  describe('độ dài khung xem', () => {
+    const MIN = 60_000
+    const HOUR = 3_600_000
+
+    it('ELECTRICAL_HISTORY_MS và khung dài nhất là 24 giờ', () => {
       expect(ELECTRICAL_HISTORY_MS).toBe(86_400_000)
+      expect(ELECTRICAL_MAX_WINDOW_MS).toBe(86_400_000)
+    })
+
+    it('electricalBucketForWindow giữ đúng ngưỡng cũ của 1h, 6h, 12h', () => {
+      expect(electricalBucketForWindow(15 * MIN)).toEqual({ bucketMs: 0, hint: 'Từng mẫu (mỗi giây một mẫu)' })
+      expect(electricalBucketForWindow(HOUR).bucketMs).toBe(0)
+      expect(electricalBucketForWindow(90 * MIN)).toEqual({ bucketMs: 60_000, hint: 'Trung bình mỗi phút' })
+      expect(electricalBucketForWindow(6 * HOUR).bucketMs).toBe(60_000)
+      expect(electricalBucketForWindow(12 * HOUR)).toEqual({ bucketMs: 300_000, hint: 'Trung bình mỗi 5 phút' })
+    })
+
+    it('electricalTickStepForWindow chọn bước nhỏ nhất cho tối đa 8 khoảng', () => {
+      expect(electricalTickStepForWindow(5 * MIN)).toBe(MIN)
+      expect(electricalTickStepForWindow(15 * MIN)).toBe(2 * MIN)
+      expect(electricalTickStepForWindow(HOUR)).toBe(10 * MIN)
+      expect(electricalTickStepForWindow(6 * HOUR)).toBe(HOUR)
+      expect(electricalTickStepForWindow(12 * HOUR)).toBe(2 * HOUR)
+      expect(electricalTickStepForWindow(24 * HOUR)).toBe(3 * HOUR)
+    })
+
+    it('formatWindowDuration', () => {
+      expect(formatWindowDuration(5 * MIN)).toBe('5 phút')
+      expect(formatWindowDuration(45 * MIN)).toBe('45 phút')
+      expect(formatWindowDuration(HOUR)).toBe('1 giờ')
+      expect(formatWindowDuration(90 * MIN)).toBe('1 giờ 30 phút')
+      expect(formatWindowDuration(24 * HOUR)).toBe('24 giờ')
+    })
+
+    it('parseWindowInput nhận phút, giờ thập phân và từ chối ngoài [5 phút, max]', () => {
+      const max = 24 * HOUR
+      expect(parseWindowInput('90', 'minute', max)).toBe(90 * MIN)
+      expect(parseWindowInput(' 1,5 ', 'hour', max)).toBe(90 * MIN)
+      expect(parseWindowInput('5', 'minute', max)).toBe(5 * MIN)
+      expect(parseWindowInput('24', 'hour', max)).toBe(max)
+      expect(parseWindowInput('2', 'minute', max)).toBeNull()
+      expect(parseWindowInput('25', 'hour', max)).toBeNull()
+      expect(parseWindowInput('', 'minute', max)).toBeNull()
+      expect(parseWindowInput('abc', 'minute', max)).toBeNull()
+      expect(parseWindowInput('-10', 'minute', max)).toBeNull()
+    })
+  })
+
+  describe('electricalYAxisScale (thang trục Y theo mẫu trong khung)', () => {
+    const pts = (values: (number | null)[]) => values.map((power, i) => makePoint({ time: i * 1000, power }))
+
+    it('khung không có mẫu thì trả null', () => {
+      expect(electricalYAxisScale([], 'power')).toBeNull()
+      expect(electricalYAxisScale(pts([null, null]), 'power')).toBeNull()
+    })
+
+    it('0–465 mW thành 0–500, không đẩy lên 600', () => {
+      expect(electricalYAxisScale(pts([0, 442.1, 465.7]), 'power')).toEqual({
+        domain: [0, 500],
+        ticks: [0, 100, 200, 300, 400, 500],
+        digits: 0,
+      })
+    })
+
+    it('chỉ dao động 420–465 thì trục bám sát 420–470, không kéo về 0', () => {
+      const scale = electricalYAxisScale(pts([421.3, 465.7, 440]), 'power')!
+      expect(scale.domain).toEqual([420, 470])
+      expect(scale.ticks.length).toBeLessThanOrEqual(7)
+    })
+
+    it('điện áp quanh 5 V có số lẻ và mọi mẫu bằng nhau vẫn có khoảng', () => {
+      const v = (values: number[]) => values.map((voltage, i) => makePoint({ time: i * 1000, voltage }))
+      const scale = electricalYAxisScale(v([5.08, 5.104, 5.12]), 'voltage')!
+      expect(scale.domain[0]).toBeLessThanOrEqual(5.08)
+      expect(scale.domain[1]).toBeGreaterThanOrEqual(5.12)
+      expect(scale.digits).toBeGreaterThan(0)
+
+      const flat = electricalYAxisScale(v([5, 5]), 'voltage')!
+      expect(flat.domain[0]).toBeLessThan(5)
+      expect(flat.domain[1]).toBeGreaterThan(5)
+      expect(electricalYAxisScale(pts([0, 0]), 'power')!.domain[0]).toBe(0)
+    })
+  })
+
+  describe('isLoneBackfill (mẫu gửi bù đứng lẻ cần chấm riêng)', () => {
+    const series = (receptions: ('live' | 'backfill')[]) =>
+      bucketElectricalPoints(
+        receptions.map((reception, i) => makePoint({ time: i * 1000, power: 400, reception })),
+        0
+      )
+
+    it('mẫu gửi bù kẹp giữa hai mẫu trực tiếp là lẻ', () => {
+      const s = series(['live', 'backfill', 'live'])
+      expect(isLoneBackfill(s, 0)).toBe(false)
+      expect(isLoneBackfill(s, 1)).toBe(true)
+    })
+
+    it('hai mẫu gửi bù liền nhau không lẻ (đã có nét đứt); ở mép dãy vẫn tính lẻ', () => {
+      const s = series(['backfill', 'backfill', 'live', 'backfill'])
+      expect(isLoneBackfill(s, 0)).toBe(false)
+      expect(isLoneBackfill(s, 1)).toBe(false)
+      expect(isLoneBackfill(s, 3)).toBe(true)
+      expect(isLoneBackfill(s, 9)).toBe(false)
+    })
+  })
+
+  describe('formatReceiveDelay (độ trễ nhận mẫu gửi bù)', () => {
+    it('giây, phút, giờ', () => {
+      expect(formatReceiveDelay(14_000)).toBe('14 giây')
+      expect(formatReceiveDelay(180_000)).toBe('3 phút')
+      expect(formatReceiveDelay(185_000)).toBe('3 phút 5 giây')
+      expect(formatReceiveDelay(2 * 3_600_000 + 600_000)).toBe('2 giờ 10 phút')
+      expect(formatReceiveDelay(-5_000)).toBe('0 giây')
     })
   })
 

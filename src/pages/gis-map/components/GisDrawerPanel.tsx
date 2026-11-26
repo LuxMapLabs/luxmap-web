@@ -63,7 +63,7 @@ import {
   type RetirableFixture,
 } from '../../assets/components/fixtures/components/RetireFixtureModal'
 import { useAuthImage } from '../../../hooks/useAuthImage'
-import { POLE_LAMP_UI, poleFeatureLampState, poleLampState } from '../../../utils/gis-map/poleLampState'
+import { POLE_LAMP_UI, feederHealthUi, feederLampLabel, poleFeatureLampState, poleLampState } from '../../../utils/gis-map/poleLampState'
 import {
   IOT_GATEWAY_STATUS,
   IOT_NODE_STATUS,
@@ -95,15 +95,27 @@ const poleStatusBadge = (p?: { fixture_status?: string | null; power_state?: str
   return { label: ui.label, short: ui.short, className: `border ${ui.badge}` }
 }
 
-// Trạng thái cấp điện của mạch theo power_state do API trả về
-const feederPowerLabel = (state?: string | null) =>
-  state === 'on' ? 'Đang cấp điện' : state === 'off' ? 'Mạch đang tắt' : 'Chưa rõ'
-const feederPowerBadge = (state?: string | null) =>
-  state === 'on'
-    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-    : state === 'off'
-    ? 'bg-white text-slate-700 border-slate-300 dark:bg-slate-900 dark:text-slate-200 dark:border-slate-600'
-    : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+// Sức khỏe mạch (power_state) và bật/tắt (lamp_state) của GET /assets/feeders; API chưa trả thì ghi '-'
+const FEEDER_BADGE_EMPTY = 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+const FeederStateBadges: React.FC<{ powerState?: string | null; lampState?: string | null }> = ({ powerState, lampState }) => {
+  const health = feederHealthUi(powerState)
+  return (
+    <>
+      <span
+        className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${health?.badge ?? FEEDER_BADGE_EMPTY}`}
+        title="Sức khỏe mạch"
+      >
+        {health?.label ?? '-'}
+      </span>
+      <span
+        className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${FEEDER_BADGE_EMPTY}`}
+        title="Bật/tắt"
+      >
+        {feederLampLabel(lampState)}
+      </span>
+    </>
+  )
+}
 
 const fixtureTypeLabel = (type?: string | null) => (type === 'led_road_lamp' ? 'Đèn LED đường phố' : type || '-')
 
@@ -465,7 +477,9 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
           feeder_name: assetMatch?.feeder_name || `Mạch ${idx + 1} - Lộ ${idx + 1}`,
           relay_no: fState.relay_no ?? assetMatch?.control?.relay_no,
           control_mode: fState.control_mode ?? assetMatch?.control?.control_mode,
-          power_state: fState.power_state ?? assetMatch?.power_state,
+          // power_state của /map/cabinets là bật/tắt; sức khỏe chỉ có ở /assets/feeders
+          power_state: assetMatch?.power_state,
+          lamp_state: assetMatch?.lamp_state ?? fState.power_state,
           mode_reported_at: fState.mode_reported_at ?? assetMatch?.control?.mode_reported_at,
           pole_count: feederPoles.length || assetMatch?.pole_count || 0,
           cabinet: {
@@ -1128,7 +1142,6 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                 <div className="space-y-1.5">
                   {cabinetFeeders.map((feeder: any, idx: number) => {
                     const fId = feeder.feeder_id || feeder.external_ref || `fdr-${idx}`
-                    const cabFeeder = (selectedCabinet?.feeders || []).find((cf: any) => cf.feeder_id === fId)
                     const nodeId = feederNodeId(fId, feeder)
                     const currentMode = modeOf(nodeId)
                     const feederPoles = cabinetConnectedPoles.filter(
@@ -1270,13 +1283,7 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                                 <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
                                   {fCode}
                                 </span>
-                                <span
-                                  className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${feederPowerBadge(
-                                    cabFeeder?.power_state ?? feeder.power_state
-                                  )}`}
-                                >
-                                  {feederPowerLabel(cabFeeder?.power_state ?? feeder.power_state)}
-                                </span>
+                                <FeederStateBadges powerState={feeder.power_state} lampState={feeder.lamp_state} />
                                 <span className="whitespace-nowrap">{poleCount} cột đèn</span>
                               </div>
                               {canControlLighting && nodeId && (
@@ -1478,17 +1485,24 @@ export const GisDrawerPanel: React.FC<GisDrawerPanelProps> = ({
                       ).length || selectedFeeder.pole_count || 0} cột đèn
                     </strong>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Trạng thái cấp điện:</span>
-                    <strong className="text-slate-900 dark:text-white">
-                      {feederPowerLabel(
-                        selectedFeeder.power_state ??
-                          (assetFeeders || []).find(
-                            (af: any) => af.feeder_id === (selectedFeeder.feeder_id || selectedFeeder.external_ref)
-                          )?.power_state
-                      )}
-                    </strong>
-                  </div>
+                  {(() => {
+                    // Luôn đọc từ GET /assets/feeders theo id (selectedFeeder có thể là thuộc tính cạnh topology)
+                    const af = (assetFeeders || []).find(
+                      (x: any) => x.feeder_id === (selectedFeeder.feeder_id || selectedFeeder.external_ref)
+                    )
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Sức khỏe mạch:</span>
+                          <strong className="text-slate-900 dark:text-white">{feederHealthUi(af?.power_state)?.label ?? '-'}</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Mạch:</span>
+                          <strong className="text-slate-900 dark:text-white">{feederLampLabel(af?.lamp_state)}</strong>
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
 

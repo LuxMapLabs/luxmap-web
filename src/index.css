@@ -1063,3 +1063,10 @@ button:focus-visible {
     zoom: 1.5;
   }
 }
+
+/* Nút đóng (X) của toast đặt ở góc trên bên phải thay vì bên trái mặc định của Sonner */
+[data-sonner-toast] {
+  --toast-close-button-start: auto;
+  --toast-close-button-end: 0;
+  --toast-close-button-transform: translate(35%, -35%);
+}

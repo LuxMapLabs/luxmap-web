@@ -11,7 +11,7 @@ import {
 import { FeederElectricalSummary, SPARKLINE_SAMPLES } from '../../pages/gis-map/components/FeederElectricalSummary'
 import { ELECTRICAL_POLL_MS } from '../../hooks/iot/useElectricalSeries'
 import { useElectricalChunks } from '../../hooks/iot/useElectricalChunks'
-import type { ElectricalChunkState, ElectricalPoint, ElectricalRange } from '../../utils/iot/electricalSeries'
+import type { ElectricalChunkState, ElectricalPoint } from '../../utils/iot/electricalSeries'
 import iotAPI from '../../feature/iot/iotAPI'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
@@ -25,6 +25,7 @@ vi.mock('../../hooks/iot/useElectricalChunks', () => ({
 }))
 
 const api = vi.mocked(iotAPI)
+const HOUR = 3_600_000
 const mockUseElectricalChunks = vi.mocked(useElectricalChunks)
 
 const sample = (
@@ -97,11 +98,11 @@ const ChartWithRangeToggle: React.FC<{ feederId?: string; live?: boolean }> = ({
   feederId = 'FDR-009',
   live = true,
 }) => {
-  const [range, setRange] = useState<ElectricalRange>('6h')
+  const [range, setRange] = useState(6 * HOUR)
   return (
     <div>
-      <ElectricalRangeToggle value={range} onChange={setRange} />
-      <ElectricalHistoryChart feederId={feederId} live={live} range={range} />
+      <ElectricalRangeToggle value={range} onChange={setRange} maxMs={24 * HOUR} />
+      <ElectricalHistoryChart feederId={feederId} live={live} windowMs={range} />
     </div>
   )
 }
@@ -122,7 +123,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
   afterEach(() => vi.useRealTimers())
 
   it('loads the newest samples via useElectricalChunks and shows the latest values, power first', () => {
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(mockUseElectricalChunks).toHaveBeenCalledWith(
       'FDR-009',
       expect.objectContaining({ timeBasis: 'measured_at', live: true, direction: 0 })
@@ -137,7 +138,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
   })
 
   it('switches the charted metric', () => {
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.getByText(/2 mẫu/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Điện áp/ }))
     expect(screen.getByRole('button', { name: /Điện áp/ })).toHaveAttribute('aria-pressed', 'true')
@@ -163,9 +164,60 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     expect(api.getFeederElectricalHistory).not.toHaveBeenCalled()
   })
 
+  it('nhập 90 phút vào ô Tùy chọn thì khung xem dài 90 phút, không nút nhanh nào sáng', () => {
+    renderWithMonitor(<ChartWithRangeToggle />)
+
+    const input = screen.getByLabelText('Tùy chọn')
+    expect(input).toHaveValue('6')
+    expect(screen.getByLabelText('Đơn vị')).toHaveValue('hour')
+
+    // Gõ 90 rồi đổi đơn vị sang phút: đổi đơn vị áp dụng ngay
+    fireEvent.change(input, { target: { value: '90' } })
+    fireEvent.change(screen.getByLabelText('Đơn vị'), { target: { value: 'minute' } })
+
+    const last = mockUseElectricalChunks.mock.calls[mockUseElectricalChunks.mock.calls.length - 1]
+    expect(last[1].view.to - last[1].view.from).toBe(90 * 60_000)
+    expect(screen.getByText(/mẫu trong 1 giờ 30 phút/)).toBeInTheDocument()
+    for (const label of ['1 giờ', '6 giờ', '12 giờ']) {
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'false')
+    }
+  })
+
+  it('ElectricalRangeToggle: bấm nút nhanh gọi onChange với số ms tương ứng', () => {
+    const onChange = vi.fn()
+    renderWithMonitor(<ElectricalRangeToggle value={6 * HOUR} onChange={onChange} maxMs={24 * HOUR} />)
+    expect(screen.getByRole('button', { name: '6 giờ' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: '30 phút' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '1 giờ' }))
+    expect(onChange).toHaveBeenCalledWith(HOUR)
+  })
+
+  it('ElectricalRangeToggle: nhập ngoài khoảng thì báo lỗi ngay dưới ô và không đổi khung', () => {
+    const onChange = vi.fn()
+    renderWithMonitor(<ElectricalRangeToggle value={HOUR} onChange={onChange} maxMs={24 * HOUR} />)
+    const input = screen.getByLabelText('Tùy chọn')
+
+    fireEvent.change(input, { target: { value: '30' } })
+    fireEvent.blur(input)
+    expect(onChange).not.toHaveBeenCalled()
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('alert')).toHaveTextContent('Nhập từ 5 phút đến 24 giờ')
+
+    fireEvent.change(input, { target: { value: '1,5' } })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onChange).toHaveBeenCalledWith(1.5 * HOUR)
+  })
+
+  it('ElectricalRangeToggle: ẩn nút nhanh dài hơn maxMs (chế độ Theo ngày khoảng ngắn)', () => {
+    renderWithMonitor(<ElectricalRangeToggle value={HOUR} onChange={vi.fn()} maxMs={3 * HOUR} />)
+    expect(screen.getByRole('button', { name: '1 giờ' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '6 giờ' })).not.toBeInTheDocument()
+  })
+
   it('shows initial skeleton when viewLoading && points.length === 0 and does NOT show empty or legacy backfilling badge', () => {
     setRecentChunksMock({ points: [], latest: null, viewLoading: true })
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
 
     expect(screen.queryByText('Mạch chưa có mẫu điện nào.')).not.toBeInTheDocument()
     expect(screen.queryByText(/Đang tải thêm lịch sử/)).not.toBeInTheDocument()
@@ -173,7 +225,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
 
   it('shows empty state "Mạch chưa có mẫu điện nào." only when !viewLoading && points.length === 0', () => {
     setRecentChunksMock({ points: [], latest: null, viewLoading: false })
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
 
     expect(screen.getByText('Mạch chưa có mẫu điện nào.')).toBeInTheDocument()
     expect(screen.getByText(/Biểu đồ tự hiện khi node gửi mẫu/)).toBeInTheDocument()
@@ -184,7 +236,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     setRecentChunksMock({ viewLoading: true })
 
     const { rerender } = renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live range="6h" />
+      <ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />
     )
 
     // Ngay lúc đầu và trước 300ms: không nhấp nháy thanh tiến trình
@@ -207,7 +259,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
 
     // Hết viewLoading: biến mất ngay
     setRecentChunksMock({ viewLoading: false })
-    rerender(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    rerender(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.queryByTestId('electrical-loading-bar')).not.toBeInTheDocument()
   })
 
@@ -216,7 +268,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     setRecentChunksMock({ viewLoading: true })
 
     const { rerender } = renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live range="6h" />
+      <ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />
     )
     act(() => {
       vi.advanceTimersByTime(150)
@@ -224,7 +276,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     expect(screen.queryByTestId('electrical-loading-bar')).not.toBeInTheDocument()
 
     setRecentChunksMock({ viewLoading: false })
-    rerender(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    rerender(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     act(() => {
       vi.advanceTimersByTime(500)
     })
@@ -240,7 +292,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
       error: 'Chưa cấu hình nguồn điều khiển cho thiết bị IoT.',
     })
     const { rerender } = renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live range="6h" />
+      <ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />
     )
     expect(
       screen.queryByText('Chưa cấu hình nguồn điều khiển cho thiết bị IoT.')
@@ -253,13 +305,13 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
       viewLoading: false,
       error: 'Lỗi mạng tạm thời',
     })
-    rerender(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    rerender(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.queryByText('Lỗi mạng tạm thời')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Tải lại/i })).not.toBeInTheDocument()
   })
 
   it('a feeder without an IoT node (FDR-011) passes live=false to useElectricalChunks', () => {
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-011" live={false} range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-011" live={false} windowMs={6 * HOUR} />)
     expect(mockUseElectricalChunks).toHaveBeenCalledWith(
       'FDR-011',
       expect.objectContaining({ live: false })
@@ -269,7 +321,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
 
   it('passes timeBasis="measured_at" by default and timeBasis="received_at" when specified', () => {
     const { unmount } = renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live range="6h" />
+      <ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />
     )
     expect(mockUseElectricalChunks).toHaveBeenLastCalledWith(
       'FDR-009',
@@ -278,7 +330,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     unmount()
 
     renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live range="6h" timeBasis="received_at" />
+      <ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} timeBasis="received_at" />
     )
     expect(mockUseElectricalChunks).toHaveBeenLastCalledWith(
       'FDR-009',
@@ -296,7 +348,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     setRecentChunksMock({ points: pts })
 
     renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live range="6h" dateRange={{ from, to }} />
+      <ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} dateRange={{ from, to }} />
     )
 
     expect(mockUseElectricalChunks).toHaveBeenLastCalledWith(
@@ -321,7 +373,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     setRecentChunksMock({ points: [] })
 
     renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live={false} range="6h" dateRange={{ from, to }} />
+      <ElectricalHistoryChart feederId="FDR-009" live={false} windowMs={6 * HOUR} dateRange={{ from, to }} />
     )
 
     // Bỏ dải chip ngày, thay bằng một thanh trượt phủ cả khoảng đã chọn
@@ -346,7 +398,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     })
 
     const { rerender } = renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live={false} range="6h" dateRange={{ from, to }} />
+      <ElectricalHistoryChart feederId="FDR-009" live={false} windowMs={6 * HOUR} dateRange={{ from, to }} />
     )
 
     expect(screen.queryByText('Lỗi tải dữ liệu khoảng ngày.')).not.toBeInTheDocument()
@@ -359,20 +411,20 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     // Kể cả khi viewLoading = true với points rỗng cũng không thay bằng skeleton che mất thanh trượt
     setRecentChunksMock({ points: [], latest: null, viewLoading: true, error: null })
     rerender(
-      <ElectricalHistoryChart feederId="FDR-009" live={false} range="6h" dateRange={{ from, to }} />
+      <ElectricalHistoryChart feederId="FDR-009" live={false} windowMs={6 * HOUR} dateRange={{ from, to }} />
     )
     expect(screen.getByRole('slider', { name: 'Di chuyển khung thời gian' })).toBeInTheDocument()
   })
 
   it('shows legend for live and backfill samples (backfill = lấy lại từ thẻ nhớ khi mất kết nối)', () => {
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="1h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={HOUR} />)
     expect(screen.getByText('Trực tiếp')).toBeInTheDocument()
     const backfill = screen.getByText('Gửi bù từ thẻ nhớ')
     expect(backfill.closest('span[title]')?.getAttribute('title')).toMatch(/mất kết nối/)
   })
 
   it('shows "Dao động trong ô" legend at range 6h and hides "Đèn bật" and "Đổi node"', () => {
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.getByText(/2 mẫu/)).toBeInTheDocument()
 
     const legend = screen.getByText('Dao động trong ô')
@@ -392,7 +444,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     setRecentChunksMock({ points: [] })
 
     renderWithMonitor(
-      <ElectricalHistoryChart feederId="FDR-009" live={false} range="12h" dateRange={{ from, to }} />
+      <ElectricalHistoryChart feederId="FDR-009" live={false} windowMs={12 * HOUR} dateRange={{ from, to }} />
     )
 
     expect(screen.queryByRole('group', { name: 'Chọn ngày xem' })).not.toBeInTheDocument()
@@ -411,14 +463,14 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     setRecentChunksMock({ points: [] })
 
     const DateRangeWithToggle: React.FC = () => {
-      const [range, setRange] = useState<ElectricalRange>('6h')
+      const [range, setRange] = useState(6 * HOUR)
       return (
         <div>
-          <ElectricalRangeToggle value={range} onChange={setRange} />
+          <ElectricalRangeToggle value={range} onChange={setRange} maxMs={24 * HOUR} />
           <ElectricalHistoryChart
             feederId="FDR-009"
             live={false}
-            range={range}
+            windowMs={range}
             dateRange={{ from, to }}
           />
         </div>
@@ -450,7 +502,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
   })
 
   it('thanh trượt khung thời gian không vượt quá dải 24 giờ khi kéo hoặc bấm phím mũi tên và cập nhật direction', () => {
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.getByText(/2 mẫu trong 6 giờ/)).toBeInTheDocument()
 
     const slider = screen.getByRole('slider', { name: 'Di chuyển khung thời gian' })
@@ -538,7 +590,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     vi.setSystemTime(new Date('2026-11-24T12:00:00.000Z'))
     setRecentChunksMock()
 
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.getByText(/2 mẫu trong 6 giờ/)).toBeInTheDocument()
 
     const slider = screen.getByRole('slider', { name: 'Di chuyển khung thời gian' })
@@ -583,7 +635,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
   })
 
   it('nút "Về hiện tại" chỉ hiện khi đã kéo/bấm phím khỏi mép phải, bấm thì quay về mép phải và ẩn đi', () => {
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.getByText(/2 mẫu trong 6 giờ/)).toBeInTheDocument()
 
     // Mặc định đang ở mép phải: không hiện nút "Về hiện tại"
@@ -605,7 +657,7 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
   })
 
   it('hiển thị nhãn ngày giờ dạng dd/MM HH:mm trên dải 24 giờ và aria-valuetext có ngày', () => {
-    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live range="6h" />)
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.getByText(/2 mẫu trong 6 giờ/)).toBeInTheDocument()
 
     const labelsBox = screen.getByTestId('electrical-window-labels')

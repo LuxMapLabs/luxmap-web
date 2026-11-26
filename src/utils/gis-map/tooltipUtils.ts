@@ -1,5 +1,5 @@
 import type { PoleFeature, SegmentInfo } from '../../pages/gis-map/GisMapPage'
-import { POLE_LAMP_UI, poleFeatureLampState } from './poleLampState'
+import { FEEDER_HEALTH_UI, POLE_LAMP_UI, feederHealthUi, feederLampLabel, poleFeatureLampState } from './poleLampState'
 
 interface PoleTooltipParams {
   pole: PoleFeature
@@ -73,41 +73,12 @@ interface FeederTooltipParams {
 }
 
 export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): string {
-  // Cùng luật với màu đường (useFeederLinesLayer): sự cố trước, rồi mạch tắt, rồi đang cấp điện
-  const isLineFault = p.status === 'fault'
-  const isLineWarn = !isLineFault && p.status === 'warn'
-  const isLineOff = !isLineFault && !isLineWarn && (p.status === 'off' || p.power_state === 'off')
-  const isLineActive = !isLineFault && !isLineWarn && !isLineOff && (p.status === 'active' || p.power_state === 'on')
-
-  // Màu đỏ/cam chỉ nói có lỗi, nên luôn ghi riêng mạch đang bật hay tắt
-  const powerText = p.power_state === 'on' ? 'Đang bật' : p.power_state === 'off' ? 'Đang tắt' : 'Chưa rõ'
-
-  let statusBg = 'bg-slate-400'
-  let statusText = 'Chưa rõ trạng thái'
-  let headerTitleColor = 'text-slate-700 dark:text-slate-300'
-  let badgeClasses = 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
-
-  if (isLineFault) {
-    statusBg = 'bg-rose-500'
-    statusText = 'Sự cố'
-    headerTitleColor = 'text-rose-700 dark:text-rose-400'
-    badgeClasses = 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800'
-  } else if (isLineWarn) {
-    statusBg = 'bg-amber-500'
-    statusText = 'Cảnh báo'
-    headerTitleColor = 'text-amber-700 dark:text-amber-400'
-    badgeClasses = 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800'
-  } else if (isLineOff) {
-    statusBg = 'bg-white ring-1 ring-slate-400'
-    statusText = 'Mạch đang tắt'
-    headerTitleColor = 'text-slate-800 dark:text-slate-200'
-    badgeClasses = 'text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600'
-  } else if (isLineActive) {
-    statusBg = 'bg-emerald-500'
-    statusText = 'Đang cấp điện'
-    headerTitleColor = 'text-emerald-700 dark:text-emerald-400'
-    badgeClasses = 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800'
-  }
+  // Cùng nguồn với màu đường (useFeederLinesLayer): sức khỏe = power_state, bật/tắt = lamp_state, đều do API trả
+  const health = feederHealthUi(p.power_state)
+  const statusText = health?.label ?? '-'
+  const badgeClasses = health?.badge ?? FEEDER_HEALTH_UI.unknown.badge
+  const dotColor = (health ?? FEEDER_HEALTH_UI.unknown).color
+  const lampText = feederLampLabel(p.lamp_state)
 
   // Tủ cấp nguồn: Tuyệt đối không dùng mã cột (POLE-xxx) làm tên tủ điện
   let cabName = p.cabinet_external_ref || p.cabinet_name || p.cabinet_code
@@ -131,8 +102,8 @@ export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): 
   return `
     <div class="bg-white/98 dark:bg-slate-900/98 text-slate-800 dark:text-slate-100 p-3 rounded-2xl shadow-xl border border-slate-200/90 dark:border-slate-700 backdrop-blur-md min-w-60 font-sans">
       <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800 gap-2">
-        <span class="font-bold text-xs ${headerTitleColor} flex items-center gap-1.5 truncate">
-          <span class="w-2 h-2 rounded-full ${statusBg} ${isLineFault ? 'animate-pulse' : ''} shrink-0"></span>
+        <span class="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5 truncate">
+          <span class="w-2 h-2 rounded-full ring-1 ring-slate-300 ${p.power_state === 'incident' ? 'animate-pulse' : ''} shrink-0" style="background:${dotColor}"></span>
           Tuyến điện ${feederDisplay}
         </span>
         <span class="${badgeClasses} px-2 py-0.5 rounded-full font-bold text-[10px] shrink-0 border">
@@ -140,7 +111,7 @@ export function getFeederTooltipHtml({ featureProps: p }: FeederTooltipParams): 
         </span>
       </div>
       <div class="pt-2 space-y-1.5 text-[11.5px]">
-        <div>Nguồn mạch: <strong class="text-slate-900 dark:text-white font-semibold">${powerText}</strong></div>
+        <div>Mạch: <strong class="text-slate-900 dark:text-white font-semibold">${lampText}</strong></div>
         <div>Tủ cấp nguồn: <strong class="text-slate-900 dark:text-white font-semibold">${cabName}</strong></div>
         ${fromId && toPoleId ? `<div class="font-mono text-[11px] text-slate-600 dark:text-slate-300">Liên kết: <strong class="text-blue-600 dark:text-blue-400">${fromId}</strong> ➔ <strong class="text-emerald-600 dark:text-emerald-400">${toPoleId}</strong></div>` : ''}
         ${branch || order ? `<div class="text-[11px] text-slate-500 dark:text-slate-400">${[branch, order].filter(Boolean).join(' • ')}</div>` : ''}

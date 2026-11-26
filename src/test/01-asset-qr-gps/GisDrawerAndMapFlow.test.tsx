@@ -13,6 +13,7 @@ vi.mock('../../feature/iot/iotAPI', () => ({
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { store } from '../../redux/store'
+import { refreshFeedersSuccess } from '../../feature/assets/assetSlice'
 import { mapAPI } from '../../feature/map/mapAPI'
 import { GisMapLegend } from '../../pages/gis-map/components/GisMapLegend'
 import { GisDrawerPanel, type GisDrawerPanelProps } from '../../pages/gis-map/components/GisDrawerPanel'
@@ -244,17 +245,19 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       // Chú giải bản đồ
       expect(screen.getByText('Chú giải bản đồ')).toBeInTheDocument()
       expect(screen.getByText('Cột đèn')).toBeInTheDocument()
-      expect(screen.getByText('Bình thường')).toBeInTheDocument()
+      // "Bình thường" có ở cả mục cột lẫn mục mạch (sức khỏe mạch)
+      expect(screen.getAllByText('Bình thường')).toHaveLength(2)
       expect(screen.getByText('Đèn mờ')).toBeInTheDocument()
       expect(screen.getByText('Hỏng')).toBeInTheDocument()
       expect(screen.getByText('Mạch điện')).toBeInTheDocument()
-      // "Đang tắt" có ở cả mục cột lẫn mục mạch
-      expect(screen.getAllByText('Đang tắt')).toHaveLength(2)
+      expect(screen.getByText('Đang tắt')).toBeInTheDocument()
       expect(screen.getByText('Chưa quét')).toBeInTheDocument()
       expect(screen.getByText('Tủ điện')).toBeInTheDocument()
-      expect(screen.getByText('Có điện')).toBeInTheDocument()
+      // Mạch: 5 nhãn sức khỏe power_state; vạch trắng đứt = đang tắt
+      expect(screen.getByText('Cảnh báo')).toBeInTheDocument()
       expect(screen.getByText('Sự cố')).toBeInTheDocument()
-      expect(screen.getByText('Chưa rõ')).toBeInTheDocument()
+      expect(screen.getByText('Mất kết nối IoT')).toBeInTheDocument()
+      expect(screen.getByText('Chưa có IoT')).toBeInTheDocument()
       expect(screen.getByText('Tuyến đường')).toBeInTheDocument()
     })
 
@@ -548,9 +551,43 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       expect(screen.getByText(/Điều khiển nguồn Mạch điện/i)).toBeInTheDocument()
       expect(screen.getByText('Thông số Kỹ thuật Mạch điện')).toBeInTheDocument()
       expect(screen.getByText('Tủ A')).toBeInTheDocument()
-      // API chưa trả power_state / control_mode: không tự đoán chế độ, trạng thái cấp điện ghi 'Chưa rõ'
-      expect(screen.getByText('Chưa rõ')).toBeInTheDocument()
+      // API chưa trả power_state / lamp_state / control_mode: không tự đoán, sức khỏe và mạch ghi '-'
+      expect(screen.getByText('Sức khỏe mạch:').nextElementSibling).toHaveTextContent(/^-$/)
+      expect(screen.getByText('Mạch:').nextElementSibling).toHaveTextContent(/^-$/)
       expect(screen.queryByText(/Chế độ: /)).toBeNull()
+    })
+
+    it('GisDrawerPanel: mạch hiện nguyên power_state (sức khỏe) và lamp_state (bật/tắt) của /assets/feeders', () => {
+      store.dispatch(
+        refreshFeedersSuccess([
+          {
+            feeder_id: 'FDR-009',
+            feeder_name: 'Mạch A',
+            commune_id: null,
+            commune_name: null,
+            has_geometry: false,
+            pole_count: 0,
+            updated_at: null,
+            power_state: 'warning',
+            lamp_state: 'on',
+          },
+        ])
+      )
+      render(
+        <Provider store={store}>
+          <GisDrawerPanel
+            {...defaultDrawerProps}
+            selectedPole={null}
+            selectedCabinet={null}
+            // Thuộc tính cạnh topology mang power_state cũ: không được dùng, phải tra theo id
+            selectedFeeder={{ feeder_id: 'FDR-009', feeder_name: 'Mạch A', power_state: 'off' }}
+          />
+        </Provider>
+      )
+      // warning không có nghĩa là đèn tắt
+      expect(screen.getByText('Sức khỏe mạch:').nextElementSibling).toHaveTextContent('Cảnh báo')
+      expect(screen.getByText('Mạch:').nextElementSibling).toHaveTextContent('Đang bật')
+      store.dispatch(refreshFeedersSuccess([]))
     })
 
     it('validateImportRow chấp nhận dòng dữ liệu CSV có đủ 100% các cột bắt buộc', () => {
@@ -599,13 +636,13 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       fireEvent.click(collapseBtn)
 
       // Bảng thu gọn chỉ còn nút icon
-      expect(screen.queryByText('Bình thường')).toBeNull()
+      expect(screen.queryAllByText('Bình thường')).toHaveLength(0)
       const expandBtn = screen.getByTitle('Mở chú giải bản đồ')
       expect(expandBtn).toBeInTheDocument()
 
       // Mở lại
       fireEvent.click(expandBtn)
-      expect(screen.getByText('Bình thường')).toBeInTheDocument()
+      expect(screen.getAllByText('Bình thường').length).toBeGreaterThan(0)
     })
 
     it('GisDrawerPanel hiển thị danh sách Mạch điện của tủ, nút toggle switch từng mạch và không còn nút Aptomat đơn lẻ', () => {

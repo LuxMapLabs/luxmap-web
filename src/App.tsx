@@ -93,7 +93,7 @@ function App() {
   return (
     <BrowserRouter>
       {/* Global Toast Notifications (Sonner) */}
-      <Toaster richColors position="top-right" />
+      <Toaster richColors closeButton position="top-right" />
 
       <Routes>
           {/* Route đăng nhập công khai */}

@@ -9,8 +9,8 @@ export interface IotDiagnosticHistoryItem {
     history_id?: number
     feeder_id?: string | null
     node_id?: string | null
-    code?: 'telemetry_stale' | 'voltage_loss' | 'voltage_deviation' | 'current_drop' | 'ds3231_unavailable' | 'ds3231_read_failed' | 'ds3231_time_invalid' | 'ina226_unavailable' | 'ina226_read_failed' | 'ina226_shunt_out_of_range' | 'bh1750_unavailable' | 'bh1750_read_failed' | 'microsd_unavailable' | 'microsd_read_failed' | 'microsd_write_failed' | 'lora_tx_blocked' | 'lora_rx_frame_error'
-    status?: 'active' | 'resolved' | 'interrupted'
+    code?: string | null
+    status?: string | null
     started_at?: string | null
     ended_at?: string | null
     closed_at?: string | null
@@ -27,7 +27,7 @@ export interface IotDiagnosticHistoryItemPagedResult {
 export interface IotDiagnosticResult {
     node_id?: string | null
     feeder_id?: string | null
-    status?: 'normal' | 'anomaly' | 'stale' | 'no_data'
+    status?: string | null
     measurement?: IotMeasurement
     anomalies?: IotAnomaly[]
     connection_status?: 'online' | 'offline' | 'no_data'
@@ -48,7 +48,7 @@ export interface IotFeederElectricalResult {
     feeder_id?: string | null
     node_id?: string | null
     server_id?: string | null
-    status?: 'online' | 'offline' | 'no_data' | 'unconfigured'
+    status?: string | null
     measurement?: IotMeasurement
     power_state?: FeederPowerState
 }

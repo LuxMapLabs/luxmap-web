@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarRange, X } from 'lucide-react'
 import type { ElectricalTimeBasis } from '../feature/iot/iotMonitorSlice'
-import type { ElectricalRange } from '../utils/iot/electricalSeries'
+import { ELECTRICAL_DEFAULT_WINDOW_MS, ELECTRICAL_MAX_WINDOW_MS } from '../utils/iot/electricalSeries'
 import { startOfDay, endOfDay, type DateRange } from '../utils/dateUtils'
 import { TabBar } from './TabBar'
 import { ElectricalHistoryChart, ElectricalRangeToggle } from './ElectricalHistoryChart'
@@ -35,7 +35,7 @@ export const FeederHistoryModal: React.FC<FeederHistoryModalProps> = ({
   const [activeTab, setActiveTab] = useState<FeederHistoryTab>(
     initialTab === 'commands' && !nodeId ? 'electrical' : initialTab
   )
-  const [range, setRange] = useState<ElectricalRange>('6h')
+  const [windowMs, setWindowMs] = useState(ELECTRICAL_DEFAULT_WINDOW_MS)
   const [timeBasis, setTimeBasis] = useState<ElectricalTimeBasis>('measured_at')
   const [viewMode, setViewMode] = useState<'recent' | 'by_date'>('recent')
   const [dayRange, setDayRange] = useState<DateRange>({ startDate: null, endDate: null })
@@ -49,6 +49,12 @@ export const FeederHistoryModal: React.FC<FeederHistoryModalProps> = ({
     if (from.getTime() >= to.getTime()) return null
     return { from, to }
   }, [dayRange.startDate, dayRange.endDate])
+
+  // Chế độ Theo ngày: khung không dài hơn khoảng ngày đã chọn.
+  const maxWindowMs =
+    viewMode === 'by_date' && computedDateRange
+      ? Math.min(ELECTRICAL_MAX_WINDOW_MS, computedDateRange.to.getTime() - computedDateRange.from.getTime())
+      : ELECTRICAL_MAX_WINDOW_MS
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -193,7 +199,7 @@ export const FeederHistoryModal: React.FC<FeederHistoryModalProps> = ({
                     />
                   </div>
                 )}
-                <ElectricalRangeToggle value={range} onChange={setRange} />
+                <ElectricalRangeToggle value={windowMs} onChange={setWindowMs} maxMs={maxWindowMs} />
               </div>
             </div>
             {viewMode === 'recent' ? (
@@ -201,7 +207,7 @@ export const FeederHistoryModal: React.FC<FeederHistoryModalProps> = ({
                 key={`${feederId}-${timeBasis}`}
                 feederId={feederId}
                 live={Boolean(nodeId)}
-                range={range}
+                windowMs={windowMs}
                 timeBasis={timeBasis}
               />
             ) : !computedDateRange ? (
@@ -218,7 +224,7 @@ export const FeederHistoryModal: React.FC<FeederHistoryModalProps> = ({
               <ElectricalHistoryChart
                 key={`${feederId}-${timeBasis}-${computedDateRange.from.getTime()}-${computedDateRange.to.getTime()}`}
                 feederId={feederId}
-                range={range}
+                windowMs={windowMs}
                 dateRange={{ from: computedDateRange.from, to: computedDateRange.to }}
                 live={false}
                 timeBasis={timeBasis}
