@@ -1,11 +1,10 @@
 import React, { useState } from 'react'
 import { Activity, Minus } from 'lucide-react'
-import { FEEDER_HEALTH_UI, POLE_LAMP_UI, type PoleLampState } from '../../../utils/gis-map/poleLampState'
-import type { FeederHealthState } from '../../../types/common/enums'
+import { FEEDER_HEALTH_UI, FEEDER_OFF_LINE, POLE_LAMP_UI, type PoleLampState } from '../../../utils/gis-map/poleLampState'
 
 // Thứ tự chú giải cột: 'on' và 'normal' cùng màu nên gộp một dòng
 const LEGEND_POLES: { status: PoleLampState; label: string }[] = [
-  { status: 'normal', label: 'Bình thường' },
+  { status: 'normal', label: POLE_LAMP_UI.on.label },
   { status: 'off', label: POLE_LAMP_UI.off.label },
   { status: 'dim', label: POLE_LAMP_UI.dim.label },
   { status: 'out', label: POLE_LAMP_UI.out.label },
@@ -16,7 +15,14 @@ const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   <div className="col-span-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{children}</div>
 )
 
-const LEGEND_LINES: FeederHealthState[] = ['normal', 'warning', 'incident', 'offline', 'unknown']
+// 'normal' tách hai dòng theo bật/tắt; cảnh báo / sự cố / chưa có IoT theo sức khỏe backend trả
+const LEGEND_LINES: { label: string; color: string }[] = [
+  { label: 'Đang bật', color: FEEDER_HEALTH_UI.normal.color },
+  { label: 'Đang tắt', color: FEEDER_OFF_LINE.color },
+  FEEDER_HEALTH_UI.warning,
+  FEEDER_HEALTH_UI.incident,
+  FEEDER_HEALTH_UI.unknown,
+]
 
 interface PoleLegendIconProps {
   status: PoleLampState
@@ -218,17 +224,17 @@ export const GisMapLegend: React.FC = () => {
 
         <div className="col-span-2 border-t border-slate-200 mt-1" />
         <SectionTitle>Mạch điện</SectionTitle>
-        {LEGEND_LINES.map((status) => (
-          <div key={status} className="flex items-center gap-2">
+        {LEGEND_LINES.map((item) => (
+          <div key={item.label} className="flex items-center gap-2">
             <span
               className="w-4 h-[3px] rounded-full shrink-0 ring-1 ring-slate-400/70"
-              style={{ background: FEEDER_HEALTH_UI[status].color }}
+              style={{ background: item.color }}
             />
-            <span className="font-medium text-slate-700">{FEEDER_HEALTH_UI[status].label}</span>
+            <span className="font-medium text-slate-700">{item.label}</span>
           </div>
         ))}
         <div className="col-span-2 w-0 min-w-full text-[10.5px] text-slate-500 leading-snug">
-          Màu: sức khỏe mạch. Vạch trắng đứt: mạch đang tắt. Không có vạch: mạch đang bật hoặc chưa rõ.
+          Xanh / trắng: mạch bình thường. Cảnh báo / Sự cố giữ nguyên màu dù mạch bật hay tắt.
         </div>
 
         <div className="col-span-2 border-t border-slate-200 mt-1" />

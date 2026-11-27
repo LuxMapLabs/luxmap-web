@@ -6,7 +6,7 @@ import type { SegmentInfo } from '../../pages/gis-map/GisMapPage'
 import { getFeederTooltipHtml, getRoadSegmentTooltipHtml } from '../../utils/gis-map/tooltipUtils'
 import { fetchCabinetTopologyRequest, clearCabinetTopology } from '../../feature/map/mapSlice'
 import { findByIdOrRef } from '../../utils/assets/findByIdOrRef'
-import { FEEDER_HEALTH_UI, feederHealthUi } from '../../utils/gis-map/poleLampState'
+import { FEEDER_HEALTH_UI, feederLineColors } from '../../utils/gis-map/poleLampState'
 
 interface UseFeederLinesLayerProps {
   map: maplibregl.Map | null
@@ -163,22 +163,6 @@ export function useFeederLinesLayer({
             FEEDER_HEALTH_UI.unknown.color,
           ],
           'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.2, 12, 1.8, 16, 2.6],
-          'line-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 11.0, 0.95],
-        },
-      })
-
-      // Mạch đang TẮT (lamp_state = off): vạch trắng đứt đè lên màu sức khỏe, để màu vẫn đọc được "đang tắt"
-      map.addLayer({
-        id: 'feeder-lines-alert-off',
-        type: 'line',
-        source: 'feeder-lines',
-        minzoom: 8.5,
-        filter: ['==', ['get', 'lamp_state'], 'off'],
-        layout: { 'line-join': 'round', 'line-cap': 'butt' },
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.2, 12, 1.8, 16, 2.6],
-          'line-dasharray': [2, 2],
           'line-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 11.0, 0.95],
         },
       })
@@ -398,7 +382,7 @@ export function useFeederLinesLayer({
       })
     }
 
-    // Màu đường chỉ theo power_state (sức khỏe); lamp_state = off thêm vạch trắng đứt (lớp feeder-lines-alert-off)
+    // Màu đường theo power_state (sức khỏe); chỉ mạch normal đang tắt tô trắng
     const features = sourceEdges.map((feat: any) => {
       const p = feat.properties || {}
       const feederId = p.feeder_id
@@ -414,7 +398,7 @@ export function useFeederLinesLayer({
 
       const powerState = feederId ? feederHealthMap.get(feederId) : undefined
       const lampState = feederId ? feederLampMap.get(feederId) : undefined
-      const health = feederHealthUi(powerState) ?? FEEDER_HEALTH_UI.unknown
+      const line = feederLineColors(powerState, lampState)
 
       return {
         ...feat,
@@ -425,8 +409,8 @@ export function useFeederLinesLayer({
           power_state: powerState,
           lamp_state: lampState,
           control_mode: feederId ? feederControlModeMap.get(feederId) : undefined,
-          color: health.color,
-          glow_color: health.glow,
+          color: line.color,
+          glow_color: line.glow,
         },
       }
     })

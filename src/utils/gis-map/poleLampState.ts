@@ -35,7 +35,7 @@ const GREEN_BADGE = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-e
 
 export const POLE_LAMP_UI: Record<PoleLampState, LampStateUi> = {
   on: { label: 'Đang bật', short: 'Bật', badge: GREEN_BADGE, dot: 'bg-emerald-500', sphere: GREEN },
-  normal: { label: 'Bình thường', short: 'Bình thường', badge: GREEN_BADGE, dot: 'bg-emerald-500', sphere: GREEN },
+  normal: { label: 'Đang bật', short: 'Bật', badge: GREEN_BADGE, dot: 'bg-emerald-500', sphere: GREEN },
   off: {
     label: 'Đang tắt',
     short: 'Tắt',
@@ -70,9 +70,17 @@ export const POLE_LAMP_UI: Record<PoleLampState, LampStateUi> = {
 export const poleFeatureLampState = (p?: { fixture_status?: string | null; power_state?: string | null } | null) =>
   poleLampState(p?.fixture_status, p?.power_state)
 
+const FEEDER_INCIDENT_UI = {
+  label: 'Sự cố',
+  color: '#ef4444',
+  glow: '#dc2626',
+  badge: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800',
+}
+
 /**
  * Sức khỏe mạch = `power_state` của GET /assets/feeders (FEEDER-HEALTH-1), backend tự tính.
  * Màu đường feeder (lõi + quầng), nhãn và badge chỉ theo trường này; bật/tắt là `lamp_state`, tách riêng.
+ * `offline` (node IoT mất kết nối) cũng tính là sự cố.
  */
 export const FEEDER_HEALTH_UI: Record<FeederHealthState, { label: string; color: string; glow: string; badge: string }> = {
   normal: {
@@ -87,18 +95,8 @@ export const FEEDER_HEALTH_UI: Record<FeederHealthState, { label: string; color:
     glow: '#d97706',
     badge: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800',
   },
-  incident: {
-    label: 'Sự cố',
-    color: '#ef4444',
-    glow: '#dc2626',
-    badge: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800',
-  },
-  offline: {
-    label: 'Mất kết nối IoT',
-    color: '#475569',
-    glow: '#1e293b',
-    badge: 'bg-slate-200 text-slate-800 border-slate-400 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-500',
-  },
+  incident: FEEDER_INCIDENT_UI,
+  offline: FEEDER_INCIDENT_UI,
   unknown: {
     label: 'Chưa có IoT',
     color: '#94a3b8',
@@ -113,6 +111,13 @@ export const FEEDER_LAMP_LABEL: Record<FeederPowerState, string> = { on: 'Đang 
 /** UI sức khỏe mạch; API chưa trả (hoặc mạch không có trong danh sách) thì `null`: chữ ghi '-', đường tô xám như "Chưa có IoT". */
 export const feederHealthUi = (state?: string | null) =>
   state && state in FEEDER_HEALTH_UI ? FEEDER_HEALTH_UI[state as FeederHealthState] : null
+
+/** Mạch bình thường đang tắt: trắng như cột đang tắt, quầng tối để không chìm trên nền bản đồ. */
+export const FEEDER_OFF_LINE = { color: '#f8fafc', glow: '#0f172a' }
+
+/** Màu đường feeder: `normal` đang tắt → trắng; còn lại theo sức khỏe (cảnh báo / sự cố giữ màu dù đang tắt). */
+export const feederLineColors = (powerState?: string | null, lampState?: string | null) =>
+  powerState === 'normal' && lampState === 'off' ? FEEDER_OFF_LINE : feederHealthUi(powerState) ?? FEEDER_HEALTH_UI.unknown
 
 /** Nhãn bật/tắt; API chưa trả thì '-'. */
 export const feederLampLabel = (state?: string | null) =>

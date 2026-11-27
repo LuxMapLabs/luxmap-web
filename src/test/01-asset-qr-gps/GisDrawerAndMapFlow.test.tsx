@@ -245,18 +245,19 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       // Chú giải bản đồ
       expect(screen.getByText('Chú giải bản đồ')).toBeInTheDocument()
       expect(screen.getByText('Cột đèn')).toBeInTheDocument()
-      // "Bình thường" có ở cả mục cột lẫn mục mạch (sức khỏe mạch)
-      expect(screen.getAllByText('Bình thường')).toHaveLength(2)
+      expect(screen.queryByText('Bình thường')).not.toBeInTheDocument()
       expect(screen.getByText('Đèn mờ')).toBeInTheDocument()
       expect(screen.getByText('Hỏng')).toBeInTheDocument()
       expect(screen.getByText('Mạch điện')).toBeInTheDocument()
-      expect(screen.getByText('Đang tắt')).toBeInTheDocument()
+      // "Đang bật" / "Đang tắt" có ở cả mục cột lẫn mục mạch
+      expect(screen.getAllByText('Đang bật')).toHaveLength(2)
+      expect(screen.getAllByText('Đang tắt')).toHaveLength(2)
       expect(screen.getByText('Chưa quét')).toBeInTheDocument()
       expect(screen.getByText('Tủ điện')).toBeInTheDocument()
-      // Mạch: 5 nhãn sức khỏe power_state; vạch trắng đứt = đang tắt
+      // Mạch: bình thường tách "Đang bật" / "Đang tắt"; offline gộp vào "Sự cố"
       expect(screen.getByText('Cảnh báo')).toBeInTheDocument()
       expect(screen.getByText('Sự cố')).toBeInTheDocument()
-      expect(screen.getByText('Mất kết nối IoT')).toBeInTheDocument()
+      expect(screen.queryByText('Mất kết nối IoT')).not.toBeInTheDocument()
       expect(screen.getByText('Chưa có IoT')).toBeInTheDocument()
       expect(screen.getByText('Tuyến đường')).toBeInTheDocument()
     })
@@ -636,13 +637,13 @@ describe('GIS Map Flow, Topology & Drawer Panel Test Suite (Task 1)', () => {
       fireEvent.click(collapseBtn)
 
       // Bảng thu gọn chỉ còn nút icon
-      expect(screen.queryAllByText('Bình thường')).toHaveLength(0)
+      expect(screen.queryAllByText('Đang bật')).toHaveLength(0)
       const expandBtn = screen.getByTitle('Mở chú giải bản đồ')
       expect(expandBtn).toBeInTheDocument()
 
       // Mở lại
       fireEvent.click(expandBtn)
-      expect(screen.getAllByText('Bình thường').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Đang bật').length).toBeGreaterThan(0)
     })
 
     it('GisDrawerPanel hiển thị danh sách Mạch điện của tủ, nút toggle switch từng mạch và không còn nút Aptomat đơn lẻ', () => {
