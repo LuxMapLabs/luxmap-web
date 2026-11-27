@@ -10,6 +10,7 @@ import {
   Lightbulb,
   ChevronDown,
   Check,
+  CircleCheck,
 } from 'lucide-react'
 import type { SegmentInfo, GisStats } from '../GisMapPage'
 import type { SearchResultItem } from '../../../utils/gis-map/gisSearchUtils'
@@ -222,28 +223,26 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
         </span>
       </button>
 
-      {/* 2. Đạt chuẩn */}
+      {/* 2. Bình thường: gồm cả đèn bật (xanh) và tắt (trắng) nên dùng màu trung tính */}
       <button
         type="button"
         onClick={() => setStatusFilter('normal')}
         className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all duration-150 cursor-pointer shrink-0 border ${
           statusFilter === 'normal'
-            ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+            ? 'bg-slate-100 text-slate-900 border-slate-400 shadow-2xs dark:bg-slate-800 dark:text-slate-100 dark:border-slate-500'
             : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
         }`}
       >
-        <span
-          className={`w-2 h-2 rounded-full shrink-0 ${
-            statusFilter === 'normal'
-              ? 'bg-emerald-600 ring-2 ring-emerald-300/70 dark:ring-emerald-700/60'
-              : 'bg-emerald-500'
+        <CircleCheck
+          className={`w-3 h-3 ${
+            statusFilter === 'normal' ? 'text-slate-700 dark:text-slate-300' : 'text-slate-500'
           }`}
         />
         <span>Bình thường</span>
         <span
           className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono transition-colors ${
             statusFilter === 'normal'
-              ? 'bg-emerald-200/80 text-emerald-900 dark:bg-emerald-900/90 dark:text-emerald-200 font-bold'
+              ? 'bg-slate-200/90 text-slate-900 dark:bg-slate-700 dark:text-slate-100 font-bold'
               : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
           }`}
         >

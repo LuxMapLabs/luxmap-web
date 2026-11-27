@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import loginBgHq from '../assets/images/login-bg-hq.png'
 import luxmapMark from '../assets/images/luxmap-mark.svg'
 
+// Hai lớp [&_input] cuối: ô trình duyệt tự điền vẫn nền trắng và không lấn góc bo
 export const INPUT_WRAP =
-  'relative flex h-[46px] items-center rounded-xl border transition-all duration-150 focus-within:ring-2 motion-reduce:transition-none'
+  'relative flex h-[46px] items-center rounded-xl border transition-all duration-150 focus-within:ring-2 motion-reduce:transition-none [&_input]:rounded-[11px] [&_input:-webkit-autofill]:shadow-[inset_0_0_0_100px_white]'
 export const INPUT_OK =
   'border-slate-300 bg-white hover:border-slate-400 focus-within:border-primary focus-within:ring-primary/20'
 export const INPUT_ERROR =

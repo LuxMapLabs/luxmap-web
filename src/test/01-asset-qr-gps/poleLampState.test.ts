@@ -35,16 +35,16 @@ describe('feeder health / lamp labels', () => {
     expect(feederHealthUi('normal')?.label).toBe('Bình thường')
     expect(feederHealthUi('warning')?.label).toBe('Cảnh báo')
     expect(feederHealthUi('incident')?.label).toBe('Sự cố')
-    expect(feederHealthUi('offline')?.label).toBe('Mất kết nối IoT')
+    expect(feederHealthUi('offline')).toBe(FEEDER_HEALTH_UI.incident)
     expect(feederHealthUi('unknown')?.label).toBe('Chưa có IoT')
     expect(feederHealthUi(undefined)).toBeNull()
     // Giá trị bật/tắt cũ không phải sức khỏe mạch
     expect(feederHealthUi('on')).toBeNull()
   })
 
-  it('five health colours are distinct', () => {
+  it('four health colours are distinct (offline shares incident)', () => {
     const colors = Object.values(FEEDER_HEALTH_UI).map((ui) => ui.color)
-    expect(new Set(colors).size).toBe(colors.length)
+    expect(new Set(colors).size).toBe(4)
   })
 
   it('lamp_state labels; missing is "-"', () => {

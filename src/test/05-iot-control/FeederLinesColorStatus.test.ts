@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { getFeederTooltipHtml } from '../../utils/gis-map/tooltipUtils'
-import { FEEDER_HEALTH_UI } from '../../utils/gis-map/poleLampState'
+import { FEEDER_HEALTH_UI, FEEDER_OFF_LINE, feederLineColors } from '../../utils/gis-map/poleLampState'
+
+describe('Màu đường mạch', () => {
+  it('bình thường: bật xanh, tắt trắng', () => {
+    expect(feederLineColors('normal', 'on')).toBe(FEEDER_HEALTH_UI.normal)
+    expect(feederLineColors('normal', 'off')).toBe(FEEDER_OFF_LINE)
+  })
+
+  it('cảnh báo / sự cố đang tắt vẫn giữ màu theo backend', () => {
+    expect(feederLineColors('warning', 'off')).toBe(FEEDER_HEALTH_UI.warning)
+    expect(feederLineColors('incident', 'off')).toBe(FEEDER_HEALTH_UI.incident)
+    expect(feederLineColors(undefined, 'off')).toBe(FEEDER_HEALTH_UI.unknown)
+  })
+})
 
 // Tooltip mạch đọc nguyên power_state (sức khỏe) và lamp_state (bật/tắt) của GET /assets/feeders (FEEDER-HEALTH-1)
 describe('Tooltip mạch: sức khỏe và bật/tắt tách riêng', () => {
@@ -33,7 +46,7 @@ describe('Tooltip mạch: sức khỏe và bật/tắt tách riêng', () => {
   })
 
   it.each([
-    ['offline', 'Mất kết nối IoT'],
+    ['offline', 'Sự cố'],
     ['unknown', 'Chưa có IoT'],
   ])('%s: nhãn "%s"', (power_state, label) => {
     expect(getFeederTooltipHtml({ featureProps: { feeder_id: 'F', power_state, lamp_state: 'unknown' } })).toContain(label)
