@@ -27,6 +27,8 @@ export interface AgendaWorkOrder {
     updated_at?: string | null
     due_date?: string | null
     scheduled_date?: string | null
+    completed_at?: string | null
+    closed_at?: string | null
     segment_ids?: string[]
     flags?: AgendaFlag[]
     location?: WorkOrderLocation
@@ -131,6 +133,20 @@ export interface EvidenceItemPagedResult {
 export interface FaultOutcomeRequest {
     fault_id?: string | null
     outcome?: InspectionOutcome
+}
+
+export interface FeederRepairRequest {
+    action?: string | null
+    feeder_id?: string | null
+}
+
+export interface FeederRepairResult {
+    id?: number
+    work_order_id?: string | null
+    feeder_id?: string | null
+    status?: string | null
+    started_at?: string | null
+    ended_at?: string | null
 }
 
 export interface FollowUpWorkOrderRequest {
@@ -365,6 +381,8 @@ export interface WorkOrderDetail {
     updated_at?: string | null
     due_date?: string | null
     scheduled_date?: string | null
+    completed_at?: string | null
+    closed_at?: string | null
     segment_ids?: string[]
     note?: string | null
     review_note?: string | null
@@ -374,8 +392,6 @@ export interface WorkOrderDetail {
     created_by: string | null
     assigned_at?: string | null
     started_at?: string | null
-    completed_at?: string | null
-    closed_at?: string | null
     assignee_eligible?: boolean
     allowed_actions: string[]
     faults: WorkOrderFaultDetail[]
@@ -422,6 +438,8 @@ export interface WorkOrderItem {
     updated_at?: string | null
     due_date?: string | null
     scheduled_date?: string | null
+    completed_at?: string | null
+    closed_at?: string | null
 }
 
 export interface WorkOrderItemPagedResult {

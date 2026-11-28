@@ -17,6 +17,7 @@ import {
   type ElectricalTimeBasis,
   type IotMonitorState,
 } from '../../feature/iot/iotMonitorSlice'
+import type { IotFeederRepairPeriod } from '../../types/iot/feeders'
 
 export interface UseElectricalChunksOptions {
   /** Mặc định `'measured_at'` (giờ đo trên node); `'received_at'` theo giờ Bridge nhận. */
@@ -34,6 +35,7 @@ export interface UseElectricalChunksOptions {
 }
 
 const EMPTY_POINTS: ElectricalPoint[] = []
+const EMPTY_REPAIRS: IotFeederRepairPeriod[] = []
 const EMPTY_CHUNKS: Record<number, ElectricalChunkState> = {}
 
 /**
@@ -118,6 +120,7 @@ export function useElectricalChunks(
   return {
     points,
     latest: points.length > 0 ? points[points.length - 1] : null,
+    repairPeriods: entry ? entry.repairPeriods : EMPTY_REPAIRS,
     chunks,
     viewLoading,
     error: entry ? entry.error : null,

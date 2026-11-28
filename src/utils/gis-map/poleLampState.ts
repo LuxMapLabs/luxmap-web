@@ -97,6 +97,13 @@ export const FEEDER_HEALTH_UI: Record<FeederHealthState, { label: string; color:
   },
   incident: FEEDER_INCIDENT_UI,
   offline: FEEDER_INCIDENT_UI,
+  // Có khoảng sửa đang mở từ phiếu sửa chữa: backend tạm ngưng chẩn đoán, đè mọi trạng thái khác
+  repairing: {
+    label: 'Đang sửa',
+    color: '#0ea5e9',
+    glow: '#0369a1',
+    badge: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800',
+  },
   unknown: {
     label: 'Chưa có IoT',
     color: '#94a3b8',

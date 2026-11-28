@@ -391,6 +391,7 @@ describe('electricalChunks — reducer của iotMonitorSlice', () => {
       live: true,
       points: [],
       chunks: {},
+      repairPeriods: [],
       error: null,
     })
 

@@ -81,11 +81,11 @@ export interface IotCommandStatus {
 export interface IotDiagnosticResult {
     node_id?: string | null
     feeder_id?: string | null
-    status?: string | null
+    status?: 'normal' | 'anomaly' | 'stale' | 'no_data' | 'insufficient_samples' | 'repairing'
     measurement?: IotMeasurement
     anomalies?: IotAnomaly[]
     connection_status?: 'online' | 'offline' | 'no_data'
-    electrical_status?: 'fresh' | 'stale' | 'no_data'
+    electrical_status?: 'fresh' | 'stale' | 'no_data' | 'repairing'
     last_seen_at?: string | null
     last_command_ack_at?: string | null
     electrical_window?: ElectricalWindowAssessment
