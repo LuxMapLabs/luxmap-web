@@ -37,14 +37,15 @@ describe('feeder health / lamp labels', () => {
     expect(feederHealthUi('incident')?.label).toBe('Sự cố')
     expect(feederHealthUi('offline')).toBe(FEEDER_HEALTH_UI.incident)
     expect(feederHealthUi('unknown')?.label).toBe('Chưa có IoT')
+    expect(feederHealthUi('repairing')?.label).toBe('Đang sửa')
     expect(feederHealthUi(undefined)).toBeNull()
     // Giá trị bật/tắt cũ không phải sức khỏe mạch
     expect(feederHealthUi('on')).toBeNull()
   })
 
-  it('four health colours are distinct (offline shares incident)', () => {
+  it('five health colours are distinct (offline shares incident)', () => {
     const colors = Object.values(FEEDER_HEALTH_UI).map((ui) => ui.color)
-    expect(new Set(colors).size).toBe(4)
+    expect(new Set(colors).size).toBe(5)
   })
 
   it('lamp_state labels; missing is "-"', () => {

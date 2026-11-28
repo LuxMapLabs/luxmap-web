@@ -13,6 +13,11 @@ describe('Màu đường mạch', () => {
     expect(feederLineColors('incident', 'off')).toBe(FEEDER_HEALTH_UI.incident)
     expect(feederLineColors(undefined, 'off')).toBe(FEEDER_HEALTH_UI.unknown)
   })
+
+  it('đang sửa: tô màu "Đang sửa", không xám như chưa có IoT', () => {
+    expect(feederLineColors('repairing', 'unknown')).toBe(FEEDER_HEALTH_UI.repairing)
+    expect(feederLineColors('repairing', 'off')).toBe(FEEDER_HEALTH_UI.repairing)
+  })
 })
 
 // Tooltip mạch đọc nguyên power_state (sức khỏe) và lamp_state (bật/tắt) của GET /assets/feeders (FEEDER-HEALTH-1)
@@ -48,6 +53,7 @@ describe('Tooltip mạch: sức khỏe và bật/tắt tách riêng', () => {
   it.each([
     ['offline', 'Sự cố'],
     ['unknown', 'Chưa có IoT'],
+    ['repairing', 'Đang sửa'],
   ])('%s: nhãn "%s"', (power_state, label) => {
     expect(getFeederTooltipHtml({ featureProps: { feeder_id: 'F', power_state, lamp_state: 'unknown' } })).toContain(label)
   })

@@ -21,6 +21,7 @@ const LEGEND_LINES: { label: string; color: string }[] = [
   { label: 'Đang tắt', color: FEEDER_OFF_LINE.color },
   FEEDER_HEALTH_UI.warning,
   FEEDER_HEALTH_UI.incident,
+  FEEDER_HEALTH_UI.repairing,
   FEEDER_HEALTH_UI.unknown,
 ]
 
@@ -234,7 +235,7 @@ export const GisMapLegend: React.FC = () => {
           </div>
         ))}
         <div className="col-span-2 w-0 min-w-full text-[10.5px] text-slate-500 leading-snug">
-          Xanh / trắng: mạch bình thường. Cảnh báo / Sự cố giữ nguyên màu dù mạch bật hay tắt.
+          Xanh / trắng: mạch bình thường. Cảnh báo / Sự cố giữ nguyên màu dù mạch bật hay tắt. Đang sửa: kỹ sư đang sửa mạch theo phiếu.
         </div>
 
         <div className="col-span-2 border-t border-slate-200 mt-1" />

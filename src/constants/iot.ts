@@ -25,6 +25,8 @@ export const IOT_NODE_STATUS: Record<string, IotStatusBadge> = {
   no_data: { label: 'Chưa có dữ liệu', tone: 'warn' },
   source_unavailable: { label: 'Không đọc được nguồn', tone: 'warn' },
   unconfigured: { label: 'Chưa gán nguồn đo', tone: 'muted' },
+  // `/iot/feeders/{id}/electrical` → `status` khi mạch đang có khoảng sửa mở (IOT-FEEDER-REPAIR)
+  repairing: { label: 'Đang sửa', tone: 'muted' },
 }
 
 /** `GET /iot/nodes`, `/electrical`, `/diagnostics`, `/diagnostics/summary` → `electrical_status` (độ mới mẫu điện). */
@@ -34,6 +36,7 @@ export const IOT_ELECTRICAL_STATUS: Record<string, IotStatusBadge> = {
   no_data: { label: 'Chưa có mẫu điện', tone: 'muted' },
   source_unavailable: { label: 'Không đọc được nguồn', tone: 'warn' },
   unconfigured: { label: 'Chưa cấu hình nguồn', tone: 'muted' },
+  repairing: { label: 'Đang sửa · tạm ngưng đọc', tone: 'muted' },
 }
 
 /** `GET /iot/nodes/{nodeId}/diagnostics` & `GET /iot/diagnostics/summary` → trạng thái chẩn đoán. */
@@ -44,6 +47,7 @@ export const IOT_DIAGNOSTIC_STATUS: Record<string, IotStatusBadge> = {
   no_data: { label: 'Chưa có dữ liệu', tone: 'muted' },
   unconfigured: { label: 'Chưa cấu hình nguồn', tone: 'muted' },
   source_unavailable: { label: 'Mất nguồn Bridge', tone: 'warn' },
+  repairing: { label: 'Đang sửa · tạm ngưng chẩn đoán', tone: 'muted' },
 }
 
 /** `GET /iot/nodes/{nodeId}/diagnostics` → `sensor_health.status`. */

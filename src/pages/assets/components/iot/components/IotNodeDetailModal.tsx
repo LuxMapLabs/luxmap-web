@@ -43,6 +43,7 @@ const ELECTRICAL_FRESHNESS_STATUS: Record<string, IotStatusBadge> = {
   no_data: { label: 'Chưa có số đo', tone: 'muted' },
   unconfigured: { label: 'Chưa gán nguồn đo', tone: 'muted' },
   source_unavailable: { label: 'Không đọc được nguồn', tone: 'warn' },
+  repairing: { label: 'Đang sửa · tạm ngưng đọc', tone: 'muted' },
 }
 
 const formatTime = (value?: string | null) => {
