@@ -39,6 +39,7 @@ import {
   type ElectricalBucketPoint,
 } from '../utils/iot/electricalSeries'
 import { ElectricalWindowSlider } from './ElectricalWindowSlider'
+import { FEEDER_HEALTH_UI } from '../utils/gis-map/poleLampState'
 
 const METRIC_TONE: Record<ElectricalMetric, { active: string }> = {
   power: {
@@ -55,6 +56,18 @@ const METRIC_TONE: Record<ElectricalMetric, { active: string }> = {
 /** Màu mẫu gửi bù (tím) tách khỏi ba màu chỉ số xanh lá, xanh dương, vàng. */
 const BACKFILL_COLOR = '#7c3aed'
 const BACKFILL_LABEL = 'Gửi bù từ thẻ nhớ'
+
+/** Dải "Đang sửa" cùng màu mạch đang sửa trên GIS. */
+const REPAIR_COLOR = FEEDER_HEALTH_UI.repairing.color
+const REPAIR_TEXT_COLOR = FEEDER_HEALTH_UI.repairing.glow
+const REPAIR_NOTE = 'Trong lúc sửa · không dùng để chẩn đoán'
+
+/** Khoảng sửa theo phiếu (ms); khoảng đang mở kéo tới hiện tại. */
+interface RepairRange {
+  start: number
+  end: number
+  workOrderId: string
+}
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
@@ -145,10 +158,13 @@ const CustomTooltip: React.FC<{
   payload?: Array<{ payload: ChartDataPoint }>
   metric: ElectricalMetric
   bucketMs: number
-}> = ({ active, payload, metric, bucketMs }) => {
+  repairRanges: RepairRange[]
+}> = ({ active, payload, metric, bucketMs, repairRanges }) => {
   if (!active || !payload || !payload.length) return null
   const point = payload[0].payload
   if (!point || point.count === 0) return null
+  const pointEnd = point.time + Math.max(bucketMs, 0)
+  const inRepair = repairRanges.some((r) => point.time <= r.end && pointEnd >= r.start)
 
   const d = new Date(point.time)
   const dateStr = `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`
@@ -209,6 +225,11 @@ const CustomTooltip: React.FC<{
               ? `${BACKFILL_LABEL} · đã nhận, trễ ${formatReceiveDelay(point.receivedFrom - point.measuredFrom)}`
               : `${BACKFILL_LABEL} · đã nhận`
             : `${point.backfillCount}/${point.count} mẫu là ${BACKFILL_LABEL.toLowerCase()}, đã nhận`}
+        </p>
+      )}
+      {inRepair && (
+        <p className="font-semibold" style={{ color: REPAIR_TEXT_COLOR }}>
+          {REPAIR_NOTE}
         </p>
       )}
     </div>
@@ -400,7 +421,7 @@ export const ElectricalHistoryChart: React.FC<{
   }, [windowMs, bounds, minWindowEnd, maxWindowEnd])
 
   // Hợp nhất cả hai chế độ vào useElectricalChunks (chế độ Theo ngày truyền live = false, track = bounds, bounds).
-  const { points, latest, viewLoading } = useElectricalChunks(feederId, {
+  const { points, latest, repairPeriods, viewLoading } = useElectricalChunks(feederId, {
     timeBasis,
     live: isDateRange ? false : live,
     view: { from: windowStart, to: windowEnd },
@@ -478,6 +499,18 @@ export const ElectricalHistoryChart: React.FC<{
   const backfillRanges = useMemo(() => findBackfillRanges(series, bucketMs), [series, bucketMs])
   // Nền tím rộng tối thiểu 1/200 khung (~3px) để mẫu gửi bù lẻ vẫn thấy vị trí.
   const minBackfillMs = effectiveWindowMs / 200
+
+  // Khoảng sửa giao với khung đang xem; `ended_at = null` (đang sửa) kéo tới hiện tại
+  const repairRanges: RepairRange[] = useMemo(
+    () =>
+      repairPeriods.flatMap((r) => {
+        const start = Date.parse(r.started_at ?? '')
+        const end = r.ended_at ? Date.parse(r.ended_at) : nowMs
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end < windowStart || start > windowEnd) return []
+        return [{ start, end, workOrderId: r.work_order_id ?? '-' }]
+      }),
+    [repairPeriods, nowMs, windowStart, windowEnd]
+  )
 
   const xTicks = useMemo(
     () => buildAxisTicks(windowStart, windowEnd, electricalTickStepForWindow(effectiveWindowMs)),
@@ -621,6 +654,18 @@ export const ElectricalHistoryChart: React.FC<{
               />
               <span>{BACKFILL_LABEL}</span>
             </span>
+            {repairRanges.length > 0 && (
+              <span
+                className="flex items-center gap-1"
+                title="Kỹ sư đang sửa mạch theo phiếu sửa chữa. Mẫu điện trong khoảng này (nếu có) vẫn hiện nhưng không dùng để chẩn đoán lỗi."
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-xs border"
+                  style={{ backgroundColor: `${REPAIR_COLOR}33`, borderColor: REPAIR_COLOR }}
+                />
+                <span>{FEEDER_HEALTH_UI.repairing.label}</span>
+              </span>
+            )}
             {bucketMs > 0 && (
               <span
                 className="flex items-center gap-1"
@@ -648,7 +693,7 @@ export const ElectricalHistoryChart: React.FC<{
             </div>
             <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-full" />
           </div>
-        ) : !isDateRange && !viewLoading && points.length === 0 ? (
+        ) : !isDateRange && !viewLoading && points.length === 0 && repairRanges.length === 0 ? (
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-4 text-center">
             <Activity className="w-8 h-8 text-slate-400 mb-2" />
             <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -687,8 +732,11 @@ export const ElectricalHistoryChart: React.FC<{
                   />
                   <YAxis
                     width={56}
-                    domain={yScale ? yScale.domain : ['auto', 'auto']}
+                    // Khung không có mẫu (vd. cắt điện lúc sửa): miền tạm [0, 1] để dải "Đang sửa" vẫn vẽ được, ẩn số trục
+                    domain={yScale ? yScale.domain : rangePoints.length === 0 ? [0, 1] : ['auto', 'auto']}
                     ticks={yScale ? yScale.ticks : undefined}
+                    tick={rangePoints.length > 0}
+                    allowDataOverflow={rangePoints.length === 0}
                     tickFormatter={(val) => {
                       if (!Number.isFinite(val)) return ''
                       const digits = yScale ? yScale.digits : metric === 'voltage' ? 2 : 0
@@ -697,6 +745,29 @@ export const ElectricalHistoryChart: React.FC<{
                     stroke="#94a3b8"
                     fontSize={10}
                   />
+                  {repairRanges.map((r) => {
+                    const x1 = Math.max(r.start, windowStart)
+                    const x2 = Math.min(Math.max(r.end, r.start + minBackfillMs), windowEnd)
+                    return (
+                      <ReferenceArea
+                        key={`repair-${r.workOrderId}-${r.start}`}
+                        x1={x1}
+                        x2={x2}
+                        fill={REPAIR_COLOR}
+                        fillOpacity={0.14}
+                        stroke={REPAIR_COLOR}
+                        strokeOpacity={0.5}
+                        strokeDasharray="3 3"
+                        ifOverflow="hidden"
+                        // Chữ chỉ hiện khi dải đủ rộng (≥ 8% khung) để không đè lên nhau
+                        label={
+                          (x2 - x1) / effectiveWindowMs >= 0.08
+                            ? { value: FEEDER_HEALTH_UI.repairing.label, position: 'insideTop', fill: REPAIR_TEXT_COLOR, fontSize: 10, fontWeight: 600 }
+                            : undefined
+                        }
+                      />
+                    )
+                  })}
                   {backfillRanges.map((r) => {
                     const pad = Math.max(0, (minBackfillMs - (r.end - r.start)) / 2)
                     return (
@@ -754,6 +825,7 @@ export const ElectricalHistoryChart: React.FC<{
                       <CustomTooltip
                         metric={metric}
                         bucketMs={bucketMs}
+                        repairRanges={repairRanges}
                       />
                     }
                   />

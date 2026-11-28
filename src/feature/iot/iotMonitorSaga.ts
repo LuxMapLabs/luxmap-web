@@ -28,6 +28,7 @@ import {
   clearDiagnosticHistory,
   commandModesLoaded,
   electricalChunksAbsorb,
+  electricalRepairPeriodsAbsorb,
   electricalSeriesAbsorb,
   feederElectricalLoaded,
   fetchAutoPrefillRequest,
@@ -436,6 +437,10 @@ function* fetchAndAbsorbChunkPage(
   if (items.length > 0) {
     yield put(electricalChunksAbsorb({ key, samples: items }))
   }
+  // Khoảng sửa không phân trang (mọi trang trả giống nhau): chỉ đọc ở trang 1
+  if (page === 1 && res.repair_periods?.length) {
+    yield put(electricalRepairPeriodsAbsorb({ key, periods: res.repair_periods }))
+  }
   return res
 }
 
@@ -541,6 +546,8 @@ function* liveElectricalChunksPoll(
         sort_by: timeBasis,
       })
       yield put(electricalChunksAbsorb({ key, samples: page.items || [] }))
+      // Không from/to: BE trả mọi khoảng sửa của mạch, gồm khoảng đang mở và lúc nó vừa đóng
+      yield put(electricalRepairPeriodsAbsorb({ key, periods: page.repair_periods || [] }))
       yield put(setElectricalChunksError({ key, error: null }))
     } catch (err) {
       yield put(

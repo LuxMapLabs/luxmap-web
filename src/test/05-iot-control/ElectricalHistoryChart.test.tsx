@@ -13,6 +13,8 @@ import { ELECTRICAL_POLL_MS } from '../../hooks/iot/useElectricalSeries'
 import { useElectricalChunks } from '../../hooks/iot/useElectricalChunks'
 import type { ElectricalChunkState, ElectricalPoint } from '../../utils/iot/electricalSeries'
 import iotAPI from '../../feature/iot/iotAPI'
+import type { IotFeederRepairPeriod } from '../../types/iot/feeders'
+import { electricalRepairPeriodsAbsorb, startElectricalChunks } from '../../feature/iot/iotMonitorSlice'
 
 vi.mock('../../feature/iot/iotAPI', () => ({
   default: {
@@ -62,6 +64,7 @@ const makePoint = (timeMs: number, current: number): ElectricalPoint => ({
 interface MockChunksReturn {
   points: ElectricalPoint[]
   latest: ElectricalPoint | null
+  repairPeriods: IotFeederRepairPeriod[]
   chunks: Record<number, ElectricalChunkState>
   viewLoading: boolean
   error: string | null
@@ -76,6 +79,7 @@ const setRecentChunksMock = (overrides?: Partial<MockChunksReturn>) => {
   const result: MockChunksReturn = {
     points,
     latest,
+    repairPeriods: overrides?.repairPeriods ?? [],
     chunks: overrides?.chunks ?? {},
     viewLoading: overrides?.viewLoading ?? false,
     error: overrides?.error ?? null,
@@ -83,7 +87,7 @@ const setRecentChunksMock = (overrides?: Partial<MockChunksReturn>) => {
   mockUseElectricalChunks.mockImplementation((feederId) =>
     feederId
       ? result
-      : { points: [], latest: null, chunks: {}, viewLoading: false, error: null }
+      : { points: [], latest: null, repairPeriods: [], chunks: {}, viewLoading: false, error: null }
   )
   return result
 }
@@ -423,6 +427,39 @@ describe('ElectricalHistoryChart (biểu đồ lịch sử điện của mạch)
     expect(backfill.closest('span[title]')?.getAttribute('title')).toMatch(/mất kết nối/)
   })
 
+  it('khoảng sửa giao khung đang xem: hiện chú giải "Đang sửa"; ngoài khung thì không', () => {
+    const now = Date.now()
+    setRecentChunksMock({
+      repairPeriods: [{ work_order_id: 'WO-0123', started_at: new Date(now - HOUR).toISOString(), ended_at: null }],
+    })
+    const { unmount } = renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
+    expect(screen.getByText('Đang sửa')).toBeInTheDocument()
+    unmount()
+
+    setRecentChunksMock({
+      repairPeriods: [
+        {
+          work_order_id: 'WO-0100',
+          started_at: new Date(now - 20 * HOUR).toISOString(),
+          ended_at: new Date(now - 19 * HOUR).toISOString(),
+        },
+      ],
+    })
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
+    expect(screen.queryByText('Đang sửa')).not.toBeInTheDocument()
+  })
+
+  it('mạch đang sửa mà chưa có mẫu (cắt điện): vẫn vẽ biểu đồ để thấy dải "Đang sửa", không hiện "chưa có mẫu"', () => {
+    setRecentChunksMock({
+      points: [],
+      latest: null,
+      repairPeriods: [{ work_order_id: 'WO-0123', started_at: new Date(Date.now() - HOUR).toISOString(), ended_at: null }],
+    })
+    renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
+    expect(screen.queryByText('Mạch chưa có mẫu điện nào.')).not.toBeInTheDocument()
+    expect(screen.getByText('Đang sửa')).toBeInTheDocument()
+  })
+
   it('shows "Dao động trong ô" legend at range 6h and hides "Đèn bật" and "Đổi node"', () => {
     renderWithMonitor(<ElectricalHistoryChart feederId="FDR-009" live windowMs={6 * HOUR} />)
     expect(screen.getByText(/2 mẫu/)).toBeInTheDocument()
@@ -717,5 +754,19 @@ describe('FeederElectricalSummary (dòng số đo trong mạch của khung tủ)
     )
     expect(await screen.findByText('492.5 mW')).toBeInTheDocument()
     expect(container.querySelector('.recharts-wrapper')).toBeNull()
+  })
+})
+
+describe('electricalRepairPeriodsAbsorb (khoảng sửa của lịch sử điện)', () => {
+  it('gộp theo phiếu + giờ bắt đầu: khoảng đang mở được cập nhật giờ kết thúc, xếp theo giờ bắt đầu', () => {
+    let state = iotMonitorReducer(undefined, startElectricalChunks({ key: 'k', feederId: 'FDR-009', timeBasis: 'measured_at', live: true }))
+    const open = { work_order_id: 'WO-0123', started_at: '2026-11-27T03:00:00Z', ended_at: null }
+    const older = { work_order_id: 'WO-0100', started_at: '2026-11-26T03:00:00Z', ended_at: '2026-11-26T04:00:00Z' }
+    state = iotMonitorReducer(state, electricalRepairPeriodsAbsorb({ key: 'k', periods: [open] }))
+    state = iotMonitorReducer(
+      state,
+      electricalRepairPeriodsAbsorb({ key: 'k', periods: [older, { ...open, ended_at: '2026-11-27T03:30:00Z' }] })
+    )
+    expect(state.electricalChunks.k.repairPeriods).toEqual([older, { ...open, ended_at: '2026-11-27T03:30:00Z' }])
   })
 })

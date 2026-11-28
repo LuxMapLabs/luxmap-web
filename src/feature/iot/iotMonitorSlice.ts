@@ -12,6 +12,7 @@ import type {
   IotDiagnosticHistoryItem,
   IotFeederHistorySample,
   IotFeederElectricalResult,
+  IotFeederRepairPeriod,
 } from '../../types/iot/feeders'
 import type { IotServerStatus } from '../../types/iot/servers'
 import {
@@ -73,6 +74,8 @@ export interface ElectricalChunksEntry {
   live: boolean
   points: ElectricalPoint[]
   chunks: Record<number, ElectricalChunkState>
+  /** Các khoảng sửa feeder theo phiếu (`repair_periods` của lịch sử điện), xếp theo giờ bắt đầu. */
+  repairPeriods: IotFeederRepairPeriod[]
   error: string | null
 }
 
@@ -321,6 +324,7 @@ export const iotMonitorSlice = createSlice({
         live,
         points: [],
         chunks: {},
+        repairPeriods: [],
         error: null,
       }
     },
@@ -370,6 +374,21 @@ export const iotMonitorSlice = createSlice({
       const samples = action.payload.samples
       if (!samples || samples.length === 0) return
       entry.points = mergeElectricalPoints(entry.points, samples, Number.MAX_SAFE_INTEGER, entry.timeBasis)
+    },
+    /** Gộp khoảng sửa theo phiếu + giờ bắt đầu; bản mới ghi đè (khoảng đang mở có `ended_at` khi sửa xong). */
+    electricalRepairPeriodsAbsorb: (
+      state,
+      action: PayloadAction<{ key: string; periods: IotFeederRepairPeriod[] }>
+    ) => {
+      const entry = state.electricalChunks[action.payload.key]
+      if (!entry || action.payload.periods.length === 0) return
+      const byKey = new Map(entry.repairPeriods.map((r) => [`${r.work_order_id}|${r.started_at}`, r]))
+      action.payload.periods.forEach((r) => {
+        if (r.started_at) byKey.set(`${r.work_order_id}|${r.started_at}`, r)
+      })
+      entry.repairPeriods = [...byKey.values()].sort(
+        (a, b) => Date.parse(a.started_at ?? '') - Date.parse(b.started_at ?? '')
+      )
     },
     setElectricalChunksError: (
       state,
@@ -793,6 +812,7 @@ export const {
   requestElectricalChunks,
   setElectricalChunkState,
   electricalChunksAbsorb,
+  electricalRepairPeriodsAbsorb,
   setElectricalChunksError,
   startCommandModes,
   stopCommandModes,
